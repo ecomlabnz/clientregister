@@ -1,0 +1,115 @@
+# Client Register
+
+A client and case register for a New Zealand immigration practice, running
+entirely on Cloudflare: Workers for the application, D1 for the register, KV for
+sessions, R2 for documents, Workers AI (or the Anthropic API) for the optional
+AI layer.
+
+It records who the practice acts for, what stage each matter is at, what was
+quoted, what was earned, and how the money splits — and it captures work coming
+in from email, Telegram and WhatsApp so nothing sits unread in a phone.
+
+## What it does
+
+| Area | What you get |
+|---|---|
+| **Clients** | Contact details, nationality, current visa and expiry, an encrypted passport field, a full timeline. |
+| **Cases** | 16-status lifecycle with enforced transitions, INZ application/client numbers, lodgement and deadline dates, priority, owner, next action. |
+| **Fees** | Per-case fee lines with GST treatment per line (exclusive / inclusive / none), disbursements kept separate, and an adjustable revenue split between you and the admin team — allocated to the cent. |
+| **Quotes** | Draft → sent → accepted/declined/expired, with one-click conversion of an accepted quote into case fee lines. |
+| **Inquiries** | Everything that arrives before there is a client, from any channel; convert to a client + case in one step. |
+| **Tasks** | Attached to a case, client, inquiry or quote — raised from wherever the need was noticed. |
+| **Inbox** | Email, Telegram and WhatsApp messages captured verbatim and triaged by a human. |
+| **AI layer** | Optional. Extracts contact details, likely case type, urgency and a summary from an inbound message. Suggests only; never writes. |
+| **Email out** | Optional. Everything is queued and recorded first, sent second. |
+| **Admin** | Users and roles, practice settings, integration status, append-only audit log. |
+
+## Security in one paragraph
+
+Sessions are 256-bit random tokens; only their SHA-256 is stored, in KV and in
+D1, so neither store yields a usable session. Passwords are PBKDF2-SHA256 at
+600,000 iterations with per-user salts, with account lockout and per-IP
+throttling. TOTP two-factor with single-use recovery codes. Every state-changing
+request is checked for origin *and* a per-session CSRF token. The response CSP
+allows no inline script, no inline style and no third-party origin — the UI
+ships its own CSS and JS and has no CDN dependency. All output is escaped by
+default; the only way to emit raw HTML is an explicit `raw()` call. Passport
+numbers are sealed with AES-256-GCM and reading one is an audited action.
+Inbound webhooks are verified by signature before their payload is parsed, and
+a message from a sender who is not on that channel's allow-list can never create
+a record on its own. Full detail: [docs/security.md](docs/security.md).
+
+## Getting it running
+
+Prerequisites: a Cloudflare account, Node 22, and this repository.
+
+```bash
+npm install
+```
+
+The D1 database (`clientregister-db`) and the KV namespace
+(`clientregister-sessions`) already exist and are wired into `wrangler.jsonc`;
+the schema has been applied. To bring up a fresh copy elsewhere, see
+[docs/operations.md](docs/operations.md).
+
+### 1. Set the secrets you need
+
+Only `SETUP_TOKEN` is required to get in the door.
+
+```bash
+openssl rand -hex 32 | npx wrangler secret put SETUP_TOKEN
+openssl rand -base64 32 | npx wrangler secret put FIELD_KEY   # enables encrypted passport storage
+```
+
+Everything else is optional and switches a capability on when present — see
+`.dev.vars.example` for the full list and
+[docs/integrations.md](docs/integrations.md) for how to wire each channel up.
+
+### 2. Deploy
+
+Deployment runs from GitHub, not from a laptop. Add two repository secrets:
+
+- `CLOUDFLARE_API_TOKEN` — an API token with *Edit Cloudflare Workers*, *D1
+  edit* and *Workers KV Storage edit* on this account.
+- `CLOUDFLARE_ACCOUNT_ID` — your account ID.
+
+Then push to `main`. The workflow typechecks, tests, applies any pending D1
+migrations and deploys.
+
+To deploy by hand while you are setting things up:
+
+```bash
+npx wrangler deploy
+```
+
+### 3. Create the first account
+
+Visit `/setup`, enter the `SETUP_TOKEN` and your details. The page only works
+while the register has no users. Sign in, then turn on two-factor
+authentication under **My account** before entering any client data.
+
+## Local development
+
+```bash
+cp .dev.vars.example .dev.vars     # fill in SETUP_TOKEN at least
+npm run db:migrate:local
+npm run dev
+```
+
+`npm test` runs the unit suite (fee arithmetic, crypto, the status machine,
+form validation, escaping, channel allow-lists). `npm run typecheck` and
+`npm run build:check` are what CI runs.
+
+## Adding a feature
+
+Every feature is a module under `src/modules/<name>` exporting one `AppModule`,
+registered in `src/registry.ts`. A module owns its routes and its navigation
+entry; nothing else in the app knows it exists. Adding one is a folder plus one
+line in the registry — see [docs/architecture.md](docs/architecture.md).
+
+## Documentation
+
+- [docs/architecture.md](docs/architecture.md) — how it is put together and why.
+- [docs/security.md](docs/security.md) — the controls, and what they do not cover.
+- [docs/integrations.md](docs/integrations.md) — email, Telegram, WhatsApp, AI, outbound mail.
+- [docs/operations.md](docs/operations.md) — deployment, secrets, migrations, backup, recovery.
