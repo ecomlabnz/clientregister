@@ -1,0 +1,34 @@
+/**
+ * The module registry.
+ *
+ * This list *is* the application's feature set. Adding a feature means writing
+ * a module folder and adding one line here; removing one means deleting a line.
+ * Order affects only the admin listing — navigation order is set per nav item.
+ */
+
+import type { AppModule } from './core/module';
+import { authModule } from './modules/auth';
+import { dashboardModule } from './modules/dashboard';
+import { clientsModule } from './modules/clients';
+import { casesModule } from './modules/cases';
+import { feesModule } from './modules/fees';
+import { inquiriesModule } from './modules/inquiries';
+import { quotesModule } from './modules/quotes';
+import { tasksModule } from './modules/tasks';
+import { documentsModule } from './modules/documents';
+import { inboxModule } from './modules/inbox';
+import { adminModule } from './modules/admin';
+
+export const registeredModules: AppModule[] = [
+  authModule,
+  dashboardModule,
+  inboxModule,
+  inquiriesModule,
+  clientsModule,
+  casesModule,
+  feesModule,
+  quotesModule,
+  tasksModule,
+  documentsModule,
+  adminModule,
+];

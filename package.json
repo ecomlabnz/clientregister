@@ -1,0 +1,30 @@
+{
+  "name": "clientregister",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Modular, security-first client & case register for an immigration practice, built on Cloudflare Workers.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:check": "wrangler deploy --dry-run --outdir=.wrangler/dry",
+    "db:migrate:local": "wrangler d1 migrations apply clientregister-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply clientregister-db --remote",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
+    "hono": "^4.6.14",
+    "postal-mime": "^2.3.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260827.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "wrangler": "^4.127.0"
+  }
+}

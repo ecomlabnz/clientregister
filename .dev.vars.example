@@ -1,0 +1,38 @@
+# Copy to .dev.vars for local development (`wrangler dev`).
+# In production these are set as encrypted secrets:
+#   npx wrangler secret put <NAME>
+# NEVER commit real values. .dev.vars is git-ignored.
+
+# One-time bootstrap token for /setup (creating the first owner account).
+# Generate with: openssl rand -hex 32
+SETUP_TOKEN=
+
+# --- Telegram ingest (optional) ---
+# Bot token from @BotFather.
+TELEGRAM_BOT_TOKEN=
+# Random string registered with setWebhook's secret_token parameter.
+TELEGRAM_WEBHOOK_SECRET=
+# Comma-separated numeric Telegram user IDs allowed to feed the register.
+TELEGRAM_ALLOWED_USER_IDS=
+
+# --- WhatsApp Cloud API ingest (optional) ---
+WHATSAPP_APP_SECRET=
+WHATSAPP_VERIFY_TOKEN=
+# Comma-separated E.164 numbers allowed to feed the register (no '+').
+WHATSAPP_ALLOWED_SENDERS=
+
+# --- Inbound email ingest (optional) ---
+# Comma-separated addresses whose mail may create entries. Anything else is
+# stored as untrusted and requires manual triage.
+INGEST_EMAIL_ALLOWED_SENDERS=
+
+# --- Outbound email (optional, disabled until set) ---
+# Provider: "resend" or "none".
+MAIL_PROVIDER=none
+MAIL_FROM=
+RESEND_API_KEY=
+
+# --- AI layer (optional) ---
+# Provider: "workers-ai" (uses the bound AI binding), "anthropic", or "none".
+AI_PROVIDER=none
+ANTHROPIC_API_KEY=

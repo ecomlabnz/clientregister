@@ -1,0 +1,56 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "clientregister",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "none"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "clientregister-db",
+      "database_id": "cffee490-cd35-4f54-97f2-e9d72b4aa2bb",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "kv_namespaces": [
+    {
+      "binding": "SESSIONS",
+      "id": "bc10c12242b1440aaf6cff8c3f3e5837"
+    }
+  ],
+
+  // Workers AI powers the (optional) AI triage layer. Safe to leave bound:
+  // nothing calls it unless AI_PROVIDER is set to workers-ai.
+  "ai": { "binding": "AI" },
+
+  // Document storage. R2 must be enabled once in the Cloudflare dashboard
+  // (Dashboard -> R2 -> Enable), then create the bucket and uncomment:
+  //   npx wrangler r2 bucket create clientregister-docs
+  // "r2_buckets": [
+  //   { "binding": "DOCS", "bucket_name": "clientregister-docs" }
+  // ],
+
+  "vars": {
+    "APP_NAME": "Client Register",
+    "APP_ENV": "production",
+    // Public origin, used for absolute links in outbound email.
+    // Override per-environment; must be https in production.
+    "APP_ORIGIN": "https://clientregister.workers.dev"
+  },
+
+  // Housekeeping: flush the outbound mail queue and expire stale quotes.
+  // 19:00 UTC is 07:00 the next morning in New Zealand (NZST).
+  "triggers": {
+    "crons": ["0 19 * * *"]
+  }
+}
