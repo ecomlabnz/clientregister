@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.12.0', date: '28 August 2026',
+    notes: [
+      'Quotes are now itemised: description, quantity, unit price, and a line for each thing.',
+      'Fees and disbursements are shown and totalled separately, with GST only where it applies.',
+      'A quote shows the date it is valid until, worked out from the day it was issued.',
+      'Your GST number and address print on every quote — set them under Settings → Practice.',
+      'A catalogue of standard items you can pick from, add to and edit.',
+    ],
+  },
+  {
     version: '0.11.0', date: '28 August 2026',
     notes: [
       'Clients now split into Leads, Individuals, Organisations and All.',
@@ -219,9 +229,34 @@ function sections(origin: string): Section[] {
         <p>A quote is a proposal: draft it, mark it sent, then record whether it was accepted or
            declined. A quote past its <em>valid until</em> date is marked expired automatically
            overnight, so the pipeline does not show dead quotes as live.</p>
+        <h4>Itemising</h4>
+        <p>A quote is a list, not a figure. Each line carries a description, a quantity, a unit
+           (hour, application, response) and a price per unit. Add lines on the quote page; choosing
+           something from <strong>standard items</strong> fills the line in, and you can still
+           change any of it.</p>
+        <p>Every line is either a <strong>professional fee</strong> or a <strong>disbursement</strong>
+           — money paid to somebody else on the client's behalf, such as an INZ fee or a medical.
+           The two are shown and totalled apart on the printed quote, because a client is entitled
+           to see what is your fee and what is passed through. It also matters internally: only
+           professional fees are apportioned in the revenue split. Disbursements are never split.</p>
+        <h4>Standard items</h4>
+        <p><strong>Quotes → standard items</strong> is the list behind that dropdown. Add to it,
+           edit it, and retire anything you have stopped offering. Retiring keeps it off the
+           dropdown without touching quotes that used it: a quote holds its own copy of the wording
+           and the price, so changing a price here never alters a quote already sent.</p>
+        <h4>How long it stands</h4>
+        <p>Set the date of issue and how many days the quote stands for; the quote prints the
+           <strong>date</strong> it is valid until, never a number of days, so nobody has to work it
+           out. The count includes the day of issue — issued on the 28th, seven days means it is
+           good through the 3rd. The default is under <strong>Settings → Quotes</strong>, along with
+           the capacity and payment wording printed beneath the total.</p>
+        <p>Your practice name, address, contact details and <strong>GST number</strong> come from
+           <strong>Settings → Practice</strong> and print at the top of every quote.</p>
+        <h4>Turning it into fees</h4>
         <p>Once a quote is accepted and attached to a case, <strong>Add to case fees</strong>
-           copies it across as fee lines in one step — so the money is entered once, not twice.
-           Editing the quote afterwards does not change those fee lines; edit them on the case.</p>`,
+           copies it across — one fee line per quote line, keeping the split treatment right — so
+           the money is entered once, not twice. Editing the quote afterwards does not change those
+           fee lines; edit them on the case.</p>`,
     },
     {
       id: 'inquiries',

@@ -27,6 +27,12 @@ export const PRACTICE_SETTINGS: SettingsGroup = {
       help: 'Where clients should reply. Shown on quotes.' },
     { key: 'practice.contact_phone', type: 'string', label: 'Contact phone',
       default: '', maxLength: 60 },
+    { key: 'practice.postal_address', type: 'text', label: 'Address',
+      default: '', maxLength: 300,
+      help: 'Shown on quotes, one line per line.' },
+    { key: 'practice.gst_number', type: 'string', label: 'GST number',
+      default: '', maxLength: 20,
+      help: 'Printed on every quote when set. Leave blank if the practice is not GST registered.' },
     { key: 'practice.adviser_details', type: 'text', label: 'Adviser or barrister details',
       default: '', maxLength: 500,
       help: 'Licence or admission details, as they should appear on a quote.' },
@@ -44,6 +50,8 @@ export interface PracticeDetails {
   legalName: string;
   contactEmail: string;
   contactPhone: string;
+  postalAddress: string;
+  gstNumber: string;
   adviserDetails: string;
   termsUrl: string;
   termsLabel: string;
@@ -55,6 +63,8 @@ export async function practiceDetails(env: Env): Promise<PracticeDetails> {
     legalName: values['practice.legal_name'] || env.APP_NAME || 'Client Register',
     contactEmail: values['practice.contact_email'] ?? '',
     contactPhone: values['practice.contact_phone'] ?? '',
+    postalAddress: values['practice.postal_address'] ?? '',
+    gstNumber: values['practice.gst_number'] ?? '',
     adviserDetails: values['practice.adviser_details'] ?? '',
     termsUrl: values['practice.terms_url'] ?? '',
     termsLabel: values['practice.terms_label'] || 'Terms of Engagement',

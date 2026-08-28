@@ -324,13 +324,19 @@ export const adminModule: AppModule = {
             ${field({ label: 'Email', name: 'email', type: 'email', required: true, maxlength: 320 })}
             ${select({ label: 'Role', name: 'role', value: 'assistant', includeBlank: false,
                        options: optionsFrom(ROLES, ROLE_LABELS) })}
-            <ul class="hint">
-              ${ROLES.map((role) => html`<li><strong>${ROLE_LABELS[role]}</strong> — ${ROLE_DESCRIPTIONS[role]}</li>`)}
-            </ul>
-            <p class="hint">A temporary password is generated and shown once. The new user should
-               change it and turn on two-factor authentication immediately.</p>
             <button class="btn btn-primary" type="submit">Create user</button>
-          </form>`)}`);
+          </form>
+          <p class="hint mt">A temporary password is generated and shown once. The new user should
+             change it and turn on two-factor authentication immediately.</p>`)}
+
+        ${/* Below the form rather than inside it: the form is a row of columns,
+              and a list of five paragraphs dropped into one of those columns
+              collides with everything beside it. */ ''}
+        ${card('What each role can do', html`
+          <dl class="kv role-list">
+            ${ROLES.map((role) => html`
+              <dt>${ROLE_LABELS[role]}</dt><dd>${ROLE_DESCRIPTIONS[role]}</dd>`)}
+          </dl>`)}`);
     });
 
     r.post('/users', requirePermission('admin:users'), async (c) => {

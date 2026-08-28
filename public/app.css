@@ -462,8 +462,27 @@ details[open] > summary { margin-bottom: 12px; }
   padding-bottom: 18px; border-bottom: 2px solid var(--border);
 }
 .quote-doc-ref { text-align: right; }
+@media print { .quote-doc-table thead { display: table-header-group; } }
 .quote-doc-table { margin-top: 10px; }
+.quote-doc-table th { padding: 6px 0; border-bottom: 1px solid var(--border); }
 .quote-doc-table td { padding: 7px 0; }
+.quote-doc-table td:not(:first-child), .quote-doc-table th:not(:first-child) { padding-left: 14px; }
+/* Fees and disbursements are separated on the page as well as in the totals,
+   because a client is entitled to see at a glance what is the practice's fee
+   and what is money passed through on their behalf. */
+.quote-doc-group td {
+  padding-top: 16px; font-size: 0.74rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
+  border-bottom: none;
+}
+.quote-doc-table tfoot td { border-bottom: none; padding: 5px 0; }
+.quote-doc-table tfoot tr:first-child td { border-top: 1px solid var(--border); padding-top: 10px; }
+.quote-doc-table tfoot .totals-row td { border-top: 2px solid var(--border); padding-top: 10px; background: none; }
+.quote-doc-meta { display: grid; grid-template-columns: auto auto; gap: 3px 12px; margin: 0; font-size: 0.85rem; justify-content: end; }
+.quote-doc-meta dt { color: var(--muted); }
+.quote-doc-meta dd { margin: 0; text-align: right; }
+.quote-doc-conditions { margin: 0; padding-left: 18px; font-size: 0.88rem; line-height: 1.6; }
+.quote-doc-conditions li { margin-bottom: 7px; }
 .quote-doc-terms { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); }
 .break-url { word-break: break-all; font-size: 0.85rem; }
 .quote-doc-foot { margin-top: 28px; display: flex; gap: 8px; }
@@ -668,6 +687,10 @@ body.site { background: var(--bg); }
 }
 .site-foot p { margin: 0; }
 .site-foot-links { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; font-size: 0.86rem; }
+
+/* Role descriptions read as a definition list: the name, then what it means. */
+.role-list { grid-template-columns: minmax(120px, auto) 1fr; gap: 8px 16px; }
+.role-list dt { font-weight: 650; color: var(--text); }
 
 /* --- Knowledge base ------------------------------------------------------- */
 /* An article is read, not scanned, so it gets a measure and a line height that
