@@ -7,7 +7,7 @@
  */
 
 import { Hono } from 'hono';
-import type { AppContext, EntityType } from '../../types';
+import type { AppContext, Env, EntityType } from '../../types';
 import type { AppModule } from '../../core/module';
 import { all, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
@@ -142,9 +142,11 @@ export const tasksModule: AppModule = {
             ${field({ label: 'Due', name: 'due_at', type: 'date' })}
             ${select({ label: 'Priority', name: 'priority', value: 'normal', includeBlank: false,
                        options: optionsFrom(PRIORITIES, PRIORITY_LABELS) })}
-            ${select({ label: 'Assign to', name: 'assigned_to', value: '', options: users, includeBlank: 'Unassigned' })}
+            ${select({ label: 'Assign to', name: 'assigned_to', value: user.id, required: true,
+                       options: users, includeBlank: false })}
             ${field({ label: 'Details', name: 'details', type: 'textarea', rows: 2, maxlength: 2000 })}
-            <p class="hint">To attach a task to a case or client, add it from that record’s page.</p>
+            <p class="hint">Every task has an owner — it defaults to you. Attaching it to a case or
+               client is optional: add it from that record’s page to do so.</p>
             <button class="btn btn-primary" type="submit">Add task</button>
           </form>`) : ''}`);
     });
@@ -157,12 +159,17 @@ export const tasksModule: AppModule = {
       const details = f.optional('details', { max: 2000 });
       const dueAt = f.date('due_at');
       const priority = f.enum('priority', PRIORITIES, { fallback: 'normal' })!;
-      const assignedTo = f.optional('assigned_to', { max: 60 });
+      const assignedTo = f.text('assigned_to', { required: true, label: 'Assignee', max: 60 });
       const entityType = f.enum('entity_type', ENTITY_TYPES, {});
       const entityId = f.optional('entity_id', { max: 60 });
       const back = safeReturn(String(form.get('return_to') ?? ''));
 
       if (!f.valid) return redirectWith(c, back, Object.values(f.errors)[0]!, 'err');
+      // The database will refuse an unknown id anyway; saying so here is the
+      // difference between a clear message and the generic error page.
+      if (!(await isAssignable(c.env, assignedTo))) {
+        return redirectWith(c, back, 'Choose an active person to own this task.', 'err');
+      }
 
       const id = newId('tsk');
       await run(
@@ -170,7 +177,7 @@ export const tasksModule: AppModule = {
         `INSERT INTO tasks (id, title, details, status, priority, due_at, assigned_to, entity_type, entity_id,
             created_at, updated_at, created_by)
          VALUES (?,?,?,'open',?,?,?,?,?,?,?,?)`,
-        id, title, details, priority, dueAt, assignedTo || null,
+        id, title, details, priority, dueAt, assignedTo,
         entityType && entityId ? entityType : null, entityType && entityId ? entityId : null,
         nowIso(), nowIso(), user.id,
       );
@@ -214,8 +221,9 @@ export const tasksModule: AppModule = {
                        options: optionsFrom(PRIORITIES, PRIORITY_LABELS) })}
             ${select({ label: 'Status', name: 'status', value: task.status, includeBlank: false,
                        options: optionsFrom(TASK_STATUSES, TASK_STATUS_LABELS) })}
-            ${select({ label: 'Assigned to', name: 'assigned_to', value: task.assigned_to ?? '',
-                       options: users, includeBlank: 'Unassigned' })}
+            ${select({ label: 'Assigned to', name: 'assigned_to', value: task.assigned_to,
+                       required: true, options: users, includeBlank: false,
+                       hint: 'A task always belongs to someone. Hand it over rather than clearing it.' })}
           </div>
           <div class="form-section">
             <h3>Attached to</h3>
@@ -248,17 +256,20 @@ export const tasksModule: AppModule = {
       const dueAt = f.date('due_at');
       const priority = f.enum('priority', PRIORITIES, { fallback: 'normal' })!;
       const status = f.enum('status', TASK_STATUSES, { fallback: 'open' })!;
-      const assignedTo = f.optional('assigned_to', { max: 60 });
+      const assignedTo = f.text('assigned_to', { required: true, label: 'Assignee', max: 60 });
       const detach = f.bool('detach') === 1;
       const back = safeReturn(String(form.get('return_to') ?? ''), `/tasks/${id}/edit`);
       if (!f.valid) return redirectWith(c, `/tasks/${id}/edit`, Object.values(f.errors)[0]!, 'err');
+      if (!(await isAssignable(c.env, assignedTo))) {
+        return redirectWith(c, `/tasks/${id}/edit`, 'Choose an active person to own this task.', 'err');
+      }
 
       await run(
         c.env.DB,
         `UPDATE tasks SET title = ?, details = ?, due_at = ?, priority = ?, status = ?,
            assigned_to = ?, entity_type = ?, entity_id = ?, completed_at = ?, updated_at = ?
          WHERE id = ?`,
-        title, details, dueAt, priority, status, assignedTo || null,
+        title, details, dueAt, priority, status, assignedTo,
         detach ? null : existing.entity_type, detach ? null : existing.entity_id,
         status === 'done' ? (existing.completed_at ?? nowIso()) : null,
         nowIso(), id,
@@ -271,7 +282,7 @@ export const tasksModule: AppModule = {
         if (existing.title !== title) changes.push(`renamed to “${title}”`);
         if (existing.due_at !== dueAt) changes.push(dueAt ? `due ${dateShort(dueAt)}` : 'due date cleared');
         if (existing.status !== status) changes.push(`marked ${TASK_STATUS_LABELS[status].toLowerCase()}`);
-        if (existing.assigned_to !== (assignedTo || null)) changes.push('reassigned');
+        if (existing.assigned_to !== assignedTo) changes.push('reassigned');
         if (changes.length > 0) {
           await addEntry(c.env, {
             entityType: existing.entity_type, entityId: existing.entity_id, kind: 'system',
@@ -315,3 +326,15 @@ export const tasksModule: AppModule = {
     app.route('/tasks', r);
   },
 };
+
+/**
+ * Whether this id names somebody who can actually be given work.
+ *
+ * A suspended account cannot sign in, so a task assigned to one is a task
+ * nobody is doing — which is the thing the NOT NULL constraint exists to
+ * prevent, expressed one level up where a person can be told about it.
+ */
+async function isAssignable(env: Env, userId: string): Promise<boolean> {
+  const row = await one<{ id: string }>(env.DB, `SELECT id FROM users WHERE id = ? AND status = 'active'`, userId);
+  return row !== null;
+}

@@ -669,6 +669,19 @@ body.site { background: var(--bg); }
 .site-foot p { margin: 0; }
 .site-foot-links { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; font-size: 0.86rem; }
 
+/* --- Knowledge base ------------------------------------------------------- */
+/* An article is read, not scanned, so it gets a measure and a line height that
+   suit prose. Everything else on the page stays at working density. */
+
+.kb-body { max-width: 74ch; font-size: 0.94rem; line-height: 1.65; }
+.kb-body p { margin: 0 0 14px; }
+.kb-body h4 { font-size: 0.95rem; font-weight: 620; margin: 20px 0 8px; }
+.kb-body ul, .kb-body ol { margin: 0 0 14px; padding-left: 22px; }
+.kb-body li { margin-bottom: 5px; }
+.kb-body a { word-break: break-word; }
+.kb-body > :last-child { margin-bottom: 0; }
+.lede-sm { font-size: 1rem; color: var(--muted); margin: 0 0 16px; max-width: 74ch; line-height: 1.6; }
+
 /* --- Small screens -------------------------------------------------------- */
 /* This register is read on a phone between appointments as often as at a desk,
    so a narrow screen is a first-class layout, not a fallback. Every page has to

@@ -20,6 +20,7 @@ import { tasksModule } from './modules/tasks';
 import { documentsModule } from './modules/documents';
 import { inboxModule } from './modules/inbox';
 import { adminModule } from './modules/admin';
+import { knowledgeModule } from './modules/knowledge';
 import { helpModule } from './modules/help';
 
 export const registeredModules: AppModule[] = [
@@ -37,6 +38,7 @@ export const registeredModules: AppModule[] = [
   quotesModule,
   tasksModule,
   documentsModule,
+  knowledgeModule,
   adminModule,
   helpModule,
 ];

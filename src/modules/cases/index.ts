@@ -292,6 +292,7 @@ export const casesModule: AppModule = {
     // --- Detail -------------------------------------------------------------
     r.get('/:id', requirePermission('register:read'), async (c) => {
       const id = c.req.param('id')!;
+      const viewer = c.get('user')!;
       const kase = await one<CaseRow & { client_name: string; client_ref: string; assignee_name: string | null }>(
         c.env.DB,
         `SELECT k.*, cl.full_name AS client_name, cl.ref AS client_ref, u.name AS assignee_name
@@ -455,7 +456,8 @@ export const casesModule: AppModule = {
                     ${field({ label: 'Due', name: 'due_at', type: 'date' })}
                     ${select({ label: 'Priority', name: 'priority', value: 'normal', includeBlank: false,
                                options: optionsFrom(PRIORITIES, PRIORITY_LABELS) })}
-                    ${select({ label: 'Assign to', name: 'assigned_to', value: kase.assigned_to ?? '', options: users, includeBlank: 'Unassigned' })}
+                    ${select({ label: 'Assign to', name: 'assigned_to', required: true, includeBlank: false,
+                               value: kase.assigned_to ?? viewer.id, options: users })}
                     ${field({ label: 'Details', name: 'details', type: 'textarea', rows: 2, maxlength: 2000 })}
                     <button class="btn btn-primary" type="submit">Add task</button>
                   </form>

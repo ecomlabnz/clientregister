@@ -7,6 +7,58 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.9.0 — 28 August 2026
+
+### Added
+- **A knowledge base.** Visa packs, internal circulars, legal material,
+  announcements and immigration instructions, searchable and taggable, sharing
+  the same tag vocabulary as cases so "AEWV" means the same thing on a matter
+  and on a circular.
+- **Publication and effective dates are separate fields**, plus an expiry and a
+  review date. Immigration instructions are routinely announced weeks before
+  they apply; collapsing those into one date makes the register unable to answer
+  either "what was the rule in March" or "what changes next month".
+- **Follow-up tasks raised from those dates**, a configurable number of days
+  ahead (7 by default; 0 means the day itself). They are *reconciled* rather
+  than fired once: recomputed when an article is saved and again every night, so
+  changing the lead time in settings corrects every existing follow-up instead of
+  leaving a trail of stale ones. A follow-up someone has finished or cancelled is
+  never reopened by the nightly run. Verified end to end: changing the lead time
+  from 7 to 3 moved both follow-ups on an untouched article, and a second run
+  changed nothing.
+- **File an inbound message into the knowledge base** from the inbox. Subject,
+  text and arrival date carry across; the original stays in the inbox and the
+  article links back to it.
+- **Version history on every article**, with an optional note of what changed, so
+  what an article said on the day a client was advised stays recoverable. Like
+  the audit log it is append-only, enforced by database triggers rather than by
+  convention — verified by attempting an update and a delete directly against
+  the database and having each refused.
+- **Superseding**: marking a new article as replacing an old one moves the old
+  one to Superseded and stops its follow-ups, deleting nothing.
+- **Kinds are configuration**, edited in Settings as `key | Label`, one per line,
+  and validated on write — so a new kind is a line in a text box, and nothing
+  unrecognised can reach the database.
+
+### Changed
+- **Every task now has an owner.** `tasks.assigned_to` is `NOT NULL` with
+  `ON DELETE RESTRICT`: an unassigned task is work nobody has agreed to do, and
+  a person with open work cannot be removed out from under it. What a task is
+  *about* stays optional. Existing unassigned tasks are given to whoever created
+  them, falling back to the owner account — none are dropped. Verified on a
+  populated copy of the schema, including the case with no creator either.
+- The task forms default the owner to the person adding it, and refuse a
+  suspended account: assigning work to someone who cannot sign in is the same as
+  not assigning it.
+
+### Security
+- Article bodies are rendered by a small purpose-built renderer rather than a
+  Markdown library. A parser that emits HTML would sit in the path of everything
+  a stranger can put in front of the practice through an inbound channel. This
+  handles paragraphs, lists, headings and links; every fragment goes through the
+  escaping templates, and only `http`/`https` are linked. Covered by tests that
+  push script tags and quote-breaking URLs through it.
+
 ## 0.8.0 — 28 August 2026
 
 ### Added

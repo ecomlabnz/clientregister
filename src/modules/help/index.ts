@@ -32,6 +32,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.9.0', date: '28 August 2026',
+    notes: [
+      'A knowledge base for visa packs, circulars, legal material and announcements.',
+      'Articles keep the date they were published and the date they take effect, apart.',
+      'Those dates raise their own follow-up tasks, a week ahead by default — change it in Settings.',
+      'A message in the inbox can be filed straight into the knowledge base.',
+      'Every edit is kept, and the history cannot be altered.',
+      'Every task now has an owner. What it is about stays optional.',
+    ],
+  },
+  {
     version: '0.8.0', date: '28 August 2026',
     notes: [
       'A public page for the practice, shown to anyone arriving without signing in.',
@@ -218,7 +229,52 @@ function sections(): Section[] {
            shows on that case.</p>
         <p>Everything about a task can be changed afterwards: title, detail, due date, priority,
            who owns it, and whether it stays attached. Overdue tasks appear on Today and on
-           Alerts.</p>`,
+           Alerts.</p>
+        <p><strong>Every task belongs to someone.</strong> It defaults to you and can be handed
+           over, but it cannot be left with nobody: an unassigned task sits in the list looking
+           accounted for and is exactly the sort of thing that gets missed. What a task is
+           <em>about</em> stays optional — a client, a case, a knowledge base article, or nothing
+           at all.</p>`,
+    },
+    {
+      id: 'knowledge',
+      title: 'The knowledge base',
+      body: html`
+        <p>Under <strong>Knowledge</strong> the practice keeps the material it has to look things up
+           in: visa packs, internal circulars, legal material, announcements and immigration
+           instructions. Anything you file is searchable, taggable and dated.</p>
+        <h4>Two dates, kept apart</h4>
+        <p>An article records <strong>when it was published</strong> — the date the source issued
+           it — and separately <strong>when it takes effect</strong>. Immigration instructions are
+           routinely announced weeks before they bite, and keeping the two apart is what lets the
+           register answer both “what was the rule in March” and “what changes next month”. There
+           are two more if you want them: when it stops applying, and when someone should look at
+           it again.</p>
+        <h4>It reminds you by itself</h4>
+        <p>A published article carrying any of those dates raises a task against it, due
+           <strong>a week ahead</strong> by default. Change that lead time under
+           <strong>Settings → Knowledge base</strong> and every existing follow-up corrects itself
+           overnight — you do not have to reopen the articles. Set it to 0 and the task falls on
+           the day itself.</p>
+        <p>The task belongs to whoever filed the article. Finish or cancel one and it stays
+           finished: the nightly run will not reopen a decision you have made.</p>
+        <h4>Filing what arrives</h4>
+        <p>When a circular comes in by email, Telegram or WhatsApp, open it in the
+           <strong>Inbox</strong> and choose <strong>File in the knowledge base</strong>. The
+           subject, the text and the date it arrived are carried across; you add the kind and the
+           effective date. The original message stays in the inbox, and the article links back to
+           it, so where something came from is always answerable.</p>
+        <h4>Editing, and the history</h4>
+        <p>Anyone with write access can edit an article. Each edit keeps the previous version,
+           with a note of what changed if you write one — so what an article said on the day you
+           advised a client remains recoverable. That history is append-only: the database refuses
+           to alter or delete it, not merely the application.</p>
+        <p>Marking a new article as replacing an old one moves the old one to
+           <strong>Superseded</strong> and stops its follow-up tasks, without deleting anything.</p>
+        <h4>Kinds are yours to change</h4>
+        <p>The list of kinds lives in <strong>Settings → Knowledge base</strong>, one per line as
+           <code>key | Label</code>. Add one whenever you need it. Renaming a label is free;
+           changing a key leaves existing articles on the old one, so prefer relabelling.</p>`,
     },
     {
       id: 'alerts',
