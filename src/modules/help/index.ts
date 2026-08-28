@@ -406,8 +406,12 @@ function sections(origin: string): Section[] {
            land after signing in would be absurd.</p>
         <h4>Appearance</h4>
         <p>Pick one of three themes — <strong>Slate</strong>, <strong>Warm</strong> or
-           <strong>Ink</strong> — and choose whether the register follows your device's day and
-           night setting or stays light or dark all the time. The choice is saved against your
+           <strong>Ink</strong> for quiet working colours, or <strong>Blossom</strong>,
+           <strong>Lagoon</strong> and <strong>Aurora</strong> for bold ones — and choose whether
+           the register follows your device's day and night setting or stays light or dark all the
+           time. Every one has both, and every one is checked for legibility: a test fails if any
+           combination of text and background in any theme falls below the accessibility standard
+           for normal text. The choice is saved against your
            account rather than the browser, so it travels with you to your phone and back.</p>`,
     },
     {

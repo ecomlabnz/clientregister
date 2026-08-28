@@ -22,6 +22,7 @@ import { PRIORITIES, PRIORITY_LABELS, TASK_STATUS_LABELS, TASK_STATUSES } from '
 import { userOptions } from '../../core/lookups';
 import { addEntry } from '../../core/timeline';
 import { can } from '../../core/rbac';
+import { asPrefBoolean, preferencesFor } from '../../core/preferences';
 
 const ENTITY_TYPES: EntityType[] = ['client', 'case', 'inquiry', 'quote'];
 
@@ -68,8 +69,11 @@ export const tasksModule: AppModule = {
 
     r.get('/', requirePermission('register:read'), async (c) => {
       const user = c.get('user')!;
+      const prefs = await preferencesFor(c.env, user.id);
       const scope = c.req.query('scope') ?? 'open';
-      const who = c.req.query('who') ?? '';
+      // Whose tasks, defaulting to the person's own preference. An explicit
+      // choice in the address always wins over it.
+      const who = c.req.query('who') ?? (asPrefBoolean(prefs['pref.tasks_mine'], true) ? 'me' : '');
 
       const conds: string[] = [];
       const params: unknown[] = [];
@@ -92,38 +96,70 @@ export const tasksModule: AppModule = {
         ...params,
       );
 
+      // Counts for the tabs, so a person can see where the work is without
+      // clicking through each view.
+      const counts = await one<{ open: number; overdue: number; done: number; total: number }>(
+        c.env.DB,
+        `SELECT SUM(status IN ('open','in_progress','blocked')) AS open,
+                SUM(status IN ('open','in_progress','blocked') AND due_at IS NOT NULL AND due_at < ?) AS overdue,
+                SUM(status IN ('done','cancelled')) AS done,
+                COUNT(*) AS total
+           FROM tasks ${who === 'me' ? 'WHERE assigned_to = ?' : ''}`,
+        ...(who === 'me' ? [nowIso().slice(0, 10), user.id] : [nowIso().slice(0, 10)]),
+      );
+
       const links = await Promise.all(rows.map((t: any) => entityLabel(c.env, t.entity_type, t.entity_id)));
       const users = await userOptions(c.env);
       const csrf = c.get('session')!.csrf;
       const writable = can(user, 'register:write');
 
+      const views = [
+        { id: 'open', label: 'Open', count: counts?.open ?? 0 },
+        { id: 'overdue', label: 'Overdue', count: counts?.overdue ?? 0 },
+        { id: 'done', label: 'Completed', count: counts?.done ?? 0 },
+        { id: 'all', label: 'All', count: counts?.total ?? 0 },
+      ];
+
       return page(c, { title: 'Tasks', active: '/tasks' }, html`
         ${pageHeader('Tasks', 'Everything outstanding, and what it belongs to.')}
-        <form method="get" action="/tasks" class="filters">
-          <select name="scope">
-            <option value="open" ${scope === 'open' ? raw('selected') : ''}>Open</option>
-            <option value="overdue" ${scope === 'overdue' ? raw('selected') : ''}>Overdue</option>
-            <option value="done" ${scope === 'done' ? raw('selected') : ''}>Completed</option>
-            <option value="all" ${scope === 'all' ? raw('selected') : ''}>All</option>
-          </select>
+        <nav class="tabs">
+          ${views.map((v) => html`
+            <a class="${v.id === scope ? 'tab current' : 'tab'}"
+               href="${`/tasks?scope=${v.id}${who ? `&who=${who}` : ''}`}">${v.label} <span class="muted">${v.count}</span></a>`)}
+        </nav>
+        <form method="get" action="/tasks" class="filters" data-live-search>
+          <input type="hidden" name="scope" value="${scope}">
           <select name="who">
             <option value="">Anyone</option>
             <option value="me" ${who === 'me' ? raw('selected') : ''}>Mine</option>
           </select>
-          <button class="btn btn-secondary" type="submit">Filter</button>
+          <button class="btn btn-secondary js-hide" type="submit">Filter</button>
         </form>
 
+        <div data-live-results>
         ${rows.length === 0
           ? emptyState('Nothing here.')
-          : table(['Task', 'Attached to', 'Due', 'Owner', 'Status', ''], rows.map((t: any, i: number) => html`
+          : table([
+              { label: 'Task', width: '34' },
+              { label: 'Attached to', width: '18', hideOn: 'sm' },
+              { label: 'Due', width: '14' },
+              { label: 'Owner', width: '12', hideOn: 'sm' },
+              { label: 'Status', width: '12', hideOn: 'sm' },
+              { label: '', width: '14' },
+            ], rows.map((t: any, i: number) => html`
               <tr id="${t.id}" class="${isOverdue(t.due_at) && t.status !== 'done' && t.status !== 'cancelled' ? 'row-urgent' : ''}">
-                <td><strong>${t.title}</strong>
+                <td><strong class="clamp-2">${t.title}</strong>
                     ${t.priority !== 'normal' ? badge(PRIORITY_LABELS[t.priority as keyof typeof PRIORITY_LABELS], t.priority === 'urgent' ? 'red' : 'amber') : ''}
-                    ${t.details ? html`<div class="muted small prewrap">${t.details}</div>` : ''}</td>
-                <td class="small">${links[i] ? html`<a href="${links[i]!.href}">${links[i]!.label}</a>` : '—'}</td>
+                    ${t.details ? html`<div class="muted small prewrap clamp-2">${t.details}</div>` : ''}
+                    <div class="row-meta show-sm">
+                      ${links[i] ? html`<a href="${links[i]!.href}">${links[i]!.label}</a>` : ''}
+                      ${badge(TASK_STATUS_LABELS[t.status as keyof typeof TASK_STATUS_LABELS] ?? t.status, statusTone(t.status))}
+                      <span class="muted">${t.assignee_name ?? ''}</span>
+                    </div></td>
+                <td class="small col-sm-hide">${links[i] ? html`<a href="${links[i]!.href}">${links[i]!.label}</a>` : '—'}</td>
                 <td class="small">${t.due_at ? html`${dateShort(t.due_at)}<div class="muted">${relativeDays(t.due_at)}</div>` : '—'}</td>
-                <td class="small">${t.assignee_name ?? '—'}</td>
-                <td>${badge(TASK_STATUS_LABELS[t.status as keyof typeof TASK_STATUS_LABELS] ?? t.status, statusTone(t.status))}</td>
+                <td class="small col-sm-hide">${t.assignee_name ?? '—'}</td>
+                <td class="col-sm-hide">${badge(TASK_STATUS_LABELS[t.status as keyof typeof TASK_STATUS_LABELS] ?? t.status, statusTone(t.status))}</td>
                 <td>${writable ? html`
                   <form method="post" action="/tasks/${t.id}/status" class="inline-form">
                     ${csrfField(csrf)}
@@ -133,7 +169,8 @@ export const tasksModule: AppModule = {
                     <button class="btn btn-small btn-secondary js-hide" type="submit">Set</button>
                   </form>
                   <a class="btn btn-small btn-secondary" href="/tasks/${t.id}/edit">Edit</a>` : ''}</td>
-              </tr>`))}
+              </tr>`), { sticky: true, fixed: true, empty: 'Nothing here.' })}
+        </div>
 
         ${writable ? card('New task', html`
           <form method="post" action="/tasks" class="row-form">

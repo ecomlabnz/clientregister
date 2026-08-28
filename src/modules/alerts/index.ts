@@ -215,6 +215,15 @@ export const alertsModule: AppModule = {
         : alerts;
       const counts = countBySeverity(alerts);
 
+      // Counted from what this horizon actually holds, so the tabs agree with
+      // the list rather than with a second query that might not.
+      const views = [
+        { id: '', label: 'Everything', count: alerts.length },
+        ...(Object.keys(KIND_LABELS) as AlertKind[]).map((k) => ({
+          id: k as string, label: KIND_LABELS[k], count: alerts.filter((a) => a.kind === k).length,
+        })),
+      ];
+
       return page(c, { title: 'Alerts', active: '/alerts' }, html`
         ${pageHeader('Alerts', `Everything with a date attached, across the whole register, for the next ${horizon} days.`)}
 
@@ -226,30 +235,42 @@ export const alertsModule: AppModule = {
           <div class="stat"><span class="stat-label">Later</span><span class="stat-value">${counts.soon}</span></div>
         </div>
 
-        <form method="get" action="/alerts" class="filters">
-          <select name="kind">
-            <option value="">Everything</option>
-            ${(Object.keys(KIND_LABELS) as AlertKind[]).map((k) =>
-              html`<option value="${k}" ${k === kindFilter ? raw('selected') : ''}>${KIND_LABELS[k]}</option>`)}
-          </select>
+        <nav class="tabs">
+          ${views.map((v) => html`
+            <a class="${v.id === kindFilter || (v.id === '' && !kindFilter) ? 'tab current' : 'tab'}"
+               href="${`/alerts?kind=${v.id}&days=${horizon}`}">${v.label} <span class="muted">${v.count}</span></a>`)}
+        </nav>
+        <form method="get" action="/alerts" class="filters" data-live-search>
+          <input type="hidden" name="kind" value="${kindFilter}">
           <select name="days">
             ${[30, 60, 90, 180, 365].map((d) =>
               html`<option value="${d}" ${d === horizon ? raw('selected') : ''}>Next ${d} days</option>`)}
           </select>
-          <button class="btn btn-secondary" type="submit">Apply</button>
+          <button class="btn btn-secondary js-hide" type="submit">Apply</button>
         </form>
 
+        <div data-live-results>
         ${shown.length === 0
           ? card('Nothing due', emptyState('No deadlines, expiries or overdue tasks in this window.'))
-          : table(['Due', 'What', 'Type', 'Detail'], shown.map((alert) => html`
+          : table([
+              { label: 'Due', width: '16' },
+              { label: 'What', width: '42' },
+              { label: 'Type', width: '18', hideOn: 'sm' },
+              { label: 'Detail', width: '24', hideOn: 'sm' },
+            ], shown.map((alert) => html`
               <tr class="${alert.severity === 'overdue' ? 'row-urgent' : ''}">
                 <td class="small ${alert.severity === 'overdue' ? 'warn' : ''}">
                   ${dateShort(alert.date)}
                   <div class="muted">${relativeDays(alert.date)}</div></td>
-                <td><a href="${alert.href}">${alert.title}</a></td>
-                <td>${badge(KIND_LABELS[alert.kind], SEVERITY_TONES[alert.severity])}</td>
-                <td class="small muted">${alert.detail}</td>
-              </tr>`))}`);
+                <td><a class="clamp-2" href="${alert.href}">${alert.title}</a>
+                    <div class="row-meta show-sm">
+                      ${badge(KIND_LABELS[alert.kind], SEVERITY_TONES[alert.severity])}
+                      <span class="muted">${alert.detail}</span>
+                    </div></td>
+                <td class="col-sm-hide">${badge(KIND_LABELS[alert.kind], SEVERITY_TONES[alert.severity])}</td>
+                <td class="small muted col-sm-hide">${alert.detail}</td>
+              </tr>`), { sticky: true, fixed: true, empty: 'Nothing due in this window.' })}
+        </div>`);
     });
 
     app.route('/alerts', r);

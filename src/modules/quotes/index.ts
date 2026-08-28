@@ -248,10 +248,21 @@ export const quotesModule: AppModule = {
     r.use('*', requireAuth);
 
     r.get('/', requirePermission('register:read'), async (c) => {
+      const q0 = (c.req.query('q') ?? '').trim();
+      // Four ways of looking at the pipeline. "Live" is the one that matters
+      // day to day: what is out and what has been agreed but not yet billed.
+      const view = c.req.query('view') ?? 'live';
       const status = c.req.query('status') ?? '';
       const conds: string[] = [];
       const params: unknown[] = [];
       if ((QUOTE_STATUSES as readonly string[]).includes(status)) { conds.push('q.status = ?'); params.push(status); }
+      else if (view === 'live') conds.push(`q.status IN ('draft','sent')`);
+      else if (view === 'accepted') conds.push(`q.status = 'accepted'`);
+      else if (view === 'closed') conds.push(`q.status IN ('declined','expired','withdrawn')`);
+      if (q0) {
+        conds.push('(q.ref LIKE ?1 OR q.description LIKE ?1 OR cl.full_name LIKE ?1)');
+        params.push(`%${q0}%`);
+      }
       const whereSql = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
       const rows = await all<QuoteRow & { client_name: string | null; case_ref: string | null }>(
@@ -266,6 +277,20 @@ export const quotesModule: AppModule = {
       const accepted = rows.filter((q) => q.status === 'accepted');
       const outstanding = rows.filter((q) => q.status === 'sent');
 
+      const counts = await one<{ live: number; accepted: number; closed: number; total: number }>(
+        c.env.DB,
+        `SELECT SUM(status IN ('draft','sent')) AS live,
+                SUM(status = 'accepted') AS accepted,
+                SUM(status IN ('declined','expired','withdrawn')) AS closed,
+                COUNT(*) AS total FROM quotes`,
+      );
+      const views = [
+        { id: 'live', label: 'Live', count: counts?.live ?? 0 },
+        { id: 'accepted', label: 'Accepted', count: counts?.accepted ?? 0 },
+        { id: 'closed', label: 'Closed', count: counts?.closed ?? 0 },
+        { id: 'all', label: 'All', count: counts?.total ?? 0 },
+      ];
+
       return page(c, { title: 'Quotes', active: '/quotes' }, html`
         ${pageHeader('Quotes', 'Fees proposed, and how they landed.',
           can(c.get('user'), 'quote:write') ? html`<a class="btn btn-primary" href="/quotes/new">New quote</a>` : undefined)}
@@ -274,21 +299,43 @@ export const quotesModule: AppModule = {
           <div class="stat"><span class="stat-label">Value out</span><span class="stat-value">${money(outstanding.reduce((s, q) => s + quoteTotal(q), 0))}</span></div>
           <div class="stat"><span class="stat-label">Accepted</span><span class="stat-value">${money(accepted.reduce((s, q) => s + quoteTotal(q), 0))}</span></div>
         </div>
-        <form method="get" action="/quotes" class="filters">
-          <select name="status"><option value="">All statuses</option>
+        <nav class="tabs">
+          ${views.map((v) => html`
+            <a class="${v.id === view && !status ? 'tab current' : 'tab'}"
+               href="/quotes?view=${v.id}">${v.label} <span class="muted">${v.count}</span></a>`)}
+        </nav>
+        <form method="get" action="/quotes" class="filters" data-live-search>
+          <input type="hidden" name="view" value="${view}">
+          <input type="search" name="q" value="${q0}" placeholder="Search reference, description or client">
+          <select name="status"><option value="">Any status in this view</option>
             ${QUOTE_STATUSES.map((s) => html`<option value="${s}" ${s === status ? raw('selected') : ''}>${QUOTE_STATUS_LABELS[s]}</option>`)}
           </select>
-          <button class="btn btn-secondary" type="submit">Filter</button>
+          <button class="btn btn-secondary js-hide" type="submit">Filter</button>
         </form>
-        ${table(['Reference', 'Client', 'Description', 'Total', 'Valid until', 'Status'], rows.map((row) => html`
+        <div data-live-results>
+        ${table([
+          { label: 'Reference', width: '12', hideOn: 'sm' },
+          { label: 'Client', width: '18', hideOn: 'sm' },
+          { label: 'Description', width: '32' },
+          { label: 'Total', width: '14', align: 'right' },
+          { label: 'Valid until', width: '12' },
+          { label: 'Status', width: '12', hideOn: 'sm' },
+        ], rows.map((row) => html`
           <tr>
-            <td><a href="/quotes/${row.id}"><code>${row.ref}</code></a></td>
-            <td class="small">${row.client_id ? html`<a href="/clients/${row.client_id}">${row.client_name}</a>` : '—'}</td>
-            <td>${row.description}${row.case_ref ? html`<div class="muted small">${row.case_ref}</div>` : ''}</td>
+            <td class="col-sm-hide"><a href="/quotes/${row.id}"><code>${row.ref}</code></a></td>
+            <td class="small col-sm-hide">${row.client_id ? html`<a href="/clients/${row.client_id}">${row.client_name}</a>` : '—'}</td>
+            <td><a class="clamp-2" href="/quotes/${row.id}">${row.description}</a>
+                ${row.case_ref ? html`<div class="muted small">${row.case_ref}</div>` : ''}
+                <div class="row-meta show-sm">
+                  <code>${row.ref}</code>
+                  ${row.client_name ? html`<span class="muted">${row.client_name}</span>` : ''}
+                  ${badge(QUOTE_STATUS_LABELS[row.status], statusTone(row.status))}
+                </div></td>
             <td class="num strong">${money(quoteTotal(row), row.currency)}</td>
             <td class="small">${dateShort(row.valid_until)}</td>
-            <td>${badge(QUOTE_STATUS_LABELS[row.status], statusTone(row.status))}</td>
-          </tr>`))}`);
+            <td class="col-sm-hide">${badge(QUOTE_STATUS_LABELS[row.status], statusTone(row.status))}</td>
+          </tr>`), { sticky: true, fixed: true, empty: 'No quotes in this view.' })}
+        </div>`);
     });
 
     r.get('/new', requirePermission('quote:write'), async (c) => {

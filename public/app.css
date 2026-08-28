@@ -5,8 +5,8 @@
 /* --- Design tokens ------------------------------------------------------- */
 /* Three palettes, each declaring a light (--l-*) and a dark (--d-*) value for
    every neutral. The light/dark mapping below is written once and is
-   theme-independent, so adding a fourth palette means adding one block here and
-   one entry to src/ui/theme.ts — nothing else.
+   theme-independent, so adding a palette means adding one block here and one
+   entry to src/ui/theme.ts — nothing else. A test fails if the two disagree.
 
    The pairs are declared on [data-theme] rather than :root[data-theme] so that
    any element can carry the attribute and expose that palette's colours: the
@@ -52,7 +52,55 @@
   --l-grey-bg: #e8eeee; --d-grey-bg: #1e272b;
 }
 
-/* Semantic colours are identical in all three palettes. Green means healthy and
+/*
+ * Three louder palettes. Same rules as the quiet ones — one accent, neutrals
+ * everywhere else, and the semantic colours untouched — but the neutrals are
+ * tinted towards the accent instead of staying grey, which is what makes a
+ * palette read as bright rather than as grey with a coloured button.
+ *
+ * Every accent still carries its text at a readable contrast: the light accents
+ * take white, the dark ones take a near-black drawn from their own hue.
+ */
+[data-theme="blossom"] {
+  --l-bg: #fff5f9;      --d-bg: #1a0f17;
+  --l-surface: #ffffff; --d-surface: #24141f;
+  --l-surface-2: #ffe8f1; --d-surface-2: #2e1a28;
+  --l-border: #f4c9dc;  --d-border: #43263a;
+  --l-text: #3b1229;    --d-text: #ffe9f3;
+  --l-muted: #8c5a74;   --d-muted: #d09bb7;
+  --l-accent: #c2185b;  --d-accent: #ff6fb0;
+  --l-accent-text: #ffffff; --d-accent-text: #2b0619;
+  --l-grey: #8c5a74;    --d-grey: #d09bb7;
+  --l-grey-bg: #ffe8f1; --d-grey-bg: #2e1a28;
+}
+
+[data-theme="lagoon"] {
+  --l-bg: #edfcf7;      --d-bg: #041a1a;
+  --l-surface: #ffffff; --d-surface: #06272b;
+  --l-surface-2: #d7f6ec; --d-surface-2: #093338;
+  --l-border: #a4e4d3;  --d-border: #10484e;
+  --l-text: #06302a;    --d-text: #d6fff6;
+  --l-muted: #3a7a6c;   --d-muted: #7fc9ba;
+  --l-accent: #00806a;  --d-accent: #22e0b8;
+  --l-accent-text: #ffffff; --d-accent-text: #00201c;
+  --l-grey: #3a7a6c;    --d-grey: #7fc9ba;
+  --l-grey-bg: #d7f6ec; --d-grey-bg: #093338;
+}
+
+[data-theme="aurora"] {
+  --l-bg: #f7f3ff;      --d-bg: #130d24;
+  --l-surface: #ffffff; --d-surface: #1c1433;
+  --l-surface-2: #ece3ff; --d-surface-2: #251b42;
+  --l-border: #d2c1f5;  --d-border: #382a5c;
+  --l-text: #241145;    --d-text: #ece5ff;
+  --l-muted: #6b578f;   --d-muted: #b0a0d8;
+  --l-accent: #6d28d9;  --d-accent: #b294ff;
+  --l-accent-text: #ffffff; --d-accent-text: #170a2e;
+  --l-grey: #6b578f;    --d-grey: #b0a0d8;
+  --l-grey-bg: #ece3ff; --d-grey-bg: #251b42;
+}
+
+/* Semantic colours are identical in all six palettes. Green means healthy and
    red means broken; if they shifted with the theme they would read as
    decoration instead of meaning. */
 :root {
