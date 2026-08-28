@@ -257,7 +257,7 @@ body.bare {
 .muted { color: var(--muted); }
 .small { font-size: 0.85rem; }
 .strong { font-weight: 650; }
-.num { text-align: right; font-variant-numeric: tabular-nums; }
+.num { text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: normal; word-break: normal; }
 .warn { color: var(--red); font-weight: 550; }
 .prewrap { white-space: pre-wrap; word-break: break-word; }
 .ellipsis { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -433,13 +433,28 @@ details[open] > summary { margin-bottom: 12px; }
 .task-done { opacity: 0.55; }
 .task-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 
-.fee-summary { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+/* A grid, not a flex row. Flex with a min-width lets the boxes fight over the
+   space and, once there are six of them on a phone, squeeze each to a couple of
+   characters wide — at which point the text wraps one letter per line. A grid
+   decides how many fit and wraps the rest onto the next row. */
+.fee-summary {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px; margin-bottom: 16px;
+}
 .stat {
-  flex: 1; min-width: 130px; background: var(--surface); border: 1px solid var(--border);
+  min-width: 0; background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 10px 14px; display: flex; flex-direction: column; gap: 2px;
 }
-.stat-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-.stat-value { font-size: 1.25rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+/* The page breaks long words so a client's email address cannot push the layout
+   sideways; a figure and a label must be exempt from that. */
+.stat-label {
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted);
+  overflow-wrap: normal; word-break: normal; hyphens: none;
+}
+.stat-value {
+  font-size: 1.25rem; font-weight: 650; font-variant-numeric: tabular-nums;
+  overflow-wrap: normal; word-break: normal;
+}
 .stat-warn { border-color: var(--amber); }
 .split-head { margin-top: 22px; }
 .status-now { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
@@ -784,10 +799,15 @@ body.site { background: var(--bg); }
   .faq-item p { padding: 0 18px 16px; }
   .site-foot { margin-top: 44px; padding-bottom: 36px; }
   .hero-actions .btn { flex: 1; min-width: 160px; }
+
+  /* Two across on a phone: wide enough for "Documents expiring" to read as
+     two words rather than as a column of letters. */
+  .fee-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .stat { padding: 10px 12px; }
+  .stat-value { font-size: 1.15rem; }
 }
 
 @media (max-width: 420px) {
-  .fee-summary .stat { min-width: 0; }
   .kv { grid-template-columns: 1fr; gap: 2px 0; }
   .kv dt { margin-top: 6px; }
   h1 { font-size: 1.2rem; }
