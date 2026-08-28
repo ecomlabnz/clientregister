@@ -23,6 +23,10 @@ import { isAiEnabled } from '../../ai/provider';
 import { latestTriage, runTriage } from '../../ai/triage';
 import { can } from '../../core/rbac';
 import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
+import { FormReader } from '../../core/validate';
+import {
+  CHANNEL_LABELS, type ThreadRow, linkThread, openThreadCount, postReply, threadHistory,
+} from '../../core/channels';
 
 interface IngestRow {
   id: string; channel: string; external_id: string | null; received_at: string;
@@ -94,44 +98,254 @@ export const inboxModule: AppModule = {
     });
 
     r.get('/', requirePermission('ingest:triage'), async (c) => {
-      const status = c.req.query('status') ?? 'pending';
+      const status = ['pending', 'processed', 'ignored', 'failed', 'all'].includes(c.req.query('status') ?? '')
+        ? c.req.query('status')! : 'pending';
       const channel = c.req.query('channel') ?? '';
+      const q = (c.req.query('q') ?? '').trim();
+
       const conds: string[] = [];
       const params: unknown[] = [];
-      if (['pending', 'processed', 'ignored', 'failed'].includes(status)) { conds.push('status = ?'); params.push(status); }
+      if (status !== 'all') { conds.push('status = ?'); params.push(status); }
       if (['email', 'telegram', 'whatsapp', 'api'].includes(channel)) { conds.push('channel = ?'); params.push(channel); }
+      if (q) {
+        conds.push('(subject LIKE ? OR body_text LIKE ? OR sender_display LIKE ? OR sender LIKE ?)');
+        params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+      }
       const whereSql = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
-      const [rows, pending] = await Promise.all([
-        all<IngestRow>(c.env.DB, `SELECT * FROM ingest_messages ${whereSql} ORDER BY received_at DESC LIMIT 100`, ...params),
-        count(c.env.DB, `SELECT COUNT(*) AS n FROM ingest_messages WHERE status = 'pending'`),
+      const [rows, counts, threads] = await Promise.all([
+        all<IngestRow>(c.env.DB,
+          `SELECT * FROM ingest_messages ${whereSql} ORDER BY received_at DESC LIMIT 200`, ...params),
+        all<{ status: string; n: number }>(c.env.DB,
+          `SELECT status, COUNT(*) AS n FROM ingest_messages GROUP BY status`),
+        openThreadCount(c.env),
       ]);
+      const countFor = (s: string): number => s === 'all'
+        ? counts.reduce((sum, row) => sum + row.n, 0)
+        : counts.find((row) => row.status === s)?.n ?? 0;
+
+      const views = [
+        { id: 'pending', label: 'Waiting' }, { id: 'processed', label: 'Processed' },
+        { id: 'ignored', label: 'Ignored' }, { id: 'failed', label: 'Failed' },
+        { id: 'all', label: 'All' },
+      ];
+      const keep = (extra: Record<string, string>): string =>
+        new URLSearchParams({ status, channel, q, ...extra }).toString();
 
       return page(c, { title: 'Inbox', active: '/inbox' }, html`
-        ${pageHeader('Inbox', `${pending} message(s) waiting for triage.`)}
-        <form method="get" action="/inbox" class="filters">
-          <select name="status">
-            ${['pending', 'processed', 'ignored', 'failed', 'all'].map((s) =>
-              html`<option value="${s}" ${s === status ? raw('selected') : ''}>${s}</option>`)}
-          </select>
+        ${pageHeader('Inbox', 'Everything that arrived from a channel, before anybody has decided about it.')}
+
+        <nav class="tabs">
+          ${views.map((v) => html`
+            <a class="${v.id === status ? 'tab current' : 'tab'}"
+               href="${`/inbox?${keep({ status: v.id })}`}">${v.label} <span class="muted">${countFor(v.id)}</span></a>`)}
+          <a class="tab" href="/inbox/threads">Conversations <span class="muted">${threads}</span></a>
+        </nav>
+
+        <form method="get" action="/inbox" class="filters" data-live-search>
+          <input type="hidden" name="status" value="${status}">
+          <input type="search" name="q" value="${q}" placeholder="Search sender, subject or text">
           <select name="channel">
             <option value="">All channels</option>
             ${['email', 'telegram', 'whatsapp', 'api'].map((s) =>
               html`<option value="${s}" ${s === channel ? raw('selected') : ''}>${s}</option>`)}
           </select>
-          <button class="btn btn-secondary" type="submit">Filter</button>
+          <button class="btn btn-secondary js-hide" type="submit">Filter</button>
         </form>
 
-        ${table(['Received', 'Channel', 'From', 'Subject', 'Trust', 'Status'], rows.map((row) => html`
+        <div data-live-results>
+        ${table([
+          { label: 'Received', width: '16' },
+          { label: 'From', width: '20', hideOn: 'sm' },
+          { label: 'Subject', width: '38' },
+          { label: 'Trust', width: '13', hideOn: 'sm' },
+          { label: 'Status', width: '13' },
+        ], rows.map((row) => html`
           <tr>
-            <td class="small">${dateTime(row.received_at)}</td>
-            <td class="small">${row.channel}</td>
-            <td class="small">${row.sender_display ?? row.sender ?? '—'}</td>
-            <td><a href="/inbox/${row.id}">${truncate(row.subject ?? row.body_text, 70) || '(no subject)'}</a></td>
-            <td>${row.trusted ? badge('allow-listed', 'green') : badge('unverified', 'amber')}</td>
+            <td class="small">${dateTime(row.received_at)}
+              <div class="muted">${row.channel}</div></td>
+            <td class="small col-sm-hide">${row.sender_display ?? row.sender ?? '—'}</td>
+            <td><a class="clamp-2" href="/inbox/${row.id}">${
+              truncate(row.subject ?? row.body_text, 90) || '(no subject)'}</a>
+              <div class="row-meta show-sm">
+                <span class="muted">${row.sender_display ?? row.sender ?? '—'}</span>
+                ${row.trusted ? badge('allow-listed', 'green') : badge('unverified', 'amber')}
+              </div></td>
+            <td class="col-sm-hide">${row.trusted ? badge('allow-listed', 'green') : badge('unverified', 'amber')}</td>
             <td>${badge(row.status, statusTone(row.status === 'processed' ? 'approved' : row.status))}
-                ${row.inquiry_id ? html`<a class="small" href="/inquiries/${row.inquiry_id}">inquiry</a>` : ''}</td>
-          </tr>`))}`);
+                ${row.inquiry_id ? html`<div class="small"><a href="/inquiries/${row.inquiry_id}">inquiry</a></div>` : ''}</td>
+          </tr>`), { sticky: true, fixed: true, empty: 'Nothing here.' })}
+        </div>`);
+    });
+
+    // --- Conversations ------------------------------------------------------
+    // Registered before '/:id', because Hono matches in the order routes are
+    // declared and '/threads' would otherwise be read as a message id.
+    r.get('/threads', requirePermission('ingest:triage'), async (c) => {
+      const q = (c.req.query('q') ?? '').trim();
+      const rows = await all<ThreadRow & { client_name: string | null; waiting: number }>(
+        c.env.DB,
+        `SELECT t.*, cl.full_name AS client_name,
+                (SELECT COUNT(*) FROM ingest_messages m
+                  WHERE m.thread_id = t.id AND m.status = 'pending') AS waiting
+           FROM channel_threads t LEFT JOIN clients cl ON cl.id = t.client_id
+          ${q ? 'WHERE t.peer_label LIKE ? OR t.peer_id LIKE ? OR cl.full_name LIKE ?' : ''}
+          ORDER BY t.last_message_at DESC LIMIT 200`,
+        ...(q ? [`%${q}%`, `%${q}%`, `%${q}%`] : []),
+      );
+
+      return page(c, { title: 'Conversations', active: '/inbox' }, html`
+        ${pageHeader('Conversations',
+          'Each channel as a two-way thread: what they sent, and what the practice sent back.')}
+        <nav class="tabs">
+          <a class="tab" href="/inbox">Messages</a>
+          <a class="tab current" href="/inbox/threads">Conversations <span class="muted">${rows.length}</span></a>
+        </nav>
+        <form method="get" action="/inbox/threads" class="filters" data-live-search>
+          <input type="search" name="q" value="${q}" placeholder="Search by name, number or client">
+          <button class="btn btn-secondary js-hide" type="submit">Search</button>
+        </form>
+        <div data-live-results>
+        ${rows.length === 0
+          ? card('No conversations yet', emptyState(
+              'A conversation starts the first time somebody writes in on a channel that can be '
+              + 'replied to — Telegram or WhatsApp.'))
+          : table([
+              { label: 'Who', width: '34' },
+              { label: 'Channel', width: '16', hideOn: 'sm' },
+              { label: 'Client', width: '26', hideOn: 'sm' },
+              { label: 'Last message', width: '24' },
+            ], rows.map((t) => html`
+              <tr>
+                <td><a class="clamp-1" href="${`/inbox/threads/${t.id}`}">${t.peer_label ?? t.peer_id}</a>
+                  <div class="row-meta show-sm">
+                    <span class="muted">${CHANNEL_LABELS[t.channel] ?? t.channel}</span>
+                    ${t.waiting ? badge(`${t.waiting} waiting`, 'amber') : ''}
+                  </div></td>
+                <td class="small col-sm-hide">${CHANNEL_LABELS[t.channel] ?? t.channel}</td>
+                <td class="small col-sm-hide">${t.client_id
+                  ? html`<a href="/clients/${t.client_id}">${t.client_name}</a>`
+                  : html`<span class="muted">not linked</span>`}</td>
+                <td class="small">${t.last_message_at ? dateTime(t.last_message_at) : '—'}
+                  ${t.waiting ? html`<div>${badge(`${t.waiting} waiting`, 'amber')}</div>` : ''}</td>
+              </tr>`), { sticky: true, fixed: true, empty: 'No conversations.' })}
+        </div>`);
+    });
+
+    r.get('/threads/:id', requirePermission('ingest:triage'), async (c) => {
+      const id = c.req.param('id')!;
+      const session = c.get('session')!;
+      const thread = await one<ThreadRow & { client_name: string | null }>(
+        c.env.DB,
+        `SELECT t.*, cl.full_name AS client_name FROM channel_threads t
+           LEFT JOIN clients cl ON cl.id = t.client_id WHERE t.id = ?`,
+        id,
+      );
+      if (!thread) return c.notFound();
+
+      const [history, clients] = await Promise.all([
+        threadHistory(c.env, id),
+        all<{ id: string; full_name: string }>(
+          c.env.DB, `SELECT id, full_name FROM clients WHERE status != 'archived' ORDER BY full_name LIMIT 500`),
+      ]);
+
+      const canReply = thread.channel === 'email'
+        ? can(c.get('user'), 'mail:send')
+        : can(c.get('user'), 'register:write');
+
+      return page(c, { title: thread.peer_label ?? thread.peer_id, active: '/inbox' }, html`
+        ${breadcrumbs([{ label: 'Inbox', href: '/inbox' },
+                       { label: 'Conversations', href: '/inbox/threads' },
+                       { label: thread.peer_label ?? thread.peer_id }])}
+        ${pageHeader(thread.peer_label ?? thread.peer_id,
+          `${CHANNEL_LABELS[thread.channel] ?? thread.channel} · ${thread.peer_id}`)}
+
+        <div class="cols">
+          <div class="col-main">
+            ${card('The conversation', history.length === 0
+              ? emptyState('Nothing on this thread yet.')
+              : html`<div class="thread">
+                  ${history.map((entry) => html`
+                    <div class="${entry.direction === 'in' ? 'msg msg-in' : 'msg msg-out'}">
+                      <div class="msg-meta">${entry.who} · ${dateTime(entry.at)}
+                        ${entry.direction === 'out' && entry.status && entry.status !== 'sent'
+                          ? badge(entry.status, entry.status === 'failed' ? 'red' : 'amber') : ''}</div>
+                      <div class="msg-body">${entry.body}</div>
+                      ${entry.note ? html`<div class="small muted">${entry.note}</div>` : ''}
+                      ${entry.href ? html`<div class="small"><a href="${entry.href}">Open in the inbox</a></div>` : ''}
+                    </div>`)}
+                </div>`)}
+
+            ${card('Reply', canReply ? html`
+              <form method="post" action="${`/inbox/threads/${thread.id}/reply`}" class="entry-form">
+                ${csrfField(session.csrf)}
+                ${thread.channel === 'email' ? html`
+                  <div class="field">
+                    <label for="f_subject">Subject</label>
+                    <input id="f_subject" name="subject" maxlength="200" value="">
+                  </div>` : ''}
+                <div class="field">
+                  <label for="f_body">Message</label>
+                  <textarea id="f_body" name="body" rows="5" required maxlength="4000"></textarea>
+                </div>
+                <button class="btn btn-primary" type="submit">Send</button>
+                <p class="hint">Sent as the practice, and recorded here with your name against it.
+                   ${thread.channel === 'whatsapp'
+                     ? 'WhatsApp only accepts free text within 24 hours of their last message; '
+                       + 'outside that Meta refuses it, and the reason is shown on the message.' : ''}</p>
+              </form>` : html`<p class="small muted">Your role can read this conversation but not reply on it.</p>`)}
+          </div>
+
+          <div class="col-side">
+            ${card('Who this is', html`
+              <form method="post" action="${`/inbox/threads/${thread.id}/link`}" class="entry-form">
+                ${csrfField(session.csrf)}
+                <div class="field">
+                  <label for="f_client">Client</label>
+                  <select id="f_client" name="client_id">
+                    <option value="">Not linked</option>
+                    ${clients.map((cl) => html`<option value="${cl.id}"
+                      ${cl.id === thread.client_id ? raw('selected') : ''}>${cl.full_name}</option>`)}
+                  </select>
+                </div>
+                <button class="btn btn-secondary" type="submit">Save</button>
+                <p class="hint">Linking a conversation puts it on that client's file. It changes
+                   nothing about who is trusted — that is the channel's allow-list, and it is a
+                   secret rather than a setting.</p>
+              </form>`)}
+          </div>
+        </div>`);
+    });
+
+    r.post('/threads/:id/reply', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const user = c.get('user')!;
+      const f = new FormReader(await c.req.formData());
+      const body = f.text('body', { required: true, label: 'Message', max: 4000 });
+      const subject = f.optional('subject', { max: 200 });
+      if (!f.valid) return redirectWith(c, `/inbox/threads/${id}`, Object.values(f.errors)[0]!, 'err');
+
+      const thread = await one<{ channel: string }>(
+        c.env.DB, `SELECT channel FROM channel_threads WHERE id = ?`, id);
+      if (thread?.channel === 'email' && !can(user, 'mail:send')) {
+        return redirectWith(c, `/inbox/threads/${id}`, 'Your role cannot send email.', 'err');
+      }
+
+      const result = await postReply(c.env, { threadId: id, body, userId: user.id, subject: subject ?? undefined });
+      await auditFrom(c, { action: 'channel.reply_posted', entityType: 'channel_thread', entityId: id,
+        meta: { ok: result.ok } });
+      return redirectWith(c, `/inbox/threads/${id}`, result.message, result.ok ? 'ok' : 'err');
+    });
+
+    r.post('/threads/:id/link', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const f = new FormReader(await c.req.formData());
+      const clientId = f.optional('client_id', { max: 80 });
+      await linkThread(c.env, id, clientId, null);
+      await auditFrom(c, { action: 'channel.thread_linked', entityType: 'channel_thread', entityId: id,
+        meta: { clientId } });
+      return redirectWith(c, `/inbox/threads/${id}`,
+        clientId ? 'Linked to that client.' : 'Link removed.', 'ok');
     });
 
     r.get('/:id', requirePermission('ingest:triage'), async (c) => {

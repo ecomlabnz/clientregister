@@ -104,6 +104,10 @@ export async function handleTelegramWebhook(c: Context<AppContext>): Promise<Res
     attachments,
     trusted,
     receivedAt: new Date((msg.date ?? Math.floor(Date.now() / 1000)) * 1000).toISOString(),
+    // The chat, not the sender: a reply goes back to where the message came
+    // from, which in a group is the group.
+    peerId: msg.chat?.id !== undefined ? String(msg.chat.id) : null,
+    peerLabel: msg.chat?.title ?? displayName(msg.from),
     meta: { from_id: fromId, chat_id: msg.chat?.id, username: msg.from?.username, forwarded: Boolean(msg.forward_origin) },
   });
 

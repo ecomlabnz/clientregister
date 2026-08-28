@@ -413,6 +413,19 @@ textarea { resize: vertical; min-height: 70px; }
 /* A passage the register is quoting back rather than asserting: a proposed
    email, a paragraph the assistant wrote. Set apart so it reads as something
    to check, not as the page talking. */
+/* A conversation: theirs on the left, ours on the right, and never so wide
+   that a line becomes hard to follow. Nothing here is a chat application —
+   it is a record of what was said, which is why the meta line comes first. */
+.thread { display: flex; flex-direction: column; gap: 12px; }
+.msg { max-width: 78%; border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; }
+.msg-in { align-self: flex-start; background: var(--surface-2); }
+.msg-out { align-self: flex-end; background: var(--blue-bg); border-color: var(--accent); }
+.msg-meta { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+.msg-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .msg { max-width: 92%; }
+}
+
 .quoted {
   border-left: 3px solid var(--border);
   padding: 4px 0 4px 10px;

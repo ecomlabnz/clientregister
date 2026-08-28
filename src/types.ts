@@ -36,6 +36,9 @@ export interface Env {
   WHATSAPP_APP_SECRET?: string;
   WHATSAPP_VERIFY_TOKEN?: string;
   WHATSAPP_ALLOWED_SENDERS?: string;
+  /** Cloud API credentials, needed only to reply — receiving does not use them. */
+  WHATSAPP_TOKEN?: string;
+  WHATSAPP_PHONE_NUMBER_ID?: string;
 
   INGEST_EMAIL_ALLOWED_SENDERS?: string;
 

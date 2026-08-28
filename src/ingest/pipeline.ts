@@ -20,6 +20,7 @@ import { getBoolSetting, nowIso, one, run } from '../core/db';
 import { audit } from '../core/audit';
 import { createInquiry, matchClient } from '../modules/inquiries';
 import { addEntry } from '../core/timeline';
+import { isThreadChannel, threadFor } from '../core/channels';
 
 export type Channel = 'email' | 'telegram' | 'whatsapp' | 'api';
 
@@ -34,6 +35,13 @@ export interface CapturedMessage {
   trusted: boolean;
   receivedAt?: string;
   meta?: Record<string, unknown>;
+  /**
+   * The counterpart's address on this channel — a chat id, a phone number, an
+   * email address. Given one, the message joins a conversation that can be
+   * replied to; without one it is captured exactly as before.
+   */
+  peerId?: string | null;
+  peerLabel?: string | null;
 }
 
 export interface CaptureResult {
@@ -78,6 +86,15 @@ export async function captureMessage(env: Env, msg: CapturedMessage): Promise<Ca
     msg.meta ? JSON.stringify(msg.meta) : null,
     nowIso(),
   );
+
+  // A message from somebody identifiable joins their conversation, so the
+  // reply has somewhere to go and the file shows both halves of it.
+  if (msg.peerId && isThreadChannel(msg.channel)) {
+    const threadId = await threadFor(
+      env, msg.channel, msg.peerId, msg.senderDisplay ?? null, msg.receivedAt ?? nowIso(),
+    );
+    await run(env.DB, `UPDATE ingest_messages SET thread_id = ? WHERE id = ?`, threadId, id);
+  }
 
   await audit(env, {
     action: 'ingest.captured', entityType: 'ingest_message', entityId: id,
