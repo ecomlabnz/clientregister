@@ -387,6 +387,11 @@ export const authModule: AppModule = {
             ${group.description ? html`<p class="hint mb">${group.description}</p>` : ''}
             <form method="post" action="/account/preferences" class="form-grid settings-form">
               ${csrfField(session.csrf)}
+              ${/* Which group this form is. Without it, saving one group would
+                    read every *other* group's unticked boxes as "off" — a
+                    checkbox says no by being absent, and a checkbox that was
+                    never on this form is absent for a different reason. */ ''}
+              <input type="hidden" name="group" value="${group.id}">
               ${group.preferences.map((def) => html`
                 <div class="settings-cell">
                   ${def.type === 'boolean'
@@ -399,7 +404,7 @@ export const authModule: AppModule = {
                                includeBlank: false, hint: def.help, options: def.options ?? [] })}
                 </div>`)}
               <div class="form-actions">
-                <button class="btn btn-primary" type="submit">Save preferences</button>
+                <button class="btn btn-primary" type="submit">Save ${group.title.toLowerCase()}</button>
               </div>
             </form>`))}` : ''}
 
@@ -498,18 +503,23 @@ export const authModule: AppModule = {
     r.post('/account/preferences', async (c) => {
       const user = c.get('user')!;
       const form = await c.req.formData();
-      const entries: Array<{ key: string; value: string }> = [];
+      const groupId = String(form.get('group') ?? '');
+      const group = PREFERENCE_GROUPS.find((g) => g.id === groupId);
+      if (!group) return redirectWith(c, '/account?tab=preferences', 'Unknown group of preferences.', 'err');
 
-      for (const def of ALL_PREFERENCES) {
+      const entries: Array<{ key: string; value: string }> = [];
+      for (const def of group.preferences) {
+        // Absence means "off" for a checkbox and "leave it alone" for anything
+        // else — and only within the group that was actually submitted.
         if (def.type !== 'boolean' && !form.has(def.key)) continue;
         entries.push({ key: def.key, value: coercePreference(def, form.get(def.key) as string | null) });
       }
       await writePreferences(c.env, user.id, entries);
       await auditFrom(c, {
         action: 'account.preferences_changed', entityType: 'user', entityId: user.id,
-        meta: { keys: entries.map((e) => e.key) },
+        meta: { group: group.id, keys: entries.map((e) => e.key) },
       });
-      return redirectWith(c, '/account?tab=preferences', 'Preferences saved.');
+      return redirectWith(c, '/account?tab=preferences', `${group.title} saved.`);
     });
 
     // Appearance is a preference, not a free-text field: only the themes and

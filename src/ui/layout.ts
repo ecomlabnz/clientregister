@@ -58,7 +58,19 @@ ${opts.head ?? ''}
 <link rel="apple-touch-icon" href="/favicon.svg">
 <meta name="theme-color" content="#f5484f">
 </head>
-<body class="${opts.landing ? 'site' : opts.bare ? 'bare' : 'app'}">
+${/*
+   * Notification settings ride on the body as data attributes rather than in a
+   * script block, because the policy forbids inline script — and this way the
+   * values are the person's own, rendered by the server, with nothing to fetch
+   * before the page can behave correctly.
+   */ ''}
+<body class="${opts.landing ? 'site' : opts.bare ? 'bare' : 'app'}"
+  ${chrome && c.get('notify')
+    ? raw(`data-notify="${c.get('notify')!.on ? '1' : '0'}"`
+        + ` data-notify-position="${c.get('notify')!.position}"`
+        + ` data-notify-sound="${c.get('notify')!.sound}"`
+        + ` data-notify-every="${c.get('notify')!.everySeconds}"`)
+    : ''}>
 ${opts.landing
     ? body
     : opts.bare

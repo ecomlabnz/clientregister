@@ -723,6 +723,45 @@ details[open] > summary { margin-bottom: 12px; }
 .party-list li:last-child { border-bottom: none; }
 
 
+/* --- Banners in the corner ------------------------------------------------ */
+/* Fixed to whichever corner the person chose. Narrow enough not to cover the
+   page, and dismissible, because a notification that will not go away is worse
+   than no notification. */
+
+.toasts {
+  position: fixed; z-index: 40; display: flex; flex-direction: column; gap: 8px;
+  max-width: min(360px, calc(100vw - 24px)); pointer-events: none;
+}
+.toasts-top-left { top: calc(var(--topbar-h) + 12px); left: 12px; }
+.toasts-top-right { top: calc(var(--topbar-h) + 12px); right: 12px; }
+.toasts-bottom-left { bottom: 12px; left: 12px; }
+.toasts-bottom-right { bottom: 12px; right: 12px; }
+.toasts-bottom-left, .toasts-bottom-right { flex-direction: column-reverse; }
+
+.toast {
+  pointer-events: auto;
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: var(--radius); padding: 10px 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  font-size: 0.88rem; line-height: 1.45;
+}
+.toast a { color: var(--text); font-weight: 550; }
+.toast-close {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 1.1rem; line-height: 1; padding: 0 2px; margin-left: auto; width: auto;
+}
+.toast-close:hover { color: var(--text); }
+
+@media (max-width: 720px) {
+  /* One place on a phone: the corners are all the same corner at this width,
+     and a banner over the navigation is worse than one above the content. */
+  .toasts { left: 12px; right: 12px; max-width: none; top: auto; bottom: 12px; flex-direction: column-reverse; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .toast { animation: toast-in 160ms ease-out; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
+
 /* --- Appearance picker ---------------------------------------------------- */
 
 .appearance-set {

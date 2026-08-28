@@ -58,6 +58,41 @@ export const inboxModule: AppModule = {
     const r = new Hono<AppContext>();
     r.use('*', requireAuth);
 
+    /**
+     * What is waiting, for the banner in the corner.
+     *
+     * Deliberately tiny: two counts and the newest arrival's id and heading.
+     * The browser polls this at whatever interval the person chose, so it has
+     * to cost almost nothing — and it must never return message bodies, since
+     * a notification is a nudge to go and look, not a way to read a client's
+     * message from a page that is not the inbox.
+     */
+    r.get('/api/pending', requirePermission('ingest:triage'), async (c) => {
+      const row = await one<{ pending: number; latest_id: string | null; latest_channel: string | null;
+                             latest_subject: string | null; latest_at: string | null }>(
+        c.env.DB,
+        `SELECT COUNT(*) AS pending,
+                (SELECT id FROM ingest_messages WHERE status = 'pending' ORDER BY received_at DESC LIMIT 1) AS latest_id,
+                (SELECT channel FROM ingest_messages WHERE status = 'pending' ORDER BY received_at DESC LIMIT 1) AS latest_channel,
+                (SELECT subject FROM ingest_messages WHERE status = 'pending' ORDER BY received_at DESC LIMIT 1) AS latest_subject,
+                (SELECT received_at FROM ingest_messages WHERE status = 'pending' ORDER BY received_at DESC LIMIT 1) AS latest_at
+           FROM ingest_messages WHERE status = 'pending'`,
+      );
+      return c.json({
+        pending: row?.pending ?? 0,
+        latest: row?.latest_id
+          ? {
+              id: row.latest_id,
+              channel: row.latest_channel,
+              // Truncated hard: a heading is enough to decide whether to go and
+              // look, and anything longer starts to be the message itself.
+              subject: (row.latest_subject ?? '').slice(0, 80),
+              at: row.latest_at,
+            }
+          : null,
+      }, 200, { 'cache-control': 'no-store' });
+    });
+
     r.get('/', requirePermission('ingest:triage'), async (c) => {
       const status = c.req.query('status') ?? 'pending';
       const channel = c.req.query('channel') ?? '';

@@ -7,6 +7,38 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.20.0 — 28 August 2026
+
+### Added
+- **A banner when a message arrives.** The inbox is checked on a quiet poll and
+  a small banner appears in the corner you chose — top or bottom, left or
+  right — carrying the channel and the subject line and nothing else. Clicking
+  it opens that message. It never carries the body of a message: the endpoint
+  behind it returns a count, an id, a channel and a truncated subject, so a
+  banner on a screen somebody else can see gives nothing away.
+- **A choice of five sounds, or none.** They are synthesised by the browser
+  with the Web Audio API rather than downloaded. Partly because it is lighter —
+  no files, no requests — and partly because the content policy permits no
+  media at all, so an audio file would be blocked outright. A browser will not
+  make a sound before the page has been clicked, so the first alert in a fresh
+  tab may be silent; that is the browser's rule, not a fault here.
+- **You decide how often it looks**, from every thirty seconds to every three
+  minutes, or never. "Never" means no request goes out at all. While the tab is
+  in the background nothing is asked for either, because the answer would only
+  be shown when you came back to it.
+
+### Fixed
+- **Each group of preferences is saved on its own.** Every group renders as its
+  own form, but the handler read every preference on the account — so saving
+  one group read the other group's unticked boxes as "off" and quietly turned
+  them off. The form now names its group and the handler stays inside it.
+- **The first message to arrive into an empty inbox was swallowed.** One
+  variable was doing two jobs: "we have not asked yet" and "nothing is
+  waiting" looked identical, so the first arrival set the mark instead of
+  announcing itself. Those are two pieces of state now.
+- **The in-app release notes had fallen seven versions behind** the changelog.
+  Help → Recent changes lists them again.
+
 ## 0.19.0 — 28 August 2026
 
 ### Added
