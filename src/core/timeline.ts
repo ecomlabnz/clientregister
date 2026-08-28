@@ -20,6 +20,9 @@ export interface Entry {
   created_at: string;
   created_by: string | null;
   author_name?: string | null;
+  /** An attached file, once R2 is enabled. */
+  document_id?: string | null;
+  document_name?: string | null;
 }
 
 export async function addEntry(
@@ -32,13 +35,14 @@ export async function addEntry(
     occurredAt?: string;
     createdBy?: string | null;
     pinned?: boolean;
+    documentId?: string | null;
   },
 ): Promise<string> {
   const id = newId('ent');
   await run(
     env.DB,
-    `INSERT INTO entries (id, entity_type, entity_id, kind, body, occurred_at, pinned, created_at, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO entries (id, entity_type, entity_id, kind, body, occurred_at, pinned, created_at, created_by, document_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     input.entityType,
     input.entityId,
@@ -48,6 +52,7 @@ export async function addEntry(
     input.pinned ? 1 : 0,
     nowIso(),
     input.createdBy ?? null,
+    input.documentId ?? null,
   );
   return id;
 }
@@ -60,8 +65,10 @@ export async function listEntries(
 ): Promise<Entry[]> {
   return all<Entry>(
     env.DB,
-    `SELECT e.*, u.name AS author_name
-       FROM entries e LEFT JOIN users u ON u.id = e.created_by
+    `SELECT e.*, u.name AS author_name, d.filename AS document_name
+       FROM entries e
+       LEFT JOIN users u ON u.id = e.created_by
+       LEFT JOIN documents d ON d.id = e.document_id
       WHERE e.entity_type = ? AND e.entity_id = ?
       ORDER BY e.pinned DESC, e.occurred_at DESC
       LIMIT ?`,

@@ -10,7 +10,7 @@
  */
 
 import { Hono } from 'hono';
-import type { AppContext, EntityType } from '../../types';
+import type { AppContext, Env, EntityType } from '../../types';
 import type { AppModule } from '../../core/module';
 import { all, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
@@ -41,6 +41,54 @@ interface DocumentRow {
   id: string; entity_type: string; entity_id: string; r2_key: string; filename: string;
   content_type: string; size_bytes: number; sha256: string | null; description: string | null;
   uploaded_at: string; uploaded_by: string | null; uploader_name?: string | null;
+}
+
+
+export const MAX_ATTACHMENT_BYTES = MAX_UPLOAD_BYTES;
+
+export interface StoredDocument { id: string; filename: string; size: number }
+
+/**
+ * Put one file in R2 and record it.
+ *
+ * Shared between the documents page and anything else that accepts an
+ * attachment — a file note, for instance — so there is one place that decides
+ * how a file is named, hashed and stored, and one place to change if that ever
+ * needs to alter.
+ *
+ * Returns null when storage is not enabled or the file is unusable, so a caller
+ * can carry on with whatever else it was doing rather than failing outright: a
+ * note that could not take its attachment is still a note worth keeping.
+ */
+export async function storeDocument(
+  env: Env,
+  opts: { entityType: string; entityId: string; file: File; uploadedBy: string | null; description?: string | null },
+): Promise<StoredDocument | { error: string } | null> {
+  if (!env.DOCS) return { error: 'Document storage is not switched on, so the file was not attached.' };
+  if (opts.file.size === 0) return null;
+  if (opts.file.size > MAX_UPLOAD_BYTES) {
+    return { error: `Files must be ${MAX_UPLOAD_BYTES / 1024 / 1024} MB or smaller, so the file was not attached.` };
+  }
+
+  const bytes = new Uint8Array(await opts.file.arrayBuffer());
+  const digest = await sha256Hex(bytes);
+  const filename = safeFilename(opts.file.name);
+  const id = newId('doc');
+  const key = `${opts.entityType}/${opts.entityId}/${id}-${filename}`;
+
+  await env.DOCS.put(key, bytes, {
+    httpMetadata: { contentType: opts.file.type || 'application/octet-stream' },
+    customMetadata: { uploadedBy: opts.uploadedBy ?? 'unknown', sha256: digest },
+  });
+  await run(
+    env.DB,
+    `INSERT INTO documents (id, entity_type, entity_id, r2_key, filename, content_type, size_bytes,
+        sha256, description, uploaded_at, uploaded_by)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    id, opts.entityType, opts.entityId, key, filename, opts.file.type || 'application/octet-stream',
+    bytes.byteLength, digest, opts.description ?? null, nowIso(), opts.uploadedBy,
+  );
+  return { id, filename, size: bytes.byteLength };
 }
 
 export async function listDocuments(env: any, entityType: string, entityId: string): Promise<DocumentRow[]> {
@@ -118,30 +166,19 @@ export const documentsModule: AppModule = {
         return redirectWith(c, back, `Files must be ${MAX_UPLOAD_BYTES / 1024 / 1024} MB or smaller.`, 'err');
       }
 
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const digest = await sha256Hex(bytes);
-      const filename = safeFilename(file.name);
-      const id = newId('doc');
-      const key = `${entityType}/${entityId}/${id}-${filename}`;
-
-      await c.env.DOCS.put(key, bytes, {
-        httpMetadata: { contentType: file.type || 'application/octet-stream' },
-        customMetadata: { uploadedBy: c.get('user')!.id, sha256: digest },
+      const stored = await storeDocument(c.env, {
+        entityType, entityId, file, uploadedBy: c.get('user')!.id, description,
       });
-      await run(
-        c.env.DB,
-        `INSERT INTO documents (id, entity_type, entity_id, r2_key, filename, content_type, size_bytes,
-            sha256, description, uploaded_at, uploaded_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-        id, entityType, entityId, key, filename, file.type || 'application/octet-stream',
-        bytes.byteLength, digest, description, nowIso(), c.get('user')!.id,
-      );
+      if (!stored) return redirectWith(c, back, 'Choose a file to upload.', 'err');
+      if ('error' in stored) return redirectWith(c, back, stored.error, 'err');
+
       await addEntry(c.env, {
         entityType, entityId, kind: 'file',
-        body: `Document uploaded: ${filename}${description ? ` — ${description}` : ''}.`,
-        createdBy: c.get('user')!.id,
+        body: `Document uploaded: ${stored.filename}${description ? ` — ${description}` : ''}.`,
+        createdBy: c.get('user')!.id, documentId: stored.id,
       });
-      await auditFrom(c, { action: 'document.uploaded', entityType, entityId, meta: { id, filename, size: bytes.byteLength } });
+      await auditFrom(c, { action: 'document.uploaded', entityType, entityId,
+        meta: { id: stored.id, filename: stored.filename, size: stored.size } });
       return redirectWith(c, back, 'Document uploaded.');
     });
 
