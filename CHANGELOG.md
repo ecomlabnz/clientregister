@@ -7,6 +7,38 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.15.0 — 28 August 2026
+
+### Added
+- **Payment stages on a quote.** A quote answers two questions and the system was
+  answering only one: the items say what is being paid for, the stages say when
+  each part falls due. They are stored apart rather than derived from each
+  other, because they do not line up — one piece of work is often split across a
+  deposit and a balance, and one stage can gather several fees into a single
+  payment. Each stage carries its own wording, figure and GST treatment, so it
+  prints as "$1,750 + GST" or a flat amount, the way a terms of engagement fee
+  schedule does.
+  - **Draft stages from the items** writes one stage per item as a starting
+    point, to be reworded, split or merged. How a matter is staged is a
+    judgement about that client, not something the system should decide.
+  - The page says so when the stages do not add up to the quote total, before it
+    goes out.
+  - A free note under the schedule, as the practice's own template provides for.
+- **Bank account details on the quote**, from Settings → Practice.
+
+### Security
+- **The bank account is off by default.** A quote is forwarded on, and account
+  details are exactly what invoice-redirection fraud feeds on; showing them is a
+  decision to take deliberately. When shown, the quote asks the client to quote
+  its reference and tells them to telephone before acting on any email that
+  appears to change the details.
+
+### Changed
+- Choosing **Disbursement** now defaults the GST treatment to none, since money
+  paid to Immigration New Zealand or a panel physician on a client's behalf is
+  passed through as it stands. A treatment already chosen by hand is left alone,
+  and the form says so where the script is not running.
+
 ## 0.14.0 — 28 August 2026
 
 ### Added

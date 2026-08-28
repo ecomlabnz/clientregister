@@ -200,6 +200,24 @@
     });
   });
 
+  // Choosing "Disbursement" defaults GST to none.
+  //
+  // Money paid to Immigration New Zealand or a panel physician on a client's
+  // behalf is passed through without GST added; adding it is the mistake that
+  // is easy to make and hard to spot on a quote. Only the untouched default is
+  // changed — anyone who has already set the treatment themselves keeps it.
+  Array.prototype.forEach.call(document.querySelectorAll('.js-quote-line'), function (form) {
+    var kind = form.querySelector('select[name="kind"]');
+    var gst = form.querySelector('select[name="gst_treatment"]');
+    if (!kind || !gst) return;
+    gst.addEventListener('change', function () { gst.dataset.chosen = '1'; });
+    kind.addEventListener('change', function () {
+      if (gst.dataset.chosen === '1') return;
+      gst.value = kind.value === 'professional' ? (gst.dataset.original || gst.value) : 'none';
+    });
+    gst.dataset.original = gst.value;
+  });
+
   // Print buttons. Declared with data-print rather than an inline handler,
   // because the content security policy forbids inline script.
   Array.prototype.forEach.call(document.querySelectorAll('[data-print]'), function (button) {
