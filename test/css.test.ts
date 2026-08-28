@@ -46,3 +46,18 @@ describe('nothing but tables and the nav may scroll sideways', () => {
     expect(css).toMatch(/input, select, textarea \{ font-size: 16px/);
   });
 });
+
+describe('every custom property that is used is defined', () => {
+  it('has no var() pointing at a name that does not exist', () => {
+    // A misspelled custom property is invisible: the rule is simply dropped, so
+    // a border does not appear and nothing anywhere says why. Cheap to check.
+    const defined = new Set(
+      [...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]!),
+    );
+    const used = new Set(
+      [...css.matchAll(/var\((--[a-z0-9-]+)/g)].map((m) => m[1]!),
+    );
+    const missing = [...used].filter((name) => !defined.has(name));
+    expect(missing, `used but never defined: ${missing.join(', ')}`).toEqual([]);
+  });
+});

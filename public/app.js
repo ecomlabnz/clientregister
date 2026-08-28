@@ -386,6 +386,26 @@
     window.setInterval(check, Math.max(15, every) * 1000);
   })();
 
+  // A rule has two sets of fields and uses one of them. Both are rendered, so
+  // the form is complete without scripting; here the irrelevant one is folded
+  // away as soon as the action is chosen.
+  (function ruleFields() {
+    var chooser = document.querySelector('select[name="action_kind"]');
+    if (!chooser) return;
+    var groups = document.querySelectorAll('[data-action-fields]');
+    if (!groups.length) return;
+
+    var sync = function () {
+      var chosen = chooser.value;
+      for (var i = 0; i < groups.length; i++) {
+        var applies = groups[i].getAttribute('data-action-fields').split(' ').indexOf(chosen) !== -1;
+        groups[i].hidden = !applies;
+      }
+    };
+    chooser.addEventListener('change', sync);
+    sync();
+  })();
+
   // "/" focuses the first search box on the page.
   document.addEventListener('keydown', function (event) {
     if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;

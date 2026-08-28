@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.21.0', date: '28 August 2026',
+    notes: [
+      'Automations: rules that watch the register\'s dates and propose what to do about them.',
+      'An approval queue under Alerts. Nothing leaves the practice without somebody saying yes.',
+      'A rule may raise a task on its own; an email always waits for a person.',
+      'Nothing is proposed twice, and anything dismissed stays dismissed.',
+      'With the AI switched off every rule still works — it only writes the digest\'s opening.',
+    ],
+  },
+  {
     version: '0.20.0', date: '28 August 2026',
     notes: [
       'A banner when a message arrives in the inbox, in whichever corner you choose.',
@@ -475,6 +485,48 @@ function sections(origin: string): Section[] {
         <p>The list of kinds lives in <strong>Settings → Knowledge base</strong>, one per line as
            <code>key | Label</code>. Add one whenever you need it. Renaming a label is free;
            changing a key leaves existing articles on the old one, so prefer relabelling.</p>`,
+    },
+    {
+      id: 'automations',
+      title: 'Automations — work the register proposes',
+      body: html`
+        <p>Under <strong>Alerts → For approval</strong> is a queue of things the register would
+           like to do, and under <strong>Automations</strong> (also on the Admin bar) are the rules
+           that put them there.</p>
+        <h4>What a rule is</h4>
+        <p>A trigger, a window and an action, and it reads back as one sentence: <em>when a case
+           deadline is approaching within 7 days, create a task for Tai, for approval</em>. If a
+           rule is harder to say than that, it is a program, and a program does not belong in a
+           form.</p>
+        <p>The triggers are questions the register can already answer from dates it already holds:
+           a case deadline approaching, a task past its due date, a quote about to lapse, a client
+           document expiring, a message sitting untriaged in the inbox. Write a rule this afternoon
+           and it matches everything that already qualifies, not only what happens next.</p>
+        <h4>What it may do on its own</h4>
+        <p>A <strong>task</strong> is internal, so a rule may be written to raise one without
+           asking: the worst case is a task somebody closes. A task always has a name against it —
+           the rule's, or the record's owner — and if there is neither, the rule does not act and
+           says so on the Automations page rather than failing quietly.</p>
+        <p>An <strong>email</strong> is never sent by a rule. It is written, put in the queue, and
+           waits for a person; the record then says which person approved it. This is not a setting
+           you can turn off: the database itself refuses to store an email rule that skips
+           approval.</p>
+        <p>A <strong>digest</strong> is one message gathering everything a rule matched instead of
+           one message per record. It waits for approval too.</p>
+        <h4>It proposes once</h4>
+        <p>Every proposal is keyed to its rule, its record and the date that caused it, so the
+           nightly run cannot raise the same thing twice and something you dismissed stays
+           dismissed. If the date moves, that is genuinely a new thing, and it is proposed again.</p>
+        <h4>Where the AI comes in, and where it does not</h4>
+        <p>In one place: the covering paragraph at the top of a digest. The list underneath it is
+           assembled by the register, the recipient comes from the rule, and the sending waits for
+           you. With the AI layer switched off every rule still fires, still proposes and still
+           acts — the digest simply arrives as the list.</p>
+        <p>It is written when the digest is proposed rather than when it is approved, so what you
+           read is what goes out.</p>
+        <h4>When it runs</h4>
+        <p>Every night, and whenever you press <strong>Run the rules now</strong>. Running it twice
+           costs nothing.</p>`,
     },
     {
       id: 'alerts',

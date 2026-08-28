@@ -409,6 +409,17 @@ input:focus, select:focus, textarea:focus {
 textarea { resize: vertical; min-height: 70px; }
 .hint { font-size: 0.78rem; color: var(--muted); margin: 4px 0 0; line-height: 1.45; }
 .checkbox-field label { display: flex; gap: 8px; align-items: flex-start; font-weight: 500; }
+
+/* A passage the register is quoting back rather than asserting: a proposed
+   email, a paragraph the assistant wrote. Set apart so it reads as something
+   to check, not as the page talking. */
+.quoted {
+  border-left: 3px solid var(--border);
+  padding: 4px 0 4px 10px;
+  margin: 6px 0;
+  color: var(--muted);
+}
+
 .checkbox-field input { width: auto; margin-top: 3px; }
 
 .form-grid {
