@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#14496b"/><path d="M9 9h14v3H9zm0 5.5h14v3H9zm0 5.5h9v3H9z" fill="#fff"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Client register">
+  <!-- A tab strip is what the icon is: a register you flick through. Bright,
+       because a favicon is 16 pixels of colour in a row of grey ones — and on
+       a warm gradient rather than one flat fill so it stays legible against
+       both a light and a dark browser bar. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff8a3d"/>
+      <stop offset="0.55" stop-color="#f5484f"/>
+      <stop offset="1" stop-color="#c81d78"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="url(#g)"/>
+  <path d="M7.5 9.5h17v3.2h-17zm0 5.4h17v3.2h-17zm0 5.4h10.4v3.2H7.5z" fill="#fff"/>
+  <circle cx="23.2" cy="21.9" r="2.6" fill="#fff"/>
+</svg>

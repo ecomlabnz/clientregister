@@ -125,8 +125,12 @@ export const adminModule: AppModule = {
     r.use('*', requireAuth);
 
     // --- Overview -----------------------------------------------------------
+    // Tabbed rather than one long scroll. A page that runs past the bottom of
+    // the screen hides half of itself, and the half it hides is the half nobody
+    // maintains; four short pages are read, one long one is skimmed.
     r.get('/', requirePermission('admin:settings'), async (c) => {
       const env = c.env;
+      const tab = c.req.query('tab') ?? 'overview';
       const [users, pendingIngest, queuedMail, demoCount] = await Promise.all([
         count(env.DB, 'SELECT COUNT(*) AS n FROM users'),
         count(env.DB, `SELECT COUNT(*) AS n FROM ingest_messages WHERE status = 'pending'`),
@@ -135,9 +139,22 @@ export const adminModule: AppModule = {
                             + (SELECT COUNT(*) FROM cases WHERE id LIKE 'demo\\_%' ESCAPE '\\') AS n`),
       ]);
 
+      const tabs: Array<{ id: string; label: string }> = [
+        { id: 'overview', label: 'Overview' },
+        { id: 'integrations', label: 'Integrations' },
+        { id: 'modules', label: 'Modules' },
+        { id: 'maintenance', label: 'Maintenance' },
+      ];
+
       return page(c, { title: 'Administration', active: '/admin' }, html`
         ${pageHeader('Administration', 'Who can get in, how the practice is configured, and what is wired up.')}
 
+        <nav class="tabs">
+          ${tabs.map((x) => html`
+            <a class="${x.id === tab ? 'tab current' : 'tab'}" href="/admin?tab=${x.id}">${x.label}</a>`)}
+        </nav>
+
+        ${tab === 'overview' ? html`
         <div class="fee-summary">
           <div class="stat"><span class="stat-label">Users</span><span class="stat-value">${users}</span></div>
           <div class="stat"><span class="stat-label">Inbox pending</span><span class="stat-value">${pendingIngest}</span></div>
@@ -148,9 +165,9 @@ export const adminModule: AppModule = {
           <a class="btn btn-secondary" href="/admin/users">Users</a>
           <a class="btn btn-secondary" href="/admin/settings">Practice settings</a>
           <a class="btn btn-secondary" href="/admin/audit">Audit log</a>
-        </div>
+        </div>` : ''}
 
-        ${card('Integrations', html`
+        ${tab === 'integrations' ? card('Integrations', html`
           <p class="hint mb">Step-by-step instructions for connecting each of these are in
              <a href="/help#connecting">Help → Connecting Telegram, WhatsApp and email</a>.
              Keys are set as GitHub repository secrets and reach the Worker on the next deploy —
@@ -175,12 +192,16 @@ export const adminModule: AppModule = {
                   mailSetupGaps(env).length ? ` Still needed: ${mailSetupGaps(env).join(', ')}.` : ''}`),
           statusRow('Document storage', Boolean(env.DOCS),
             'R2 bucket binding DOCS. Enable R2 in the dashboard, then uncomment the binding.'),
-        ])}`)}
+        ])}`) : ''}
 
-        ${card('Modules', table(['Module', 'Mounted at'], registeredModules.map((m) => html`
-          <tr><td>${m.title} <span class="muted small"><code>${m.name}</code></span></td>
-              <td class="small">${(m.basePaths ?? []).map((p) => html`<code>${p}</code> `)}</td></tr>`)))}
+        ${tab === 'modules' ? card('Modules', html`
+          <p class="hint mb">Every feature is a folder that registers itself here. Removing one is
+             deleting a line from the registry; adding one is a folder plus a line.</p>
+          ${table(['Module', 'Mounted at'], registeredModules.map((m) => html`
+            <tr><td>${m.title} <span class="muted small"><code>${m.name}</code></span></td>
+                <td class="small">${(m.basePaths ?? []).map((p) => html`<code>${p}</code> `)}</td></tr>`))}`) : ''}
 
+        ${tab === 'maintenance' ? html`
         ${demoCount > 0 ? card('Demonstration data', html`
           <p>This register contains <strong>${demoCount}</strong> fabricated client and case records,
              loaded to show how the system behaves with a realistic caseload.</p>
@@ -201,7 +222,9 @@ export const adminModule: AppModule = {
           <form method="post" action="/admin/mail/flush">
             ${csrfField(c.get('session')!.csrf)}
             <button class="btn btn-secondary" type="submit">Attempt delivery now</button>
-          </form>`)}`);
+          </form>
+          <p class="hint">Mail queues rather than failing when no transport is configured, so
+             nothing is lost while one is being set up.</p>`)}` : ''}`);
     });
 
     /**

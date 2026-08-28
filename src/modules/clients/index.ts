@@ -266,16 +266,17 @@ export const clientsModule: AppModule = {
       const pageNum = Math.max(1, Number(c.req.query('page') ?? '1') || 1);
       const offset = (pageNum - 1) * PAGE_SIZE;
 
-      // Leads and clients are the same records at different stages, so the
-      // split is a filter over status rather than a separate list.
-      const view = c.req.query('view') ?? 'clients';
+      // Four ways of looking at one list rather than four lists. Leads cuts by
+      // stage; individuals and organisations cut by what kind of client it is,
+      // because in practice you are either working a pipeline or looking for a
+      // person or a company, and those are different errands.
+      const view = c.req.query('view') ?? 'individuals';
       const where: string[] = [];
       const params: unknown[] = [];
-      if (!status) {
-        if (view === 'leads') where.push(`status = 'prospect'`);
-        else if (view === 'clients') where.push(`status = 'active'`);
-        else if (view === 'open') where.push(`status IN ('prospect','active')`);
-      }
+      if (view === 'leads' && !status) where.push(`status = 'prospect'`);
+      else if (view === 'individuals') where.push(`kind = 'individual'`);
+      else if (view === 'organisations') where.push(`kind = 'organisation'`);
+      if (view !== 'all' && view !== 'leads') where.push(`status <> 'archived'`);
       if (q) {
         where.push(`(full_name LIKE ?1 OR family_name LIKE ?1 OR given_names LIKE ?1
                      OR email LIKE ?1 OR phone LIKE ?1 OR ref LIKE ?1
@@ -299,15 +300,18 @@ export const clientsModule: AppModule = {
       const shown = rows.slice(0, PAGE_SIZE);
       const writable = can(c.get('user'), 'register:write');
 
-      const counts = await one<{ leads: number; clients: number; total: number }>(
+      const counts = await one<{ leads: number; individuals: number; organisations: number; total: number }>(
         c.env.DB,
-        `SELECT SUM(status = 'prospect') AS leads, SUM(status = 'active') AS clients,
+        `SELECT SUM(status = 'prospect') AS leads,
+                SUM(kind = 'individual' AND status <> 'archived') AS individuals,
+                SUM(kind = 'organisation' AND status <> 'archived') AS organisations,
                 COUNT(*) AS total FROM clients`,
       );
       const views: Array<{ id: string; label: string; count: number }> = [
         { id: 'leads', label: 'Leads', count: counts?.leads ?? 0 },
-        { id: 'clients', label: 'Clients', count: counts?.clients ?? 0 },
-        { id: 'all', label: 'Everyone', count: counts?.total ?? 0 },
+        { id: 'individuals', label: 'Individuals', count: counts?.individuals ?? 0 },
+        { id: 'organisations', label: 'Organisations', count: counts?.organisations ?? 0 },
+        { id: 'all', label: 'All', count: counts?.total ?? 0 },
       ];
 
       return page(c, { title: 'Clients', active: '/clients' }, html`
@@ -320,7 +324,7 @@ export const clientsModule: AppModule = {
             : undefined)}
         <nav class="tabs">
           ${views.map((v) => html`
-            <a class="${v.id === view && !status ? 'tab current' : 'tab'}"
+            <a class="${v.id === view ? 'tab current' : 'tab'}"
                href="/clients?view=${v.id}">${v.label} <span class="muted">${v.count}</span></a>`)}
         </nav>
 

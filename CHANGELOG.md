@@ -7,6 +7,48 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.11.0 — 28 August 2026
+
+### Added
+- **The public page is built to be found and to be read by machines.**
+  - A canonical link, Open Graph and Twitter card tags, and a title that says
+    what the practice is rather than only its name. The canonical address is a
+    setting, because a Worker answers on its `workers.dev` name as well as the
+    real domain and search engines treat those as two sites with one page.
+  - **Schema.org structured data** as JSON-LD: the practice (`LegalService`,
+    `Attorney` or `ProfessionalService` — a setting), the services as an offer
+    catalogue, and the questions as a `FAQPage`. All generated from the same
+    settings as the visible page, so they cannot drift from it.
+  - **`/llms.txt`** — the page as plain prose, for answer engines that read a
+    page rather than ranking it. Same facts, no layout to parse.
+  - **`/robots.txt` and `/sitemap.xml`**, both derived from the indexing
+    setting. While indexing is off, robots.txt disallows everything and the
+    sitemap and llms.txt return 404. When it is on, only the public page is
+    offered — every register path is explicitly disallowed.
+- **A brighter favicon**, plus `apple-touch-icon` and a `theme-color`.
+
+### Changed
+- **Clients are now Leads / Individuals / Organisations / All**, replacing
+  Leads / Clients / Everyone. Leads cuts by stage; the other two cut by what
+  kind of client it is, because looking for a person and looking for a company
+  are different errands. Archived records stay out of all but All.
+- **Administration is tabbed** — Overview, Integrations, Modules, Maintenance —
+  rather than one page that ran well past the bottom of the screen.
+
+### Documentation
+- **`docs/principles.md`** records the rules this system is built to, including
+  the new one: *if a page would run longer than one standard desktop screen,
+  split it into tabs.* A page that runs past the fold hides half of itself, and
+  the half it hides is the half nobody maintains. Tabs here are plain links with
+  a `?tab=` parameter — no JavaScript, each one linkable, and the back button
+  behaves.
+
+### Security
+- JSON-LD is emitted inside `application/ld+json`, which browsers treat as data
+  rather than code, so the policy forbidding inline script is unchanged and no
+  exception was opened. `<`, `>` and `&` are escaped inside it so no settings
+  value can close the element early — covered by tests.
+
 ## 0.10.0 — 28 August 2026
 
 ### Added

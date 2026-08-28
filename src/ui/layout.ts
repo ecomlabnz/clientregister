@@ -24,6 +24,8 @@ export interface PageOpts {
    * indexes unless a page explicitly opts in.
    */
   indexable?: boolean;
+  /** Extra head content — canonical, social cards, structured data. */
+  head?: Raw;
   status?: number;
 }
 
@@ -50,8 +52,11 @@ export function page(c: Context<AppContext>, opts: PageOpts, body: Raw): Respons
 <meta name="robots" content="${opts.indexable ? 'index, follow' : 'noindex, nofollow'}">
 ${opts.description ? html`<meta name="description" content="${opts.description}">` : ''}
 <title>${opts.landing ? opts.title : `${opts.title} · ${appName}`}</title>
+${opts.head ?? ''}
 <link rel="stylesheet" href="/app.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/favicon.svg">
+<meta name="theme-color" content="#f5484f">
 </head>
 <body class="${opts.landing ? 'site' : opts.bare ? 'bare' : 'app'}">
 ${opts.landing
