@@ -92,7 +92,8 @@ p:last-child { margin-bottom: 0; }
 }
 .nav-link:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
 .nav-link.current { background: var(--blue-bg); color: var(--accent); }
-.topbar-right { margin-left: auto; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.signout { display: flex; }
 .whoami { display: flex; align-items: center; gap: 8px; color: var(--text); }
 .whoami:hover { text-decoration: none; }
 .whoami-name { font-size: 0.9rem; }

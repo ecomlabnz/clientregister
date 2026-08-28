@@ -18,6 +18,7 @@ export interface PageOpts {
 
 export function page(c: Context<AppContext>, opts: PageOpts, body: Raw): Response {
   const user = c.get('user');
+  const session = c.get('session');
   const appName = c.env.APP_NAME || 'Client Register';
   const ok = c.req.query('ok');
   const err = c.req.query('err');
@@ -50,7 +51,13 @@ ${opts.bare
       ? html`<a class="whoami" href="/account" title="${user.email}">
                <span class="avatar">${initials(user.name)}</span>
                <span class="whoami-name">${user.name}</span>
-             </a>`
+             </a>
+             ${session
+               ? html`<form method="post" action="/logout" class="signout">
+                        <input type="hidden" name="_csrf" value="${session.csrf}">
+                        <button type="submit" class="btn btn-secondary btn-small">Sign out</button>
+                      </form>`
+               : ''}`
       : ''}
   </div>
 </header>
