@@ -166,7 +166,7 @@ with your privacy obligations in mind.
 |---|---|
 | **Owner** | Everything, including changing other owners. |
 | **Administrator** | Everything except owner-account changes. |
-| **Licensed adviser** | Read/write the register, quote, triage, send mail, run AI. |
+| **Specialist** (lawyer or licensed adviser) | Read/write the register, quote, triage, send mail, run AI. |
 | **Assistant** | Read/write the register, triage, documents, run AI. No quoting, no outbound mail, no deletion. |
 | **Read only** | Read the register and documents. |
 

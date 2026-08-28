@@ -47,12 +47,28 @@ export function can(user: Pick<User, 'role' | 'status'> | null, permission: Perm
   return ROLE_PERMISSIONS[user.role].includes(permission);
 }
 
+/**
+ * What each role is called in the interface. These are display strings only —
+ * the keys above are what is stored in `users.role` and checked against the
+ * database constraint, so a label can be reworded freely without a migration.
+ * `adviser` is shown as "Specialist" because the practice uses it for both
+ * lawyers and licensed immigration advisers.
+ */
 export const ROLE_LABELS: Record<Role, string> = {
   owner: 'Owner',
   admin: 'Administrator',
-  adviser: 'Licensed adviser',
+  adviser: 'Specialist',
   assistant: 'Assistant',
   readonly: 'Read only',
+};
+
+/** One line on what each role is for, shown where a role is chosen. */
+export const ROLE_DESCRIPTIONS: Record<Role, string> = {
+  owner: 'Everything, including managing other owners.',
+  admin: 'Everything except changing owner accounts.',
+  adviser: 'Lawyer or licensed immigration adviser: full register, quoting, fees, triage, email.',
+  assistant: 'Runs cases and tasks. Cannot quote, change fees or delete records.',
+  readonly: 'Can look at the register and documents, and change nothing.',
 };
 
 export function isRole(value: string): value is Role {
