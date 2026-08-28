@@ -290,6 +290,7 @@ details[open] > summary { margin-bottom: 12px; }
 }
 .tasklist li:last-child { border-bottom: none; }
 .task-done { opacity: 0.55; }
+.task-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 
 .fee-summary { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
 .stat {

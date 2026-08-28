@@ -145,7 +145,8 @@ export const adminModule: AppModule = {
             <td>${badge(u.status, u.status === 'active' ? 'green' : 'red')}
                 ${u.locked_until && new Date(u.locked_until) > new Date() ? badge('locked', 'amber') : ''}</td>
             <td>${u.totp_enabled ? badge('on', 'green') : badge('off', 'amber')}</td>
-            <td class="small">${dateTime(u.last_login_at)}</td>
+            <td class="small">${dateTime(u.last_login_at)}
+                <div><a class="small" href="/admin/audit?actor=${u.id}">Activity</a></div></td>
             <td>${u.id === me.id ? html`<span class="muted small">this is you</span>` : html`
               <form method="post" action="/admin/users/${u.id}/reset-password" class="inline-form"
                     data-confirm="Issue a new temporary password for ${u.name}? All their sessions will end.">
@@ -366,24 +367,54 @@ export const adminModule: AppModule = {
     // --- Audit --------------------------------------------------------------
     r.get('/audit', requirePermission('audit:read'), async (c) => {
       const action = c.req.query('action') ?? '';
+      const actor = c.req.query('actor') ?? '';
+      const since = c.req.query('since') ?? '';
       const pageNum = Math.max(1, Number(c.req.query('page') ?? '1') || 1);
-      const params: unknown[] = [];
-      let whereSql = '';
-      if (action) { whereSql = 'WHERE a.action LIKE ?'; params.push(`${action}%`); }
 
-      const rows = await all<any>(
-        c.env.DB,
-        `SELECT a.* FROM audit_log a ${whereSql} ORDER BY a.at DESC LIMIT 101 OFFSET ?`,
-        ...params, (pageNum - 1) * 100,
-      );
+      const conds: string[] = [];
+      const params: unknown[] = [];
+      if (action) { conds.push('a.action LIKE ?'); params.push(`${action}%`); }
+      if (actor) { conds.push('a.actor_id = ?'); params.push(actor); }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(since)) { conds.push('a.at >= ?'); params.push(since); }
+      const whereSql = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+
+      const [rows, users, subject] = await Promise.all([
+        all<any>(
+          c.env.DB,
+          `SELECT a.* FROM audit_log a ${whereSql} ORDER BY a.at DESC LIMIT 101 OFFSET ?`,
+          ...params, (pageNum - 1) * 100,
+        ),
+        all<{ id: string; name: string }>(c.env.DB, 'SELECT id, name FROM users ORDER BY name'),
+        actor ? one<{ name: string; email: string }>(c.env.DB, 'SELECT name, email FROM users WHERE id = ?', actor) : null,
+      ]);
       const hasMore = rows.length > 100;
+      const qs = (over: Record<string, string | number>) =>
+        new URLSearchParams({ action, actor, since, ...Object.fromEntries(
+          Object.entries(over).map(([k, v]) => [k, String(v)])) }).toString();
 
       return page(c, { title: 'Audit log', active: '/admin' }, html`
         ${breadcrumbs([{ href: '/admin', label: 'Admin' }, { label: 'Audit log' }])}
-        ${pageHeader('Audit log', 'Append-only record of who did what.')}
+        ${pageHeader(
+          subject ? `Activity — ${subject.name}` : 'Audit log',
+          subject
+            ? `Everything ${subject.email} has done, most recent first.`
+            : 'Every action taken in the register, by whom, and when.')}
+
+        <div class="alert alert-ok">
+          This log is append-only in the database itself. Triggers refuse every attempt to change or
+          delete a row — from this application, the Cloudflare console, or the API alike. Entries can
+          only be added.
+        </div>
+
         <form method="get" action="/admin/audit" class="filters">
-          <input type="search" name="action" value="${action}" placeholder="Filter by action prefix, e.g. case.">
+          <select name="actor">
+            <option value="">Everyone</option>
+            ${users.map((u) => html`<option value="${u.id}" ${u.id === actor ? raw('selected') : ''}>${u.name}</option>`)}
+          </select>
+          <input type="search" name="action" value="${action}" placeholder="Action prefix, e.g. case.">
+          <label class="small">Since <input type="date" name="since" value="${since}"></label>
           <button class="btn btn-secondary" type="submit">Filter</button>
+          ${action || actor || since ? html`<a class="btn btn-secondary" href="/admin/audit">Clear</a>` : ''}
         </form>
         ${table(['When', 'Who', 'Action', 'Entity', 'IP', 'Detail'], rows.slice(0, 100).map((row: any) => html`
           <tr>
@@ -395,8 +426,8 @@ export const adminModule: AppModule = {
             <td class="small muted">${truncate(row.meta_json, 80)}</td>
           </tr>`))}
         <div class="pager">
-          ${pageNum > 1 ? html`<a class="btn btn-secondary" href="/admin/audit?action=${action}&page=${pageNum - 1}">Previous</a>` : ''}
-          ${hasMore ? html`<a class="btn btn-secondary" href="/admin/audit?action=${action}&page=${pageNum + 1}">Next</a>` : ''}
+          ${pageNum > 1 ? html`<a class="btn btn-secondary" href="/admin/audit?${raw(qs({ page: pageNum - 1 }))}">Previous</a>` : ''}
+          ${hasMore ? html`<a class="btn btn-secondary" href="/admin/audit?${raw(qs({ page: pageNum + 1 }))}">Next</a>` : ''}
         </div>`);
     });
 

@@ -15,7 +15,7 @@ import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
-import { page, redirectWith } from '../../ui/layout';
+import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import { badge, card, csrfField, field, optionsFrom, pageHeader, select, statusTone, table } from '../../ui/components';
 import { dateShort, money } from '../../ui/format';
@@ -130,6 +130,7 @@ export async function feesSection(c: any, caseId: string, currency: string, canW
           </select>
           <button class="btn btn-small btn-secondary js-hide" type="submit">Set</button>
         </form>
+        <a class="btn btn-small btn-secondary" href="/cases/${caseId}/fees/${it.id}/edit">Edit</a>
         <form method="post" action="/cases/${caseId}/fees/${it.id}/delete" class="inline-form"
               data-confirm="Delete this fee line?">
           ${csrfField(csrf)}
@@ -286,6 +287,100 @@ export const feesModule: AppModule = {
       });
       await auditFrom(c, { action: 'fee.created', entityType: 'case', entityId: caseId, meta: { id, gross } });
       return redirectWith(c, `/cases/${caseId}`, 'Fee line added.');
+    });
+
+    r.get('/cases/:caseId/fees/:feeId/edit', requirePermission('register:write'), async (c) => {
+      const caseId = c.req.param('caseId')!;
+      const feeId = c.req.param('feeId')!;
+      const [item, kase, settings] = await Promise.all([
+        one<FeeItemRow>(c.env.DB, 'SELECT * FROM fee_items WHERE id = ? AND case_id = ?', feeId, caseId),
+        one<{ ref: string; title: string }>(c.env.DB, 'SELECT ref, title FROM cases WHERE id = ?', caseId),
+        feeSettings(c.env),
+      ]);
+      if (!item || !kase) return c.notFound();
+      const csrf = c.get('session')!.csrf;
+
+      return page(c, { title: 'Edit fee line', active: '/cases' }, html`
+        ${breadcrumbs([{ href: '/cases', label: 'Cases' },
+                       { href: `/cases/${caseId}`, label: kase.ref },
+                       { label: 'Fee line' }])}
+        ${pageHeader('Edit fee line', `${kase.ref} — ${kase.title}`)}
+        <form method="post" action="/cases/${caseId}/fees/${item.id}" class="form-grid">
+          ${csrfField(csrf)}
+          <div class="form-section">
+            <h3>The charge</h3>
+            ${field({ label: 'Description', name: 'description', value: item.description, required: true, maxlength: 200 })}
+            ${field({ label: 'Amount', name: 'amount', value: (item.amount_cents / 100).toFixed(2), required: true,
+                      hint: 'The figure as you would write it on the invoice, before the GST treatment below is applied.' })}
+            ${select({ label: 'Type', name: 'kind', value: item.kind, includeBlank: false,
+                       options: optionsFrom(FEE_KINDS, FEE_KIND_LABELS) })}
+            ${select({ label: 'GST', name: 'gst_treatment', value: item.gst_treatment, includeBlank: false,
+                       options: optionsFrom(GST_TREATMENTS, GST_TREATMENT_LABELS) })}
+            ${select({ label: 'Status', name: 'status', value: item.status, includeBlank: false,
+                       options: optionsFrom(FEE_STATUSES, FEE_STATUS_LABELS) })}
+            <div class="field checkbox-field">
+              <label><input type="checkbox" name="include_in_split" ${item.include_in_split ? raw('checked') : ''}>
+                Include in the revenue split</label>
+            </div>
+            <p class="hint">GST will be recalculated at the practice's current rate
+               (${(settings.gstRateBp / 100).toFixed(2)}%). This line was entered at
+               ${(item.gst_rate_bp / 100).toFixed(2)}%.</p>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Save changes</button>
+            <a class="btn btn-secondary" href="/cases/${caseId}">Cancel</a>
+          </div>
+        </form>`);
+    });
+
+    r.post('/cases/:caseId/fees/:feeId', requirePermission('register:write'), async (c) => {
+      const caseId = c.req.param('caseId')!;
+      const feeId = c.req.param('feeId')!;
+      const user = c.get('user')!;
+      const existing = await one<FeeItemRow>(
+        c.env.DB, 'SELECT * FROM fee_items WHERE id = ? AND case_id = ?', feeId, caseId,
+      );
+      if (!existing) return c.notFound();
+
+      const settings = await feeSettings(c.env);
+      const f = new FormReader(await c.req.formData());
+      const description = f.text('description', { required: true, label: 'Description', max: 200 });
+      const amount = f.money('amount', { required: true, label: 'Amount' });
+      const kind = f.enum('kind', FEE_KINDS, { fallback: existing.kind })!;
+      const treatment = f.enum('gst_treatment', GST_TREATMENTS, { fallback: existing.gst_treatment })!;
+      const status = f.enum('status', FEE_STATUSES, { fallback: existing.status })!;
+      const includeInSplit = f.bool('include_in_split');
+      if (!f.valid || amount === null) {
+        return redirectWith(c, `/cases/${caseId}/fees/${feeId}/edit`,
+          Object.values(f.errors)[0] ?? 'Invalid fee line.', 'err');
+      }
+
+      const rateBp = settings.gstRegistered ? settings.gstRateBp : 0;
+      const { net, gst, gross } = computeGst(amount, treatment, rateBp);
+
+      await run(
+        c.env.DB,
+        `UPDATE fee_items SET description = ?, kind = ?, amount_cents = ?, gst_treatment = ?,
+           gst_rate_bp = ?, net_cents = ?, gst_cents = ?, gross_cents = ?, include_in_split = ?,
+           status = ?, invoiced_at = ?, paid_at = ?, updated_at = ?
+         WHERE id = ?`,
+        description, kind, amount, treatment, rateBp, net, gst, gross, includeInSplit, status,
+        status === 'invoiced' || status === 'paid' ? (existing.invoiced_at ?? nowIso()) : null,
+        status === 'paid' ? (existing.paid_at ?? nowIso()) : null,
+        nowIso(), feeId,
+      );
+
+      if (existing.gross_cents !== gross) {
+        await addEntry(c.env, {
+          entityType: 'case', entityId: caseId, kind: 'system',
+          body: `Fee line “${description}” changed from ${money(existing.gross_cents, existing.currency)}`
+            + ` to ${money(gross, existing.currency)} incl. GST.`,
+          createdBy: user.id,
+        });
+      }
+      await auditFrom(c, { action: 'fee.updated', entityType: 'case', entityId: caseId,
+        meta: { feeId, from: existing.gross_cents, to: gross } });
+      return redirectWith(c, `/cases/${caseId}`, 'Fee line updated.');
     });
 
     r.post('/cases/:caseId/fees/:feeId/status', requirePermission('register:write'), async (c) => {

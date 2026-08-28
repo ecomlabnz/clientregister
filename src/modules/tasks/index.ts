@@ -14,7 +14,7 @@ import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
-import { page, redirectWith } from '../../ui/layout';
+import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import { badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, statusTone, table } from '../../ui/components';
 import { dateInputValue, dateShort, isOverdue, relativeDays } from '../../ui/format';
@@ -131,7 +131,8 @@ export const tasksModule: AppModule = {
                       ${TASK_STATUSES.map((s) => html`<option value="${s}" ${s === t.status ? raw('selected') : ''}>${TASK_STATUS_LABELS[s]}</option>`)}
                     </select>
                     <button class="btn btn-small btn-secondary js-hide" type="submit">Set</button>
-                  </form>` : ''}</td>
+                  </form>
+                  <a class="btn btn-small btn-secondary" href="/tasks/${t.id}/edit">Edit</a>` : ''}</td>
               </tr>`))}
 
         ${writable ? card('New task', html`
@@ -181,6 +182,107 @@ export const tasksModule: AppModule = {
       }
       await auditFrom(c, { action: 'task.created', entityType: 'task', entityId: id, meta: { title, entityType, entityId } });
       return redirectWith(c, back, 'Task added.');
+    });
+
+    r.get('/:id/edit', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const task = await one<any>(c.env.DB, 'SELECT * FROM tasks WHERE id = ?', id);
+      if (!task) return c.notFound();
+
+      const [users, link] = await Promise.all([
+        userOptions(c.env),
+        entityLabel(c.env, task.entity_type, task.entity_id),
+      ]);
+      const csrf = c.get('session')!.csrf;
+      const back = safeReturn(c.req.query('return_to'), '/tasks');
+
+      return page(c, { title: `Edit task`, active: '/tasks' }, html`
+        ${breadcrumbs([{ href: '/tasks', label: 'Tasks' }, { label: 'Edit' }])}
+        ${pageHeader('Edit task', task.title)}
+        <form method="post" action="/tasks/${task.id}" class="form-grid">
+          ${csrfField(csrf)}
+          <input type="hidden" name="return_to" value="${back}">
+          <div class="form-section">
+            <h3>The task</h3>
+            ${field({ label: 'Task', name: 'title', value: task.title, required: true, maxlength: 200 })}
+            ${field({ label: 'Details', name: 'details', type: 'textarea', rows: 4, value: task.details, maxlength: 2000 })}
+          </div>
+          <div class="form-section">
+            <h3>Scheduling</h3>
+            ${field({ label: 'Due', name: 'due_at', type: 'date', value: dateInputValue(task.due_at) })}
+            ${select({ label: 'Priority', name: 'priority', value: task.priority, includeBlank: false,
+                       options: optionsFrom(PRIORITIES, PRIORITY_LABELS) })}
+            ${select({ label: 'Status', name: 'status', value: task.status, includeBlank: false,
+                       options: optionsFrom(TASK_STATUSES, TASK_STATUS_LABELS) })}
+            ${select({ label: 'Assigned to', name: 'assigned_to', value: task.assigned_to ?? '',
+                       options: users, includeBlank: 'Unassigned' })}
+          </div>
+          <div class="form-section">
+            <h3>Attached to</h3>
+            ${link
+              ? html`<p><a href="${link.href}">${link.label}</a></p>
+                     <div class="field checkbox-field">
+                       <label><input type="checkbox" name="detach"> Detach this task from that record</label>
+                       <p class="hint">The task stays, but stops appearing on the record's page.</p>
+                     </div>`
+              : html`<p class="muted">Not attached to anything. Add a task from a case or client
+                       page to attach it there.</p>`}
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Save changes</button>
+            <a class="btn btn-secondary" href="${back}">Cancel</a>
+          </div>
+        </form>`);
+    });
+
+    r.post('/:id', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const user = c.get('user')!;
+      const existing = await one<any>(c.env.DB, 'SELECT * FROM tasks WHERE id = ?', id);
+      if (!existing) return c.notFound();
+
+      const form = await c.req.formData();
+      const f = new FormReader(form);
+      const title = f.text('title', { required: true, label: 'Task', max: 200 });
+      const details = f.optional('details', { max: 2000 });
+      const dueAt = f.date('due_at');
+      const priority = f.enum('priority', PRIORITIES, { fallback: 'normal' })!;
+      const status = f.enum('status', TASK_STATUSES, { fallback: 'open' })!;
+      const assignedTo = f.optional('assigned_to', { max: 60 });
+      const detach = f.bool('detach') === 1;
+      const back = safeReturn(String(form.get('return_to') ?? ''), `/tasks/${id}/edit`);
+      if (!f.valid) return redirectWith(c, `/tasks/${id}/edit`, Object.values(f.errors)[0]!, 'err');
+
+      await run(
+        c.env.DB,
+        `UPDATE tasks SET title = ?, details = ?, due_at = ?, priority = ?, status = ?,
+           assigned_to = ?, entity_type = ?, entity_id = ?, completed_at = ?, updated_at = ?
+         WHERE id = ?`,
+        title, details, dueAt, priority, status, assignedTo || null,
+        detach ? null : existing.entity_type, detach ? null : existing.entity_id,
+        status === 'done' ? (existing.completed_at ?? nowIso()) : null,
+        nowIso(), id,
+      );
+
+      // Record the change on the timeline of whatever the task belongs to, so
+      // the record's history shows it without anyone reading the audit log.
+      if (!detach && existing.entity_type && existing.entity_id) {
+        const changes: string[] = [];
+        if (existing.title !== title) changes.push(`renamed to “${title}”`);
+        if (existing.due_at !== dueAt) changes.push(dueAt ? `due ${dateShort(dueAt)}` : 'due date cleared');
+        if (existing.status !== status) changes.push(`marked ${TASK_STATUS_LABELS[status].toLowerCase()}`);
+        if (existing.assigned_to !== (assignedTo || null)) changes.push('reassigned');
+        if (changes.length > 0) {
+          await addEntry(c.env, {
+            entityType: existing.entity_type, entityId: existing.entity_id, kind: 'system',
+            body: `Task updated: ${changes.join(', ')}.`, createdBy: user.id,
+          });
+        }
+      }
+
+      await auditFrom(c, { action: 'task.updated', entityType: 'task', entityId: id,
+        meta: { title, status, detached: detach } });
+      return redirectWith(c, back, 'Task updated.');
     });
 
     r.post('/:id/status', requirePermission('register:write'), async (c) => {
