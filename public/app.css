@@ -315,6 +315,15 @@ body.bare {
 .muted { color: var(--muted); }
 /* Shown only where a column has been dropped for want of room. */
 .show-sm { display: none; }
+/* `hidden` must win.
+   The browser's own `[hidden] { display: none }` is a user-agent rule, so any
+   author rule that sets `display` on the same element beats it — and several
+   below do, on the very elements the scripts hide. That is how the client form
+   came to show its company fields for an individual: the property was set, the
+   element stayed on the page. This is the one place `!important` earns its
+   keep. */
+[hidden] { display: none !important; }
+
 .small { font-size: 0.85rem; }
 .strong { font-weight: 650; }
 .num { text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: normal; word-break: normal; }
@@ -413,6 +422,20 @@ textarea { resize: vertical; min-height: 70px; }
 /* A passage the register is quoting back rather than asserting: a proposed
    email, a paragraph the assistant wrote. Set apart so it reads as something
    to check, not as the page talking. */
+/* A file input that also takes a drop. The box is decoration around a real
+   input — with scripting off it is still a file input, just without the
+   dashed edge doing any work. */
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.dropzone-over { border-color: var(--accent); background: var(--blue-bg); }
+.dropzone-hint { font-size: 0.8rem; color: var(--muted); margin: 8px 0 0; }
+.dropzone-list { font-size: 0.8rem; margin: 4px 0 0; overflow-wrap: anywhere; }
+.dropzone-list:empty { display: none; }
+
 /* A conversation: theirs on the left, ours on the right, and never so wide
    that a line becomes hard to follow. Nothing here is a chat application —
    it is a record of what was said, which is why the meta line comes first. */
@@ -445,8 +468,15 @@ textarea { resize: vertical; min-height: 70px; }
 .form-section-wide { grid-column: 1 / -1; }
 
 /* Settings: fields flow across the grid rather than stacking in its first
-   column. A heading, a description or a long text box takes the whole width. */
-.settings-form { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 26px; }
+   column. A heading, a description or a long text box takes the whole width.
+   `display: grid` is set here rather than relied on from .form-grid — this
+   class was written assuming that company, and stacked silently into one
+   column the first time it was used on its own. */
+.settings-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0 26px;
+}
 .settings-head { grid-column: 1 / -1; }
 .settings-cell-wide { grid-column: 1 / -1; }
 .settings-cell-wide textarea { min-height: 92px; }

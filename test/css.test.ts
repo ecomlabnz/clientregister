@@ -61,3 +61,34 @@ describe('every custom property that is used is defined', () => {
     expect(missing, `used but never defined: ${missing.join(', ')}`).toEqual([]);
   });
 });
+
+describe('a layout class carries its own layout', () => {
+  it('makes .settings-form a grid by itself', () => {
+    // It set grid-template-columns and nothing else, so it only worked on the
+    // one page where the same element also carried .form-grid. Used alone it
+    // stacked into a single column, which is the bug it exists to prevent.
+    const block = css.match(/\.settings-form \{([^}]*)\}/);
+    expect(block).not.toBeNull();
+    expect(block![1]).toContain('display: grid');
+  });
+});
+
+describe('hiding something actually hides it', () => {
+  it('makes [hidden] win over any author display rule', () => {
+    // The browser's own `[hidden] { display: none }` is a user-agent rule, so
+    // any author rule setting `display` on the same element beats it. Several
+    // rules here do exactly that, on the very elements the scripts hide — which
+    // is how the client form came to show its company fields for an individual
+    // while its `hidden` property was correctly set to true.
+    expect(css).toMatch(/\[hidden\]\s*\{\s*display:\s*none\s*!important/);
+  });
+
+  it('declares it before the rules that would otherwise beat it', () => {
+    // Same specificity would be decided by order, so it goes early. It carries
+    // !important as well, but relying on one of the two is enough of a trap.
+    const guard = css.search(/\[hidden\]\s*\{\s*display:\s*none/);
+    const offender = css.indexOf('.js-tabbed [data-panel]');
+    expect(guard).toBeGreaterThan(-1);
+    expect(offender).toBeGreaterThan(guard);
+  });
+});

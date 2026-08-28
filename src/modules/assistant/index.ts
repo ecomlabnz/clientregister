@@ -34,6 +34,7 @@ import { isAiEnabled } from '../../ai/provider';
 import { runTriage, latestTriage } from '../../ai/triage';
 import { caseTypes, labelFor } from '../../core/vocabulary';
 import { newId } from '../../core/ids';
+import { assistantTabs, registerIntakeRoutes } from './intake';
 
 /** Shown wherever the assistant is offered but not switched on. */
 function notConfigured(): ReturnType<typeof html> {
@@ -58,6 +59,10 @@ export const assistantModule: AppModule = {
     const r = new Hono<AppContext>();
     r.use('*', requireAuth);
 
+    // Registered first: '/intake' would otherwise never be reached if a
+    // parameterised route were ever added above it.
+    registerIntakeRoutes(r);
+
     r.get('/', requirePermission('ai:run'), async (c) => {
       const enabled = isAiEnabled(c.env);
       const session = c.get('session')!;
@@ -73,6 +78,7 @@ export const assistantModule: AppModule = {
       return page(c, { title: 'Assistant', active: '/assistant' }, html`
         ${pageHeader('Assistant',
           'Paste something in and it will tell you what it is. It never writes anything itself.')}
+        ${assistantTabs('read')}
 
         ${enabled ? '' : notConfigured()}
 

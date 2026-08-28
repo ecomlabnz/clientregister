@@ -126,7 +126,12 @@ function clientForm(
                    options: [{ value: 'individual', label: 'Individual' },
                              { value: 'organisation', label: 'Company or organisation' }] })}
 
-        <div data-kind="individual">
+        ${'' /* Marked hidden by the server, not only by the script: a company
+                 has no passport and a person has no NZBN, and the wrong half of
+                 this form should never be on the page — with scripting or
+                 without it. The script re-computes this when the record type
+                 changes without a reload. */}
+        <div data-kind="individual" ${kind === 'individual' ? '' : raw('hidden')}>
           ${field({ label: 'Given names', name: 'given_names', value: givenNames, maxlength: 120,
                     hint: 'As they appear in the passport.' })}
           ${field({ label: 'Family name', name: 'family_name', value: familyName, required: true, maxlength: 120 })}
@@ -142,7 +147,7 @@ function clientForm(
                     maxlength: 100, placeholder: 'e.g. Director, HR Manager' })}
         </div>
 
-        <div data-kind="organisation">
+        <div data-kind="organisation" ${kind === 'organisation' ? '' : raw('hidden')}>
           ${field({ label: 'Registered name', name: 'organisation_name',
                     value: kind === 'organisation' ? values.full_name : '', maxlength: 200,
                     hint: 'Exactly as registered — the NZBN register is the authority.' })}
@@ -168,7 +173,8 @@ function clientForm(
         ${field({ label: 'Address', name: 'address', type: 'textarea', value: values.address, rows: 3, maxlength: 500 })}
       </div>
 
-      <div class="form-section" data-kind="individual" data-panel="identity">
+      <div class="form-section" data-kind="individual" data-panel="identity"
+           ${kind === 'individual' ? '' : raw('hidden')}>
         <h3>Identity documents</h3>
         ${sealingAvailable
           ? field({ label: 'Passport number', name: 'passport_number', value: '',
@@ -182,7 +188,8 @@ function clientForm(
                   hint: 'Watched on the alerts page — a passport expiring mid-application stalls it.' })}
       </div>
 
-      <div class="form-section" data-kind="individual" data-panel="immigration">
+      <div class="form-section" data-kind="individual" data-panel="immigration"
+           ${kind === 'individual' ? '' : raw('hidden')}>
         <h3>Immigration and compliance</h3>
         ${field({ label: 'Current visa type', name: 'current_visa_type', value: values.current_visa_type, maxlength: 120 })}
         ${field({ label: 'Current visa expiry', name: 'current_visa_expiry', type: 'date', value: dateInputValue(values.current_visa_expiry) })}
@@ -411,7 +418,9 @@ export const clientsModule: AppModule = {
 
       return page(c, { title: 'New client', active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { label: 'New' }])}
-        ${pageHeader('New client')}
+        ${pageHeader('New client', null, can(c.get('user'), 'ai:run')
+          ? html`<a class="btn btn-secondary" href="/assistant/intake">Read it from a document</a>`
+          : undefined)}
         ${Object.values(proposed).filter(Boolean).length > 1
           ? html`<div class="alert alert-ok">Filled in from what the assistant read. Check it before
                    saving — it is a reading, not a fact.</div>`
