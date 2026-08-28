@@ -288,34 +288,57 @@ export const adminModule: AppModule = {
         ${breadcrumbs([{ href: '/admin', label: 'Admin' }, { label: 'Users' }])}
         ${pageHeader('Users', 'Everyone who can sign in.')}
 
-        ${table(['Name', 'Role', 'Status', '2FA', 'Last sign-in', 'Actions'], users.map((u: any) => html`
+        ${/*
+          * One form per person, holding everything about them that can be
+          * changed. Name and email are editable — a person marries, or was
+          * entered with a typo, and neither is a reason to make a new account
+          * and lose the audit trail behind the old one.
+          *
+          * Your own row keeps its name and email editable but not your role or
+          * status: an owner may rename themselves, and may not accidentally
+          * demote or suspend the account they are signed in with.
+          */ ''}
+        ${table([
+          { label: 'Name and email', width: '34' },
+          { label: 'Role and status', width: '30' },
+          { label: 'State', width: '14', hideOn: 'sm' },
+          { label: 'Last sign-in', width: '14', hideOn: 'sm' },
+          { label: '', width: '14' },
+        ], users.map((u: any) => html`
           <tr>
-            <td>${u.name}<div class="muted small">${u.email}</div></td>
             <td>
-              <form method="post" action="/admin/users/${u.id}" class="inline-form">
+              <form method="post" action="/admin/users/${u.id}" class="user-row-form" id="u_${u.id}">
                 ${csrfField(csrf)}
-                <select name="role" ${u.id === me.id ? raw('disabled') : ''}>
-                  ${ROLES.map((role) => html`<option value="${role}" ${role === u.role ? raw('selected') : ''}>${ROLE_LABELS[role]}</option>`)}
-                </select>
-                <select name="status" ${u.id === me.id ? raw('disabled') : ''}>
-                  <option value="active" ${u.status === 'active' ? raw('selected') : ''}>Active</option>
-                  <option value="suspended" ${u.status === 'suspended' ? raw('selected') : ''}>Suspended</option>
-                </select>
-                ${u.id === me.id ? '' : html`<button class="btn btn-small btn-secondary" type="submit">Save</button>`}
+                <input name="name" value="${u.name}" maxlength="120" required aria-label="Full name">
+                <input name="email" type="email" value="${u.email}" maxlength="320" required aria-label="Email">
               </form>
             </td>
-            <td>${badge(u.status, u.status === 'active' ? 'green' : 'red')}
-                ${u.locked_until && new Date(u.locked_until) > new Date() ? badge('locked', 'amber') : ''}</td>
-            <td>${u.totp_enabled ? badge('on', 'green') : badge('off', 'amber')}</td>
-            <td class="small">${dateTime(u.last_login_at)}
+            <td>
+              <select name="role" form="u_${u.id}" ${u.id === me.id ? raw('disabled') : ''} aria-label="Role">
+                ${ROLES.map((role) => html`<option value="${role}" ${role === u.role ? raw('selected') : ''}>${ROLE_LABELS[role]}</option>`)}
+              </select>
+              <select name="status" form="u_${u.id}" ${u.id === me.id ? raw('disabled') : ''} aria-label="Status">
+                <option value="active" ${u.status === 'active' ? raw('selected') : ''}>Active</option>
+                <option value="suspended" ${u.status === 'suspended' ? raw('selected') : ''}>Suspended</option>
+              </select>
+              <button class="btn btn-small btn-primary mt" type="submit" form="u_${u.id}">Save</button>
+              ${u.id === me.id
+                ? html`<p class="hint">This is you. You can change your own name and email, but not
+                         your own role or status.</p>`
+                : ''}
+            </td>
+            <td class="col-sm-hide">${badge(u.status, u.status === 'active' ? 'green' : 'red')}
+                ${u.locked_until && new Date(u.locked_until) > new Date() ? badge('locked', 'amber') : ''}
+                <div>${u.totp_enabled ? badge('2FA on', 'green') : badge('2FA off', 'amber')}</div></td>
+            <td class="small col-sm-hide">${dateTime(u.last_login_at)}
                 <div><a class="small" href="/admin/audit?actor=${u.id}">Activity</a></div></td>
-            <td>${u.id === me.id ? html`<span class="muted small">this is you</span>` : html`
-              <form method="post" action="/admin/users/${u.id}/reset-password" class="inline-form"
+            <td>${u.id === me.id ? '' : html`
+              <form method="post" action="/admin/users/${u.id}/reset-password"
                     data-confirm="Issue a new temporary password for ${u.name}? All their sessions will end.">
                 ${csrfField(csrf)}
                 <button class="btn btn-small btn-secondary" type="submit">Reset password</button>
               </form>`}</td>
-          </tr>`))}
+          </tr>`), { fixed: true, sticky: true })}
 
         ${card('Add a user', html`
           <form method="post" action="/admin/users" class="row-form">
@@ -372,28 +395,64 @@ export const adminModule: AppModule = {
     r.post('/users/:id', requirePermission('admin:users'), async (c) => {
       const id = c.req.param('id')!;
       const me = c.get('user')!;
-      if (id === me.id) return redirectWith(c, '/admin/users', 'You cannot change your own role or status.', 'err');
-
       const f = new FormReader(await c.req.formData());
-      const role = f.text('role', { required: true, label: 'Role', max: 20 });
-      const status = f.enum('status', ['active', 'suspended'] as const, { fallback: 'active' })!;
+
+      const target = await one<{ role: string; name: string; email: string }>(
+        c.env.DB, 'SELECT role, name, email FROM users WHERE id = ?', id);
+      if (!target) return c.notFound();
+
+      const name = f.text('name', { required: true, label: 'Full name', max: 120 });
+      const email = f.email('email', { required: true, label: 'Email' });
+      if (!f.valid || !email) return redirectWith(c, '/admin/users', Object.values(f.errors)[0] ?? 'Give a name and a valid email.', 'err');
+
+      // Role and status are disabled on your own row, so the browser does not
+      // send them. Falling back to what is already stored means a self-edit
+      // changes the name and nothing else, rather than resetting either.
+      const wantsRole = f.optional('role', { max: 20 });
+      const wantsStatus = f.optional('status', { max: 20 });
+      const role = id === me.id ? target.role : (wantsRole ?? target.role);
+      const status = id === me.id
+        ? null
+        : (wantsStatus === 'suspended' ? 'suspended' : 'active');
       if (!isRole(role)) return redirectWith(c, '/admin/users', 'Unknown role.', 'err');
 
-      const target = await one<{ role: string }>(c.env.DB, 'SELECT role FROM users WHERE id = ?', id);
-      if (!target) return c.notFound();
-      // Only an owner may create or unmake another owner.
-      if ((target.role === 'owner' || role === 'owner') && me.role !== 'owner') {
-        return redirectWith(c, '/admin/users', 'Only an owner can change owner accounts.', 'err');
-      }
-      if (target.role === 'owner' && role !== 'owner') {
-        const owners = await count(c.env.DB, `SELECT COUNT(*) AS n FROM users WHERE role = 'owner' AND status = 'active'`);
-        if (owners <= 1) return redirectWith(c, '/admin/users', 'The practice must keep at least one active owner.', 'err');
+      if (id !== me.id) {
+        // Only an owner may create or unmake another owner.
+        if ((target.role === 'owner' || role === 'owner') && me.role !== 'owner') {
+          return redirectWith(c, '/admin/users', 'Only an owner can change owner accounts.', 'err');
+        }
+        if (target.role === 'owner' && role !== 'owner') {
+          const owners = await count(c.env.DB, `SELECT COUNT(*) AS n FROM users WHERE role = 'owner' AND status = 'active'`);
+          if (owners <= 1) return redirectWith(c, '/admin/users', 'The practice must keep at least one active owner.', 'err');
+        }
       }
 
-      await run(c.env.DB, 'UPDATE users SET role = ?, status = ?, updated_at = ? WHERE id = ?', role, status, nowIso(), id);
-      if (status === 'suspended') await revokeAllSessions(c.env, id);
-      await auditFrom(c, { action: 'admin.user_updated', entityType: 'user', entityId: id, meta: { role, status } });
-      return redirectWith(c, '/admin/users', 'User updated.');
+      try {
+        if (status === null) {
+          await run(c.env.DB, 'UPDATE users SET name = ?, email = ?, updated_at = ? WHERE id = ?',
+            name, email, nowIso(), id);
+        } else {
+          await run(c.env.DB, 'UPDATE users SET name = ?, email = ?, role = ?, status = ?, updated_at = ? WHERE id = ?',
+            name, email, role, status, nowIso(), id);
+          if (status === 'suspended') await revokeAllSessions(c.env, id);
+        }
+      } catch {
+        // The unique index on email is what refuses a duplicate.
+        return redirectWith(c, '/admin/users', `Another account already uses ${email}.`, 'err');
+      }
+
+      // Recorded field by field: "who changed what" is the question the audit
+      // log exists to answer, and an email change in particular is one somebody
+      // may need to trace later.
+      const changed: Record<string, unknown> = {};
+      if (target.name !== name) changed['name'] = { from: target.name, to: name };
+      if (target.email !== email) changed['email'] = { from: target.email, to: email };
+      if (status !== null && target.role !== role) changed['role'] = { from: target.role, to: role };
+      if (status !== null) changed['status'] = status;
+      await auditFrom(c, { action: 'admin.user_updated', entityType: 'user', entityId: id, meta: changed });
+
+      return redirectWith(c, '/admin/users',
+        id === me.id ? 'Your details have been updated.' : `${name} updated.`);
     });
 
     r.post('/users/:id/reset-password', requirePermission('admin:users'), async (c) => {

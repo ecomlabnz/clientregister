@@ -111,29 +111,17 @@ export function isCaseStatus(value: string): value is CaseStatus {
   return (CASE_STATUSES as readonly string[]).includes(value);
 }
 
-export const CASE_TYPES = [
-  'visitor',
-  'student',
-  'work_aewv',
-  'work_other',
-  'partnership_work',
-  'partnership_residence',
-  'skilled_residence',
-  'residence_other',
-  'parent_category',
-  'investor_business',
-  'section_61',
-  'ppi_response',
-  'reconsideration',
-  'appeal_ipt',
-  'ministerial',
-  'advice_only',
-  'other',
-] as const;
-
-export type CaseType = (typeof CASE_TYPES)[number];
-
-export const CASE_TYPE_LABELS: Record<CaseType, string> = {
+/**
+ * Case types moved out of the code and into settings — see
+ * src/core/vocabulary.ts. A practice's list of matter types runs to sixty-odd
+ * and changes as immigration instructions do, which is not something a
+ * deployment should be needed for.
+ *
+ * These are kept only as the mapping migration 0012 used, so that anybody
+ * reading an old audit entry or a pre-0012 export can still tell what a stored
+ * value meant.
+ */
+export const LEGACY_CASE_TYPE_LABELS: Record<string, string> = {
   visitor: 'Visitor visa',
   student: 'Student visa',
   work_aewv: 'Work — AEWV',

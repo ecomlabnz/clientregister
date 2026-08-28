@@ -16,10 +16,11 @@ import { html, raw } from '../../ui/html';
 import { badge, card, emptyState, pageHeader, statusTone, table } from '../../ui/components';
 import { dateShort, isOverdue, money, relativeDays, truncate } from '../../ui/format';
 import {
-  CASE_STATUS_LABELS, CASE_TYPE_LABELS, CLIENT_STATUS_LABELS, DEADLINE_CASE_STATUSES,
+  CASE_STATUS_LABELS, CLIENT_STATUS_LABELS, DEADLINE_CASE_STATUSES,
   INQUIRY_STATUS_LABELS, OPEN_CASE_STATUSES, PRIORITY_LABELS, TASK_STATUS_LABELS,
 } from '../../domain';
 import { can } from '../../core/rbac';
+import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
 import { documentAlerts } from '../alerts';
 
 export const dashboardModule: AppModule = {
@@ -185,6 +186,7 @@ export const dashboardModule: AppModule = {
 
     // --- Global search ------------------------------------------------------
     r.get('/search', requirePermission('register:read'), async (c) => {
+      const types = await caseTypes(c.env);
       const q = (c.req.query('q') ?? '').trim();
       if (!q) return page(c, { title: 'Search', active: '/' }, html`
         ${pageHeader('Search')}
@@ -232,7 +234,7 @@ export const dashboardModule: AppModule = {
             <tr>
               <td><a href="/cases/${row.id}"><code>${row.ref}</code></a></td>
               <td><a href="/cases/${row.id}">${row.title}</a>
-                  <div class="muted small">${CASE_TYPE_LABELS[row.case_type as keyof typeof CASE_TYPE_LABELS] ?? row.case_type}</div></td>
+                  <div class="muted small">${labelFor(types, row.case_type)}</div></td>
               <td class="small">${row.client_name}</td>
               <td>${badge(CASE_STATUS_LABELS[row.status as keyof typeof CASE_STATUS_LABELS] ?? row.status, statusTone(row.status))}</td>
             </tr>`)))}

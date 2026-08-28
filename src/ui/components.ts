@@ -32,12 +32,57 @@ export function emptyState(message: string, actionHtml?: Raw): Raw {
   return html`<div class="empty"><p>${message}</p>${actionHtml ?? ''}</div>`;
 }
 
-export function table(headers: string[], rows: Raw[]): Raw {
-  if (rows.length === 0) return emptyState('Nothing here yet.');
+export interface Column {
+  label: string;
+  /** Share of the table width. With `fixed`, this is what stops one column
+   *  taking the space three others needed. */
+  width?: string;
+  /** Dropped on a narrow screen. The caller marks the matching cells with the
+   *  same class, because a pre-rendered row cannot be told its own index. */
+  hideOn?: 'sm';
+  align?: 'right';
+}
+
+export interface TableOpts {
+  /**
+   * Column headings stay put while the rows scroll under them.
+   *
+   * This only works when the table does not need horizontal scrolling: a
+   * sticky element positions against its nearest scrolling ancestor, so inside
+   * an `overflow-x: auto` wrapper the heading sticks to the wrapper and scrolls
+   * away with the page. Verified in a browser, not assumed. Use it on lists
+   * whose columns are sized to fit; leave it off for genuinely wide tables,
+   * which keep their horizontal scroll instead.
+   */
+  sticky?: boolean;
+  /**
+   * Column widths are obeyed rather than treated as suggestions. Without this
+   * the browser sizes columns by content, which on a phone hands most of the
+   * width to whichever cell holds the longest word and squeezes the rest.
+   */
+  fixed?: boolean;
+  /** Shown instead of the table when there are no rows. */
+  empty?: string;
+}
+
+export function table(columns: Array<string | Column>, rows: Raw[], opts: TableOpts = {}): Raw {
+  if (rows.length === 0) return emptyState(opts.empty ?? 'Nothing here yet.');
+  const cols: Column[] = columns.map((c) => (typeof c === 'string' ? { label: c } : c));
+  const sized = cols.some((c) => c.width);
+
+  const wrapClass = opts.sticky ? 'table-wrap table-sticky' : 'table-wrap';
+  const tableClass = opts.fixed ? 'table-fixed' : '';
+
   return html`
-    <div class="table-wrap">
-      <table>
-        <thead><tr>${headers.map((h) => html`<th>${h}</th>`)}</tr></thead>
+    <div class="${wrapClass}">
+      <table class="${tableClass}">
+        ${sized
+          ? html`<colgroup>${cols.map((c) => html`<col ${c.width ? raw(`class="w-${c.width}"`) : ''}>`)}</colgroup>`
+          : ''}
+        <thead><tr>${cols.map((c) => html`<th class="${[
+          c.hideOn === 'sm' ? 'col-sm-hide' : '',
+          c.align === 'right' ? 'num' : '',
+        ].filter(Boolean).join(' ')}">${c.label}</th>`)}</tr></thead>
         <tbody>${join(rows)}</tbody>
       </table>
     </div>`;

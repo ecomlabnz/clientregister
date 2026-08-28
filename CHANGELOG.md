@@ -7,6 +7,57 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.13.0 — 28 August 2026
+
+### Added
+- **Case types are configuration, not code.** The seventeen types this system
+  shipped with were a guess; the practice's own list runs to sixty-odd in a
+  shorthand it already uses. That list is now the default, editable under
+  Settings → Lists and dropdowns, and validated on write so nothing
+  unrecognised reaches the database. Case statuses stay in code: they decide
+  which transitions are legal, so they are workflow rather than vocabulary.
+  - A general vocabulary layer (`src/core/vocabulary.ts`) so the next
+    amendable list is a declaration rather than a refactor.
+  - Migration 0012 maps existing cases onto the nearest new term. Anything
+    unmapped keeps its value and shows as itself — a case filed under a type
+    since retired is still that kind of case.
+  - The AI layer is handed the configured list per request rather than
+    importing one, so a type added this morning is one it may suggest this
+    afternoon.
+- **Search that answers as you type**, on the case and client lists. Debounced,
+  with the previous request cancelled so a slow answer to an abandoned query
+  cannot overwrite the one being typed now. Pure progressive enhancement: with
+  JavaScript blocked the form submits and the Filter button works exactly as
+  before. Verified in a browser that the document is never re-created.
+- **Column headings stay put** while a long list scrolls under them, meeting the
+  navigation bar exactly. This needed `overflow-x: clip` rather than `auto` on
+  the table wrapper — `auto` makes the wrapper a scrolling box, and a sticky
+  heading then sticks to *it* and scrolls away with the page. Verified in a
+  browser rather than assumed.
+- **Names and email addresses are editable on Admin → Users**, including your
+  own — a person marries, or was entered with a typo, and neither is a reason
+  to make a new account and orphan the audit trail. Your own role and status
+  stay locked so you cannot demote or suspend the account you are signed in
+  with; a forged post trying to is ignored rather than obeyed. A duplicate
+  email is refused with an explanation, and each field change is recorded in
+  the audit log with its before and after.
+
+### Changed
+- **Lists fit a phone.** Six columns cannot share 390 pixels, so on a narrow
+  screen four of them are dropped and their content folded into the matter or
+  name cell, where it reads as a line of text instead of a squeezed column.
+  Titles clamp to two lines. Case rows went from ~250px tall to ~110px.
+- Columns now take declared widths (`table-layout: fixed`) instead of being
+  sized by whichever cell holds the longest word, so a long status can no
+  longer take the space three other columns needed.
+
+### Fixed
+- **The demonstration seed would have failed** against the current schema: it
+  created tasks with no owner, which `NOT NULL` now refuses. It resolves the
+  owner account in the statement itself, so it works on any installation.
+- The seed also wrote the old case-type keys, which showed as raw keys in the
+  list rather than labels.
+
 ## 0.12.1 — 28 August 2026
 
 ### Fixed

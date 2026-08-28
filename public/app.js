@@ -80,6 +80,69 @@
     });
   });
 
+  // Search that answers as you type.
+  //
+  // Progressive enhancement, not a rewrite: the form still submits normally
+  // with this file blocked, and the Filter button still works. What this adds
+  // is a debounced fetch of the same URL the form would have gone to, from
+  // which the results region is lifted and swapped in. The server renders the
+  // page it always renders; nothing here knows anything about the data.
+  Array.prototype.forEach.call(document.querySelectorAll('form[data-live-search]'), function (form) {
+    var region = document.querySelector('[data-live-results]');
+    if (!region || !window.fetch || !window.AbortController) return;
+
+    var timer = null;
+    var inFlight = null;
+
+    var run = function () {
+      // A slow answer to an abandoned query must never overwrite the answer to
+      // the one being typed now, so the previous request is cancelled.
+      if (inFlight) inFlight.abort();
+      inFlight = new AbortController();
+
+      var params = new URLSearchParams(new FormData(form));
+      // Any page number belongs to the old query.
+      params.delete('page');
+      var url = form.getAttribute('action') + '?' + params.toString();
+
+      region.setAttribute('aria-busy', 'true');
+      window.fetch(url, { signal: inFlight.signal, credentials: 'same-origin' })
+        .then(function (response) { return response.ok ? response.text() : Promise.reject(response.status); })
+        .then(function (markup) {
+          var fresh = new DOMParser().parseFromString(markup, 'text/html')
+            .querySelector('[data-live-results]');
+          if (fresh) region.innerHTML = fresh.innerHTML;
+          region.removeAttribute('aria-busy');
+          // The address bar follows, so a reload or a shared link shows the
+          // same list — replace rather than push, so Back leaves the page
+          // rather than walking every keystroke.
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', url);
+          }
+        })
+        .catch(function (reason) {
+          // An abort is the expected case and means another request is already
+          // on its way. Anything else leaves the current results alone: a
+          // stale list is better than an empty one.
+          if (reason !== 'AbortError') region.removeAttribute('aria-busy');
+        });
+    };
+
+    var schedule = function (delay) {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(run, delay);
+    };
+
+    form.addEventListener('input', function (event) {
+      if (event.target && event.target.type === 'submit') return;
+      schedule(250);
+    });
+    // A dropdown is a decision, not a keystroke, so it applies at once.
+    form.addEventListener('change', function () { schedule(0); });
+    // Enter would otherwise reload the whole page for a result already shown.
+    form.addEventListener('submit', function (event) { event.preventDefault(); schedule(0); });
+  });
+
   // Print buttons. Declared with data-print rather than an inline handler,
   // because the content security policy forbids inline script.
   Array.prototype.forEach.call(document.querySelectorAll('[data-print]'), function (button) {

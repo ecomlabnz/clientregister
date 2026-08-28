@@ -22,7 +22,7 @@ import { processMessage } from '../../ingest/pipeline';
 import { isAiEnabled } from '../../ai/provider';
 import { latestTriage, runTriage } from '../../ai/triage';
 import { can } from '../../core/rbac';
-import { CASE_TYPE_LABELS } from '../../domain';
+import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
 
 interface IngestRow {
   id: string; channel: string; external_id: string | null; received_at: string;
@@ -100,6 +100,7 @@ export const inboxModule: AppModule = {
     });
 
     r.get('/:id', requirePermission('ingest:triage'), async (c) => {
+      const types = await caseTypes(c.env);
       const id = c.req.param('id')!;
       const msg = await one<IngestRow>(c.env.DB, 'SELECT * FROM ingest_messages WHERE id = ?', id);
       if (!msg) return c.notFound();
@@ -144,7 +145,7 @@ export const inboxModule: AppModule = {
                   <dt>Phone</dt><dd>${suggestion.contact_phone ?? '—'}</dd>
                   <dt>Nationality</dt><dd>${suggestion.nationality ?? '—'}</dd>
                   <dt>Likely case type</dt><dd>${suggestion.suggested_case_type
-                    ? (CASE_TYPE_LABELS[suggestion.suggested_case_type as keyof typeof CASE_TYPE_LABELS] ?? suggestion.suggested_case_type)
+                    ? labelFor(types, suggestion.suggested_case_type)
                     : '—'}</dd>
                   <dt>Suggested title</dt><dd>${suggestion.suggested_title ?? '—'}</dd>
                   <dt>Next action</dt><dd>${suggestion.suggested_next_action ?? '—'}</dd>

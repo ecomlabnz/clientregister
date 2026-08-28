@@ -32,13 +32,14 @@ import {
 } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, money, relativeDays, truncate } from '../../ui/format';
 import {
-  CASE_STATUS_LABELS, CASE_TYPE_LABELS, CLIENT_STATUSES, CLIENT_STATUS_LABELS,
+  CASE_STATUS_LABELS, CLIENT_STATUSES, CLIENT_STATUS_LABELS,
   ENTRY_KINDS, ENTRY_KIND_LABELS, PARTY_ROLE_LABELS, QUOTE_STATUS_LABELS, type ClientStatus,
 } from '../../domain';
 import { organisationOptions, userOptions } from '../../core/lookups';
 import { addEntry, listEntries } from '../../core/timeline';
 import { casesForClient, relatedClients } from '../../core/parties';
 import { can } from '../../core/rbac';
+import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
 import { composeFullName, splitFullName, type ClientKind } from '../../core/names';
 import {
   fetchEntity, isValidNzbnFormat, normaliseNzbn, nzbnConfigured, searchEntities,
@@ -328,7 +329,7 @@ export const clientsModule: AppModule = {
                href="/clients?view=${v.id}">${v.label} <span class="muted">${v.count}</span></a>`)}
         </nav>
 
-        <form method="get" action="/clients" class="filters">
+        <form method="get" action="/clients" class="filters" data-live-search>
           <input type="hidden" name="view" value="${view}">
           <input type="search" name="q" value="${q}" placeholder="Search name, email, phone, reference or NZBN">
           <select name="status">
@@ -337,23 +338,37 @@ export const clientsModule: AppModule = {
           </select>
           <button class="btn btn-secondary" type="submit">Filter</button>
         </form>
-        ${table(['Reference', 'Name', 'Contact', 'Status', 'Open cases', 'Updated'], shown.map((row) => html`
+        <div data-live-results>
+        ${table([
+          { label: 'Reference', width: '14', hideOn: 'sm' },
+          { label: 'Name', width: '30' },
+          { label: 'Contact', width: '24' },
+          { label: 'Status', width: '14', hideOn: 'sm' },
+          { label: 'Open cases', width: '10', hideOn: 'sm' },
+          { label: 'Updated', width: '12', hideOn: 'sm' },
+        ], shown.map((row) => html`
           <tr>
-            <td><a href="/clients/${row.id}"><code>${row.ref}</code></a></td>
+            <td class="col-sm-hide"><a href="/clients/${row.id}"><code>${row.ref}</code></a></td>
             <td><a href="/clients/${row.id}">${row.full_name}</a>
                 <div class="muted small">
                   ${row.kind === 'organisation'
                     ? html`Organisation${row.nzbn ? html` · NZBN ${row.nzbn}` : ''}`
                     : row.nationality ?? ''}
+                </div>
+                <div class="row-meta show-sm">
+                  <code>${row.ref}</code>
+                  ${badge(CLIENT_STATUS_LABELS[row.status], statusTone(row.status))}
+                  ${row.open_cases ? html`<span class="muted">${row.open_cases} open</span>` : ''}
                 </div></td>
             <td class="small">${row.email ?? ''}${row.email && row.phone ? raw('<br>') : ''}${row.phone ?? ''}</td>
-            <td>${badge(CLIENT_STATUS_LABELS[row.status], statusTone(row.status))}</td>
-            <td>${row.open_cases || '—'}</td>
-            <td class="small">${dateShort(row.updated_at)}</td>
-          </tr>`))}
+            <td class="col-sm-hide">${badge(CLIENT_STATUS_LABELS[row.status], statusTone(row.status))}</td>
+            <td class="col-sm-hide">${row.open_cases || '—'}</td>
+            <td class="small col-sm-hide">${dateShort(row.updated_at)}</td>
+          </tr>`), { sticky: true, fixed: true, empty: 'No clients match that.' })}
         <div class="pager">
           ${pageNum > 1 ? html`<a class="btn btn-secondary" href="/clients?view=${view}&q=${q}&status=${status}&page=${pageNum - 1}">Previous</a>` : ''}
           ${hasMore ? html`<a class="btn btn-secondary" href="/clients?view=${view}&q=${q}&status=${status}&page=${pageNum + 1}">Next</a>` : ''}
+        </div>
         </div>`);
     });
 
@@ -518,6 +533,7 @@ export const clientsModule: AppModule = {
 
     // --- Detail -------------------------------------------------------------
     r.get('/:id', requirePermission('register:read'), async (c) => {
+      const types = await caseTypes(c.env);
       const id = c.req.param('id')!;
       const client = await one<ClientRow & { assignee_name: string | null }>(
         c.env.DB,
@@ -580,7 +596,7 @@ export const clientsModule: AppModule = {
               <tr>
                 <td><a href="/cases/${k.id}"><code>${k.ref}</code></a></td>
                 <td><a href="/cases/${k.id}">${k.title}</a></td>
-                <td class="small">${CASE_TYPE_LABELS[k.case_type as keyof typeof CASE_TYPE_LABELS] ?? k.case_type}</td>
+                <td class="small">${labelFor(types, k.case_type)}</td>
                 <td>${badge(CASE_STATUS_LABELS[k.status as keyof typeof CASE_STATUS_LABELS] ?? k.status, statusTone(k.status))}</td>
                 <td class="small">${k.next_action ? html`${truncate(k.next_action, 60)}<div class="muted">${dateShort(k.next_action_due)}</div>` : '—'}</td>
               </tr>`)))}
