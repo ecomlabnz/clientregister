@@ -6,6 +6,7 @@ import { html, raw, type Raw } from './html';
 import { getNavItems } from './nav-store';
 import { visibleNav } from '../core/module';
 import { initials } from './format';
+import { APP_VERSION } from '../version';
 
 export interface PageOpts {
   title: string;
@@ -68,7 +69,9 @@ ${opts.bare
 </main>
 <footer class="footer">
   <span>${appName}</span>
-  <span class="muted">${c.env.APP_ENV !== 'production' ? `environment: ${c.env.APP_ENV}` : ''}</span>
+  <span class="muted">
+    <a href="/help">Help</a> · v${APP_VERSION}${c.env.APP_ENV !== 'production' ? ` · ${c.env.APP_ENV}` : ''}
+  </span>
 </footer>`}
 <script src="/app.js" defer></script>
 </body>

@@ -10,6 +10,7 @@
 import type { Hono } from 'hono';
 import type { AppContext, User } from '../types';
 import type { Permission } from './rbac';
+import type { SettingsGroup } from './settings';
 import { can } from './rbac';
 
 export interface NavItem {
@@ -29,6 +30,12 @@ export interface AppModule {
   /** Mount points, e.g. ['/clients']. Informational — used by docs and admin. */
   basePaths?: string[];
   nav?: NavItem[];
+  /**
+   * Configuration this module owns, rendered as a tab on the settings page.
+   * Declaring settings here is what allows them to be validated and saved
+   * generically — and is what stops anything undeclared being written.
+   */
+  settings?: SettingsGroup[];
   /** Attach routes to the main app. Called once at startup. */
   register(app: Hono<AppContext>): void;
 }

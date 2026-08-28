@@ -8,6 +8,10 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
+import {
+  asBoolean, coerceSetting, collectSettingsGroups, readSettings, SettingValueError,
+  writeSettings, type SettingDef, type SettingsGroup,
+} from '../../core/settings';
 import { all, count, getSetting, nowIso, one, run, setSetting } from '../../core/db';
 import { newId, randomToken } from '../../core/ids';
 import { hashPassword } from '../../core/crypto';
@@ -16,7 +20,7 @@ import { revokeAllSessions } from '../../core/session';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
-import { html, raw } from '../../ui/html';
+import { html, raw, type Raw } from '../../ui/html';
 import { badge, card, csrfField, field, optionsFrom, pageHeader, select, table } from '../../ui/components';
 import { dateTime, truncate } from '../../ui/format';
 import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../core/rbac';
@@ -26,8 +30,77 @@ import { nzbnConfigured } from '../../integrations/nzbn';
 import { mailConfigured } from '../../mail/provider';
 import { flushQueue } from '../../mail/queue';
 import { registeredModules } from '../../registry';
+import { PRACTICE_SETTINGS } from '../../core/practice';
+import { can } from '../../core/rbac';
 
 const ROLES = ['owner', 'admin', 'adviser', 'assistant', 'readonly'] as const;
+
+/** Render one declared setting as the input its type calls for. */
+function settingField(def: SettingDef, value: string): Raw {
+  switch (def.type) {
+    case 'boolean':
+      return html`
+        <div class="field checkbox-field">
+          <label><input type="checkbox" name="${def.key}" ${asBoolean(value) ? raw('checked') : ''}>
+            ${def.label}</label>
+          ${def.help ? html`<p class="hint">${def.help}</p>` : ''}
+        </div>`;
+
+    case 'enum':
+      return select({
+        label: def.label, name: def.key, value, includeBlank: false, hint: def.help,
+        options: def.options ?? [],
+      });
+
+    case 'percent':
+      return field({
+        label: def.label, name: def.key, value: (Number(value) / 100).toString(),
+        hint: def.help, placeholder: '15',
+      });
+
+    case 'text':
+      return field({ label: def.label, name: def.key, value, type: 'textarea', rows: 3,
+                     hint: def.help, maxlength: def.maxLength ?? 4000 });
+
+    case 'integer':
+      return field({ label: def.label, name: def.key, value, type: 'number', hint: def.help });
+
+    default:
+      return field({ label: def.label, name: def.key, value, hint: def.help,
+                     maxlength: def.maxLength ?? 200 });
+  }
+}
+
+/** The default revenue split, which is a table rather than a single value. */
+async function defaultSharesCard(c: any, csrf: string): Promise<Raw> {
+  const raw_ = await getSetting(c.env, 'fees.default_shares', '[]');
+  let shares: Array<{ party_key: string; label: string; percent_bp: number }> = [];
+  try { shares = JSON.parse(raw_); } catch { shares = []; }
+
+  return card('Default revenue split for new cases', html`
+    <p class="hint">Each case starts from this and can be adjusted on the case itself. Shares must
+       total 100%.</p>
+    <form method="post" action="/admin/settings/default-shares">
+      ${csrfField(csrf)}
+      <table class="edit-table">
+        <thead><tr><th>Label</th><th>Key</th><th>Percent</th></tr></thead>
+        <tbody>
+          ${[0, 1, 2, 3].map((i) => {
+            const sh = shares[i];
+            return html`<tr>
+              <td><input name="share_label_${i}" value="${sh?.label ?? ''}" maxlength="80"
+                    placeholder="${i === 0 ? 'Principal (me)' : i === 1 ? 'Admin team' : ''}"></td>
+              <td><input name="share_key_${i}" value="${sh?.party_key ?? ''}" maxlength="40"
+                    placeholder="${i === 0 ? 'principal' : i === 1 ? 'admin' : ''}"></td>
+              <td><input name="share_percent_${i}" value="${sh ? (sh.percent_bp / 100).toString() : ''}"
+                    inputmode="decimal" size="6">%</td>
+            </tr>`;
+          })}
+        </tbody>
+      </table>
+      <button class="btn btn-primary" type="submit">Save default split</button>
+    </form>`);
+}
 
 function statusRow(label: string, ok: boolean, detail: string) {
   return html`
@@ -42,6 +115,7 @@ export const adminModule: AppModule = {
   name: 'admin',
   title: 'Administration',
   basePaths: ['/admin'],
+  settings: [PRACTICE_SETTINGS],
   nav: [{ href: '/admin', label: 'Admin', permission: 'admin:settings', order: 10 }],
 
   register(app) {
@@ -251,117 +325,120 @@ export const adminModule: AppModule = {
     });
 
     // --- Settings -----------------------------------------------------------
+    //
+    // Rendered from the groups the modules declare. Only a key that appears in
+    // a declared group can be read here or written by the handler below, so a
+    // crafted post cannot introduce or overwrite anything else.
     r.get('/settings', requirePermission('admin:settings'), async (c) => {
+      const groups = collectSettingsGroups(registeredModules)
+        .filter((g) => can(c.get('user'), g.permission ?? 'admin:settings'));
+      if (groups.length === 0) return c.notFound();
+
+      const requested = c.req.query('tab');
+      const group = groups.find((g) => g.id === requested) ?? groups[0]!;
+      const values = await readSettings(c.env, group.settings);
       const csrf = c.get('session')!.csrf;
-      const [gstRate, gstRegistered, defaultTreatment, splitBase, defaultShares, autoCreate] = await Promise.all([
-        getSetting(c.env, 'fees.gst_rate_bp', '1500'),
-        getSetting(c.env, 'fees.gst_registered', 'true'),
-        getSetting(c.env, 'fees.default_gst_treatment', 'exclusive'),
-        getSetting(c.env, 'fees.split_base', 'net_professional'),
-        getSetting(c.env, 'fees.default_shares', '[]'),
-        getSetting(c.env, 'ingest.auto_create_inquiries', 'true'),
-      ]);
 
-      let shares: Array<{ party_key: string; label: string; percent_bp: number }> = [];
-      try { shares = JSON.parse(defaultShares); } catch { shares = []; }
-
-      return page(c, { title: 'Practice settings', active: '/admin' }, html`
+      return page(c, { title: `Settings — ${group.title}`, active: '/admin' }, html`
         ${breadcrumbs([{ href: '/admin', label: 'Admin' }, { label: 'Settings' }])}
-        ${pageHeader('Practice settings', 'Defaults applied to new cases and fee lines.')}
+        ${pageHeader('Settings', 'Parameters of the system, grouped by what they affect.')}
+
+        <nav class="tabs">
+          ${groups.map((g) => html`
+            <a class="${g.id === group.id ? 'tab current' : 'tab'}"
+               href="/admin/settings?tab=${g.id}">${g.title}</a>`)}
+        </nav>
 
         <form method="post" action="/admin/settings" class="form-grid">
           ${csrfField(csrf)}
+          <input type="hidden" name="tab" value="${group.id}">
           <div class="form-section">
-            <h3>GST</h3>
-            <div class="field checkbox-field">
-              <label><input type="checkbox" name="gst_registered" ${gstRegistered === 'true' ? raw('checked') : ''}>
-                The practice is GST registered</label>
-              <p class="hint">When off, no GST is calculated on new fee lines.</p>
-            </div>
-            ${field({ label: 'GST rate (%)', name: 'gst_rate', value: (Number(gstRate) / 100).toString(),
-                      hint: 'New Zealand GST is 15%. Existing fee lines keep the rate they were entered under.' })}
-            ${select({ label: 'Default treatment for new fee lines', name: 'default_gst_treatment',
-                       value: defaultTreatment, includeBlank: false,
-                       options: optionsFrom(GST_TREATMENTS, GST_TREATMENT_LABELS) })}
+            <h3>${group.title}</h3>
+            ${group.description ? html`<p class="hint">${group.description}</p>` : ''}
+            ${group.settings.map((def) => settingField(def, values[def.key] ?? def.default))}
           </div>
-
-          <div class="form-section">
-            <h3>Revenue split</h3>
-            ${select({ label: 'Split is calculated on', name: 'split_base', value: splitBase, includeBlank: false,
-                       options: optionsFrom(SPLIT_BASES, SPLIT_BASE_LABELS) })}
-            <p class="hint">Default shares for new cases. Each case can be adjusted afterwards.</p>
-            <table class="edit-table">
-              <thead><tr><th>Label</th><th>Key</th><th>Percent</th></tr></thead>
-              <tbody>
-                ${[0, 1, 2, 3].map((i) => {
-                  const s = shares[i];
-                  return html`<tr>
-                    <td><input name="share_label_${i}" value="${s?.label ?? ''}" maxlength="80" placeholder="${i === 0 ? 'Principal (me)' : i === 1 ? 'Admin team' : ''}"></td>
-                    <td><input name="share_key_${i}" value="${s?.party_key ?? ''}" maxlength="40" placeholder="${i === 0 ? 'principal' : i === 1 ? 'admin' : ''}"></td>
-                    <td><input name="share_percent_${i}" value="${s ? (s.percent_bp / 100).toString() : ''}" inputmode="decimal" size="6">%</td>
-                  </tr>`;
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div class="form-section">
-            <h3>Inbound channels</h3>
-            <div class="field checkbox-field">
-              <label><input type="checkbox" name="auto_create_inquiries" ${autoCreate === 'true' ? raw('checked') : ''}>
-                Automatically create an inquiry from allow-listed senders</label>
-              <p class="hint">Messages from senders who are not allow-listed always wait in the inbox,
-                 whatever this is set to.</p>
-            </div>
-          </div>
-
           <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Save settings</button>
+            <button class="btn btn-primary" type="submit">Save ${group.title.toLowerCase()}</button>
             <a class="btn btn-secondary" href="/admin">Cancel</a>
           </div>
-        </form>`);
+        </form>
+
+        ${group.note === 'default-shares' ? await defaultSharesCard(c, csrf) : ''}
+
+        ${card('What is not here', html`
+          <p>API keys, webhook secrets and the field-encryption key are deliberately not settings.
+             They are held outside the database, so reading it never yields a credential and
+             changing one leaves a trace in the deployment. See
+             <strong>Admin → Integrations</strong> for what is connected.</p>`)}`);
     });
 
     r.post('/settings', requirePermission('admin:settings'), async (c) => {
       const user = c.get('user')!;
       const form = await c.req.formData();
-      const f = new FormReader(form);
+      const tab = String(form.get('tab') ?? '');
 
-      const gstRegistered = f.bool('gst_registered') === 1;
-      const rateBp = parsePercentToBp(String(form.get('gst_rate') ?? '15'));
-      if (rateBp === null) return redirectWith(c, '/admin/settings', 'GST rate must be a percentage between 0 and 100.', 'err');
-      const treatment = f.enum('default_gst_treatment', GST_TREATMENTS, { fallback: 'exclusive' })!;
-      const splitBase = f.enum('split_base', SPLIT_BASES, { fallback: 'net_professional' })!;
-      const autoCreate = f.bool('auto_create_inquiries') === 1;
+      const group = collectSettingsGroups(registeredModules)
+        .filter((g) => can(c.get('user'), g.permission ?? 'admin:settings'))
+        .find((g) => g.id === tab);
+      if (!group) return redirectWith(c, '/admin/settings', 'Unknown settings group.', 'err');
 
+      const entries: Array<{ key: string; value: string }> = [];
+      try {
+        for (const def of group.settings) {
+          // An unchecked checkbox sends nothing, and absence is how "off" is
+          // expressed — so booleans are always written. For every other type,
+          // a field the form did not submit at all is left alone rather than
+          // blanked: a partial post should not erase settings it never
+          // mentioned. Submitting an empty value still clears it.
+          if (def.type !== 'boolean' && !form.has(def.key)) continue;
+          entries.push({ key: def.key, value: coerceSetting(def, form.get(def.key) as string | null) });
+        }
+      } catch (err) {
+        if (err instanceof SettingValueError) {
+          return redirectWith(c, `/admin/settings?tab=${group.id}`, err.message, 'err');
+        }
+        throw err;
+      }
+
+      await writeSettings(c.env, entries, user.id);
+      await auditFrom(c, {
+        action: 'admin.settings_updated',
+        meta: { group: group.id, keys: entries.map((e) => e.key) },
+      });
+      return redirectWith(c, `/admin/settings?tab=${group.id}`, `${group.title} saved.`);
+    });
+
+    // The default revenue split is a table rather than a single value, so it
+    // keeps its own form beneath the generic fields of the Fees tab.
+    r.post('/settings/default-shares', requirePermission('admin:settings'), async (c) => {
+      const user = c.get('user')!;
+      const form = await c.req.formData();
       const shares: Array<{ party_key: string; label: string; percent_bp: number }> = [];
+
       for (let i = 0; i < 4; i++) {
         const label = String(form.get(`share_label_${i}`) ?? '').trim();
         if (!label) continue;
         const rawKey = String(form.get(`share_key_${i}`) ?? '').trim() || label;
         const key = rawKey.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
         const bp = parsePercentToBp(String(form.get(`share_percent_${i}`) ?? '0'));
-        if (bp === null) return redirectWith(c, '/admin/settings', `Share "${label}" needs a percentage between 0 and 100.`, 'err');
-        if (shares.some((s) => s.party_key === key)) {
-          return redirectWith(c, '/admin/settings', `Duplicate share key "${key}".`, 'err');
+        if (bp === null) {
+          return redirectWith(c, '/admin/settings?tab=fees', `Share "${label}" needs a percentage between 0 and 100.`, 'err');
+        }
+        if (shares.some((sh) => sh.party_key === key)) {
+          return redirectWith(c, '/admin/settings?tab=fees', `Duplicate share key "${key}".`, 'err');
         }
         shares.push({ party_key: key || `party_${i}`, label, percent_bp: bp });
       }
-      const total = shares.reduce((s, x) => s + x.percent_bp, 0);
+
+      const total = shares.reduce((sum, sh) => sum + sh.percent_bp, 0);
       if (shares.length > 0 && total !== 10000) {
-        return redirectWith(c, '/admin/settings', `Default shares total ${(total / 100).toFixed(2)}% — they must total 100%.`, 'err');
+        return redirectWith(c, '/admin/settings?tab=fees',
+          `Default shares total ${(total / 100).toFixed(2)}% — they must total 100%.`, 'err');
       }
 
-      await Promise.all([
-        setSetting(c.env, 'fees.gst_registered', gstRegistered ? 'true' : 'false', user.id),
-        setSetting(c.env, 'fees.gst_rate_bp', String(rateBp), user.id),
-        setSetting(c.env, 'fees.default_gst_treatment', treatment, user.id),
-        setSetting(c.env, 'fees.split_base', splitBase, user.id),
-        setSetting(c.env, 'fees.default_shares', JSON.stringify(shares), user.id),
-        setSetting(c.env, 'ingest.auto_create_inquiries', autoCreate ? 'true' : 'false', user.id),
-      ]);
-      await auditFrom(c, { action: 'admin.settings_updated', meta: { rateBp, splitBase, shares: shares.length } });
-      return redirectWith(c, '/admin/settings', 'Settings saved.');
+      await writeSettings(c.env, [{ key: 'fees.default_shares', value: JSON.stringify(shares) }], user.id);
+      await auditFrom(c, { action: 'admin.default_shares_updated', meta: { parties: shares.length } });
+      return redirectWith(c, '/admin/settings?tab=fees', 'Default split saved.');
     });
 
     // --- Audit --------------------------------------------------------------

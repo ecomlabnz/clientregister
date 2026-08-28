@@ -14,6 +14,7 @@
 import { Hono } from 'hono';
 import type { AppContext, Env } from '../../types';
 import type { AppModule } from '../../core/module';
+import type { SettingsGroup } from '../../core/settings';
 import { all } from '../../core/db';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { page } from '../../ui/layout';
@@ -178,10 +179,26 @@ export function countBySeverity(alerts: Alert[]): Record<AlertSeverity, number> 
   );
 }
 
+export const ALERT_SETTINGS: SettingsGroup = {
+  id: 'alerts',
+  title: 'Alerts',
+  description: 'How far ahead the register looks, and what counts as pressing.',
+  order: 30,
+  settings: [
+    { key: 'alerts.horizon_days', type: 'integer', label: 'Look ahead (days)',
+      default: '90', min: 7, max: 365,
+      help: 'The default window on the alerts page and the dashboard.' },
+    { key: 'alerts.urgent_days', type: 'integer', label: 'Treat as urgent within (days)',
+      default: '14', min: 1, max: 90,
+      help: 'Anything due inside this window is counted as pressing rather than upcoming.' },
+  ],
+};
+
 export const alertsModule: AppModule = {
   name: 'alerts',
   title: 'Alerts',
   basePaths: ['/alerts'],
+  settings: [ALERT_SETTINGS],
   nav: [{ href: '/alerts', label: 'Alerts', permission: 'register:read', order: 98 }],
 
   register(app) {

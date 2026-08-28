@@ -17,7 +17,8 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import {
-  badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, statusTone, table,
+  actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select,
+  statusTone, table,
 } from '../../ui/components';
 import { dateInputValue, dateShort, money } from '../../ui/format';
 import { QUOTE_STATUS_LABELS, QUOTE_STATUSES, type QuoteStatus } from '../../domain';
@@ -26,6 +27,9 @@ import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
 import { computeGst, GST_TREATMENT_LABELS, GST_TREATMENTS, type GstTreatment } from '../../core/fees';
 import { feeSettings } from '../fees';
+import { practiceDetails } from '../../core/practice';
+import { mailConfigured } from '../../mail/provider';
+import { flushQueue, queueEmail } from '../../mail/queue';
 
 export interface QuoteRow {
   id: string; ref: string; client_id: string | null; case_id: string | null; inquiry_id: string | null;
@@ -36,6 +40,53 @@ export interface QuoteRow {
 
 function quoteTotal(q: Pick<QuoteRow, 'amount_cents' | 'gst_cents' | 'disbursements_cents'>): number {
   return q.amount_cents + q.gst_cents + q.disbursements_cents;
+}
+
+/**
+ * A first draft of the covering email, for editing rather than sending as-is.
+ * It states the figures and points at the terms, which are the two things a
+ * quote must not leave ambiguous.
+ */
+function defaultQuoteEmail(
+  q: QuoteRow & { client_name: string | null },
+  practice: { legalName: string; termsLabel: string; termsUrl: string; contactEmail: string; contactPhone: string },
+): string {
+  const lines = [
+    `Dear ${q.client_name ?? 'Sir or Madam'},`,
+    '',
+    `Thank you for your enquiry. I am pleased to quote for the following work:`,
+    '',
+    q.description,
+    '',
+    `Professional fee:   ${money(q.amount_cents, q.currency)}`,
+    `GST:                ${money(q.gst_cents, q.currency)}`,
+    `Disbursements:      ${money(q.disbursements_cents, q.currency)}`,
+    `Total payable:      ${money(quoteTotal(q), q.currency)}`,
+    '',
+  ];
+
+  if (q.valid_until) lines.push(`This quote is valid until ${dateShort(q.valid_until)}.`, '');
+
+  if (practice.termsUrl) {
+    lines.push(
+      `This quote is given on the ${practice.termsLabel}, which you may download here:`,
+      practice.termsUrl,
+      '',
+      'Please read those terms before accepting this quote.',
+      '',
+    );
+  }
+
+  lines.push(
+    'Please let me know if you would like to proceed, or if anything above needs clarifying.',
+    '',
+    'Kind regards,',
+    practice.legalName,
+  );
+  if (practice.contactEmail) lines.push(practice.contactEmail);
+  if (practice.contactPhone) lines.push(practice.contactPhone);
+
+  return lines.join('\n');
 }
 
 export const quotesModule: AppModule = {
@@ -188,17 +239,36 @@ export const quotesModule: AppModule = {
       );
       if (!q) return c.notFound();
 
-      const entries = await listEntries(c.env, 'quote', id);
+      const [entries, terms] = await Promise.all([
+        listEntries(c.env, 'quote', id),
+        practiceDetails(c.env),
+      ]);
       const csrf = c.get('session')!.csrf;
       const writable = can(c.get('user'), 'quote:write');
 
       return page(c, { title: q.ref, active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { label: q.ref }])}
-        ${pageHeader(q.description, `${q.ref} · ${QUOTE_STATUS_LABELS[q.status]}`,
-          writable ? html`<a class="btn btn-secondary" href="/quotes/${q.id}/edit">Edit</a>` : undefined)}
+        ${pageHeader(q.description, `${q.ref} · ${QUOTE_STATUS_LABELS[q.status]}`, html`
+          <a class="btn btn-secondary" href="/quotes/${q.id}/print" target="_blank" rel="noopener">Print</a>
+          ${writable ? html`
+            <a class="btn btn-secondary" href="/quotes/${q.id}/edit">Edit</a>
+            <a class="btn btn-primary" href="/quotes/${q.id}/email">Email to client</a>
+            ${q.status !== 'withdrawn' && q.status !== 'accepted'
+              ? actionButton(`/quotes/${q.id}/status`, csrf, 'Cancel quote',
+                  { className: 'btn btn-danger', fields: { status: 'withdrawn' },
+                    confirm: `Cancel quote ${q.ref}? It stays on the file, marked withdrawn.` })
+              : ''}` : ''}`)}
 
         <div class="cols">
           <div class="col-main">
+            ${terms.termsUrl
+              ? html`<div class="alert alert-ok">
+                       This quote is given on the
+                       <a href="${terms.termsUrl}" target="_blank" rel="noopener noreferrer">${terms.termsLabel}</a>,
+                       which the client may download from that link.
+                     </div>`
+              : ''}
+
             ${card('Amounts', table(['Item', 'Amount'], [
               html`<tr><td>Professional fee (net)</td><td class="num">${money(q.amount_cents, q.currency)}</td></tr>`,
               html`<tr><td>GST</td><td class="num">${money(q.gst_cents, q.currency)}</td></tr>`,
@@ -245,6 +315,170 @@ export const quotesModule: AppModule = {
             ${card('Notes', html`<p class="prewrap">${q.notes || '—'}</p>`)}
           </div>
         </div>`);
+    });
+
+    /**
+     * A printable quote. Rendered without the application chrome so that what
+     * comes out of the printer is the document, not the screen around it.
+     */
+    r.get('/:id/print', requirePermission('register:read'), async (c) => {
+      const id = c.req.param('id')!;
+      const q = await one<QuoteRow & { client_name: string | null; case_ref: string | null }>(
+        c.env.DB,
+        `SELECT q.*, cl.full_name AS client_name, k.ref AS case_ref FROM quotes q
+           LEFT JOIN clients cl ON cl.id = q.client_id
+           LEFT JOIN cases k ON k.id = q.case_id
+          WHERE q.id = ?`,
+        id,
+      );
+      if (!q) return c.notFound();
+      const practice = await practiceDetails(c.env);
+      await auditFrom(c, { action: 'quote.printed', entityType: 'quote', entityId: id });
+
+      return page(c, { title: `Quote ${q.ref}`, bare: true }, html`
+        <article class="quote-doc">
+          <header class="quote-doc-head">
+            <div>
+              <h1>${practice.legalName}</h1>
+              ${practice.adviserDetails ? html`<p class="prewrap small">${practice.adviserDetails}</p>` : ''}
+              <p class="small">
+                ${practice.contactEmail ? html`${practice.contactEmail}<br>` : ''}
+                ${practice.contactPhone ?? ''}
+              </p>
+            </div>
+            <div class="quote-doc-ref">
+              <h2>Fee quote</h2>
+              <p class="small"><strong>${q.ref}</strong><br>
+                 ${dateShort(q.created_at)}
+                 ${q.valid_until ? html`<br>Valid until ${dateShort(q.valid_until)}` : ''}</p>
+            </div>
+          </header>
+
+          <section>
+            <h3>Prepared for</h3>
+            <p>${q.client_name ?? '—'}${q.case_ref ? html`<br><span class="muted small">Matter ${q.case_ref}</span>` : ''}</p>
+          </section>
+
+          <section>
+            <h3>Scope</h3>
+            <p class="prewrap">${q.description}</p>
+          </section>
+
+          <table class="quote-doc-table">
+            <tbody>
+              <tr><td>Professional fee</td><td class="num">${money(q.amount_cents, q.currency)}</td></tr>
+              <tr><td>GST</td><td class="num">${money(q.gst_cents, q.currency)}</td></tr>
+              <tr><td>Disbursements</td><td class="num">${money(q.disbursements_cents, q.currency)}</td></tr>
+              <tr class="totals-row"><td class="strong">Total payable</td>
+                  <td class="num strong">${money(quoteTotal(q), q.currency)}</td></tr>
+            </tbody>
+          </table>
+
+          ${practice.termsUrl
+            ? html`<section class="quote-doc-terms">
+                     <h3>Terms of engagement</h3>
+                     <p>This quote is given on the <strong>${practice.termsLabel}</strong>, which may
+                        be downloaded from:</p>
+                     <p class="break-url"><a href="${practice.termsUrl}">${practice.termsUrl}</a></p>
+                   </section>`
+            : ''}
+
+          <footer class="quote-doc-foot no-print">
+            <button class="btn btn-primary" data-print type="button">Print this quote</button>
+            <a class="btn btn-secondary" href="/quotes/${q.id}">Back to the quote</a>
+          </footer>
+        </article>`);
+    });
+
+    /** Compose an email of the quote. It is queued and recorded, never sent blind. */
+    r.get('/:id/email', requirePermission('mail:send'), async (c) => {
+      const id = c.req.param('id')!;
+      const q = await one<QuoteRow & { client_name: string | null; client_email: string | null }>(
+        c.env.DB,
+        `SELECT q.*, cl.full_name AS client_name, cl.email AS client_email FROM quotes q
+           LEFT JOIN clients cl ON cl.id = q.client_id WHERE q.id = ?`,
+        id,
+      );
+      if (!q) return c.notFound();
+
+      const practice = await practiceDetails(c.env);
+      const csrf = c.get('session')!.csrf;
+      const configured = mailConfigured(c.env);
+
+      return page(c, { title: `Email ${q.ref}`, active: '/quotes' }, html`
+        ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { href: `/quotes/${q.id}`, label: q.ref }, { label: 'Email' }])}
+        ${pageHeader(`Email quote ${q.ref}`, q.client_name ?? undefined)}
+
+        ${configured
+          ? ''
+          : html`<div class="alert alert-warn">No outgoing mail provider is configured, so this will
+                   be recorded and queued but not delivered. It sends as soon as one is set up —
+                   see Admin → Integrations.</div>`}
+
+        <form method="post" action="/quotes/${q.id}/email" class="form-grid">
+          ${csrfField(csrf)}
+          <div class="form-section">
+            <h3>Message</h3>
+            ${field({ label: 'To', name: 'to', type: 'email', required: true,
+                      value: q.client_email ?? '', maxlength: 320 })}
+            ${field({ label: 'Copy to', name: 'cc', type: 'email', value: '', maxlength: 320 })}
+            ${field({ label: 'Subject', name: 'subject', required: true, maxlength: 200,
+                      value: `Fee quote ${q.ref} — ${q.description}`.slice(0, 200) })}
+            ${field({ label: 'Message', name: 'body', type: 'textarea', rows: 16, required: true,
+                      maxlength: 10000, value: defaultQuoteEmail(q, practice) })}
+            <div class="field checkbox-field">
+              <label><input type="checkbox" name="mark_sent" checked>
+                Mark this quote as sent</label>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Queue this email</button>
+            <a class="btn btn-secondary" href="/quotes/${q.id}">Cancel</a>
+          </div>
+        </form>`);
+    });
+
+    r.post('/:id/email', requirePermission('mail:send'), async (c) => {
+      const id = c.req.param('id')!;
+      const user = c.get('user')!;
+      const q = await one<QuoteRow>(c.env.DB, 'SELECT * FROM quotes WHERE id = ?', id);
+      if (!q) return c.notFound();
+
+      const f = new FormReader(await c.req.formData());
+      const to = f.email('to', { required: true, label: 'To' });
+      const cc = f.email('cc');
+      const subject = f.text('subject', { required: true, label: 'Subject', max: 200 });
+      const body = f.text('body', { required: true, label: 'Message', max: 10000 });
+      const markSent = f.bool('mark_sent') === 1;
+      if (!f.valid || !to) {
+        return redirectWith(c, `/quotes/${id}/email`, Object.values(f.errors)[0] ?? 'Invalid message.', 'err');
+      }
+
+      const outboundId = await queueEmail(c.env, {
+        to, cc, subject, text: body,
+        entityType: 'quote', entityId: id, createdBy: user.id,
+      });
+
+      if (markSent && q.status === 'draft') {
+        await run(c.env.DB, `UPDATE quotes SET status = 'sent', sent_at = ?, updated_at = ? WHERE id = ?`,
+          q.sent_at ?? nowIso(), nowIso(), id);
+      }
+      await addEntry(c.env, { entityType: 'quote', entityId: id, kind: 'email_out',
+        body: `Quote emailed to ${to}${cc ? ` (copy to ${cc})` : ''}.\n\nSubject: ${subject}`,
+        createdBy: user.id });
+      if (q.client_id) {
+        await addEntry(c.env, { entityType: 'client', entityId: q.client_id, kind: 'email_out',
+          body: `Quote ${q.ref} emailed to ${to}.`, createdBy: user.id });
+      }
+      await auditFrom(c, { action: 'quote.emailed', entityType: 'quote', entityId: id,
+        meta: { to, outboundId } });
+
+      // Try to deliver straight away; the daily job picks up anything left.
+      const result = await flushQueue(c.env, 5);
+      return redirectWith(c, `/quotes/${id}`,
+        result.sent > 0
+          ? `Quote emailed to ${to}.`
+          : `Quote queued for ${to}. It will send once an email provider is configured.`);
     });
 
     r.get('/:id/edit', requirePermission('quote:write'), async (c) => {

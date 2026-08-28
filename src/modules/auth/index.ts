@@ -8,6 +8,7 @@
 import { Hono } from 'hono';
 import type { AppContext, Env, User } from '../../types';
 import type { AppModule } from '../../core/module';
+import type { SettingsGroup } from '../../core/settings';
 import { all, count, nowIso, one, run } from '../../core/db';
 import { newId, randomToken } from '../../core/ids';
 import {
@@ -18,6 +19,7 @@ import {
   saveSession, sessionTokenFrom, setSessionCookie, sessionLabel,
 } from '../../core/session';
 import { authenticate, requireAuth, validatePassword } from '../../core/auth';
+import { asInteger, readSettings } from '../../core/settings';
 import { auditFrom, clientIp } from '../../core/audit';
 import { rateLimit } from '../../core/ratelimit';
 import { FormReader } from '../../core/validate';
@@ -66,10 +68,36 @@ function safeNext(value: string | undefined): string {
   return value;
 }
 
+/**
+ * Security policy that is safe to hold in the database.
+ *
+ * Note what is absent: no key, secret or allow-list is settable here. Those
+ * stay outside the database so that reading it never yields a credential, and
+ * so changing one leaves a trace in the deployment rather than only in a form
+ * post.
+ */
+export const SECURITY_SETTINGS: SettingsGroup = {
+  id: 'security',
+  title: 'Security',
+  description: 'Policy applied to everyone who signs in.',
+  order: 15,
+  settings: [
+    { key: 'security.require_two_factor', type: 'boolean',
+      label: 'Require two-factor authentication for everyone',
+      default: 'false',
+      help: 'Anyone without it is sent to set it up before they can use the register. '
+        + 'Turn this on once you have set up your own.' },
+    { key: 'security.password_min_length', type: 'integer',
+      label: 'Minimum password length', default: '12', min: 12, max: 128,
+      help: 'Length does more for a password than composition rules. It cannot be set below 12.' },
+  ],
+};
+
 export const authModule: AppModule = {
   name: 'auth',
   title: 'Authentication',
   basePaths: ['/login', '/logout', '/account', '/setup'],
+  settings: [SECURITY_SETTINGS],
 
   register(app) {
     const r = new Hono<AppContext>();
@@ -133,7 +161,8 @@ export const authModule: AppModule = {
             <p><a class="btn btn-primary btn-block" href="/setup">Try again</a></p>
           </div>`);
       }
-      const pwErr = validatePassword(password);
+      const policy = await readSettings(c.env, SECURITY_SETTINGS.settings);
+      const pwErr = validatePassword(password, asInteger(policy['security.password_min_length'], 12));
       if (pwErr) f.errors['password'] = pwErr;
       if (!f.valid || !email) {
         return page(c, { title: 'Setup', bare: true, status: 400 }, html`
@@ -370,7 +399,8 @@ export const authModule: AppModule = {
         return redirectWith(c, '/account', 'Current password is incorrect.', 'err');
       }
       if (next !== confirm) return redirectWith(c, '/account', 'New passwords do not match.', 'err');
-      const pwErr = validatePassword(next);
+      const policy = await readSettings(c.env, SECURITY_SETTINGS.settings);
+      const pwErr = validatePassword(next, asInteger(policy['security.password_min_length'], 12));
       if (pwErr) return redirectWith(c, '/account', pwErr, 'err');
 
       await run(
