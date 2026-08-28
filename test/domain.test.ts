@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CASE_STATUSES, CASE_STATUS_HELP, CASE_STATUS_LABELS, CASE_TRANSITIONS, CASE_TYPES,
-  CASE_TYPE_LABELS, canTransition, isCaseStatus, isOpenStatus, OPEN_CASE_STATUSES,
+  CASE_STATUSES, CASE_STATUS_HELP, CASE_STATUS_LABELS, CASE_TRANSITIONS, canTransition, isCaseStatus, isOpenStatus, OPEN_CASE_STATUSES,
 } from '../src/domain';
 
 describe('case status lifecycle', () => {
@@ -11,7 +10,6 @@ describe('case status lifecycle', () => {
       expect(CASE_STATUS_HELP[status]).toBeTruthy();
       expect(CASE_TRANSITIONS[status]).toBeDefined();
     }
-    for (const type of CASE_TYPES) expect(CASE_TYPE_LABELS[type]).toBeTruthy();
   });
 
   it('only ever transitions to a real status', () => {

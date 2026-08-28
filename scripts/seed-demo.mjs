@@ -149,13 +149,23 @@ function split(caseKey, shares) {
 }
 
 let taskSeq = 0;
+/**
+ * Every task has an owner, so the demonstration data has to name one. It cannot
+ * be hard-coded — the accounts differ between installations — so the owner
+ * account is looked up in the statement itself. If somehow no account is
+ * active, the insert is skipped rather than failing the whole seed.
+ */
+const OWNER_ID = `(SELECT id FROM users WHERE status = 'active'` +
+  ` ORDER BY CASE role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, created_at LIMIT 1)`;
+
 function task(caseKey, title, dueOffset, priority = 'normal', status = 'open') {
   taskSeq += 1;
   emit(
-    `INSERT INTO tasks (id, title, details, status, priority, due_at, entity_type, entity_id,` +
-    ` created_at, updated_at) VALUES (` +
-    [`demo_tsk_${taskSeq}`, title, null, status, priority, day(dueOffset), 'case', cases.get(caseKey).id,
-     at(-30), at(-5)].map(q).join(', ') + ');',
+    `INSERT INTO tasks (id, title, details, status, priority, due_at, assigned_to, entity_type,` +
+    ` entity_id, created_at, updated_at)` +
+    ` SELECT ${[`demo_tsk_${taskSeq}`, title, null, status, priority, day(dueOffset)].map(q).join(', ')},` +
+    ` ${OWNER_ID}, ${q('case')}, ${q(cases.get(caseKey).id)}, ${q(at(-30))}, ${q(at(-5))}` +
+    ` WHERE ${OWNER_ID} IS NOT NULL;`,
   );
 }
 
@@ -355,7 +365,7 @@ tag('Test data', 'red');
 
 // --- Cases ------------------------------------------------------------------
 kase('sharma_aewv', {
-  client: 'rahul', title: 'AEWV — Chef, Harbour Cafe', case_type: 'work_aewv', status: 'lodged',
+  client: 'rahul', title: 'AEWV — Chef, Harbour Cafe', case_type: 'wv_aewv', status: 'lodged',
   priority: 'high', inz: 'INZ-2026-114552', lodged: day(-35), due: day(28),
   next_action: 'Await decision; chase if nothing by the due date', next_due: day(28),
   summary: 'AEWV for a chef role with an accredited employer. Job check approved; application lodged.',
@@ -369,7 +379,7 @@ split('sharma_aewv', [{ key: 'principal', label: 'Principal (me)', bp: 7000 }, {
 task('sharma_aewv', 'Diarise decision follow-up with INZ', 28, 'normal');
 
 kase('priya_partnership', {
-  client: 'priya', title: 'Partnership work visa — partner of AEWV holder', case_type: 'partnership_work',
+  client: 'priya', title: 'Partnership work visa — partner of AEWV holder', case_type: 'wv_partner',
   status: 'gathering_documents', priority: 'high',
   next_action: 'Collect joint bank statements and tenancy agreement', next_due: day(9),
   summary: 'Partnership-based work visa relying on Rahul’s AEWV. Relationship evidence being assembled.',
@@ -383,7 +393,7 @@ task('priya_partnership', 'Chase joint bank statements', 9, 'high');
 task('priya_partnership', 'Draft relationship submission', 16, 'normal');
 
 kase('aarav_student', {
-  client: 'aarav', title: 'Dependent child student visa', case_type: 'student', status: 'preparing',
+  client: 'aarav', title: 'Dependent child student visa', case_type: 'sv_general', status: 'preparing',
   next_action: 'Obtain offer of place from school', next_due: day(14),
   summary: 'Dependent child of an AEWV holder; domestic-fee student visa sought.',
 });
@@ -394,7 +404,7 @@ fee('aarav_student', 'Dependent child student visa', 'professional', 90000, 'exc
 split('aarav_student', [{ key: 'principal', label: 'Principal (me)', bp: 5000 }, { key: 'admin', label: 'Admin team', bp: 5000 }]);
 
 kase('harbour_accreditation', {
-  client: 'harbour', title: 'Employer accreditation renewal', case_type: 'other', status: 'approved',
+  client: 'harbour', title: 'Employer accreditation renewal', case_type: 'ot_other', status: 'approved',
   inz: 'INZ-2026-098771', lodged: day(-120), decided: at(-70), outcome: 'approved',
   summary: 'Standard accreditation renewal for up to five migrant workers. Granted.',
 });
@@ -404,7 +414,7 @@ fee('harbour_accreditation', 'Accreditation renewal', 'professional', 180000, 'e
 split('harbour_accreditation', [{ key: 'principal', label: 'Principal (me)', bp: 7000 }, { key: 'admin', label: 'Admin team', bp: 3000 }]);
 
 kase('orchards_jobcheck', {
-  client: 'orchards', title: 'Job check — 3 seasonal orchard roles', case_type: 'other', status: 'lodged',
+  client: 'orchards', title: 'Job check — 3 seasonal orchard roles', case_type: 'ot_other', status: 'lodged',
   inz: 'INZ-2026-121004', lodged: day(-18), due: day(12),
   next_action: 'Await job check outcome', next_due: day(12),
   summary: 'Job check for three seasonal orchard roles, advertised as required.',
@@ -415,7 +425,7 @@ fee('orchards_jobcheck', 'Job check — 3 roles', 'professional', 150000, 'exclu
 split('orchards_jobcheck', [{ key: 'principal', label: 'Principal (me)', bp: 6000 }, { key: 'admin', label: 'Admin team', bp: 4000 }]);
 
 kase('sione_aewv', {
-  client: 'sione', title: 'AEWV — Orchard worker, Kiwi Orchards', case_type: 'work_aewv',
+  client: 'sione', title: 'AEWV — Orchard worker, Kiwi Orchards', case_type: 'wv_aewv',
   status: 'inz_rfi', priority: 'urgent', inz: 'INZ-2026-118330', lodged: day(-50), due: day(6),
   next_action: 'Respond to RFI — fresh police certificate required', next_due: day(5),
   summary: 'INZ has asked for a current Samoan police certificate; the one on file has expired.',
@@ -430,7 +440,7 @@ task('sione_aewv', 'Order replacement Samoan police certificate', 2, 'urgent');
 task('sione_aewv', 'File RFI response with INZ', 5, 'urgent');
 
 kase('ana_residence', {
-  client: 'ana', title: 'Partnership residence — partner of NZ citizen', case_type: 'partnership_residence',
+  client: 'ana', title: 'Partnership residence — partner of NZ citizen', case_type: 'rv_partnership',
   status: 'interim_visa', priority: 'high', inz: 'INZ-2026-104488', lodged: day(-75), due: day(55),
   next_action: 'Await decision; client is on an interim visa', next_due: day(55),
   summary: 'Partnership residence with a New Zealand citizen partner. Lodged onshore before expiry; '
@@ -445,7 +455,7 @@ split('ana_residence', [{ key: 'principal', label: 'Principal (me)', bp: 7500 },
 quote('ana_residence', 'ana', 'Partnership residence — preparation and lodgement', 380000, 153500, 'accepted', -40);
 
 kase('maria_visitor', {
-  client: 'mariasilva', title: 'Visitor visa — parent of resident applicant', case_type: 'visitor',
+  client: 'mariasilva', title: 'Visitor visa — parent of resident applicant', case_type: 'vv_general',
   status: 'approved', lodged: day(-100), decided: at(-60), outcome: 'approved',
   summary: 'Nine-month visitor visa to attend the birth of a grandchild. Granted.',
 });
@@ -456,7 +466,7 @@ fee('maria_visitor', 'Visitor visa', 'professional', 95000, 'exclusive', 'paid')
 split('maria_visitor', [{ key: 'principal', label: 'Principal (me)', bp: 5000 }, { key: 'admin', label: 'Admin team', bp: 5000 }]);
 
 kase('wei_skilled', {
-  client: 'wei', title: 'Skilled residence — Green List straight to residence', case_type: 'skilled_residence',
+  client: 'wei', title: 'Skilled residence — Green List straight to residence', case_type: 'rv_smc',
   status: 'preparing', priority: 'high',
   next_action: 'Obtain occupational registration evidence', next_due: day(21),
   summary: 'Green List residence with the partner included as a secondary applicant.',
@@ -471,7 +481,7 @@ task('wei_skilled', 'Chase occupational registration certificate', 21, 'high');
 quote('wei_skilled', 'wei', 'Skilled residence — preparation and lodgement', 450000, 240000, 'sent', 20);
 
 kase('li_partnership', {
-  client: 'li', title: 'Partnership work visa — interim cover', case_type: 'partnership_work',
+  client: 'li', title: 'Partnership work visa — interim cover', case_type: 'wv_partner',
   status: 'engaged',
   next_action: 'Prepare application to maintain lawful status', next_due: day(18),
   summary: 'Partnership work visa to keep the partner lawful while the residence application is prepared.',
@@ -483,7 +493,7 @@ fee('li_partnership', 'Partnership work visa', 'professional', 200000, 'exclusiv
 split('li_partnership', [{ key: 'principal', label: 'Principal (me)', bp: 7000 }, { key: 'admin', label: 'Admin team', bp: 3000 }]);
 
 kase('joseph_s61', {
-  client: 'joseph', title: 'Section 61 request — unlawful since March', case_type: 'section_61',
+  client: 'joseph', title: 'Section 61 request — unlawful since March', case_type: 'rq_section_61_request',
   status: 'lodged', priority: 'urgent', lodged: day(-10), due: day(3),
   next_action: 'Follow up with the Resolution team', next_due: day(3),
   summary: 'Section 61 request following a visa expiry that went unnoticed. No right of appeal; '
@@ -496,7 +506,7 @@ split('joseph_s61', [{ key: 'principal', label: 'Principal (me)', bp: 8000 }, { 
 task('joseph_s61', 'Call INZ Resolution team for an update', 3, 'urgent');
 
 kase('mai_student', {
-  client: 'mai', title: 'Student visa — further study, Bachelor of Nursing', case_type: 'student',
+  client: 'mai', title: 'Student visa — further study, Bachelor of Nursing', case_type: 'sv_general',
   status: 'ready_to_lodge',
   next_action: 'Lodge once the tuition receipt arrives', next_due: day(7),
   summary: 'Second-year student visa. All documents held except the tuition fee receipt.',
@@ -508,7 +518,7 @@ split('mai_student', [{ key: 'principal', label: 'Principal (me)', bp: 5000 }, {
 task('mai_student', 'Lodge student visa application', 7, 'high');
 
 kase('ahmed_recon', {
-  client: 'ahmed', title: 'Reconsideration — visitor visa declined', case_type: 'reconsideration',
+  client: 'ahmed', title: 'Reconsideration — visitor visa declined', case_type: 'rq_reconsideration_temporary_visa_decline',
   status: 'appeal', priority: 'high', lodged: day(-12), due: day(9),
   next_action: 'File further financial evidence', next_due: day(8),
   summary: 'Visitor visa declined for insufficient funds. Reconsideration lodged within the '
@@ -521,7 +531,7 @@ split('ahmed_recon', [{ key: 'principal', label: 'Principal (me)', bp: 8000 }, {
 task('ahmed_recon', 'File supplementary bank statements', 8, 'urgent');
 
 kase('elena_ppi', {
-  client: 'elena', title: 'PPI response — undisclosed conviction', case_type: 'ppi_response',
+  client: 'elena', title: 'PPI response — undisclosed conviction', case_type: 'reply_ppi_response',
   status: 'ppi', priority: 'urgent', due: day(11),
   next_action: 'Draft PPI response and obtain character references', next_due: day(10),
   summary: 'PPI letter regarding a conviction not disclosed on the original application. '
@@ -535,14 +545,14 @@ task('elena_ppi', 'Obtain character references', 6, 'urgent');
 task('elena_ppi', 'Draft PPI response', 10, 'urgent');
 
 kase('daniel_investor', {
-  client: 'daniel', title: 'Active Investor Plus — vineyard acquisition', case_type: 'investor_business',
+  client: 'daniel', title: 'Active Investor Plus — vineyard acquisition', case_type: 'rv_entrepreneur',
   status: 'on_hold',
   next_action: 'Awaiting the client’s due diligence on the target business', next_due: day(45),
   summary: 'Investor residence linked to a proposed acquisition. Paused at the client’s request '
     + 'until due diligence on the vineyard completes.',
 });
 party('daniel_investor', 'daniel', 'principal_applicant');
-party('daniel_investor', 'vineyards', 'other', 'Target business for the proposed investment');
+party('daniel_investor', 'vineyards', 'ot_other', 'Target business for the proposed investment');
 tagCase('daniel_investor', ['Investor', 'Residence']);
 fee('daniel_investor', 'Investor residence — initial advice', 'professional', 300000, 'exclusive', 'paid');
 split('daniel_investor', [{ key: 'principal', label: 'Principal (me)', bp: 9000 }, { key: 'admin', label: 'Admin team', bp: 1000 }]);

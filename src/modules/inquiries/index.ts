@@ -22,13 +22,14 @@ import {
 } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, truncate } from '../../ui/format';
 import {
-  CASE_STATUS_LABELS, CASE_TYPE_LABELS, CASE_TYPES, ENTRY_KIND_LABELS, ENTRY_KINDS,
+  CASE_STATUS_LABELS, ENTRY_KIND_LABELS, ENTRY_KINDS,
   INQUIRY_SOURCE_LABELS, INQUIRY_SOURCES, INQUIRY_STATUS_LABELS, INQUIRY_STATUSES,
   type InquirySource, type InquiryStatus,
 } from '../../domain';
 import { clientOptions, userOptions } from '../../core/lookups';
 import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
+import { caseTypes, isTerm, labelFor, termOptions } from '../../core/vocabulary';
 
 export interface InquiryRow {
   id: string; ref: string; source: InquirySource; source_ref: string | null; received_at: string;
@@ -206,6 +207,7 @@ export const inquiriesModule: AppModule = {
     });
 
     r.get('/:id', requirePermission('register:read'), async (c) => {
+      const types = await caseTypes(c.env);
       const id = c.req.param('id')!;
       const inq = await one<InquiryRow & { client_name: string | null; client_ref: string | null; case_ref: string | null }>(
         c.env.DB,
@@ -256,7 +258,7 @@ export const inquiriesModule: AppModule = {
                   ${field({ label: 'Matter title', name: 'title', required: true, maxlength: 200,
                             value: inq.subject ?? '', placeholder: 'e.g. Partnership work visa' })}
                   ${select({ label: 'Case type', name: 'case_type', value: '', required: true,
-                             options: optionsFrom(CASE_TYPES, CASE_TYPE_LABELS), includeBlank: 'Choose a type' })}
+                             options: termOptions(types), includeBlank: 'Choose a type' })}
                   ${select({ label: 'Assign to', name: 'assigned_to', value: '', options: users, includeBlank: 'Unassigned' })}
                   <button class="btn btn-primary" type="submit">Create client and case</button>
                   ${suggested ? html`<p class="hint">Matched an existing client by contact details:
@@ -422,7 +424,11 @@ export const inquiriesModule: AppModule = {
       const clientId = f.optional('client_id', { max: 60 });
       const newClientName = f.optional('new_client_name', { max: 200 });
       const title = f.text('title', { required: true, label: 'Matter title', max: 200 });
-      const caseType = f.enum('case_type', CASE_TYPES, { required: true, label: 'Case type' });
+      const types = await caseTypes(c.env);
+      const caseType = f.text('case_type', { required: true, label: 'Case type', max: 60 });
+      if (caseType && !isTerm(types, caseType)) {
+        return redirectWith(c, `/inquiries/${id}`, 'That is not one of the case types you have configured.', 'err');
+      }
       const assignedTo = f.optional('assigned_to', { max: 60 });
       if (!f.valid || !caseType) return redirectWith(c, `/inquiries/${id}`, Object.values(f.errors)[0] ?? 'Invalid conversion.', 'err');
 

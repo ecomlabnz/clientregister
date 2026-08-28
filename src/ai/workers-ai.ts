@@ -6,7 +6,6 @@
  */
 
 import type { Env } from '../types';
-import { CASE_TYPES } from '../domain';
 import { parseTriageJson, TRIAGE_SYSTEM_PROMPT, type AiProvider, type TriageResult } from './provider';
 
 const DEFAULT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
@@ -22,7 +21,7 @@ export function createWorkersAiProvider(env: Env): AiProvider {
 
 Reply with a single JSON object and nothing else, using exactly these keys:
 {"contact_name":string|null,"contact_email":string|null,"contact_phone":string|null,
- "nationality":string|null,"suggested_case_type":one of [${CASE_TYPES.join(', ')}] or null,
+ "nationality":string|null,"suggested_case_type":one of [${input.caseTypes.join(', ')}] or null,
  "suggested_title":string|null,"summary":string,"urgency":"low"|"normal"|"high"|"urgent",
  "suggested_next_action":string|null,"key_dates":string[],"is_spam":boolean}`;
 

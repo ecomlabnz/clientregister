@@ -23,19 +23,22 @@ import {
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate } from '../../ui/format';
 import {
   canTransition, CASE_STATUS_HELP, CASE_STATUS_LABELS, CASE_STATUSES, CASE_TRANSITIONS,
-  CASE_TYPE_LABELS, CASE_TYPES, DEADLINE_CASE_STATUSES, ENTRY_KIND_LABELS, ENTRY_KINDS,
+  DEADLINE_CASE_STATUSES, ENTRY_KIND_LABELS, ENTRY_KINDS,
   isOpenStatus, isPartyRole, OPEN_CASE_STATUSES, PARTY_ROLE_LABELS, PARTY_ROLES, PRIORITIES,
-  PRIORITY_LABELS, TASK_STATUS_LABELS, type CaseStatus, type CaseType,
+  PRIORITY_LABELS, TASK_STATUS_LABELS, type CaseStatus,
 } from '../../domain';
 import { clientOptions, userOptions } from '../../core/lookups';
 import { addParty, partiesForCase, removeParty } from '../../core/parties';
 import { findOrCreateTag, listTags, tagCase, tagsForCase, tagsForCases, untagCase } from '../../core/tags';
 import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
+import {
+  VOCABULARY_SETTINGS, caseTypes, isTerm, labelFor, termOptions, type Term,
+} from '../../core/vocabulary';
 import { feesSection } from '../fees';
 
 export interface CaseRow {
-  id: string; ref: string; client_id: string; title: string; case_type: CaseType;
+  id: string; ref: string; client_id: string; title: string; case_type: string;
   status: CaseStatus; priority: string; assigned_to: string | null;
   inz_application_number: string | null; inz_client_number: string | null;
   lodged_at: string | null; decision_due_at: string | null; decided_at: string | null;
@@ -52,6 +55,7 @@ function caseForm(
   values: Partial<CaseRow>,
   clients: Array<{ value: string; label: string }>,
   users: Array<{ value: string; label: string }>,
+  types: Term[],
   errors?: Record<string, string>,
 ): Raw {
   const csrf = c.get('session').csrf;
@@ -67,7 +71,7 @@ function caseForm(
         ${field({ label: 'Matter title', name: 'title', value: values.title, required: true, maxlength: 200,
                   placeholder: 'e.g. AEWV — Chef, Auckland' })}
         ${select({ label: 'Case type', name: 'case_type', value: values.case_type ?? '', required: true,
-                   options: optionsFrom(CASE_TYPES, CASE_TYPE_LABELS), includeBlank: 'Choose a type' })}
+                   options: termOptions(types), includeBlank: 'Choose a type' })}
         ${values.id
           ? html`<div class="field"><label>Status</label>
                  <p class="hint">Status changes are made from the case page so the reason is recorded.</p></div>`
@@ -102,11 +106,17 @@ function caseForm(
     </form>`;
 }
 
-function readCaseForm(f: FormReader) {
+function readCaseForm(f: FormReader, types: Term[]) {
+  // Validated against the configured vocabulary rather than a compile-time
+  // list: the practice owns the list, but only what is on it can be stored.
+  const submittedType = f.text('case_type', { required: true, label: 'Case type', max: 60 });
+  if (submittedType && !isTerm(types, submittedType)) {
+    f.errors['case_type'] = 'That is not one of the case types you have configured.';
+  }
   return {
     client_id: f.text('client_id', { required: true, label: 'Client', max: 60 }),
     title: f.text('title', { required: true, label: 'Matter title', max: 200 }),
-    case_type: f.enum('case_type', CASE_TYPES, { required: true, label: 'Case type' }),
+    case_type: submittedType,
     priority: f.enum('priority', PRIORITIES, { fallback: 'normal' })!,
     assigned_to: f.optional('assigned_to', { max: 60 }),
     inz_application_number: f.optional('inz_application_number', { max: 60 }),
@@ -123,6 +133,7 @@ export const casesModule: AppModule = {
   name: 'cases',
   title: 'Cases',
   basePaths: ['/cases'],
+  settings: [VOCABULARY_SETTINGS],
   nav: [{ href: '/cases', label: 'Cases', permission: 'register:read', order: 80 }],
 
   register(app) {
@@ -131,6 +142,7 @@ export const casesModule: AppModule = {
 
     // --- List ---------------------------------------------------------------
     r.get('/', requirePermission('register:read'), async (c) => {
+      const types = await caseTypes(c.env);
       const q = (c.req.query('q') ?? '').trim();
       const status = c.req.query('status') ?? '';
       const assigned = c.req.query('assigned') ?? '';
@@ -192,7 +204,7 @@ export const casesModule: AppModule = {
       return page(c, { title: 'Cases', active: '/cases' }, html`
         ${pageHeader('Cases', 'Every matter the practice is running.',
           can(c.get('user'), 'register:write') ? html`<a class="btn btn-primary" href="/cases/new">New case</a>` : undefined)}
-        <form method="get" action="/cases" class="filters">
+        <form method="get" action="/cases" class="filters" data-live-search>
           <input type="search" name="q" value="${q}" placeholder="Search matter, client, reference or INZ number">
           <select name="status">
             <option value="">${scope === 'all' ? 'All statuses' : 'Open statuses'}</option>
@@ -212,34 +224,65 @@ export const casesModule: AppModule = {
           </select>
           <button class="btn btn-secondary" type="submit">Filter</button>
         </form>
-        ${table(['Reference', 'Matter', 'Client', 'Status', 'Key date', 'Owner'], shown.map((row) => html`
+        <div data-live-results>
+        ${/*
+          * Six columns will not fit a phone. Rather than shrinking them all
+          * until every cell wraps one word per line, four of them are dropped
+          * and their content folded into the matter cell, where it reads as a
+          * sentence instead of a squeezed column. The same rows serve both
+          * layouts, so there is one list to maintain, not two.
+          */ ''}
+        ${table([
+          { label: 'Reference', width: '16', hideOn: 'sm' },
+          { label: 'Matter', width: '30' },
+          { label: 'Client', width: '18', hideOn: 'sm' },
+          { label: 'Status', width: '18', hideOn: 'sm' },
+          { label: 'Key date', width: '18' },
+          { label: 'Owner', width: '12', hideOn: 'sm' },
+        ], shown.map((row) => {
+          const overdue = isOverdue(row.decision_due_at) && isOpenStatus(row.status);
+          return html`
           <tr class="${row.priority === 'urgent' ? 'row-urgent' : ''}">
-            <td><a href="/cases/${row.id}"><code>${row.ref}</code></a>
+            <td class="col-sm-hide"><a href="/cases/${row.id}"><code>${row.ref}</code></a>
                 ${row.priority !== 'normal' ? badge(PRIORITY_LABELS[row.priority as keyof typeof PRIORITY_LABELS], row.priority === 'urgent' ? 'red' : 'amber') : ''}</td>
-            <td><a href="/cases/${row.id}">${row.title}</a>
-                <div class="muted small">${CASE_TYPE_LABELS[row.case_type] ?? row.case_type}</div>
-                ${(tagsByCase.get(row.id) ?? []).length > 0
-                  ? html`<div class="tag-row">${(tagsByCase.get(row.id) ?? []).map((tag) => badge(tag.name, tag.colour))}</div>`
-                  : ''}</td>
-            <td class="small"><a href="/clients/${row.client_id}">${row.client_name}</a></td>
-            <td>${badge(CASE_STATUS_LABELS[row.status] ?? row.status, statusTone(row.status))}</td>
-            <td class="small ${isOverdue(row.decision_due_at) && isOpenStatus(row.status) ? 'warn' : ''}">
+            <td>
+              <a class="clamp-2" href="/cases/${row.id}">${row.title}</a>
+              <div class="muted small clamp-1">${labelFor(types, row.case_type)}</div>
+              <div class="row-meta show-sm">
+                <code>${row.ref}</code>
+                <a href="/clients/${row.client_id}">${row.client_name}</a>
+                ${badge(CASE_STATUS_LABELS[row.status] ?? row.status, statusTone(row.status))}
+                ${row.priority !== 'normal'
+                  ? badge(PRIORITY_LABELS[row.priority as keyof typeof PRIORITY_LABELS], row.priority === 'urgent' ? 'red' : 'amber')
+                  : ''}
+              </div>
+              ${(tagsByCase.get(row.id) ?? []).length > 0
+                ? html`<div class="tag-row hide-sm">${(tagsByCase.get(row.id) ?? []).map((tag) => badge(tag.name, tag.colour))}</div>`
+                : ''}
+            </td>
+            <td class="small col-sm-hide"><a href="/clients/${row.client_id}">${row.client_name}</a></td>
+            <td class="col-sm-hide">${badge(CASE_STATUS_LABELS[row.status] ?? row.status, statusTone(row.status))}</td>
+            <td class="small ${overdue ? 'warn' : ''}">
               ${row.decision_due_at
                 ? html`${dateShort(row.decision_due_at)}<div class="muted">${relativeDays(row.decision_due_at)}</div>`
                 : row.next_action_due
                   ? html`${dateShort(row.next_action_due)}<div class="muted">next action</div>`
                   : '—'}</td>
-            <td class="small">${row.assignee_name ?? '—'}</td>
-          </tr>`))}
+            <td class="small col-sm-hide">${row.assignee_name ?? '—'}</td>
+          </tr>`;
+        }), { sticky: true, fixed: true, empty: 'No cases match that.' })}
         <div class="pager">
           ${pageNum > 1 ? html`<a class="btn btn-secondary" href="/cases?${raw(qs({ page: pageNum - 1 }))}">Previous</a>` : ''}
           ${hasMore ? html`<a class="btn btn-secondary" href="/cases?${raw(qs({ page: pageNum + 1 }))}">Next</a>` : ''}
+        </div>
         </div>`);
     });
 
     // --- Create -------------------------------------------------------------
     r.get('/new', requirePermission('register:write'), async (c) => {
-      const [clients, users] = await Promise.all([clientOptions(c.env), userOptions(c.env)]);
+      const [clients, users, types] = await Promise.all([
+        clientOptions(c.env), userOptions(c.env), caseTypes(c.env),
+      ]);
       const preset = c.req.query('client_id') ?? '';
       return page(c, { title: 'New case', active: '/cases' }, html`
         ${breadcrumbs([{ href: '/cases', label: 'Cases' }, { label: 'New' }])}
@@ -247,13 +290,14 @@ export const casesModule: AppModule = {
         ${clients.length === 0
           ? emptyState('Create a client first — a case always belongs to one.',
               html`<a class="btn btn-primary" href="/clients/new">New client</a>`)
-          : caseForm(c, { client_id: preset }, clients, users)}`);
+          : caseForm(c, { client_id: preset }, clients, users, types)}`);
     });
 
     r.post('/', requirePermission('register:write'), async (c) => {
+      const types = await caseTypes(c.env);
       const user = c.get('user')!;
       const f = new FormReader(await c.req.formData());
-      const v = readCaseForm(f);
+      const v = readCaseForm(f, types);
       const status = f.enum('status', ['lead', 'engaged'] as const, { fallback: 'lead' })!;
 
       const client = v.client_id
@@ -264,7 +308,7 @@ export const casesModule: AppModule = {
       if (!f.valid) {
         const [clients, users] = await Promise.all([clientOptions(c.env), userOptions(c.env)]);
         return page(c, { title: 'New case', active: '/cases', status: 400 }, html`
-          ${pageHeader('New case')}${caseForm(c, v as Partial<CaseRow>, clients, users, f.errors)}`);
+          ${pageHeader('New case')}${caseForm(c, v as Partial<CaseRow>, clients, users, types, f.errors)}`);
       }
 
       const id = newId('cas');
@@ -291,6 +335,7 @@ export const casesModule: AppModule = {
 
     // --- Detail -------------------------------------------------------------
     r.get('/:id', requirePermission('register:read'), async (c) => {
+      const types = await caseTypes(c.env);
       const id = c.req.param('id')!;
       const viewer = c.get('user')!;
       const kase = await one<CaseRow & { client_name: string; client_ref: string; assignee_name: string | null }>(
@@ -334,7 +379,7 @@ export const casesModule: AppModule = {
                        { href: `/clients/${kase.client_id}`, label: kase.client_name },
                        { label: kase.ref }])}
         ${pageHeader(kase.title,
-          `${kase.ref} · ${CASE_TYPE_LABELS[kase.case_type] ?? kase.case_type} · ${kase.client_name}`,
+          `${kase.ref} · ${labelFor(types, kase.case_type)} · ${kase.client_name}`,
           writable ? html`<a class="btn btn-secondary" href="/cases/${kase.id}/edit">Edit</a>
                           <a class="btn btn-secondary" href="/quotes/new?case_id=${kase.id}&client_id=${kase.client_id}">New quote</a>` : undefined)}
 
@@ -512,7 +557,7 @@ export const casesModule: AppModule = {
             ${card('Key details', html`
               <dl class="kv">
                 <dt>Client</dt><dd><a href="/clients/${kase.client_id}">${kase.client_name}</a> <code>${kase.client_ref}</code></dd>
-                <dt>Type</dt><dd>${CASE_TYPE_LABELS[kase.case_type] ?? kase.case_type}</dd>
+                <dt>Type</dt><dd>${labelFor(types, kase.case_type)}</dd>
                 <dt>Priority</dt><dd>${PRIORITY_LABELS[kase.priority as keyof typeof PRIORITY_LABELS] ?? kase.priority}</dd>
                 <dt>Owner</dt><dd>${kase.assignee_name ?? 'Unassigned'}</dd>
                 <dt>INZ application</dt><dd>${kase.inz_application_number ?? '—'}</dd>
@@ -545,24 +590,27 @@ export const casesModule: AppModule = {
     r.get('/:id/edit', requirePermission('register:write'), async (c) => {
       const kase = await one<CaseRow>(c.env.DB, 'SELECT * FROM cases WHERE id = ?', c.req.param('id')!);
       if (!kase) return c.notFound();
-      const [clients, users] = await Promise.all([clientOptions(c.env), userOptions(c.env)]);
+      const [clients, users, types] = await Promise.all([
+        clientOptions(c.env), userOptions(c.env), caseTypes(c.env),
+      ]);
       return page(c, { title: `Edit ${kase.ref}`, active: '/cases' }, html`
         ${breadcrumbs([{ href: '/cases', label: 'Cases' }, { href: `/cases/${kase.id}`, label: kase.ref }, { label: 'Edit' }])}
         ${pageHeader(`Edit ${kase.ref}`)}
-        ${caseForm(c, kase, clients, users)}`);
+        ${caseForm(c, kase, clients, users, types)}`);
     });
 
     r.post('/:id', requirePermission('register:write'), async (c) => {
+      const types = await caseTypes(c.env);
       const id = c.req.param('id')!;
       const existing = await one<CaseRow>(c.env.DB, 'SELECT * FROM cases WHERE id = ?', id);
       if (!existing) return c.notFound();
 
       const f = new FormReader(await c.req.formData());
-      const v = readCaseForm(f);
+      const v = readCaseForm(f, types);
       if (!f.valid) {
         const [clients, users] = await Promise.all([clientOptions(c.env), userOptions(c.env)]);
         return page(c, { title: 'Edit case', active: '/cases', status: 400 }, html`
-          ${pageHeader(`Edit ${existing.ref}`)}${caseForm(c, { ...existing, ...v } as Partial<CaseRow>, clients, users, f.errors)}`);
+          ${pageHeader(`Edit ${existing.ref}`)}${caseForm(c, { ...existing, ...v } as Partial<CaseRow>, clients, users, types, f.errors)}`);
       }
 
       await run(

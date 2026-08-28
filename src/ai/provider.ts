@@ -35,7 +35,13 @@ export interface TriageResult {
 export interface AiProvider {
   readonly name: string;
   readonly model: string;
-  triage(input: { subject: string | null; body: string }): Promise<TriageResult>;
+  /**
+   * `caseTypes` is the practice's configured vocabulary, passed in rather than
+   * imported, so a type added in settings this morning is one the model may
+   * suggest this afternoon — and so this layer has no opinion about what the
+   * list contains.
+   */
+  triage(input: { subject: string | null; body: string; caseTypes: string[] }): Promise<TriageResult>;
 }
 
 export const TRIAGE_SYSTEM_PROMPT = `You assist a New Zealand licensed immigration adviser.

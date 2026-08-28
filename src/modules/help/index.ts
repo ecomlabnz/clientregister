@@ -553,6 +553,31 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
            The <strong>Today</strong> screen shows how many are waiting.</p>`,
     },
     {
+      id: 'lists',
+      title: 'Changing the lists and dropdowns',
+      body: html`
+        <p>Under <strong>Settings → Lists and dropdowns</strong> you can rewrite the vocabulary this
+           practice uses. <strong>Case types</strong> starts as your own list of visa matters — the
+           VV, SV, WV and RV classes, then requests, appeals, responses, variations, transfers,
+           citizenship and employer work — and you can add to it whenever instructions change.</p>
+        <p>One per line, written as <code>key | Label</code>. Blank lines and lines starting with
+           <code>#</code> are ignored, so you can group the list and annotate it:</p>
+        <pre># Work
+wv_aewv | WV. AEWV
+wv_partner | WV. Partner</pre>
+        <p>The key is what gets stored. Relabelling is free — change <code>WV. AEWV</code> to
+           <code>Accredited Employer Work Visa</code> and every case follows. Changing a
+           <em>key</em> leaves existing cases on the old one, and they will then show the raw key
+           rather than a label, so prefer relabelling.</p>
+        <p>Removing a type does not touch cases already filed under it. Those keep their value and
+           display it as it stands, because a case filed last year under a type you no longer offer
+           is still that kind of case.</p>
+        <p><strong>Case statuses are deliberately not here.</strong> They decide which moves are
+           legal — what a case may become from where it is — so changing them would change how the
+           system behaves rather than what it is called. Kinds of knowledge base article live under
+           Settings → Knowledge base, and quotable items under Quotes → standard items.</p>`,
+    },
+    {
       id: 'admin',
       title: 'Administration',
       body: html`

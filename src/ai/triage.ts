@@ -7,6 +7,7 @@
 
 import type { Env } from '../types';
 import { newId } from '../core/ids';
+import { caseTypes } from '../core/vocabulary';
 import { sha256Hex } from '../core/crypto';
 import { all, nowIso, one, run } from '../core/db';
 import { getProvider, type TriageResult } from './provider';
@@ -38,7 +39,10 @@ export async function runTriage(
   const id = newId('air');
 
   try {
-    const result = await provider.triage(input);
+    // The vocabulary is read here rather than in each provider, so both of them
+    // see the same list and neither has to know where it comes from.
+    const types = await caseTypes(env);
+    const result = await provider.triage({ ...input, caseTypes: types.map((x) => x.key) });
     await run(
       env.DB,
       `INSERT INTO ai_runs (id, kind, provider, model, entity_type, entity_id, input_hash, status,
