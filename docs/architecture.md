@@ -78,8 +78,13 @@ one is deleting that line. Navigation is collected from the modules at startup
 and filtered per user by permission, so a role that cannot use a feature never
 sees it.
 
-Current modules: `auth`, `dashboard`, `inbox`, `inquiries`, `clients`, `cases`,
-`fees`, `quotes`, `tasks`, `documents`, `admin`.
+Current modules: `auth`, `dashboard`, `alerts`, `inbox`, `inquiries`, `clients`,
+`cases`, `fees`, `quotes`, `tasks`, `documents`, `admin`.
+
+`src/integrations/` holds read-only connectors to outside registers — currently
+the NZBN register. They are separate from `src/ingest/` (which receives things
+pushed at us) because they are pulled on demand and never write to the register
+without a person choosing to.
 
 ## Request path
 
@@ -105,6 +110,19 @@ Five ideas carry the register:
 Two tables serve all of them: **entries** (one timeline for every record type)
 and **tasks** (attached to any record by `entity_type`/`entity_id`). A new
 record type gets history and tasks for free.
+
+**clients** carries two shapes. An individual has `given_names` and
+`family_name` stored apart — immigration forms and police certificates
+distinguish them — plus identity documents and the compliance dates a matter
+depends on. An organisation has a registered name, an `nzbn` and a
+`company_number`. `full_name` is the single display name every other table
+joins to, and is derived from whichever shape applies (`src/core/names.ts`), so
+the parts and the whole cannot drift apart.
+
+The `alerts` module is a read-only view across all of it: case deadlines,
+overdue tasks, expiring quotes and expiring client documents, merged and
+ordered by how soon they bite. It stores nothing, so it cannot disagree with
+the records it summarises.
 
 Everything from outside lands in **ingest_messages** first, verbatim, and is
 promoted into an inquiry by the pipeline or by a person in the inbox.

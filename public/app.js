@@ -30,6 +30,24 @@
     });
   });
 
+  // The client form carries both an individual and an organisation section.
+  // Without scripting both are shown and labelled, which still works; with it,
+  // only the relevant one is visible.
+  var clientForm = document.querySelector('.js-client-form');
+  if (clientForm) {
+    var kindSelect = clientForm.querySelector('select[name="kind"]');
+    var sections = clientForm.querySelectorAll('[data-kind]');
+    var applyKind = function () {
+      Array.prototype.forEach.call(sections, function (section) {
+        section.hidden = section.getAttribute('data-kind') !== kindSelect.value;
+      });
+    };
+    if (kindSelect && sections.length) {
+      kindSelect.addEventListener('change', applyKind);
+      applyKind();
+    }
+  }
+
   // "/" focuses the first search box on the page.
   document.addEventListener('keydown', function (event) {
     if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;

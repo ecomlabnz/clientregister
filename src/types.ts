@@ -39,6 +39,10 @@ export interface Env {
 
   INGEST_EMAIL_ALLOWED_SENDERS?: string;
 
+  /** MBIE NZBN register. Free, but needs a registered subscriber key. */
+  NZBN_API_KEY?: string;
+  NZBN_USE_SANDBOX?: string;
+
   MAIL_PROVIDER?: string;
   MAIL_FROM?: string;
   RESEND_API_KEY?: string;
