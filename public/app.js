@@ -30,23 +30,6 @@
     });
   });
 
-  // The client form carries both an individual and an organisation section.
-  // Without scripting both are shown and labelled, which still works; with it,
-  // only the relevant one is visible.
-  var clientForm = document.querySelector('.js-client-form');
-  if (clientForm) {
-    var kindSelect = clientForm.querySelector('select[name="kind"]');
-    var sections = clientForm.querySelectorAll('[data-kind]');
-    var applyKind = function () {
-      Array.prototype.forEach.call(sections, function (section) {
-        section.hidden = section.getAttribute('data-kind') !== kindSelect.value;
-      });
-    };
-    if (kindSelect && sections.length) {
-      kindSelect.addEventListener('change', applyKind);
-      applyKind();
-    }
-  }
 
   // Choosing a standard item on a quote fills the rest of the line in. The
   // values ride on the option's data attributes, so this costs no request and
@@ -228,6 +211,16 @@
   // problem on a field it cannot show, so an invalid field on a hidden tab
   // would stop the form submitting with nothing to explain why. Listening for
   // `invalid` in the capture phase lets us reveal that tab first.
+  // Form tabs, and the two kinds of client record.
+  //
+  // These are one problem rather than two. A company has no passport and a
+  // person has no NZBN, so the sections that belong to the other kind are not
+  // merely hidden — their tab goes too, because a tab that opens nothing is
+  // worse than no tab.
+  //
+  // Without scripting every section shows at once, which still works: the
+  // server marks the irrelevant kind hidden in the HTML itself, so the company
+  // boxes never appear on an individual whether this file runs or not.
   Array.prototype.forEach.call(document.querySelectorAll('.js-tabbed'), function (form) {
     var name = form.getAttribute('data-tabs');
     var bar = document.querySelector('[data-tabs-for="' + name + '"]');
@@ -235,29 +228,77 @@
 
     var panels = form.querySelectorAll('[data-panel]');
     var buttons = bar.querySelectorAll('[data-tab]');
+    var kindSelect = form.querySelector('select[name="kind"]');
+    var kindBlocks = form.querySelectorAll('[data-kind]');
 
-    var show = function (which) {
+    // Does this element belong to the kind of record being edited?
+    var applies = function (el) {
+      var kind = el.getAttribute('data-kind');
+      if (!kind || !kindSelect) return true;
+      return kind === kindSelect.value;
+    };
+
+    var panelFor = function (which) {
+      for (var i = 0; i < panels.length; i++) {
+        if (panels[i].getAttribute('data-panel') === which) return panels[i];
+      }
+      return null;
+    };
+
+    var current = buttons.length ? buttons[0].getAttribute('data-tab') : null;
+
+    var render = function () {
+      // Anything belonging to the other kind disappears first, wherever it sits.
+      Array.prototype.forEach.call(kindBlocks, function (block) {
+        block.hidden = !applies(block);
+      });
+
+      // A tab whose section does not apply is not offered.
+      Array.prototype.forEach.call(buttons, function (button) {
+        var panel = panelFor(button.getAttribute('data-tab'));
+        button.hidden = Boolean(panel) && !applies(panel);
+      });
+
+      // If the open tab just became irrelevant, fall back to the first one that
+      // is not, rather than leaving the form apparently empty.
+      var open = panelFor(current);
+      if (!open || !applies(open)) {
+        for (var i = 0; i < buttons.length; i++) {
+          if (!buttons[i].hidden) { current = buttons[i].getAttribute('data-tab'); break; }
+        }
+      }
+
       Array.prototype.forEach.call(panels, function (panel) {
-        panel.hidden = panel.getAttribute('data-panel') !== which;
+        panel.hidden = panel.getAttribute('data-panel') !== current || !applies(panel);
       });
       Array.prototype.forEach.call(buttons, function (button) {
-        var on = button.getAttribute('data-tab') === which;
+        var on = button.getAttribute('data-tab') === current;
         button.classList.toggle('current', on);
         button.setAttribute('aria-selected', on ? 'true' : 'false');
       });
     };
 
     Array.prototype.forEach.call(buttons, function (button) {
-      button.addEventListener('click', function () { show(button.getAttribute('data-tab')); });
+      button.addEventListener('click', function () {
+        current = button.getAttribute('data-tab');
+        render();
+      });
     });
 
+    if (kindSelect) kindSelect.addEventListener('change', render);
+
+    // A field failing validation inside a closed tab would otherwise report an
+    // error nobody can see.
     form.addEventListener('invalid', function (event) {
       var panel = event.target.closest ? event.target.closest('[data-panel]') : null;
-      if (panel && panel.hidden) show(panel.getAttribute('data-panel'));
+      if (panel && panel.hidden) {
+        current = panel.getAttribute('data-panel');
+        render();
+      }
     }, true);
 
     bar.hidden = false;
-    show(buttons[0].getAttribute('data-tab'));
+    render();
   });
 
   // Print buttons. Declared with data-print rather than an inline handler,
@@ -385,6 +426,51 @@
     check();
     window.setInterval(check, Math.max(15, every) * 1000);
   })();
+
+  // A file input that also accepts a drop.
+  //
+  // Progressive enhancement in the strict sense: the input inside the box is an
+  // ordinary file input and works on its own. This adds the drop target, and
+  // the list of what is about to be sent — which matters, because a file that
+  // silently failed to attach looks exactly like a model that read nothing.
+  Array.prototype.forEach.call(document.querySelectorAll('.js-dropzone'), function (zone) {
+    var input = zone.querySelector('input[type="file"]');
+    var list = zone.querySelector('[data-dropzone-list]');
+    if (!input) return;
+
+    var describe = function () {
+      if (!list) return;
+      var files = input.files;
+      if (!files || !files.length) { list.textContent = ''; return; }
+      var names = [];
+      for (var i = 0; i < files.length; i++) {
+        names.push(files[i].name + ' (' + Math.max(1, Math.round(files[i].size / 1024)) + ' KB)');
+      }
+      list.textContent = names.join(', ');
+    };
+
+    var stop = function (event) { event.preventDefault(); event.stopPropagation(); };
+    ['dragenter', 'dragover'].forEach(function (name) {
+      zone.addEventListener(name, function (event) { stop(event); zone.classList.add('dropzone-over'); });
+    });
+    ['dragleave', 'drop'].forEach(function (name) {
+      zone.addEventListener(name, function (event) { stop(event); zone.classList.remove('dropzone-over'); });
+    });
+    zone.addEventListener('drop', function (event) {
+      var dropped = event.dataTransfer && event.dataTransfer.files;
+      if (!dropped || !dropped.length) return;
+      // Assigning a DataTransfer's list is the only way to put dropped files
+      // into a file input, so the ordinary form submission carries them.
+      try {
+        input.files = dropped;
+      } catch (e) {
+        return;
+      }
+      describe();
+    });
+    input.addEventListener('change', describe);
+    describe();
+  });
 
   // A rule has two sets of fields and uses one of them. Both are rendered, so
   // the form is complete without scripting; here the irrelevant one is folded

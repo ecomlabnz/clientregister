@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.24.0', date: '29 August 2026',
+    notes: [
+      'Open a matter from a document: drop it in and get the form back filled, not a summary.',
+      'It names what it could not find, offers an existing client rather than a duplicate, '
+        + 'and never invents a date.',
+      'The company fields no longer appear on an individual — with scripting or without it.',
+      'Fixed: hiding a section did not hide it, because a stylesheet rule was beating [hidden].',
+    ],
+  },
+  {
     version: '0.23.0', date: '28 August 2026',
     notes: [
       'Invoices, raised from a quote in one press. The quote is left as it is.',
@@ -450,6 +460,44 @@ function sections(origin: string): Section[] {
            use Cloudflare's own models with nothing leaving their network. Both are repository
            secrets, set the same way as everything else in
            <a href="/help#connecting">the setup guide</a>.</p>`,
+    },
+    {
+      id: 'intake',
+      title: 'Opening a matter from a document',
+      body: html`
+        <p>The ordinary way to open a matter is to type it in, and that has not changed. This is the
+           other way: <strong>Assistant → Open a matter</strong>, or the button on the New case and
+           New client pages.</p>
+        <p>Drop in what you already have — a forwarded email, an INZ letter, a photograph of one, a
+           scrap of notes — or paste it. What comes back is not a summary to read and retype: it is
+           <em>the form</em>, with the boxes filled in. The client, anybody else the document names
+           and their role on the matter, the type, the numbers, the dates.</p>
+        <p>Correct what is wrong, fill what is empty, and press <strong>Open the matter</strong>.
+           That press is the moment anything is written — before it, the register is untouched. One
+           submit creates the client, links the other people as parties, opens the case and puts a
+           line on its timeline saying where it came from.</p>
+        <h4>What it will not do</h4>
+        <ul>
+          <li><strong>It will not keep your file.</strong> The upload is read and dropped. There is
+              nowhere to keep it until R2 is switched on, and pretending otherwise would lose
+              somebody's document. Attach it to the matter afterwards if it belongs on the file.</li>
+          <li><strong>It will not extract a passport number</strong>, even when the document shows
+              one. That column is encrypted, and pulling numbers out here would write them in the
+              clear into the run log on the way past. It is one field, typed once.</li>
+          <li><strong>It will not invent a date.</strong> If the document gives no decision due
+              date, the box comes back empty and the omission is listed under "it could not find
+              these" — a made-up deadline in a system that raises alerts is worse than no
+              deadline.</li>
+        </ul>
+        <h4>Somebody already on the register</h4>
+        <p>If the person looks like an existing client — same email, same phone, or both halves of
+           the name — you are offered that record instead of a second one. Choosing it leaves the
+           existing record exactly as it is; the reading does not overwrite what you already hold.</p>
+        <h4>What it can read</h4>
+        <p>Text, Markdown, CSV, HTML, JSON, .eml, PDF, PNG, JPEG, GIF and WebP, up to five files.
+           With <code>AI_PROVIDER</code> set to <code>anthropic</code>, PDFs and photographs are
+           read directly. On Cloudflare's own models it is text only, and it says so by name rather
+           than quietly ignoring the attachment.</p>`,
     },
     {
       id: 'notes',

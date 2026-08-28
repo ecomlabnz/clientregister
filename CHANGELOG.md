@@ -7,6 +7,60 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.24.0 — 29 August 2026
+
+### Added
+- **Open a matter from a document.** Assistant → Open a matter, or the button on
+  New case and New client. Drop in a forwarded email, an INZ letter, a
+  photograph of one or a scrap of notes — or paste it — and what comes back is
+  not a summary to read and retype but *the form*, with the boxes filled: the
+  client, anybody else the document names and their role on the matter, the
+  type, the numbers, the dates. Correct it, press the button, and one submit
+  creates the client, links the parties, opens the case and records where it
+  came from. Before that press the register is untouched.
+- **It says what it could not find.** Rather than a confidence score, the empty
+  boxes are named: no decision date stated, no application number in the
+  material. A missing date stays missing — an invented deadline in a system that
+  raises alerts is worse than no deadline.
+- **It offers an existing client rather than a duplicate**, on a matching email,
+  a matching phone, or both halves of a name. A shared family name is a
+  coincidence, not a match. Choosing the existing record leaves it exactly as it
+  is; the reading never overwrites what the practice already holds.
+- **Passport numbers are deliberately not extracted**, even when the document
+  shows one. The column is sealed, and pulling numbers out here would write them
+  in the clear into the run log on the way past. It is one field, typed once.
+- **The file is read and dropped.** It is not stored — there is nowhere to store
+  it until R2 is switched on, and pretending otherwise would lose somebody's
+  document. Uploads are sniffed by their first bytes rather than trusted from
+  the browser, capped at five files and 8 MB each.
+- **A drop target that lists what it is about to send**, as progressive
+  enhancement over an ordinary file input. A file that silently failed to attach
+  looks exactly like a model that read nothing.
+- On Cloudflare's own models, which read text only, a PDF or a photograph is
+  refused **by name** rather than quietly ignored.
+
+### Fixed
+- **Hiding something did not hide it.** `.js-tabbed [data-panel]` and
+  `[data-kind]` set `display: grid`, and an author rule beats the browser's own
+  `[hidden] { display: none }` — so every section the scripts hid stayed on the
+  page with its `hidden` property correctly set to true. This is why the client
+  form showed its company fields, NZBN and Companies Office number under an
+  individual's name, and why all five tab panels appeared at once. `[hidden]`
+  now carries `!important`, declared before the rules that were beating it.
+- **A tab that opened the wrong fields.** Clicking Identity while the record
+  type was Organisation un-hid a section of passport fields, because the tab
+  handler knew about tabs and the kind handler knew about kinds and neither knew
+  about the other. They are one piece of code now: a tab whose section belongs
+  to the other kind is not offered at all, and switching type moves off a tab
+  that has just become irrelevant.
+- **The client form is right with scripting off**, not only with it on. The
+  server marks the irrelevant half hidden in the HTML itself, so a person never
+  sees a company's NZBN box and an organisation never sees a passport box,
+  whether or not the script runs.
+- **`.settings-form` had no `display: grid`** of its own — it worked only where
+  the same element also carried `.form-grid`, and stacked into a single column
+  the first time it was used alone.
+
 ## 0.23.0 — 28 August 2026
 
 ### Added

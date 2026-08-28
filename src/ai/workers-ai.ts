@@ -7,8 +7,9 @@
 
 import type { Env } from '../types';
 import {
-  BRIEF_SYSTEM_PROMPT, TRIAGE_SYSTEM_PROMPT, parseBriefJson, parseTriageJson,
-  type AiProvider, type BriefResult, type TriageResult,
+  BRIEF_SYSTEM_PROMPT, INTAKE_SYSTEM_PROMPT, TRIAGE_SYSTEM_PROMPT,
+  parseBriefJson, parseIntakeJson, parseTriageJson,
+  type AiProvider, type BriefResult, type IntakeResult, type TriageResult,
 } from './provider';
 
 const DEFAULT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
@@ -41,6 +42,48 @@ Reply with a single JSON object and nothing else, using exactly these keys:
 
       if (!result?.response) throw new Error('workers-ai returned no response');
       return parseTriageJson(result.response);
+    },
+
+    async extract(input): Promise<IntakeResult> {
+      // This model reads text and nothing else. A PDF or a photograph is
+      // refused by name rather than silently dropped, so the person knows why
+      // the form came back empty and can paste the text instead.
+      const unreadable = input.files.filter((f) => !f.text).map((f) => f.name);
+      if (unreadable.length) {
+        throw new Error(
+          `this provider reads text only, so ${unreadable.join(', ')} could not be opened. `
+          + 'Paste the text, or set AI_PROVIDER to anthropic to read documents and photographs.',
+        );
+      }
+      const material = [
+        ...input.files.map((f) => `File: ${f.name}\n\n${(f.text ?? '').slice(0, 8000)}`),
+        input.text.trim() ? `Notes:\n${input.text.slice(0, 8000)}` : '',
+      ].filter(Boolean).join('\n\n---\n\n');
+      if (!material) throw new Error('there was nothing to read');
+
+      const instruction = `${INTAKE_SYSTEM_PROMPT}
+
+Reply with a single JSON object and nothing else, using exactly these keys:
+{"applicant":{"given_names":string|null,"family_name":string|null,"preferred_name":string|null,
+  "email":string|null,"phone":string|null,"nationality":string|null,"date_of_birth":string|null,
+  "role":string|null},
+ "other_parties":[same shape as applicant],
+ "case_type":one of [${input.caseTypes.join(', ')}] or null,
+ "suggested_title":string|null,"inz_client_number":string|null,"inz_application_number":string|null,
+ "lodged_on":string|null,"decision_due_on":string|null,"summary":string,"missing":string[]}
+Party roles must be one of: principal_applicant, secondary_applicant, supporting_partner,
+dependent_child, employer, sponsor, agent, other.`;
+
+      const result = (await env.AI!.run(model as never, {
+        messages: [
+          { role: 'system', content: instruction },
+          { role: 'user', content: material },
+        ],
+        max_tokens: 1800,
+      } as never)) as { response?: string };
+
+      if (!result?.response) throw new Error('workers-ai returned no response');
+      return parseIntakeJson(result.response);
     },
 
     async brief(input): Promise<BriefResult> {

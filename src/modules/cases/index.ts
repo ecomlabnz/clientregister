@@ -293,7 +293,9 @@ export const casesModule: AppModule = {
       const preset = c.req.query('client_id') ?? '';
       return page(c, { title: 'New case', active: '/cases' }, html`
         ${breadcrumbs([{ href: '/cases', label: 'Cases' }, { label: 'New' }])}
-        ${pageHeader('New case')}
+        ${pageHeader('New case', null, can(c.get('user'), 'ai:run')
+          ? html`<a class="btn btn-secondary" href="/assistant/intake">Open one from a document</a>`
+          : undefined)}
         ${clients.length === 0
           ? emptyState('Create a client first — a case always belongs to one.',
               html`<a class="btn btn-primary" href="/clients/new">New client</a>`)

@@ -60,6 +60,134 @@ Do not give immigration advice to the client and do not draft correspondence.
 You are briefing an experienced adviser on their own file, not advising them on
 the law.`;
 
+
+/**
+ * A whole file read at once: a person, the people around them, and the matter.
+ *
+ * This is the shape behind "drop it here and let it fill the form in". It is
+ * deliberately close to what the register stores, because the point is a form
+ * somebody checks and submits — not a summary they then retype.
+ *
+ * One field is conspicuously absent: the passport number. The register seals
+ * that column, and an extraction pipeline that pulled passport numbers out of
+ * documents would write them in the clear into `ai_runs` on the way past. It is
+ * one field, it is typed once, and a person typing it is worth more than the
+ * keystrokes saved.
+ */
+export interface IntakePerson {
+  given_names: string | null;
+  family_name: string | null;
+  /** A name they actually go by, where the document says so ("aka Teera"). */
+  preferred_name: string | null;
+  email: string | null;
+  phone: string | null;
+  nationality: string | null;
+  /** ISO date, or null when the document does not say. */
+  date_of_birth: string | null;
+  /** One of the register's party roles, or null when it is not clear. */
+  role: string | null;
+}
+
+export interface IntakeResult {
+  /** The person the matter is for. */
+  applicant: IntakePerson;
+  /** Anyone else the document names: a supporting partner, an employer. */
+  other_parties: IntakePerson[];
+  /** One of the practice's configured case types, or null. */
+  case_type: string | null;
+  suggested_title: string | null;
+  inz_client_number: string | null;
+  inz_application_number: string | null;
+  /** ISO dates. */
+  lodged_on: string | null;
+  decision_due_on: string | null;
+  summary: string;
+  /**
+   * What the document does not say and a person will have to supply. More
+   * useful than a confidence score: it names the empty boxes.
+   */
+  missing: string[];
+}
+
+export const INTAKE_SYSTEM_PROMPT = `You read documents and notes for a New Zealand immigration practice
+and turn them into a draft register entry: who the matter is for, who else is
+involved, and what kind of matter it is.
+Extract only what the material actually states. Never invent a name, a date, a
+number or a visa type. If something is not stated, return null for it and add a
+short line to "missing" naming what a person will have to supply.
+Dates must be ISO (YYYY-MM-DD). Where a document writes a date ambiguously,
+prefer the New Zealand reading (day before month) and say so in "missing".
+Family names in immigration documents are often written in capitals; keep the
+capitalisation the document uses.
+Do not extract passport numbers even when they appear — that field is entered by
+a person.
+Do not give immigration advice and do not draft correspondence.`;
+
+/** Defensive normalisation, applied to both providers' output. */
+export function normaliseIntake(input: Partial<IntakeResult>): IntakeResult {
+  const str = (v: unknown, max = 200): string | null =>
+    typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null;
+  const isoDate = (v: unknown): string | null => {
+    const value = str(v, 10);
+    return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+  };
+  const person = (raw: unknown): IntakePerson => {
+    const p = (raw ?? {}) as Partial<IntakePerson>;
+    return {
+      given_names: str(p.given_names, 120),
+      family_name: str(p.family_name, 120),
+      preferred_name: str(p.preferred_name, 80),
+      email: str(p.email, 320),
+      phone: str(p.phone, 40),
+      nationality: str(p.nationality, 80),
+      date_of_birth: isoDate(p.date_of_birth),
+      role: str(p.role, 40),
+    };
+  };
+
+  return {
+    applicant: person(input.applicant),
+    other_parties: Array.isArray(input.other_parties)
+      ? input.other_parties.slice(0, 8).map(person)
+      : [],
+    case_type: str(input.case_type, 60),
+    suggested_title: str(input.suggested_title, 200),
+    inz_client_number: str(input.inz_client_number, 40),
+    inz_application_number: str(input.inz_application_number, 40),
+    lodged_on: isoDate(input.lodged_on),
+    decision_due_on: isoDate(input.decision_due_on),
+    summary: str(input.summary, 2000) ?? '',
+    missing: Array.isArray(input.missing)
+      ? input.missing.filter((x): x is string => typeof x === 'string').slice(0, 12)
+      : [],
+  };
+}
+
+export function parseIntakeJson(text: string): IntakeResult {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const candidate = (fenced?.[1] ?? text).trim();
+  const start = candidate.indexOf('{');
+  const end = candidate.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error('model returned no JSON object');
+  return normaliseIntake(JSON.parse(candidate.slice(start, end + 1)) as Partial<IntakeResult>);
+}
+
+/**
+ * A file handed to the model as it arrived.
+ *
+ * Text is decoded in the Worker; anything else travels as bytes, and it is the
+ * provider that decides whether it can read it. A provider that cannot says so
+ * rather than quietly ignoring the attachment.
+ */
+export interface IntakeFile {
+  name: string;
+  mediaType: string;
+  /** Decoded text, for anything textual. */
+  text?: string;
+  /** base64, for a PDF or an image. */
+  data?: string;
+}
+
 export interface AiProvider {
   readonly name: string;
   readonly model: string;
@@ -72,6 +200,11 @@ export interface AiProvider {
   triage(input: { subject: string | null; body: string; caseTypes: string[] }): Promise<TriageResult>;
   /** Read a record the practice already holds and brief its owner on it. */
   brief(input: { title: string; file: string }): Promise<BriefResult>;
+  /**
+   * Read notes and documents into a draft register entry. `caseTypes` is the
+   * practice's configured vocabulary, as for triage.
+   */
+  extract(input: { text: string; files: IntakeFile[]; caseTypes: string[] }): Promise<IntakeResult>;
 }
 
 export const TRIAGE_SYSTEM_PROMPT = `You assist a New Zealand licensed immigration adviser.
