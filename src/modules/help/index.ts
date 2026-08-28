@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.11.0', date: '28 August 2026',
+    notes: [
+      'Clients now split into Leads, Individuals, Organisations and All.',
+      'Administration is tabbed rather than one long page.',
+      'The public page is built for search engines and for AI assistants that read it.',
+      'A brighter icon, so the tab is easy to find in a row of them.',
+    ],
+  },
+  {
     version: '0.10.0', date: '28 August 2026',
     notes: [
       'Step-by-step instructions for connecting Telegram, WhatsApp and email — see the section above.',
@@ -512,7 +521,11 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
       id: 'admin',
       title: 'Administration',
       body: html`
-        <p>Owners and administrators get an <strong>Admin</strong> section.</p>
+        <p>Owners and administrators get an <strong>Admin</strong> section, in four tabs:
+           <strong>Overview</strong> for the day's numbers and the links to users, settings and the
+           audit log; <strong>Integrations</strong> for what is connected and what is still missing;
+           <strong>Modules</strong> for what this installation is made of; and
+           <strong>Maintenance</strong> for the mail queue and the demonstration data.</p>
         <h4>Users and roles</h4>
         <p>Add a user and the system generates a temporary password shown once — hand it over
            yourself and have them change it. Suspending someone ends their sessions immediately,

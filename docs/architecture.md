@@ -172,3 +172,5 @@ becomes an invoice.
 | An AI provider | A file in `src/ai/` implementing `AiProvider`, plus a case in `getProvider`. |
 | A mail transport | A file in `src/mail/` implementing `MailProvider`, plus a case in `getMailProvider`. |
 | A schema change | A new numbered file in `migrations/`. Never edit an applied one. |
+
+The rules this design is held to are in [principles.md](principles.md).

@@ -31,7 +31,7 @@ import type { SettingsGroup } from '../../core/settings';
 import { nextRef, nowIso, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { readSettings, asBoolean } from '../../core/settings';
-import { practiceDetails } from '../../core/practice';
+import { practiceDetails, type PracticeDetails } from '../../core/practice';
 import { audit, clientIp } from '../../core/audit';
 import { sha256Hex } from '../../core/crypto';
 import { rateLimit } from '../../core/ratelimit';
@@ -95,10 +95,47 @@ export const WEBSITE_SETTINGS: SettingsGroup = {
     { key: 'website.faq', type: 'text', label: 'Questions people ask', default: DEFAULT_FAQ, maxLength: 4000 },
     { key: 'website.enquiry_form', type: 'boolean', label: 'Accept enquiries through the page', default: 'false',
       help: 'Adds a short form that creates an inquiry in the register. Off by default — with it off the page shows your email address instead.' },
+    { key: 'website.seo_title', type: 'string', label: 'Page title for search results', default: '', maxLength: 120,
+      help: 'What appears as the heading in a search result and on the browser tab. Leave blank to use the practice name and the line above the headline. Around 60 characters reads best.' },
+    { key: 'website.canonical_url', type: 'string', label: 'Public web address', default: '', maxLength: 300,
+      help: 'The address the public should reach this page on, e.g. https://immigration.kiwi. Used for the canonical link, the sitemap and the structured data. Leave blank to use whatever address the page was opened on.' },
+    { key: 'website.service_area', type: 'string', label: 'Where you act', default: 'New Zealand', maxLength: 200,
+      help: 'Named in the structured data search engines and AI assistants read.' },
+    { key: 'website.practice_type', type: 'enum', label: 'How to describe the practice', default: 'LegalService',
+      options: [
+        { value: 'LegalService', label: 'Legal service' },
+        { value: 'Attorney', label: 'Lawyer / barrister' },
+        { value: 'ProfessionalService', label: 'Professional service' },
+      ],
+      help: 'The schema.org type published in the structured data.' },
     { key: 'website.closing', type: 'text', label: 'Closing invitation', maxLength: 600,
       default: 'Tell us what you are trying to do and where you have got to. You will get a straight answer about whether it is worth pursuing.' },
   ],
 };
+
+/**
+ * The address the public should be told about.
+ *
+ * A Worker answers on its workers.dev name as well as on whatever domain sits
+ * in front of it, and search engines treat those as two sites holding the same
+ * page. The configured address wins, so every canonical link, sitemap entry and
+ * piece of structured data names one address rather than whichever one the
+ * request happened to arrive on.
+ */
+function canonicalBase(c: Context<AppContext>, values: Record<string, string>): string {
+  return canonicalBaseFrom(values['website.canonical_url'] ?? '', new URL(c.req.url).origin);
+}
+
+export function canonicalBaseFrom(configured: string, requestOrigin: string): string {
+  const trimmed = configured.trim().replace(/\/+$/, '');
+  return /^https?:\/\/[^\s/]+$/i.test(trimmed) ? trimmed : requestOrigin;
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
 
 /**
  * Back to the enquiry section with a message.
@@ -150,6 +187,90 @@ export const landingModule: AppModule = {
       const values = await readSettings(c.env, WEBSITE_SETTINGS.settings);
       if (!asBoolean(values['website.enabled'], true)) return next();
       return renderLanding(c, values);
+    });
+
+    // Machine-readable siblings of the page. All three are derived from the same
+    // settings, so they cannot drift from what a visitor is shown.
+    app.get('/robots.txt', async (c) => {
+      const values = await readSettings(c.env, WEBSITE_SETTINGS.settings);
+      const open = asBoolean(values['website.enabled'], true) && asBoolean(values['website.allow_indexing'], false);
+      const base = canonicalBase(c, values);
+      // Everything except the public page is a client register. Even when
+      // indexing is allowed, only the page itself is offered.
+      const body = open
+        ? [
+            'User-agent: *',
+            'Allow: /$',
+            'Disallow: /account', 'Disallow: /admin', 'Disallow: /api/',
+            'Disallow: /cases', 'Disallow: /clients', 'Disallow: /fees', 'Disallow: /inbox',
+            'Disallow: /inquiries', 'Disallow: /knowledge', 'Disallow: /login', 'Disallow: /quotes',
+            'Disallow: /setup', 'Disallow: /tasks',
+            '',
+            `Sitemap: ${base}/sitemap.xml`,
+            '',
+          ].join('\n')
+        : 'User-agent: *\nDisallow: /\n';
+      return c.text(body, 200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=3600' });
+    });
+
+    app.get('/sitemap.xml', async (c) => {
+      const values = await readSettings(c.env, WEBSITE_SETTINGS.settings);
+      if (!asBoolean(values['website.enabled'], true) || !asBoolean(values['website.allow_indexing'], false)) {
+        return c.text('Not found', 404);
+      }
+      const base = canonicalBase(c, values);
+      const body = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>${escapeXml(base)}/</loc><changefreq>monthly</changefreq><priority>1.0</priority></url>
+</urlset>
+`;
+      return c.text(body, 200, { 'content-type': 'application/xml; charset=utf-8', 'cache-control': 'public, max-age=3600' });
+    });
+
+    /**
+     * /llms.txt — the page as plain prose, for answer engines.
+     *
+     * An assistant asked "who does immigration law in New Zealand" reads pages
+     * rather than ranking them, and what it can quote accurately is what it
+     * repeats. Handing it the same facts as clean text costs nothing and
+     * removes the guesswork of parsing a layout. It follows the page's own
+     * indexing setting, because it is the same content by another door.
+     */
+    app.get('/llms.txt', async (c) => {
+      const values = await readSettings(c.env, WEBSITE_SETTINGS.settings);
+      if (!asBoolean(values['website.enabled'], true) || !asBoolean(values['website.allow_indexing'], false)) {
+        return c.text('Not found', 404);
+      }
+      const practice = await practiceDetails(c.env);
+      const lines: string[] = [`# ${practice.legalName}`, ''];
+      if (values['website.lede']) lines.push(`> ${values['website.lede']}`, '');
+      lines.push(`Immigration law practice acting in ${values['website.service_area'] || 'New Zealand'}.`, '');
+
+      const services = parseList(values['website.services']);
+      if (services.length) {
+        lines.push('## What we do', '');
+        for (const s of services) lines.push(`- **${s.head}**${s.body ? `: ${s.body}` : ''}`);
+        lines.push('');
+      }
+      const process = parseList(values['website.process']);
+      if (process.length) {
+        lines.push('## How working together goes', '');
+        process.forEach((s, i) => lines.push(`${i + 1}. **${s.head}**${s.body ? `: ${s.body}` : ''}`));
+        lines.push('');
+      }
+      const faq = parseList(values['website.faq']);
+      if (faq.length) {
+        lines.push('## Questions and answers', '');
+        for (const q of faq) lines.push(`### ${q.head}`, '', q.body, '');
+      }
+      lines.push('## Contact', '');
+      if (practice.contactEmail) lines.push(`- Email: ${practice.contactEmail}`);
+      if (practice.contactPhone) lines.push(`- Phone: ${practice.contactPhone}`);
+      if (practice.adviserDetails) lines.push(`- ${practice.adviserDetails}`);
+      lines.push('', `Terms of engagement: ${practice.termsUrl}`, '');
+
+      return c.text(lines.join('\n'), 200,
+        { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=3600' });
     });
 
     app.post('/enquiry', async (c) => {
@@ -374,12 +495,115 @@ async function renderLanding(c: Parameters<typeof page>[0], values: Record<strin
   </div>
 </footer>`;
 
+  const indexable = asBoolean(values['website.allow_indexing'], false);
+  const base = canonicalBase(c, values);
+  const description = (values['website.lede'] || '').slice(0, 300);
+  // A page title carries two jobs: naming the practice, and saying what it is,
+  // because a search result shows the title before anything else.
+  const title = values['website.seo_title']
+    || `${practice.legalName} — ${values['website.eyebrow'] || 'New Zealand immigration law'}`;
+
   return page(c, {
-    title: practice.legalName,
+    title,
     landing: true,
-    description: values['website.lede'] || undefined,
-    indexable: asBoolean(values['website.allow_indexing'], false),
+    description: description || undefined,
+    indexable,
+    head: seoHead({ base, title, description, practice, values, faq, services }),
   }, body);
+}
+
+/**
+ * What a machine reads.
+ *
+ * Two audiences that want the same facts in different forms: a search engine,
+ * which wants a canonical address and a social card, and an answer engine,
+ * which wants the facts stated outright rather than inferred from a layout.
+ * Both are served from the same settings as the visible page, so the three can
+ * never disagree.
+ *
+ * The structured data is JSON-LD in a script tag of type application/ld+json.
+ * That is data, not code: browsers do not execute it, so it is unaffected by
+ * the policy forbidding inline script, and no exception has to be opened.
+ */
+function seoHead(opts: {
+  base: string;
+  title: string;
+  description: string;
+  practice: PracticeDetails;
+  values: Record<string, string>;
+  faq: Array<{ head: string; body: string }>;
+  services: Array<{ head: string; body: string }>;
+}): Raw {
+  const { base, title, description, practice, values, faq, services } = opts;
+
+  const organisation: Record<string, unknown> = {
+    '@type': values['website.practice_type'] || 'LegalService',
+    '@id': `${base}/#practice`,
+    name: practice.legalName,
+    url: `${base}/`,
+    ...(description ? { description } : {}),
+    ...(practice.contactEmail ? { email: practice.contactEmail } : {}),
+    ...(practice.contactPhone ? { telephone: practice.contactPhone } : {}),
+    areaServed: { '@type': 'Country', name: values['website.service_area'] || 'New Zealand' },
+    availableLanguage: 'en',
+    ...(services.length
+      ? {
+          hasOfferCatalog: {
+            '@type': 'OfferCatalog',
+            name: 'Immigration services',
+            itemListElement: services.map((s) => ({
+              '@type': 'Offer',
+              itemOffered: { '@type': 'Service', name: s.head, ...(s.body ? { description: s.body } : {}) },
+            })),
+          },
+        }
+      : {}),
+  };
+
+  const graph: Array<Record<string, unknown>> = [
+    organisation,
+    { '@type': 'WebSite', '@id': `${base}/#website`, url: `${base}/`, name: practice.legalName,
+      publisher: { '@id': `${base}/#practice` }, inLanguage: 'en-NZ' },
+  ];
+
+  // The questions are published as questions, which is the form an answer
+  // engine can quote without having to guess where an answer begins and ends.
+  if (faq.length) {
+    graph.push({
+      '@type': 'FAQPage',
+      '@id': `${base}/#questions`,
+      mainEntity: faq.map((q) => ({
+        '@type': 'Question',
+        name: q.head,
+        acceptedAnswer: { '@type': 'Answer', text: q.body },
+      })),
+    });
+  }
+
+  const jsonLd = JSON.stringify({ '@context': 'https://schema.org', '@graph': graph });
+
+  return html`<link rel="canonical" href="${`${base}/`}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="${practice.legalName}">
+<meta property="og:title" content="${title}">
+${description ? html`<meta property="og:description" content="${description}">` : ''}
+<meta property="og:url" content="${`${base}/`}">
+<meta property="og:locale" content="en_NZ">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="${title}">
+${description ? html`<meta name="twitter:description" content="${description}">` : ''}
+<link rel="alternate" type="text/plain" href="${`${base}/llms.txt`}" title="Plain-text summary">
+${raw(`<script type="application/ld+json">${jsonLdSafe(jsonLd)}</script>`)}`;
+}
+
+/**
+ * JSON-LD sits inside a script element, where the parser is looking for the
+ * literal characters `</script` and nothing else. Escaping the `<` of any such
+ * sequence keeps the JSON valid while making it impossible for a settings value
+ * to close the element early.
+ */
+function jsonLdSafe(json: string): string {
+  return json.replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
 }
 
 function sectionHead(title: string, sub: string): Raw {
@@ -390,4 +614,4 @@ function sectionHead(title: string, sub: string): Raw {
     </div>`;
 }
 
-export const __internal = { parseList, paragraphs };
+export const __internal = { parseList, paragraphs, jsonLdSafe, escapeXml, canonicalBaseFrom };
