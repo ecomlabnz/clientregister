@@ -7,6 +7,24 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.12.1 — 28 August 2026
+
+### Fixed
+- **The figures strip on Today was unusable on a phone.** Six boxes laid out as
+  a flex row with a minimum width fought over 390 pixels until each was a couple
+  of characters wide, and the labels wrapped one letter per line — "OPEN CASES"
+  came out as a column of letters, and `$17,480.00` broke across nine lines. It
+  is now a grid, which decides how many fit and wraps the rest, and drops to two
+  columns on a phone. Labels and figures also opt out of the page-wide
+  long-word breaking that a client's email address needs but a number does not.
+- Checked with a real browser at 390px: no page-level horizontal scroll on the
+  dashboard, clients or quotes — only the navigation strip and tables scroll,
+  inside their own boxes, which is intended.
+
+### Added
+- Tests covering those layout decisions, so the ones that were got wrong once
+  cannot be got wrong again silently.
+
 ## 0.12.0 — 28 August 2026
 
 ### Added
