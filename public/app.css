@@ -372,6 +372,18 @@ textarea { resize: vertical; min-height: 70px; }
 /* A section that needs the whole form rather than one of its columns. */
 .form-section-wide { grid-column: 1 / -1; }
 
+/* Settings: fields flow across the grid rather than stacking in its first
+   column. A heading, a description or a long text box takes the whole width. */
+.settings-form { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 26px; }
+.settings-head { grid-column: 1 / -1; }
+.settings-cell-wide { grid-column: 1 / -1; }
+.settings-cell-wide textarea { min-height: 92px; }
+@media (min-width: 1000px) {
+  /* Never more than three across: a form of fifteen boxes in five columns is
+     harder to read than one in three, whatever the window allows. */
+  .settings-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 /* Composing a message. The body is padded into columns of figures, which only
    line up in a monospace face. */
 .compose-body { font-family: var(--mono); font-size: 0.85rem; line-height: 1.5; min-height: 320px; }
@@ -450,6 +462,39 @@ details[open] > summary { margin-bottom: 12px; }
   padding: 4px 12px; font-size: 0.82rem;
 }
 .tabs-sub .tab.current { background: var(--blue-bg); border-color: transparent; color: var(--accent); }
+
+/*
+ * A tab bar stays under the navigation while its page scrolls.
+ *
+ * Only on a screen wide enough for the bar to be one line. Measured in a
+ * browser: at desktop width a bar is 36px and a second one 30px, but on a phone
+ * they wrap to over 100px, and freezing that would spend a third of the screen
+ * on navigation nobody is looking at.
+ */
+@media (min-width: 721px) {
+  .main > .tabs {
+    position: sticky; top: var(--topbar-h); z-index: 6;
+    background: var(--bg); padding-top: 6px; margin-top: -6px;
+  }
+  /* The second bar sits under the first rather than beside it. */
+  .main > .tabs-sub { top: calc(var(--topbar-h) + 36px); z-index: 5; }
+  /* A sticky table heading on a page that also has tabs must clear them. */
+  .tabs ~ * .table-sticky thead th { top: calc(var(--topbar-h) + 36px); }
+}
+
+/* Tabs across a form. They are buttons rather than links, because they move
+   between parts of one form rather than between pages. */
+.form-tabs .tab {
+  background: none; font: inherit; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; color: var(--muted);
+}
+.form-tabs .tab.current { background: var(--surface); color: var(--accent); border-color: var(--border); border-bottom-color: var(--surface); }
+/* A tabbed form shows one panel, which then gets the whole width to lay out in. */
+.js-tabbed [data-panel]:not([hidden]) { grid-column: 1 / -1; }
+.js-tabbed [data-panel] { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 26px; align-content: start; }
+.js-tabbed [data-panel] > h3 { grid-column: 1 / -1; }
+.js-tabbed [data-panel] > p, .js-tabbed [data-panel] > [data-kind] { grid-column: 1 / -1; }
+.js-tabbed [data-kind] { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 26px; }
 
 /* The manual reads as prose rather than as a form. */
 .manual h4 { margin: 18px 0 6px; font-size: 0.95rem; }

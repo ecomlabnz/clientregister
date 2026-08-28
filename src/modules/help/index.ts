@@ -396,6 +396,14 @@ function sections(origin: string): Section[] {
            can do to protect it. You will be given eight recovery codes when you set it up — save
            them somewhere safe, because they are shown once.</p>
         <p>Changing your password signs out every other device automatically.</p>
+        <h4>Your preferences</h4>
+        <p>Under <strong>My account → Preferences</strong> you choose how <em>you</em> like to work:
+           which page you land on after signing in, how many rows a list shows, whether Clients
+           opens on Leads or Individuals, whether Cases opens on open matters or everything.</p>
+        <p>These affect nobody else. They are not settings — a <strong>setting</strong> says how the
+           practice works and one answer serves everybody, so an administrator owns it; a
+           <strong>preference</strong> is yours, and needing an administrator to change where you
+           land after signing in would be absurd.</p>
         <h4>Appearance</h4>
         <p>Pick one of three themes — <strong>Slate</strong>, <strong>Warm</strong> or
            <strong>Ink</strong> — and choose whether the register follows your device's day and

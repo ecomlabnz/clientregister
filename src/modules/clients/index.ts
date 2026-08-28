@@ -39,6 +39,7 @@ import { organisationOptions, userOptions } from '../../core/lookups';
 import { addEntry, listEntries } from '../../core/timeline';
 import { casesForClient, relatedClients } from '../../core/parties';
 import { can } from '../../core/rbac';
+import { asPrefInteger, preferencesFor } from '../../core/preferences';
 import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
 import { composeFullName, splitFullName, type ClientKind } from '../../core/names';
 import {
@@ -64,7 +65,7 @@ export interface ClientRow {
   created_at: string; updated_at: string; created_by: string | null;
 }
 
-const PAGE_SIZE = 25;
+const DEFAULT_PAGE_SIZE = 25;
 
 /** Show a date with a warning when it has passed or is close. */
 function expiryCell(value: string | null, warnDays = 90): Raw {
@@ -103,9 +104,23 @@ function clientForm(
                parts. We have suggested a split of “${values.full_name}” below — correct it if it
                is wrong, then save.</div>`
       : ''}
-    <form method="post" action="${action}" class="form-grid js-client-form">
+    ${/*
+      * The form is one form, split across tabs by script alone: every field
+      * stays in the document and submits together, so nothing is lost by
+      * switching between them and nothing depends on the tabs working. With
+      * scripting off, all five sections simply show at once, as they always
+      * did.
+      */ ''}
+    <nav class="tabs form-tabs js-hide" data-tabs-for="client">
+      <button type="button" class="tab current" data-tab="who">Who this is</button>
+      <button type="button" class="tab" data-tab="contact">Contact</button>
+      <button type="button" class="tab" data-tab="identity">Identity</button>
+      <button type="button" class="tab" data-tab="immigration">Immigration</button>
+      <button type="button" class="tab" data-tab="file">File</button>
+    </nav>
+    <form method="post" action="${action}" class="form-grid js-client-form js-tabbed" data-tabs="client">
       ${csrfField(csrf)}
-      <div class="form-section">
+      <div class="form-section" data-panel="who">
         <h3>Who this is</h3>
         ${select({ label: 'Record type', name: 'kind', value: kind, includeBlank: false,
                    options: [{ value: 'individual', label: 'Individual' },
@@ -141,7 +156,7 @@ function clientForm(
         </div>
       </div>
 
-      <div class="form-section">
+      <div class="form-section" data-panel="contact">
         <h3>Contact</h3>
         ${field({ label: 'Email', name: 'email', type: 'email', value: values.email, maxlength: 320 })}
         ${field({ label: 'Phone', name: 'phone', value: values.phone, maxlength: 60 })}
@@ -153,7 +168,7 @@ function clientForm(
         ${field({ label: 'Address', name: 'address', type: 'textarea', value: values.address, rows: 3, maxlength: 500 })}
       </div>
 
-      <div class="form-section" data-kind="individual">
+      <div class="form-section" data-kind="individual" data-panel="identity">
         <h3>Identity documents</h3>
         ${sealingAvailable
           ? field({ label: 'Passport number', name: 'passport_number', value: '',
@@ -167,7 +182,7 @@ function clientForm(
                   hint: 'Watched on the alerts page — a passport expiring mid-application stalls it.' })}
       </div>
 
-      <div class="form-section" data-kind="individual">
+      <div class="form-section" data-kind="individual" data-panel="immigration">
         <h3>Immigration and compliance</h3>
         ${field({ label: 'Current visa type', name: 'current_visa_type', value: values.current_visa_type, maxlength: 120 })}
         ${field({ label: 'Current visa expiry', name: 'current_visa_expiry', type: 'date', value: dateInputValue(values.current_visa_expiry) })}
@@ -180,7 +195,7 @@ function clientForm(
         ${field({ label: 'Chest x-ray expires', name: 'chest_xray_expiry', type: 'date', value: dateInputValue(values.chest_xray_expiry) })}
       </div>
 
-      <div class="form-section">
+      <div class="form-section" data-panel="file">
         <h3>File management</h3>
         ${select({ label: 'Status', name: 'status', value: values.status ?? 'prospect', includeBlank: false,
                    options: optionsFrom(CLIENT_STATUSES, CLIENT_STATUS_LABELS) })}
@@ -265,13 +280,16 @@ export const clientsModule: AppModule = {
       const q = (c.req.query('q') ?? '').trim();
       const status = c.req.query('status') ?? '';
       const pageNum = Math.max(1, Number(c.req.query('page') ?? '1') || 1);
+
+      const prefs = await preferencesFor(c.env, c.get('user')!.id);
+      const PAGE_SIZE = asPrefInteger(prefs['pref.page_size'], DEFAULT_PAGE_SIZE);
       const offset = (pageNum - 1) * PAGE_SIZE;
 
       // Four ways of looking at one list rather than four lists. Leads cuts by
       // stage; individuals and organisations cut by what kind of client it is,
       // because in practice you are either working a pipeline or looking for a
       // person or a company, and those are different errands.
-      const view = c.req.query('view') ?? 'individuals';
+      const view = c.req.query('view') ?? prefs['pref.clients_view'] ?? 'individuals';
       const where: string[] = [];
       const params: unknown[] = [];
       if (view === 'leads' && !status) where.push(`status = 'prospect'`);

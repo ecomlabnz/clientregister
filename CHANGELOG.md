@@ -7,6 +7,47 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.17.0 — 28 August 2026
+
+### Added
+- **Per-user preferences**, under My account → Preferences: where you land after
+  signing in, rows per page, which view Clients and Cases open on, whether the
+  task list filters to you, and whether new tasks are assigned to you by
+  default. They affect only that person.
+  - The distinction from settings is deliberate. A *setting* says how the
+    practice works and one answer serves everybody, so an administrator owns it.
+    A *preference* is one person's, and needing an administrator to change where
+    you land after signing in would be absurd.
+  - Declared by the module that owns them, key and value in the database, so
+    adding one is a line of code rather than a migration — and only a declared
+    key can be written, with each value coerced to its declared type. Tested
+    that a landing page outside the offered list is refused, since that value
+    ends up in a redirect.
+  - Theme and colour mode stay as columns on the user row: they are read on
+    every request to render the page, and a second query for them on every page
+    load would cost something for nothing.
+- **My account is tabbed** — Security, Preferences, Appearance, Devices — having
+  grown past a screen.
+
+### Changed
+- **The new client form is in tabs**: Who this is, Contact, Identity,
+  Immigration, File. The whole form is always in the document and submits
+  together, so nothing is lost switching between them, and with scripting off
+  every section shows at once exactly as before. An invalid field on a hidden
+  tab reveals its tab rather than blocking the submit with nothing to see —
+  verified in a browser.
+- **Settings fields lay out across the page** instead of stacking in a single
+  narrow column with the rest of a desktop empty. Long text settings take the
+  full width; the rest flow two or three across, never more.
+- **Tab bars stay under the navigation while a page scrolls**, and a sticky
+  table heading clears them. Desktop only: measured in a browser, a bar is 36px
+  on a wide screen but wraps past 100px on a phone, and freezing that would
+  spend a third of the screen on navigation nobody is reading.
+
+### Fixed
+- The audit log's heading sat below its tab bar while every other page in the
+  section had it above.
+
 ## 0.16.0 — 28 August 2026
 
 ### Added

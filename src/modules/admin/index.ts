@@ -512,14 +512,22 @@ export const adminModule: AppModule = {
                href="/admin/settings?tab=${g.id}">${g.title}</a>`)}
         </nav>
 
-        <form method="post" action="/admin/settings" class="form-grid">
+        ${/*
+          * The fields are direct children of the grid rather than nested in one
+          * section. Nested, they stack in the first of the grid's columns and
+          * leave the rest of a desktop empty — which is what this page used to
+          * do. A long text setting takes the full width; the rest flow two or
+          * three across, as the window allows.
+          */ ''}
+        <form method="post" action="/admin/settings" class="form-grid settings-form">
           ${csrfField(csrf)}
           <input type="hidden" name="tab" value="${group.id}">
-          <div class="form-section">
-            <h3>${group.title}</h3>
-            ${group.description ? html`<p class="hint">${group.description}</p>` : ''}
-            ${group.settings.map((def) => settingField(def, values[def.key] ?? def.default))}
-          </div>
+          <h3 class="settings-head">${group.title}</h3>
+          ${group.description ? html`<p class="hint settings-head">${group.description}</p>` : ''}
+          ${group.settings.map((def) => html`
+            <div class="${def.type === 'text' ? 'settings-cell settings-cell-wide' : 'settings-cell'}">
+              ${settingField(def, values[def.key] ?? def.default)}
+            </div>`)}
           <div class="form-actions">
             <button class="btn btn-primary" type="submit">Save ${group.title.toLowerCase()}</button>
             <a class="btn btn-secondary" href="/admin">Cancel</a>
@@ -633,12 +641,12 @@ export const adminModule: AppModule = {
           Object.entries(over).map(([k, v]) => [k, String(v)])) }).toString();
 
       return page(c, { title: 'Audit log', active: '/admin' }, html`
-        ${adminTabs('audit')}
         ${pageHeader(
           subject ? `Activity — ${subject.name}` : 'Audit log',
           subject
             ? `Everything ${subject.email} has done, most recent first.`
             : 'Every action taken in the register, by whom, and when.')}
+        ${adminTabs('audit')}
 
         <div class="alert alert-ok">
           This log is append-only in the database itself. Triggers refuse every attempt to change or
