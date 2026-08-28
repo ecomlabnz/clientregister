@@ -33,7 +33,7 @@ export async function attachSession(c: Context<AppContext>, next: Next): Promise
     if (session) {
       const row = await one<User>(
         c.env.DB,
-        'SELECT id, email, name, role, status, totp_enabled FROM users WHERE id = ?',
+        'SELECT id, email, name, role, status, totp_enabled, theme, colour_mode FROM users WHERE id = ?',
         session.userId,
       );
       if (row && row.status === 'active') {
@@ -83,7 +83,8 @@ export type LoginResult =
 export async function authenticate(env: Env, email: string, password: string): Promise<LoginResult> {
   const row = await one<UserRow>(
     env.DB,
-    `SELECT id, email, name, role, status, totp_enabled, password_hash, failed_logins, locked_until, totp_secret
+    `SELECT id, email, name, role, status, totp_enabled, theme, colour_mode,
+            password_hash, failed_logins, locked_until, totp_secret
        FROM users WHERE email = ?`,
     email.trim().toLowerCase(),
   );
@@ -128,6 +129,7 @@ export async function authenticate(env: Env, email: string, password: string): P
   const user: User = {
     id: row.id, email: row.email, name: row.name,
     role: row.role, status: row.status, totp_enabled: row.totp_enabled,
+    theme: row.theme, colour_mode: row.colour_mode,
   };
   return { ok: true, user, needsTotp: row.totp_enabled === 1 && !!row.totp_secret };
 }

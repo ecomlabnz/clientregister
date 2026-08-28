@@ -2,66 +2,175 @@
    The CSP forbids external styles and inline style attributes, so everything
    the interface needs is here. */
 
-:root {
-  color-scheme: light dark;
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --surface-2: #f0f2f5;
-  --border: #d9dee5;
-  --text: #16202b;
-  --muted: #5b6a7a;
-  --accent: #14496b;
-  --accent-text: #ffffff;
-  --green: #16794a;
-  --green-bg: #e3f4ec;
-  --amber: #8a5a00;
-  --amber-bg: #fdf1dc;
-  --red: #a3271f;
-  --red-bg: #fbe6e4;
-  --blue: #14496b;
-  --blue-bg: #e4eef6;
-  --grey: #5b6a7a;
-  --grey-bg: #eceff3;
-  --radius: 8px;
-  --shadow: 0 1px 2px rgba(16, 30, 45, 0.06), 0 1px 8px rgba(16, 30, 45, 0.04);
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+/* --- Design tokens ------------------------------------------------------- */
+/* Three palettes, each declaring a light (--l-*) and a dark (--d-*) value for
+   every neutral. The light/dark mapping below is written once and is
+   theme-independent, so adding a fourth palette means adding one block here and
+   one entry to src/ui/theme.ts — nothing else.
+
+   The pairs are declared on [data-theme] rather than :root[data-theme] so that
+   any element can carry the attribute and expose that palette's colours: the
+   appearance picker uses this to draw its swatches from the real tokens
+   instead of repeating the hex codes. */
+
+:root, [data-theme="slate"] {
+  --l-bg: #f6f7f9;      --d-bg: #12171d;
+  --l-surface: #ffffff; --d-surface: #1a2128;
+  --l-surface-2: #eef1f4; --d-surface-2: #212a33;
+  --l-border: #d8dee6;  --d-border: #2c3742;
+  --l-text: #16202b;    --d-text: #e4eaf1;
+  --l-muted: #5b6a7a;   --d-muted: #93a2b2;
+  --l-accent: #1d4f76;  --d-accent: #69a8d4;
+  --l-accent-text: #ffffff; --d-accent-text: #0a141c;
+  --l-grey: #5b6a7a;    --d-grey: #9aa8b6;
+  --l-grey-bg: #eceff3; --d-grey-bg: #222b34;
 }
 
+[data-theme="warm"] {
+  --l-bg: #faf8f5;      --d-bg: #1a1715;
+  --l-surface: #ffffff; --d-surface: #221e1b;
+  --l-surface-2: #f3efe9; --d-surface-2: #2a2522;
+  --l-border: #e2dbd1;  --d-border: #3a332e;
+  --l-text: #241f1b;    --d-text: #ece5dd;
+  --l-muted: #6f6459;   --d-muted: #a89a8c;
+  --l-accent: #9a5133;  --d-accent: #d99873;
+  --l-accent-text: #ffffff; --d-accent-text: #1d1310;
+  --l-grey: #6f6459;    --d-grey: #a89a8c;
+  --l-grey-bg: #f1ece5; --d-grey-bg: #2b2622;
+}
+
+[data-theme="ink"] {
+  --l-bg: #f4f7f7;      --d-bg: #0f1417;
+  --l-surface: #ffffff; --d-surface: #161d21;
+  --l-surface-2: #e9efef; --d-surface-2: #1d262a;
+  --l-border: #d0dbdb;  --d-border: #283237;
+  --l-text: #10201f;    --d-text: #e0eaea;
+  --l-muted: #55676a;   --d-muted: #8ea1a4;
+  --l-accent: #0f5f5c;  --d-accent: #5fbdb4;
+  --l-accent-text: #ffffff; --d-accent-text: #061413;
+  --l-grey: #55676a;    --d-grey: #8ea1a4;
+  --l-grey-bg: #e8eeee; --d-grey-bg: #1e272b;
+}
+
+/* Semantic colours are identical in all three palettes. Green means healthy and
+   red means broken; if they shifted with the theme they would read as
+   decoration instead of meaning. */
+:root {
+  --l-green: #16794a;   --d-green: #6ed3a4;
+  --l-green-bg: #e3f4ec; --d-green-bg: #12332a;
+  --l-amber: #8a5a00;   --d-amber: #e0b061;
+  --l-amber-bg: #fdf1dc; --d-amber-bg: #33280f;
+  --l-red: #a3271f;     --d-red: #f08f86;
+  --l-red-bg: #fbe6e4;  --d-red-bg: #3a1d1a;
+  --l-blue: #14496b;    --d-blue: #7fb4d8;
+  --l-blue-bg: #e4eef6; --d-blue-bg: #142836;
+  --l-shadow: 0 1px 2px rgba(16, 30, 45, 0.06), 0 1px 8px rgba(16, 30, 45, 0.04);
+  --d-shadow: none;
+
+  --radius: 6px;
+  /* No web fonts: the CSP allows only self-hosted ones, and shipping a font
+     file would be the single heaviest thing on the page. This stack resolves to
+     the best grotesque already on the machine — SF Pro on Apple, Segoe UI
+     Variable on Windows 11, Inter where it is installed, Roboto on Android — so
+     the interface looks designed and costs nothing to load. */
+  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+    "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+/* Light is the base. */
+:root {
+  color-scheme: light;
+  --bg: var(--l-bg);
+  --surface: var(--l-surface);
+  --surface-2: var(--l-surface-2);
+  --border: var(--l-border);
+  --text: var(--l-text);
+  --muted: var(--l-muted);
+  --accent: var(--l-accent);
+  --accent-text: var(--l-accent-text);
+  --green: var(--l-green);
+  --green-bg: var(--l-green-bg);
+  --amber: var(--l-amber);
+  --amber-bg: var(--l-amber-bg);
+  --red: var(--l-red);
+  --red-bg: var(--l-red-bg);
+  --blue: var(--l-blue);
+  --blue-bg: var(--l-blue-bg);
+  --grey: var(--l-grey);
+  --grey-bg: var(--l-grey-bg);
+  --shadow: var(--l-shadow);
+}
+
+/* Native widgets (scrollbars, date pickers, checkboxes) follow color-scheme. */
+:root[data-mode="dark"] { color-scheme: dark; }
+:root[data-mode="system"] { color-scheme: light dark; }
+
+/* Dark, applied either because the user chose it or because they follow the
+   device and the device is dark. The two selectors cannot both match. */
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #11161c;
-    --surface: #182027;
-    --surface-2: #1f2933;
-    --border: #2c3742;
-    --text: #e6ecf2;
-    --muted: #94a3b3;
-    --accent: #4d94c4;
-    --accent-text: #08131c;
-    --green: #6ed3a4;
-    --green-bg: #12332a;
-    --amber: #e0b061;
-    --amber-bg: #33280f;
-    --red: #f08f86;
-    --red-bg: #3a1d1a;
-    --blue: #7fb4d8;
-    --blue-bg: #142836;
-    --grey: #9aa8b6;
-    --grey-bg: #232c35;
-    --shadow: none;
+  :root[data-mode="system"] {
+    --bg: var(--d-bg);
+    --surface: var(--d-surface);
+    --surface-2: var(--d-surface-2);
+    --border: var(--d-border);
+    --text: var(--d-text);
+    --muted: var(--d-muted);
+    --accent: var(--d-accent);
+    --accent-text: var(--d-accent-text);
+    --green: var(--d-green);
+    --green-bg: var(--d-green-bg);
+    --amber: var(--d-amber);
+    --amber-bg: var(--d-amber-bg);
+    --red: var(--d-red);
+    --red-bg: var(--d-red-bg);
+    --blue: var(--d-blue);
+    --blue-bg: var(--d-blue-bg);
+    --grey: var(--d-grey);
+    --grey-bg: var(--d-grey-bg);
+    --shadow: var(--d-shadow);
   }
 }
 
+:root[data-mode="dark"] {
+  --bg: var(--d-bg);
+  --surface: var(--d-surface);
+  --surface-2: var(--d-surface-2);
+  --border: var(--d-border);
+  --text: var(--d-text);
+  --muted: var(--d-muted);
+  --accent: var(--d-accent);
+  --accent-text: var(--d-accent-text);
+  --green: var(--d-green);
+  --green-bg: var(--d-green-bg);
+  --amber: var(--d-amber);
+  --amber-bg: var(--d-amber-bg);
+  --red: var(--d-red);
+  --red-bg: var(--d-red-bg);
+  --blue: var(--d-blue);
+  --blue-bg: var(--d-blue-bg);
+  --grey: var(--d-grey);
+  --grey-bg: var(--d-grey-bg);
+  --shadow: var(--d-shadow);
+}
+
 * { box-sizing: border-box; }
+html { overflow-x: hidden; }
 
 body {
   margin: 0;
   font-family: var(--font);
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.55;
   color: var(--text);
   background: var(--bg);
   -webkit-text-size-adjust: 100%;
+  overflow-wrap: break-word;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Figures line up column to column without having to opt in per table. */
+  font-variant-numeric: tabular-nums;
 }
 
 a { color: var(--accent); text-decoration: none; }
@@ -71,9 +180,12 @@ pre {
   font-family: var(--mono); font-size: 0.85em; background: var(--surface-2);
   padding: 10px 12px; border-radius: var(--radius); overflow-x: auto;
 }
-h1 { font-size: 1.5rem; margin: 0 0 4px; }
-h2 { font-size: 1.05rem; margin: 0; }
-h3 { font-size: 0.95rem; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+h1 { font-size: 1.35rem; font-weight: 640; letter-spacing: -0.018em; margin: 0 0 3px; }
+h2 { font-size: 0.95rem; font-weight: 620; letter-spacing: -0.008em; margin: 0; }
+h3 {
+  font-size: 0.72rem; font-weight: 600; margin: 0 0 10px;
+  text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
+}
 p { margin: 0 0 10px; }
 p:last-child { margin-bottom: 0; }
 
@@ -81,14 +193,14 @@ p:last-child { margin-bottom: 0; }
 
 .topbar {
   display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
-  padding: 10px 20px; background: var(--surface);
+  padding: 9px 18px; background: var(--surface);
   border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
 }
-.brand { font-weight: 650; color: var(--text); letter-spacing: -0.01em; }
+.brand { font-weight: 640; color: var(--text); letter-spacing: -0.02em; font-size: 0.95rem; }
 .brand:hover { text-decoration: none; }
 .topnav { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
 .nav-link {
-  padding: 5px 10px; border-radius: 6px; color: var(--muted); font-size: 0.92rem; font-weight: 500;
+  padding: 4px 9px; border-radius: 5px; color: var(--muted); font-size: 0.86rem; font-weight: 500;
 }
 .nav-link:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
 .nav-link.current { background: var(--blue-bg); color: var(--accent); }
@@ -102,13 +214,16 @@ p:last-child { margin-bottom: 0; }
   display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 650;
 }
 
-.main { max-width: 1180px; margin: 0 auto; padding: 22px 20px 60px; }
+.main { max-width: 1180px; margin: 0 auto; padding: 20px 18px 60px; }
 .footer {
   max-width: 1180px; margin: 0 auto; padding: 0 20px 30px;
   display: flex; justify-content: space-between; color: var(--muted); font-size: 0.8rem;
 }
 
-body.bare { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+body.bare {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; min-height: 100dvh; padding: 20px;
+}
 .bare-main { width: 100%; max-width: 400px; }
 .auth-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
@@ -132,9 +247,9 @@ body.bare { display: flex; align-items: center; justify-content: center; min-hei
 }
 .card-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2);
+  padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface-2);
 }
-.card-body { padding: 16px; }
+.card-body { padding: 14px; }
 
 .cols { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
@@ -159,14 +274,14 @@ body.bare { display: flex; align-items: center; justify-content: center; min-hei
 
 /* --- Tables ------------------------------------------------------------- */
 
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
 th {
-  text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border);
-  color: var(--muted); font-weight: 600; font-size: 0.78rem;
-  text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;
+  text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border);
+  color: var(--muted); font-weight: 600; font-size: 0.7rem;
+  text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap;
 }
-td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
 tr:last-child td { border-bottom: none; }
 .totals-row td { border-top: 2px solid var(--border); background: var(--surface-2); }
 .row-urgent { background: var(--red-bg); }
@@ -177,8 +292,8 @@ tr:last-child td { border-bottom: none; }
 /* --- Badges ------------------------------------------------------------- */
 
 .badge {
-  display: inline-block; padding: 2px 8px; border-radius: 999px;
-  font-size: 0.74rem; font-weight: 600; white-space: nowrap;
+  display: inline-block; padding: 1px 7px; border-radius: 5px;
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.005em; white-space: nowrap;
   background: var(--grey-bg); color: var(--grey);
 }
 .badge-green { background: var(--green-bg); color: var(--green); }
@@ -190,18 +305,18 @@ tr:last-child td { border-bottom: none; }
 /* --- Forms -------------------------------------------------------------- */
 
 .field { margin-bottom: 14px; }
-label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; }
 .req { color: var(--red); }
 input, select, textarea {
-  width: 100%; padding: 8px 10px; font: inherit; font-size: 0.92rem;
+  width: 100%; padding: 7px 10px; font: inherit; font-size: 0.88rem;
   color: var(--text); background: var(--surface);
-  border: 1px solid var(--border); border-radius: 6px;
+  border: 1px solid var(--border); border-radius: 5px;
 }
 input:focus, select:focus, textarea:focus {
   outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent);
 }
 textarea { resize: vertical; min-height: 70px; }
-.hint { font-size: 0.8rem; color: var(--muted); margin: 4px 0 0; }
+.hint { font-size: 0.78rem; color: var(--muted); margin: 4px 0 0; line-height: 1.45; }
 .checkbox-field label { display: flex; gap: 8px; align-items: flex-start; font-weight: 500; }
 .checkbox-field input { width: auto; margin-top: 3px; }
 
@@ -236,15 +351,15 @@ details[open] > summary { margin-bottom: 12px; }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 7px 14px; font: inherit; font-size: 0.88rem; font-weight: 600;
-  border: 1px solid transparent; border-radius: 6px; cursor: pointer;
+  padding: 6px 13px; font: inherit; font-size: 0.84rem; font-weight: 600;
+  border: 1px solid transparent; border-radius: 5px; cursor: pointer;
   background: var(--surface-2); color: var(--text); white-space: nowrap; width: auto;
 }
 .btn:hover { text-decoration: none; filter: brightness(0.97); }
 .btn-primary { background: var(--accent); color: var(--accent-text); }
 .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
 .btn-danger { background: var(--red); color: #fff; }
-.btn-small { padding: 3px 8px; font-size: 0.78rem; }
+.btn-small { padding: 3px 8px; font-size: 0.76rem; }
 .btn-block { width: 100%; margin-bottom: 8px; }
 .btn-link, .btn-link-danger { background: none; border: none; padding: 2px 4px; text-decoration: underline; }
 .btn-link { color: var(--accent); }
@@ -256,7 +371,7 @@ details[open] > summary { margin-bottom: 12px; }
   border-bottom: 1px solid var(--border);
 }
 .tab {
-  padding: 8px 14px; font-size: 0.9rem; font-weight: 600; color: var(--muted);
+  padding: 7px 13px; font-size: 0.85rem; font-weight: 600; color: var(--muted);
   border: 1px solid transparent; border-bottom: none;
   border-radius: 6px 6px 0 0; margin-bottom: -1px;
 }
@@ -354,6 +469,19 @@ details[open] > summary { margin-bottom: 12px; }
 .quote-doc-foot { margin-top: 28px; display: flex; gap: 8px; }
 
 @media print {
+  /* Print on paper, always in the light palette. */
+  :root {
+    --bg: var(--l-bg); --surface: var(--l-surface); --surface-2: var(--l-surface-2);
+    --border: var(--l-border); --text: var(--l-text); --muted: var(--l-muted);
+    --accent: var(--l-accent); --accent-text: var(--l-accent-text);
+    --green: var(--l-green); --green-bg: var(--l-green-bg);
+    --amber: var(--l-amber); --amber-bg: var(--l-amber-bg);
+    --red: var(--l-red); --red-bg: var(--l-red-bg);
+    --blue: var(--l-blue); --blue-bg: var(--l-blue-bg);
+    --grey: var(--l-grey); --grey-bg: var(--l-grey-bg);
+    --shadow: none;
+    color-scheme: light;
+  }
   body { background: #fff; }
   .topbar, .footer, .no-print, .crumbs, .page-actions { display: none !important; }
   .quote-doc {
@@ -385,3 +513,110 @@ details[open] > summary { margin-bottom: 12px; }
   padding: 9px 0; border-bottom: 1px solid var(--border);
 }
 .party-list li:last-child { border-bottom: none; }
+
+
+/* --- Appearance picker ---------------------------------------------------- */
+
+.appearance-set {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px; margin: 0 0 4px; padding: 0; border: none;
+}
+.appearance-set legend { padding: 0; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+.appearance-option {
+  display: block; margin: 0; padding: 12px 14px; font-weight: 500; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.appearance-option:hover { border-color: var(--accent); }
+.appearance-option-head { display: flex; align-items: center; gap: 8px; }
+.appearance-option input { width: auto; margin: 0; flex-shrink: 0; }
+.appearance-option-name { font-weight: 650; font-size: 0.92rem; }
+.appearance-option .hint { margin-top: 6px; }
+.appearance-option:has(input:checked) {
+  border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent);
+}
+.appearance-option:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* The swatch reads its colours from the palette named by its own data-theme
+   attribute, so the picker can never drift out of step with the themes. */
+.swatch {
+  display: flex; margin-left: auto; border: 1px solid var(--border);
+  border-radius: 5px; overflow: hidden; flex-shrink: 0; height: 20px; width: 68px;
+}
+.swatch span { flex: 1; }
+.swatch .sw-bg { background: var(--l-bg); }
+.swatch .sw-surface { background: var(--l-surface); }
+.swatch .sw-accent { background: var(--l-accent); }
+.swatch .sw-bg-d { background: var(--d-bg); }
+.swatch .sw-surface-d { background: var(--d-surface); }
+.swatch .sw-accent-d { background: var(--d-accent); }
+
+
+/* --- Small screens -------------------------------------------------------- */
+/* This register is read on a phone between appointments as often as at a desk,
+   so a narrow screen is a first-class layout, not a fallback. Every page has to
+   be usable one-handed: nothing scrolls sideways except tables, which do it
+   inside their own box; every control is big enough to hit with a thumb; and
+   the navigation stays complete rather than being hidden behind a menu that
+   would need JavaScript to open. */
+
+@media (max-width: 720px) {
+  .topbar { padding: 8px 12px; gap: 10px; row-gap: 8px; }
+  .brand { order: 1; }
+  .topbar-right { order: 2; }
+
+  /* The whole navigation stays on the page as one swipeable strip: every
+     section is one thumb-flick away, and there is no menu script to load. */
+  .topnav {
+    order: 3; width: 100%; flex: none; flex-wrap: nowrap;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    margin: 0 -12px; padding: 2px 12px 3px;
+  }
+  .topnav::-webkit-scrollbar { display: none; }
+  .nav-link { white-space: nowrap; padding: 6px 11px; }
+  .whoami-name { display: none; }
+
+  .main { padding: 16px 12px 48px; }
+  .footer { padding: 0 12px 26px; }
+  .card { border-radius: var(--radius); }
+  .card-head { padding: 10px 12px; }
+  .card-body { padding: 12px; }
+  .form-grid { padding: 14px; gap: 0 14px; }
+  .auth-card { padding: 20px; }
+  .quote-doc { padding: 18px; }
+  .codes { grid-template-columns: 1fr; }
+  .ellipsis { max-width: 58vw; }
+
+  .page-head { margin-bottom: 14px; }
+  .page-actions, .admin-links, .form-actions, .quote-doc-foot { width: 100%; }
+  .filters input[type="search"] { flex-basis: 100%; min-width: 0; }
+  .filters select, .filters input[type="date"] { flex: 1; min-width: 140px; }
+
+  /* Rows that put a label against an action need to stack, or the action ends
+     up squeezed into a few pixels. */
+  .tasklist li, .party-list li { flex-direction: column; align-items: stretch; gap: 8px; }
+  .task-actions { flex-wrap: wrap; }
+  .quote-doc-head { gap: 12px; }
+  .quote-doc-ref { text-align: left; }
+
+  /* iOS Safari zooms the whole page whenever a focused control is smaller than
+     16px, which throws the layout off centre for the rest of the visit. */
+  input, select, textarea { font-size: 16px; padding: 9px 11px; }
+  .inline-form select { font-size: 16px; padding: 7px 8px; }
+  .filters label { font-size: 0.85rem; }
+
+  /* Thumb-sized targets. */
+  .btn { padding: 9px 15px; font-size: 0.9rem; }
+  .btn-small { padding: 6px 11px; font-size: 0.82rem; }
+  .btn-link, .btn-link-danger { padding: 6px 4px; }
+  .btn-tag-remove { padding: 4px 6px; font-size: 1.05rem; }
+  .btn-block { margin-bottom: 10px; }
+  .checkbox-field input, .appearance-option input[type="radio"] { width: 18px; height: 18px; }
+  .appearance-option { padding: 14px; }
+}
+
+@media (max-width: 420px) {
+  .fee-summary .stat { min-width: 0; }
+  .kv { grid-template-columns: 1fr; gap: 2px 0; }
+  .kv dt { margin-top: 6px; }
+  h1 { font-size: 1.2rem; }
+}

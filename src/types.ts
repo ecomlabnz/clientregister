@@ -61,6 +61,9 @@ export interface User {
   role: Role;
   status: 'active' | 'suspended';
   totp_enabled: number;
+  /** Appearance, so the server can render the right theme on the first paint. */
+  theme: string;
+  colour_mode: string;
 }
 
 export interface SessionData {

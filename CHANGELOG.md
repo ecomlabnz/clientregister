@@ -7,6 +7,48 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.7.0 — 28 August 2026
+
+### Added
+- **Day and night modes, and three themes.** Slate (cool greys, deep blue),
+  Warm (paper tones, terracotta) and Ink (blue-charcoal, teal), each with a
+  light and a dark rendering. Colour mode can follow the device or be pinned
+  light or dark. Chosen under **My account → Appearance**.
+- The choice is stored on the user row, not in a cookie, so it follows the
+  person between devices and is rendered into the first response — there is no
+  theme script, nothing extra to download, and no flash of the wrong colours.
+- **Appearance changes are recorded in the audit log** like every other change
+  to a user record.
+
+### Changed
+- **The interface is now laid out for a phone deliberately, not as a
+  fallback.** On a narrow screen the navigation becomes one swipeable strip
+  with every section still reachable (no menu script), controls grow to
+  thumb size, form controls render at 16px so iOS Safari stops zooming the
+  page on focus, rows that pair a label with an action stack instead of
+  squeezing, and nothing scrolls sideways except tables, which do it inside
+  their own box.
+- **Typography and density.** Tighter type scale, a system font stack that
+  resolves to SF Pro, Segoe UI Variable, Inter or Roboto depending on the
+  machine — still zero font bytes over the wire, because the CSP allows only
+  self-hosted fonts and a font file would be the heaviest thing on the page.
+  Tabular figures throughout, so money columns line up.
+- Badges are small rounded rectangles rather than pills, and headings, tables
+  and buttons are a touch smaller and quieter.
+
+### Security
+- Only the themes and colour modes the application defines can be written to
+  the database; anything else is refused, and a value that somehow got stored
+  is ignored on read in favour of the default.
+- Printing forces the light palette, so a dark-mode quote does not come out of
+  the printer as light text on white paper.
+
+### Internal
+- Adding a fourth theme is one block in `public/app.css` and one entry in
+  `src/ui/theme.ts`. A test fails if the two ever disagree.
+- The two settings tables that were not wrapped for horizontal scrolling now
+  are.
+
 ## 0.6.0 — 28 August 2026
 
 ### Added

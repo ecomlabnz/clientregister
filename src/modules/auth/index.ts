@@ -28,6 +28,9 @@ import { html, raw } from '../../ui/html';
 import { card, csrfField, errorList, field, pageHeader, table } from '../../ui/components';
 import { dateTime } from '../../ui/format';
 import { ROLE_LABELS } from '../../core/rbac';
+import {
+  COLOUR_MODES, COLOUR_MODE_LABELS, THEMES, THEME_INFO, colourModeOf, isColourMode, isTheme, themeOf,
+} from '../../ui/theme';
 
 const RECOVERY_CODE_COUNT = 8;
 
@@ -329,6 +332,8 @@ export const authModule: AppModule = {
     r.get('/account', async (c) => {
       const user = c.get('user')!;
       const session = c.get('session')!;
+      const theme = themeOf(user);
+      const mode = colourModeOf(user);
       const sessions = await all<{
         id: string; created_at: string; last_seen_at: string; ip: string | null; user_agent: string | null;
       }>(
@@ -383,7 +388,60 @@ export const authModule: AppModule = {
             <button class="btn btn-secondary" type="submit">Sign out everywhere else</button>
           </form>
           <p class="hint">Session ID shown to support: <code>${sessionLabel(session.sid)}</code></p>`)}
+
+        ${card('Appearance', html`
+          <form method="post" action="/account/appearance">
+            ${csrfField(session.csrf)}
+            <fieldset class="appearance-set">
+              <legend>Theme</legend>
+              ${THEMES.map((id) => html`
+                <label class="appearance-option">
+                  <span class="appearance-option-head">
+                    <input type="radio" name="theme" value="${id}" ${raw(id === theme ? 'checked' : '')}>
+                    <span class="appearance-option-name">${THEME_INFO[id].name}</span>
+                    <span class="swatch" data-theme="${id}" aria-hidden="true">
+                      <span class="sw-bg"></span><span class="sw-surface"></span><span class="sw-accent"></span>
+                      <span class="sw-bg-d"></span><span class="sw-surface-d"></span><span class="sw-accent-d"></span>
+                    </span>
+                  </span>
+                  <span class="hint">${THEME_INFO[id].description}</span>
+                </label>`)}
+            </fieldset>
+            <fieldset class="appearance-set mt">
+              <legend>Day and night</legend>
+              ${COLOUR_MODES.map((id) => html`
+                <label class="appearance-option">
+                  <span class="appearance-option-head">
+                    <input type="radio" name="colour_mode" value="${id}" ${raw(id === mode ? 'checked' : '')}>
+                    <span class="appearance-option-name">${COLOUR_MODE_LABELS[id]}</span>
+                  </span>
+                </label>`)}
+            </fieldset>
+            <p class="hint">Saved against your account, so it follows you to any device you sign in from.</p>
+            <button class="btn btn-primary mt" type="submit">Save appearance</button>
+          </form>`)}
       `);
+    });
+
+    // Appearance is a preference, not a free-text field: only the themes and
+    // modes the application actually defines can reach the database.
+    r.post('/account/appearance', async (c) => {
+      const user = c.get('user')!;
+      const f = new FormReader(await c.req.formData());
+      const theme = f.text('theme', { max: 32 });
+      const mode = f.text('colour_mode', { max: 32 });
+      if (!isTheme(theme) || !isColourMode(mode)) {
+        return redirectWith(c, '/account', 'That appearance choice is not one we offer.', 'err');
+      }
+      await run(
+        c.env.DB,
+        'UPDATE users SET theme = ?, colour_mode = ?, updated_at = ? WHERE id = ?',
+        theme, mode, nowIso(), user.id,
+      );
+      await auditFrom(c, {
+        action: 'account.appearance_changed', entityType: 'user', entityId: user.id, meta: { theme, colour_mode: mode },
+      });
+      return redirectWith(c, '/account', 'Appearance saved.');
     });
 
     r.post('/account/password', async (c) => {
