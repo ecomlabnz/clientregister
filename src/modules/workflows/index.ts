@@ -7,7 +7,7 @@
  * for somebody to say yes. Nothing leaves the practice from here without a
  * name against it.
  *
- * `/workflows/rules` is where the rules are written, and is administrators
+ * `/admin/automations` is where the rules are written, and is administrators
  * only. A rule is a trigger, a window and an action, in that order, and it is
  * readable back in one sentence — "when a case deadline is within 7 days,
  * create a task for Tai". Anything harder to say than that is a program, and a
@@ -21,6 +21,7 @@ import { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
 import { requireAuth, requirePermission } from '../../core/auth';
+import { adminTabs } from '../admin';
 import { auditFrom } from '../../core/audit';
 import { all, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
@@ -49,12 +50,19 @@ interface ActionRow {
   decided_at: string | null; decided_by_name: string | null;
 }
 
-function queueTabs(current: string, pending: number, canEdit: boolean): Raw {
+/**
+ * The queue's own bar.
+ *
+ * It deliberately does not offer the rules. Writing rules is administration and
+ * lives on the Admin bar; the queue is daily work and lives here. A tab that
+ * swapped one bar for another left a person unable to get back to where they
+ * were, which is what happened when Automations appeared on both.
+ */
+function queueTabs(current: string, pending: number): Raw {
   const tabs = [
     { id: 'pending', label: 'For approval', href: '/workflows', count: pending },
     { id: 'done', label: 'Carried out', href: '/workflows?view=done', count: null as number | null },
     { id: 'dismissed', label: 'Dismissed', href: '/workflows?view=dismissed', count: null },
-    ...(canEdit ? [{ id: 'rules', label: 'Automations', href: '/workflows/rules', count: null }] : []),
   ];
   return html`<nav class="tabs">${tabs.map((t) => html`
     <a class="${t.id === current ? 'tab current' : 'tab'}" href="${t.href}">${t.label}${
@@ -108,6 +116,14 @@ export const workflowsModule: AppModule = {
     const r = new Hono<AppContext>();
     r.use('*', requireAuth);
 
+    // Two routers, because these are two different jobs in two different parts
+    // of the application. The queue is daily work and sits with Alerts; the
+    // rules are configuration and sit with the rest of Administration, under
+    // the Admin tab bar, so following that tab does not strand anybody in a
+    // section they cannot get out of.
+    const rules = new Hono<AppContext>();
+    rules.use('*', requireAuth);
+
     // --- The queue ----------------------------------------------------------
     r.get('/', requirePermission('register:read'), async (c) => {
       const user = c.get('user')!;
@@ -130,7 +146,7 @@ export const workflowsModule: AppModule = {
       return page(c, { title: 'Workflows', active: '/alerts' }, html`
         ${pageHeader('For approval',
           'What the register would do about the dates it is watching. Nothing here has happened yet.')}
-        ${queueTabs(view, pending?.n ?? 0, canEdit)}
+        ${queueTabs(view, pending?.n ?? 0)}
 
         ${items.length === 0
           ? card(view === 'pending' ? 'Nothing waiting' : 'Nothing here', emptyState(
@@ -177,7 +193,9 @@ export const workflowsModule: AppModule = {
 
         <p class="hint">A task is internal, so a rule may be written to create one on its own.
            Anything that leaves the practice waits here for a person, whatever the rule says —
-           that is enforced where the rules are stored, not only where they are written.</p>`);
+           that is enforced where the rules are stored, not only where they are written.${
+             canEdit ? html` The rules themselves are under
+               <a href="/admin/automations">Admin → Automations</a>.` : ''}</p>`);
     });
 
     r.post('/:id/approve', requirePermission('register:write'), async (c) => {
@@ -214,7 +232,7 @@ export const workflowsModule: AppModule = {
     });
 
     // --- The rules ----------------------------------------------------------
-    r.get('/rules', requirePermission('admin:settings'), async (c) => {
+    rules.get('/', requirePermission('admin:settings'), async (c) => {
       const session = c.get('session')!;
       const editing = c.req.query('edit');
 
@@ -232,7 +250,7 @@ export const workflowsModule: AppModule = {
       return page(c, { title: 'Automations', active: '/alerts' }, html`
         ${pageHeader('Automations',
           'Rules that watch the dates already in the register and propose what to do about them.')}
-        ${queueTabs('rules', pending?.n ?? 0, true)}
+        ${adminTabs('automations')}
 
         <div class="cols">
           <div class="col-main">
@@ -248,13 +266,13 @@ export const workflowsModule: AppModule = {
                         <div class="small muted">${ruleSentence(rule)}</div>
                       </div>
                       <div class="admin-links">
-                        <a class="btn btn-secondary btn-sm" href="${`/workflows/rules?edit=${rule.id}`}">Edit</a>
-                        <form method="post" action="${`/workflows/rules/${rule.id}/toggle`}" class="inline-form">
+                        <a class="btn btn-secondary btn-sm" href="${`/admin/automations?edit=${rule.id}`}">Edit</a>
+                        <form method="post" action="${`/admin/automations/${rule.id}/toggle`}" class="inline-form">
                           ${csrfField(session.csrf)}
                           <button class="btn btn-secondary btn-sm" type="submit">
                             ${rule.enabled ? 'Turn off' : 'Turn on'}</button>
                         </form>
-                        <form method="post" action="${`/workflows/rules/${rule.id}/delete`}" class="inline-form"
+                        <form method="post" action="${`/admin/automations/${rule.id}/delete`}" class="inline-form"
                               data-confirm="Delete this rule? Proposals it has already made stay where they are.">
                           ${csrfField(session.csrf)}
                           <button class="btn btn-danger btn-sm" type="submit">Delete</button>
@@ -288,7 +306,7 @@ export const workflowsModule: AppModule = {
               <p class="small">It runs by itself every night. Running it here does the same thing —
                  and running it twice proposes nothing the second time, because every proposal is
                  keyed to its rule, its record and its date.</p>
-              <form method="post" action="/workflows/rules/run">
+              <form method="post" action="/admin/automations/run">
                 ${csrfField(session.csrf)}
                 <button class="btn btn-primary" type="submit">Run the rules now</button>
               </form>`)}
@@ -296,7 +314,7 @@ export const workflowsModule: AppModule = {
 
           <div class="col-side">
             ${card(current ? 'Edit rule' : 'New rule', html`
-              <form method="post" action="/workflows/rules" class="entry-form">
+              <form method="post" action="/admin/automations" class="entry-form">
                 ${csrfField(session.csrf)}
                 ${current ? html`<input type="hidden" name="id" value="${current.id}">` : ''}
                 ${field({ label: 'Name', name: 'name', required: true, maxlength: 80,
@@ -352,7 +370,7 @@ export const workflowsModule: AppModule = {
                 </div>
 
                 <button class="btn btn-primary" type="submit">${current ? 'Save rule' : 'Create rule'}</button>
-                ${current ? html`<a class="btn btn-secondary" href="/workflows/rules">Cancel</a>` : ''}
+                ${current ? html`<a class="btn btn-secondary" href="/admin/automations">Cancel</a>` : ''}
               </form>`)}
 
             ${card('Tokens you can use', html`
@@ -366,7 +384,7 @@ export const workflowsModule: AppModule = {
         </div>`);
     });
 
-    r.post('/rules', requirePermission('admin:settings'), async (c) => {
+    rules.post('/', requirePermission('admin:settings'), async (c) => {
       const user = c.get('user')!;
       const form = await c.req.formData();
       const f = new FormReader(form);
@@ -377,7 +395,7 @@ export const workflowsModule: AppModule = {
       const withinRaw = Number(f.optional('within_days', { max: 5 }) ?? '7');
       const within = Number.isFinite(withinRaw) ? Math.max(1, Math.min(365, Math.round(withinRaw))) : 7;
       if (!f.valid || !trigger || !action) {
-        return redirectWith(c, '/workflows/rules', Object.values(f.errors)[0] ?? 'Check the rule.', 'err');
+        return redirectWith(c, '/admin/automations', Object.values(f.errors)[0] ?? 'Check the rule.', 'err');
       }
 
       const config = {
@@ -417,10 +435,10 @@ export const workflowsModule: AppModule = {
         action: id ? 'automation.update' : 'automation.create', entityType: 'automation',
         entityId: id ?? name, meta: { trigger, action, within },
       });
-      return redirectWith(c, '/workflows/rules', id ? 'Rule saved.' : 'Rule created.', 'ok');
+      return redirectWith(c, '/admin/automations', id ? 'Rule saved.' : 'Rule created.', 'ok');
     });
 
-    r.post('/rules/run', requirePermission('admin:settings'), async (c) => {
+    rules.post('/run', requirePermission('admin:settings'), async (c) => {
       const user = c.get('user')!;
       const result = await runAutomations(c.env, {
         trigger: 'manual', userId: user.id, origin: new URL(c.req.url).origin,
@@ -432,26 +450,30 @@ export const workflowsModule: AppModule = {
       // A rule that matched and then did nothing is worth saying out loud —
       // it looks identical to a rule that is working properly.
       const why = result.skippedReasons.length ? ` ${result.skippedReasons.join('; ')}.` : '';
-      return redirectWith(c, '/workflows/rules', summary + why, result.skipped ? 'err' : 'ok');
+      return redirectWith(c, '/admin/automations', summary + why, result.skipped ? 'err' : 'ok');
     });
 
-    r.post('/rules/:id/toggle', requirePermission('admin:settings'), async (c) => {
+    rules.post('/:id/toggle', requirePermission('admin:settings'), async (c) => {
       const id = c.req.param('id')!;
       await run(c.env.DB,
         `UPDATE automations SET enabled = CASE enabled WHEN 1 THEN 0 ELSE 1 END, updated_at = ? WHERE id = ?`,
         nowIso(), id);
       await auditFrom(c, { action: 'automation.toggle', entityType: 'automation', entityId: id });
-      return redirectWith(c, '/workflows/rules', 'Rule changed.', 'ok');
+      return redirectWith(c, '/admin/automations', 'Rule changed.', 'ok');
     });
 
-    r.post('/rules/:id/delete', requirePermission('admin:settings'), async (c) => {
+    rules.post('/:id/delete', requirePermission('admin:settings'), async (c) => {
       const id = c.req.param('id')!;
       await run(c.env.DB, `DELETE FROM automations WHERE id = ?`, id);
       await auditFrom(c, { action: 'automation.delete', entityType: 'automation', entityId: id });
-      return redirectWith(c, '/workflows/rules',
+      return redirectWith(c, '/admin/automations',
         'Rule deleted. Proposals it already made are still in the queue.', 'ok');
     });
 
+    // Anybody holding the old address is sent on rather than met with a 404.
+    r.get('/rules', requirePermission('admin:settings'), (c) => c.redirect('/admin/automations', 301));
+
     app.route('/workflows', r);
+    app.route('/admin/automations', rules);
   },
 };

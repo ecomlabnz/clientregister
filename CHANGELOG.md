@@ -7,6 +7,47 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.25.0 — 29 August 2026
+
+### Added
+- **An expected decision date, filled in on lodgement.** A month after
+  lodgement by default, and only when nobody has supplied one. It stays
+  editable: INZ publishes processing times per visa type, and the adviser
+  handling the matter knows better than a default does.
+- **Chasing INZ when that date passes.** A task on the day, another a month
+  later, another the month after — three by default, assigned to whoever owns
+  the matter. Every part of it is a setting: how long a decision is expected to
+  take, whether to chase at all, the schedule, and the priority.
+- **The schedule is counted from the expected decision date**, not from
+  lodgement, so changing how long a decision takes moves the chases with it
+  rather than chasing before the decision is even due.
+- **One matter can opt out** without touching the practice default — a file
+  under a formal complaint, or one where the client has asked for silence.
+  Chases already raised are withdrawn.
+- **It reconciles rather than fires.** Each chase is a row keyed to its case and
+  its position in the sequence, rebuilt from the current dates every night. Move
+  the expected decision and the chases move; change the schedule and every open
+  matter is on the new timing by morning; a decision arriving withdraws what is
+  left. A chase somebody has already done, or marked as not needed, is left
+  alone.
+- `FormReader.checkbox()`, because an unticked box is simply absent and every
+  caller was inventing its own idea of what counted as ticked.
+
+### Fixed
+- **Automations jumped out of the Admin menu.** The tab led to a page wearing a
+  different tab bar, so following it left no way back to where you were. The
+  rules now live at `/admin/automations` under the Admin bar, where they belong
+  — they are configuration. The approval queue keeps its own bar with Alerts,
+  where it belongs — it is daily work. The old address redirects.
+- **The audit log had four-line rows.** Six columns with no widths shared the
+  page equally, so a date that reads on one line broke across four while the
+  detail was squeezed into a strip. The date now sits above the time, the name
+  above the address, the two least useful columns give way on a phone, and the
+  detail gets the width. Rows went from around 120 pixels to 59.
+- **`.clamp-1` and `.clamp-2` did nothing on a desktop**, because they were
+  defined only inside the narrow-screen media query. That is why long values
+  ran to full height on a wide screen — the class was there, the rule was not.
+
 ## 0.24.0 — 29 August 2026
 
 ### Added

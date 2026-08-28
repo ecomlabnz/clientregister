@@ -16,6 +16,7 @@ import { nowIso, run } from './core/db';
 import { audit } from './core/audit';
 import { syncAllFollowUps } from './core/kb';
 import { runAutomations } from './core/automations';
+import { syncAllCaseFollowUps } from './core/decisions';
 
 const app = createApp();
 
@@ -53,6 +54,11 @@ async function housekeeping(env: Env): Promise<void> {
     // tasks on the old timing for anyone to trip over.
     const followUps = await syncAllFollowUps(env);
 
+    // The same reconciliation for matters waiting on a decision: change the
+    // chase schedule in settings and every open matter is on the new timing by
+    // morning, not only the ones somebody happens to edit afterwards.
+    const chases = await syncAllCaseFollowUps(env);
+
     // The rules run last, so they see the state the rest of this pass left
     // behind — a quote expired a moment ago is a quote the rules can act on
     // tonight rather than tomorrow night. Running twice costs nothing: every
@@ -64,7 +70,7 @@ async function housekeeping(env: Env): Promise<void> {
     await audit(env, {
       action: 'cron.housekeeping',
       actorLabel: 'system',
-      meta: { mail, quotesExpired: expired.meta?.changes ?? 0, followUps, automations },
+      meta: { mail, quotesExpired: expired.meta?.changes ?? 0, followUps, chases, automations },
     });
   } catch (err) {
     console.error('scheduled housekeeping failed', err);

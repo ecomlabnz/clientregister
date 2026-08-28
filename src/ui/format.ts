@@ -26,6 +26,22 @@ export function dateTime(value: string | null | undefined): string {
 }
 
 /**
+ * Just the clock time, for a column that shows the date on its own line.
+ *
+ * A log of a hundred rows reads by date first and time second; putting both in
+ * one cell makes a string long enough to wrap, and a wrapped timestamp turns a
+ * one-line row into a four-line one.
+ */
+export function timeShort(value: string | null | undefined): string {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-NZ', {
+    hour: '2-digit', minute: '2-digit', timeZone: TZ,
+  }).format(d);
+}
+
+/**
  * The instant to store for a date somebody typed.
  *
  * A date-only value has to be stored at a moment that falls on that calendar

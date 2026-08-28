@@ -55,6 +55,18 @@ export class FormReader {
     return value;
   }
 
+  /**
+   * A checkbox says no by being absent.
+   *
+   * There is no "off" value to send — an unticked box is simply not submitted —
+   * so presence is the whole answer. Worth a method rather than reaching past
+   * the reader for the raw form, because the alternative is each caller
+   * inventing its own idea of what counts as ticked.
+   */
+  checkbox(name: string): boolean {
+    return this.data.has(name);
+  }
+
   /** Like `text`, but empty becomes null so the column stays NULL. */
   optional(name: string, opts: TextOpts = {}): string | null {
     const value = this.text(name, { ...opts, required: false });

@@ -34,6 +34,9 @@ import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
 import { asPrefInteger, preferencesFor } from '../../core/preferences';
 import { storeDocument } from '../documents';
+import {
+  DECISION_SETTINGS, caseForSync, decisionPolicy, expectedDecisionDate, syncCaseFollowUps,
+} from '../../core/decisions';
 import { isAiEnabled } from '../../ai/provider';
 import { briefCase, latestBrief } from '../../ai/brief';
 import {
@@ -46,6 +49,7 @@ export interface CaseRow {
   status: CaseStatus; priority: string; assigned_to: string | null;
   inz_application_number: string | null; inz_client_number: string | null;
   lodged_at: string | null; decision_due_at: string | null; decided_at: string | null;
+  chase_inz: number;
   outcome: string | null; fee_quoted_cents: number | null; fee_agreed_cents: number | null;
   currency: string; next_action: string | null; next_action_due: string | null;
   summary: string | null; created_at: string; updated_at: string;
@@ -92,7 +96,15 @@ function caseForm(
         ${field({ label: 'INZ client number', name: 'inz_client_number', value: values.inz_client_number, maxlength: 60 })}
         ${field({ label: 'Lodged on', name: 'lodged_at', type: 'date', value: dateInputValue(values.lodged_at) })}
         ${field({ label: 'Response / decision due', name: 'decision_due_at', type: 'date', value: dateInputValue(values.decision_due_at),
-                  hint: 'The date that must not be missed — RFI or PPI deadline, or expected decision.' })}
+                  hint: 'The date that must not be missed — RFI or PPI deadline, or expected decision. '
+                    + 'Left empty on a lodged matter, it is filled in from the practice default.' })}
+        <div class="field checkbox-field">
+          <label><input type="checkbox" name="chase_inz" value="1"
+                   ${values.chase_inz === 0 ? '' : raw('checked')}>
+            Chase INZ when this decision is overdue</label>
+          <p class="hint">On by default. Turn it off for a matter that should not be chased —
+             one under a formal complaint, or where the client has asked for silence.</p>
+        </div>
       </div>
 
       <div class="form-section">
@@ -127,6 +139,7 @@ function readCaseForm(f: FormReader, types: Term[]) {
     inz_client_number: f.optional('inz_client_number', { max: 60 }),
     lodged_at: f.date('lodged_at'),
     decision_due_at: f.date('decision_due_at'),
+    chase_inz: f.checkbox('chase_inz') ? 1 : 0,
     next_action: f.optional('next_action', { max: 200 }),
     next_action_due: f.date('next_action_due'),
     summary: f.optional('summary', { max: 4000 }),
@@ -137,7 +150,7 @@ export const casesModule: AppModule = {
   name: 'cases',
   title: 'Cases',
   basePaths: ['/cases'],
-  settings: [VOCABULARY_SETTINGS],
+  settings: [VOCABULARY_SETTINGS, DECISION_SETTINGS],
   nav: [{ href: '/cases', label: 'Cases', permission: 'register:read', order: 80 }],
 
   register(app) {
@@ -322,15 +335,20 @@ export const casesModule: AppModule = {
 
       const id = newId('cas');
       const ref = await nextRef(c.env.DB, 'case', 'CASE');
+      const policy = await decisionPolicy(c.env);
+      // A lodged matter with no expected decision gets the practice's default,
+      // because a date nobody typed is still a date the alerts page can watch.
+      const decisionDue = v.decision_due_at
+        ?? expectedDecisionDate(v.lodged_at, policy.expectedMonths);
       await run(
         c.env.DB,
         `INSERT INTO cases (id, ref, client_id, title, case_type, status, priority, assigned_to,
             inz_application_number, inz_client_number, lodged_at, decision_due_at,
-            next_action, next_action_due, summary, currency, created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NZD',?,?,?)`,
+            next_action, next_action_due, summary, chase_inz, currency, created_at, updated_at, created_by)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NZD',?,?,?)`,
         id, ref, v.client_id, v.title, v.case_type, status, v.priority, v.assigned_to || null,
-        v.inz_application_number, v.inz_client_number, v.lodged_at, v.decision_due_at,
-        v.next_action, v.next_action_due, v.summary, nowIso(), nowIso(), user.id,
+        v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue,
+        v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), nowIso(), user.id,
       );
       await run(
         c.env.DB,
@@ -682,16 +700,23 @@ export const casesModule: AppModule = {
           ${pageHeader(`Edit ${existing.ref}`)}${caseForm(c, { ...existing, ...v } as Partial<CaseRow>, clients, users, types, f.errors)}`);
       }
 
+      const policy = await decisionPolicy(c.env);
+      const decisionDue = v.decision_due_at
+        ?? expectedDecisionDate(v.lodged_at, policy.expectedMonths);
       await run(
         c.env.DB,
         `UPDATE cases SET client_id=?, title=?, case_type=?, priority=?, assigned_to=?,
            inz_application_number=?, inz_client_number=?, lodged_at=?, decision_due_at=?,
-           next_action=?, next_action_due=?, summary=?, updated_at=?
+           next_action=?, next_action_due=?, summary=?, chase_inz=?, updated_at=?
          WHERE id=?`,
         v.client_id, v.title, v.case_type, v.priority, v.assigned_to || null,
-        v.inz_application_number, v.inz_client_number, v.lodged_at, v.decision_due_at,
-        v.next_action, v.next_action_due, v.summary, nowIso(), id,
+        v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue,
+        v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), id,
       );
+      // The chases follow the dates rather than being fired once: moving the
+      // expected decision moves them, and turning the chase off withdraws them.
+      const matter = await caseForSync(c.env, id);
+      if (matter) await syncCaseFollowUps(c.env, matter, policy);
       await auditFrom(c, { action: 'case.updated', entityType: 'case', entityId: id });
       return redirectWith(c, `/cases/${id}`, 'Case updated.');
     });
@@ -723,10 +748,17 @@ export const casesModule: AppModule = {
       const outcome = status === 'approved' ? 'approved' : status === 'declined' ? 'declined' : kase.outcome;
       const closedAt = status === 'closed' || status === 'withdrawn' ? (kase.closed_at ?? nowIso()) : null;
 
+      // Lodging is the moment an expected decision date becomes meaningful, so
+      // it is filled in here when nobody has supplied one.
+      const policy = await decisionPolicy(c.env);
+      const expected = decisionDue
+        ?? kase.decision_due_at
+        ?? expectedDecisionDate(lodgedAt ? lodgedAt.slice(0, 10) : null, policy.expectedMonths);
+
       await run(
         c.env.DB,
         `UPDATE cases SET status=?, lodged_at=?, decided_at=?, outcome=?, closed_at=?, decision_due_at=?, updated_at=? WHERE id=?`,
-        status, lodgedAt, decidedAt, outcome, closedAt, decisionDue ?? kase.decision_due_at, nowIso(), id,
+        status, lodgedAt, decidedAt, outcome, closedAt, expected, nowIso(), id,
       );
       await run(
         c.env.DB,
@@ -738,8 +770,16 @@ export const casesModule: AppModule = {
         body: `Status: ${CASE_STATUS_LABELS[kase.status]} → ${CASE_STATUS_LABELS[status]}${note ? ` — ${note}` : ''}`,
         createdBy: user.id,
       });
+      // A decision arriving withdraws the chases; a matter moving into the
+      // queue starts them. Either way the schedule is rebuilt from the dates.
+      const matter = await caseForSync(c.env, id);
+      const chases = matter ? await syncCaseFollowUps(c.env, matter, policy) : null;
+
       await auditFrom(c, { action: 'case.status_changed', entityType: 'case', entityId: id, meta: { from: kase.status, to: status } });
-      return redirectWith(c, `/cases/${id}`, `Status updated to ${CASE_STATUS_LABELS[status]}.`);
+      return redirectWith(c, `/cases/${id}`,
+        `Status updated to ${CASE_STATUS_LABELS[status]}.`
+        + (chases?.created ? ` ${chases.created} INZ follow-up${chases.created === 1 ? '' : 's'} scheduled.` : '')
+        + (chases?.cancelled ? ` ${chases.cancelled} follow-up${chases.cancelled === 1 ? '' : 's'} withdrawn.` : ''));
     });
 
     // --- Parties ------------------------------------------------------------
