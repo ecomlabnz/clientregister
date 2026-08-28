@@ -143,6 +143,63 @@
     form.addEventListener('submit', function (event) { event.preventDefault(); schedule(0); });
   });
 
+  // The formatting buttons above a message body.
+  //
+  // Plain textarea manipulation rather than a rich-text editor: no
+  // contenteditable, no execCommand, no library. What is stored stays the text
+  // the person typed, which is what makes it safe to render and readable in the
+  // audit log afterwards. Without this file the markers can simply be typed.
+  Array.prototype.forEach.call(document.querySelectorAll('.js-compose'), function (composer) {
+    var body = composer.querySelector('textarea');
+    if (!body) return;
+
+    var apply = function (fn) {
+      var start = body.selectionStart;
+      var end = body.selectionEnd;
+      var result = fn(body.value.slice(start, end), body.value, start, end);
+      body.value = result.value;
+      body.focus();
+      body.setSelectionRange(result.start, result.end);
+      // So the browser marks the form dirty and any listener sees the change.
+      body.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    Array.prototype.forEach.call(composer.querySelectorAll('[data-wrap]'), function (button) {
+      var mark = button.getAttribute('data-wrap');
+      button.addEventListener('click', function () {
+        apply(function (selected, value, start, end) {
+          var text = selected || 'text';
+          return {
+            value: value.slice(0, start) + mark + text + mark + value.slice(end),
+            // Leave the wording selected so typing replaces it.
+            start: start + mark.length,
+            end: start + mark.length + text.length,
+          };
+        });
+      });
+    });
+
+    Array.prototype.forEach.call(composer.querySelectorAll('[data-prefix]'), function (button) {
+      var prefix = button.getAttribute('data-prefix');
+      button.addEventListener('click', function () {
+        apply(function (selected, value, start, end) {
+          // Work on whole lines: a list marker in the middle of one means
+          // nothing.
+          var from = value.lastIndexOf('\n', start - 1) + 1;
+          var to = value.indexOf('\n', end);
+          if (to === -1) to = value.length;
+          var lines = value.slice(from, to).split('\n');
+          var numbered = /^\d+\. $/.test(prefix);
+          var out = lines.map(function (line, i) {
+            var bare = line.replace(/^\s*(?:[-*•]\s+|\d+[.)]\s+|#{1,3}\s+)/, '');
+            return (numbered ? (i + 1) + '. ' : prefix) + bare;
+          }).join('\n');
+          return { value: value.slice(0, from) + out + value.slice(to), start: from, end: from + out.length };
+        });
+      });
+    });
+  });
+
   // Print buttons. Declared with data-print rather than an inline handler,
   // because the content security policy forbids inline script.
   Array.prototype.forEach.call(document.querySelectorAll('[data-print]'), function (button) {

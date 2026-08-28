@@ -81,7 +81,11 @@ describe('rendering an article body', () => {
     expect(renderBody('One.\n\nTwo.').value).toBe('<p>One.</p><p>Two.</p>');
     expect(renderBody('- a\n- b').value).toBe('<ul><li>a</li><li>b</li></ul>');
     expect(renderBody('1. a\n2. b').value).toBe('<ol><li>a</li><li>b</li></ol>');
-    expect(renderBody('## Heading').value).toBe('<h4>Heading</h4>');
+    // Heading level is respected rather than flattened, since the same
+    // renderer now writes emails as well as articles.
+    expect(renderBody('# Heading').value).toBe('<h2>Heading</h2>');
+    expect(renderBody('## Heading').value).toBe('<h3>Heading</h3>');
+    expect(renderBody('### Heading').value).toBe('<h4>Heading</h4>');
   });
 
   it('keeps a single newline as a line break inside a paragraph', () => {

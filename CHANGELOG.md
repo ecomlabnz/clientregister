@@ -7,6 +7,38 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.14.0 — 28 August 2026
+
+### Added
+- **Quote lines can be edited**, not only added and removed: description,
+  quantity, unit, price, type, GST treatment and order, all on one form. A line
+  whose quantity or price cannot be read is left exactly as it was and named in
+  the message, rather than being written half-changed or silently dropped.
+- **Emails can be sent as formatted HTML as well as plain text.** Written as
+  plain text with light markers — `**bold**`, `*italic*`, `## heading`, `-` and
+  `1.` lists, and bare web addresses — and a small toolbar inserts them.
+  Choosing *Formatted* sends both parts, so a client whose mail client will not
+  render HTML still gets a readable letter.
+  - Deliberately not a rich-text editor: no `contenteditable`, no
+    `execCommand`, no library. What is stored is the text the person typed,
+    which is what makes it safe to render and readable in the audit log.
+  - The renderer is shared with knowledge base articles, so there is one place
+    where escaping could be got wrong and one set of tests covering it.
+  - HTML emails style inline rather than with a stylesheet, because that is
+    what mail clients honour.
+
+### Changed
+- **The working area is wider on a desktop** — 1400px rather than 1180px, still
+  capped so a line of prose does not run the full width of a large monitor. The
+  public page keeps its own narrower measure, being read rather than worked in.
+- **The compose form uses the full width**, with the body in a monospace face —
+  the figures in a quote are padded into columns and only line up in one.
+- The catalogue picker's explanatory text moved out of the form row, where it
+  made that field taller than the others and threw the row out of alignment.
+- **The terms of engagement is a link on its wording** rather than a bare URL
+  across the page. The address itself still prints, because a hyperlink is no
+  use to somebody holding a printout.
+
 ## 0.13.0 — 28 August 2026
 
 ### Added
