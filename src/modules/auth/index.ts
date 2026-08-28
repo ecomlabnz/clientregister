@@ -11,7 +11,7 @@ import type { AppModule } from '../../core/module';
 import { all, count, nowIso, one, run } from '../../core/db';
 import { newId, randomToken } from '../../core/ids';
 import {
-  generateTotpSecret, hashPassword, sha256Hex, totpUri, verifyPassword, verifyTotp,
+  generateTotpSecret, hashPassword, sha256Hex, timingSafeEqualStr, totpUri, verifyPassword, verifyTotp,
 } from '../../core/crypto';
 import {
   clearSessionCookie, createSession, destroySessionBySid, revokeAllSessions,
@@ -31,6 +31,18 @@ const RECOVERY_CODE_COUNT = 8;
 
 async function userCount(env: Env): Promise<number> {
   return count(env.DB, 'SELECT COUNT(*) AS n FROM users');
+}
+
+/**
+ * The configured setup token, with surrounding whitespace removed.
+ *
+ * Secrets are pasted into web forms and CI settings, which routinely carry a
+ * trailing newline along for the ride. Trimming both sides of the comparison
+ * means an invisible character cannot lock someone out of their own first-run
+ * setup.
+ */
+function configuredSetupToken(env: Env): string {
+  return (env.SETUP_TOKEN ?? '').trim();
 }
 
 function loginPage(c: any, opts: { error?: string; email?: string; next?: string }) {
@@ -65,11 +77,13 @@ export const authModule: AppModule = {
     // --- First-run setup ----------------------------------------------------
     r.get('/setup', async (c) => {
       if ((await userCount(c.env)) > 0) return c.redirect('/login', 302);
-      if (!c.env.SETUP_TOKEN) {
+      if (!configuredSetupToken(c.env)) {
         return page(c, { title: 'Setup', bare: true, status: 503 }, html`
           <div class="auth-card">
             <h1>Setup unavailable</h1>
-            <p>No <code>SETUP_TOKEN</code> is configured. Set one and redeploy:</p>
+            <p>No <code>SETUP_TOKEN</code> is configured. Add it as a repository secret
+               (Settings → Secrets and variables → Actions) and re-run the Deploy workflow,
+               or set it directly:</p>
             <pre>npx wrangler secret put SETUP_TOKEN</pre>
           </div>`);
       }
@@ -91,8 +105,8 @@ export const authModule: AppModule = {
 
     r.post('/setup', async (c) => {
       if ((await userCount(c.env)) > 0) return c.text('Setup already completed', 409);
-      const limited = await rateLimit(c.env, 'setup', clientIp(c.req.raw) ?? 'unknown', 5, 3600);
-      if (!limited.ok) return c.text('Too many attempts. Try again later.', 429);
+      const limited = await rateLimit(c.env, 'setup', clientIp(c.req.raw) ?? 'unknown', 20, 3600);
+      if (!limited.ok) return c.text('Too many setup attempts. Try again in an hour.', 429);
 
       const f = new FormReader(await c.req.formData());
       const token = f.text('setup_token', { required: true, label: 'Setup token', max: 200 });
@@ -100,9 +114,24 @@ export const authModule: AppModule = {
       const email = f.email('email', { required: true, label: 'Email' });
       const password = f.text('password', { required: true, label: 'Password', max: 256 });
 
-      if (!c.env.SETUP_TOKEN || token !== c.env.SETUP_TOKEN) {
+      const expected = configuredSetupToken(c.env);
+      if (!expected || !timingSafeEqualStr(token, expected)) {
         await auditFrom(c, { action: 'setup.rejected', meta: { reason: 'bad_token' } });
-        return c.text('Invalid setup token', 403);
+        return page(c, { title: 'Setup', bare: true, status: 403 }, html`
+          <div class="auth-card">
+            <h1>That setup token was not accepted</h1>
+            <p>It has to match the <code>SETUP_TOKEN</code> secret on the Worker exactly.
+               Things worth checking:</p>
+            <ul class="small">
+              <li>You pasted <code>SETUP_TOKEN</code> and not another secret such as <code>FIELD_KEY</code>.</li>
+              <li>The last Deploy run listed <code>SETUP_TOKEN</code> in its
+                  <em>Collect configured secrets</em> step.</li>
+              <li>Nothing extra came along with the paste — a stray space or a second line.</li>
+            </ul>
+            <p>If you no longer know the value, replace the repository secret with a new one
+               and re-run the Deploy workflow.</p>
+            <p><a class="btn btn-primary btn-block" href="/setup">Try again</a></p>
+          </div>`);
       }
       const pwErr = validatePassword(password);
       if (pwErr) f.errors['password'] = pwErr;
