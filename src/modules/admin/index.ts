@@ -27,7 +27,7 @@ import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../c
 import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABELS, SPLIT_BASES } from '../../core/fees';
 import { isAiEnabled } from '../../ai/provider';
 import { nzbnConfigured } from '../../integrations/nzbn';
-import { mailConfigured } from '../../mail/provider';
+import { mailConfigured, mailSetupGaps } from '../../mail/provider';
 import { flushQueue } from '../../mail/queue';
 import { registeredModules } from '../../registry';
 import { PRACTICE_SETTINGS } from '../../core/practice';
@@ -150,7 +150,12 @@ export const adminModule: AppModule = {
           <a class="btn btn-secondary" href="/admin/audit">Audit log</a>
         </div>
 
-        ${card('Integrations', table(['Capability', 'Status', 'Detail'], [
+        ${card('Integrations', html`
+          <p class="hint mb">Step-by-step instructions for connecting each of these are in
+             <a href="/help#connecting">Help → Connecting Telegram, WhatsApp and email</a>.
+             Keys are set as GitHub repository secrets and reach the Worker on the next deploy —
+             they are never stored in this database.</p>
+          ${table(['Capability', 'Status', 'Detail'], [
           statusRow('Encrypted PII fields', Boolean(env.FIELD_KEY),
             'FIELD_KEY — enables storing passport numbers under AES-256-GCM.'),
           statusRow('Inbound email', Boolean(env.INGEST_EMAIL_ALLOWED_SENDERS),
@@ -164,10 +169,13 @@ export const adminModule: AppModule = {
           statusRow('AI layer', isAiEnabled(env),
             `AI_PROVIDER=${env.AI_PROVIDER ?? 'none'} — suggestions only, never applied automatically.`),
           statusRow('Outbound email', mailConfigured(env),
-            `MAIL_PROVIDER=${env.MAIL_PROVIDER ?? 'none'} — queued mail sends once configured.`),
+            mailConfigured(env)
+              ? `MAIL_PROVIDER=${env.MAIL_PROVIDER} — sending.`
+              : `MAIL_PROVIDER=${env.MAIL_PROVIDER ?? 'none'}. Mail queues until this is set; nothing is lost.${
+                  mailSetupGaps(env).length ? ` Still needed: ${mailSetupGaps(env).join(', ')}.` : ''}`),
           statusRow('Document storage', Boolean(env.DOCS),
             'R2 bucket binding DOCS. Enable R2 in the dashboard, then uncomment the binding.'),
-        ]))}
+        ])}`)}
 
         ${card('Modules', table(['Module', 'Mounted at'], registeredModules.map((m) => html`
           <tr><td>${m.title} <span class="muted small"><code>${m.name}</code></span></td>
