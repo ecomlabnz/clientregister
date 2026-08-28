@@ -563,6 +563,8 @@ details[open] > summary { margin-bottom: 12px; }
 .quote-doc-meta dd { margin: 0; text-align: right; }
 .quote-doc-conditions { margin: 0; padding-left: 18px; font-size: 0.88rem; line-height: 1.6; }
 .quote-doc-conditions li { margin-bottom: 7px; }
+.quote-doc-note { margin-top: 10px; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius); }
+.quote-doc-bank { grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0 0 10px; font-size: 0.9rem; }
 .quote-doc-terms { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); }
 .break-url { word-break: break-all; font-size: 0.85rem; }
 .quote-doc-foot { margin-top: 28px; display: flex; gap: 8px; }

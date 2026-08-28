@@ -252,6 +252,25 @@ function sections(origin: string): Section[] {
            the capacity and payment wording printed beneath the total.</p>
         <p>Your practice name, address, contact details and <strong>GST number</strong> come from
            <strong>Settings → Practice</strong> and print at the top of every quote.</p>
+        <h4>Payment stages</h4>
+        <p>A quote answers two questions, and they are kept apart. The items say
+           <em>what you are paying for</em>; the <strong>payment stages</strong> say
+           <em>when each part falls due</em> — case review on instruction, the balance when the
+           application is ready to lodge, the Immigration New Zealand fee at lodgement.</p>
+        <p>They are separate because they do not line up: one piece of work is often split across a
+           deposit and a balance, and one stage can gather several fees into a single payment. Each
+           stage carries its own wording and its own figure, and shows as “$1,750 + GST” or a flat
+           amount, the way your terms of engagement set it out.</p>
+        <p><strong>Draft stages from the items</strong> writes one stage per item as a starting
+           point. Reword, split or merge them from there — how a matter is staged is a judgement
+           about that client, not something the system should decide. If the stages do not add up
+           to the quote total, the page says so before it goes out.</p>
+        <h4>Bank account</h4>
+        <p>Set the account under <strong>Settings → Practice</strong>. It is <strong>off</strong>
+           until you tick “Show the bank account on quotes”, because a quote gets forwarded on and
+           account details are what invoice-redirection fraud feeds on. When shown, the quote asks
+           the client to quote its reference and warns them to telephone before acting on any email
+           that appears to change the details.</p>
         <h4>Turning it into fees</h4>
         <p>Once a quote is accepted and attached to a case, <strong>Add to case fees</strong>
            copies it across — one fee line per quote line, keeping the split treatment right — so

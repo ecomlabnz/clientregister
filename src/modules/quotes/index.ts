@@ -98,6 +98,17 @@ export async function quoteLines(env: Env, quoteId: string): Promise<QuoteItemRo
   );
 }
 
+export interface QuoteStageRow {
+  id: string; quote_id: string; position: number; label: string; description: string;
+  amount_cents: number; gst_treatment: GstTreatment; gst_rate_bp: number;
+  net_cents: number; gst_cents: number; gross_cents: number;
+}
+
+export async function quoteStages(env: Env, quoteId: string): Promise<QuoteStageRow[]> {
+  return all<QuoteStageRow>(
+    env.DB, 'SELECT * FROM quote_stages WHERE quote_id = ? ORDER BY position, created_at', quoteId);
+}
+
 export async function catalogue(env: Env, includeRetired = false): Promise<ServiceItemRow[]> {
   return all<ServiceItemRow>(
     env.DB,
@@ -134,7 +145,7 @@ export interface QuoteRow {
   description: string; amount_cents: number; gst_cents: number; disbursements_cents: number;
   currency: string; status: QuoteStatus; valid_until: string | null; sent_at: string | null;
   responded_at: string | null; notes: string | null; created_at: string; updated_at: string;
-  issued_on: string | null; validity_days: number | null;
+  issued_on: string | null; validity_days: number | null; stage_note: string | null;
 }
 
 function quoteTotal(q: Pick<QuoteRow, 'amount_cents' | 'gst_cents' | 'disbursements_cents'>): number {
@@ -488,14 +499,16 @@ export const quotesModule: AppModule = {
       );
       if (!q) return c.notFound();
 
-      const [entries, terms, lines, items, fees, qSettings] = await Promise.all([
+      const [entries, terms, lines, items, fees, qSettings, stages] = await Promise.all([
         listEntries(c.env, 'quote', id),
         practiceDetails(c.env),
         quoteLines(c.env, id),
         catalogue(c.env),
         feeSettings(c.env),
         quoteSettings(c.env),
+        quoteStages(c.env, id),
       ]);
+      const stageTotal = stages.reduce((sum, s) => sum + s.gross_cents, 0);
       const csrf = c.get('session')!.csrf;
       const writable = can(c.get('user'), 'quote:write');
       const totals = summariseQuote(lines.map((l) => ({
@@ -636,8 +649,99 @@ export const quotesModule: AppModule = {
                                options: optionsFrom(FEE_KINDS, FEE_KIND_LABELS) })}
                     ${select({ label: 'GST', name: 'gst_treatment',
                                value: fees.gstRegistered ? fees.defaultTreatment : 'none',
-                               includeBlank: false, options: optionsFrom(GST_TREATMENTS, GST_TREATMENT_LABELS) })}
+                               includeBlank: false, options: optionsFrom(GST_TREATMENTS, GST_TREATMENT_LABELS),
+                               hint: 'Disbursements are normally “No GST” — an INZ fee is passed through as it stands.' })}
                     <button class="btn btn-primary" type="submit">Add line</button>
+                  </form>
+                </details>` : ''}`)}
+
+            ${card('Payment stages', html`
+              <p class="hint mb">When each part falls due. Kept apart from the items above, because
+                 the two do not line up: one piece of work can be split across a deposit and a
+                 balance, and one stage can gather several fees into a single payment.</p>
+              ${stages.length === 0
+                ? emptyState('No stages set out. Payment terms alone will be printed.')
+                : table(['Stage', 'Description', 'Amount'], [
+                    ...stages.map((s) => html`
+                      <tr>
+                        <td class="small strong">${s.label || '—'}</td>
+                        <td>${s.description}</td>
+                        <td class="num">${money(s.net_cents, q.currency)}
+                          ${s.gst_treatment === 'exclusive' && s.gst_cents
+                            ? html`<span class="muted small"> + GST</span>` : ''}
+                          ${s.gst_cents
+                            ? html`<div class="muted small">${money(s.gross_cents, q.currency)} incl.</div>` : ''}
+                        </td>
+                      </tr>`),
+                    html`<tr class="totals-row">
+                      <td colspan="2" class="strong">Scheduled</td>
+                      <td class="num strong ${stageTotal !== totals.totalCents ? 'warn' : ''}">
+                        ${money(stageTotal, q.currency)}</td></tr>`,
+                  ])}
+
+              ${stages.length > 0 && stageTotal !== totals.totalCents
+                ? html`<p class="alert alert-warn">The stages come to
+                         ${money(stageTotal, q.currency)}, but the quote totals
+                         ${money(totals.totalCents, q.currency)} — a difference of
+                         ${money(Math.abs(stageTotal - totals.totalCents), q.currency)}. That may be
+                         deliberate, but it is worth a look before this goes out.</p>`
+                : ''}
+
+              ${q.stage_note ? html`<p class="prewrap small mt"><strong>Note:</strong> ${q.stage_note}</p>` : ''}
+
+              ${writable ? html`
+                ${lines.length > 0 && stages.length === 0
+                  ? html`<form method="post" action="/quotes/${q.id}/stages/generate" class="mb">
+                           ${csrfField(csrf)}
+                           <button class="btn btn-secondary" type="submit">Draft stages from the items</button>
+                           <p class="hint">One stage per item, in order, which you can then reword,
+                              split or merge.</p>
+                         </form>`
+                  : ''}
+
+                ${stages.length > 0 ? html`
+                  <details class="add-block">
+                    <summary>Edit the stages</summary>
+                    <form method="post" action="/quotes/${q.id}/stages">
+                      ${csrfField(csrf)}
+                      <input type="hidden" name="_action" value="save">
+                      <div class="table-wrap">
+                        <table class="edit-table">
+                          <thead><tr><th>#</th><th>Stage</th><th>Description</th><th>Amount</th><th>GST</th><th></th></tr></thead>
+                          <tbody>
+                            ${stages.map((s, i) => html`
+                              <tr>
+                                <td><input name="position_${s.id}" value="${i + 1}" size="2" inputmode="numeric" aria-label="Order"></td>
+                                <td><input name="label_${s.id}" value="${s.label}" size="8" maxlength="40" aria-label="Stage"></td>
+                                <td><input name="description_${s.id}" value="${s.description}" maxlength="500" required aria-label="Description"></td>
+                                <td><input name="amount_${s.id}" value="${(s.amount_cents / 100).toFixed(2)}" size="9" inputmode="decimal" required aria-label="Amount"></td>
+                                <td><select name="gst_${s.id}" aria-label="GST">
+                                  ${GST_TREATMENTS.map((g) => html`<option value="${g}" ${g === s.gst_treatment ? raw('selected') : ''}>${GST_TREATMENT_LABELS[g]}</option>`)}
+                                </select></td>
+                                <td><label class="small"><input type="checkbox" name="remove_${s.id}"> remove</label></td>
+                              </tr>`)}
+                          </tbody>
+                        </table>
+                      </div>
+                      ${field({ label: 'Note under the schedule', name: 'stage_note', type: 'textarea',
+                                rows: 2, maxlength: 1000, value: q.stage_note })}
+                      <button class="btn btn-primary" type="submit">Save the stages</button>
+                    </form>
+                  </details>` : ''}
+
+                <details class="add-block" ${stages.length === 0 ? raw('open') : ''}>
+                  <summary>Add a stage</summary>
+                  <form method="post" action="/quotes/${q.id}/stages" class="row-form">
+                    ${csrfField(csrf)}
+                    ${field({ label: 'Stage', name: 'label', maxlength: 40,
+                              value: `Stage ${stages.length + 1}`, placeholder: 'Stage 1' })}
+                    ${field({ label: 'Description', name: 'description', required: true, maxlength: 500,
+                              placeholder: 'Case review and preparation — due on instruction' })}
+                    ${field({ label: 'Amount', name: 'amount', required: true, placeholder: '0.00' })}
+                    ${select({ label: 'GST', name: 'gst_treatment',
+                               value: fees.gstRegistered ? fees.defaultTreatment : 'none',
+                               includeBlank: false, options: optionsFrom(GST_TREATMENTS, GST_TREATMENT_LABELS) })}
+                    <button class="btn btn-primary" type="submit">Add stage</button>
                   </form>
                 </details>` : ''}`)}
 
@@ -712,8 +816,8 @@ export const quotesModule: AppModule = {
         id,
       );
       if (!q) return c.notFound();
-      const [practice, lines, qs] = await Promise.all([
-        practiceDetails(c.env), quoteLines(c.env, id), quoteSettings(c.env),
+      const [practice, lines, qs, stages] = await Promise.all([
+        practiceDetails(c.env), quoteLines(c.env, id), quoteSettings(c.env), quoteStages(c.env, id),
       ]);
       const totals = summariseQuote(lines.map((l) => ({
         kind: l.kind, lineAmountCents: l.unit_amount_cents,
@@ -800,6 +904,42 @@ export const quotesModule: AppModule = {
                 <td class="num strong">${money(totals.totalCents, q.currency)}</td></tr>
             </tfoot>
           </table>`}
+
+          ${stages.length ? html`
+          <section>
+            <h3>Payment stages</h3>
+            <table class="quote-doc-table">
+              <thead><tr><th>Description</th><th class="num">Amount</th></tr></thead>
+              <tbody>
+                ${stages.map((s) => html`
+                  <tr>
+                    <td>${s.label ? html`<strong>${s.label}</strong> ` : ''}${s.description}</td>
+                    <td class="num">${money(s.net_cents, q.currency)}${
+                      s.gst_treatment === 'exclusive' && s.gst_cents ? ' + GST' : ''}</td>
+                  </tr>`)}
+              </tbody>
+              <tfoot>
+                <tr class="totals-row">
+                  <td class="strong">Total including GST</td>
+                  <td class="num strong">${money(stages.reduce((n, s) => n + s.gross_cents, 0), q.currency)}</td>
+                </tr>
+              </tfoot>
+            </table>
+            ${q.stage_note ? html`<p class="small prewrap quote-doc-note"><strong>Note:</strong> ${q.stage_note}</p>` : ''}
+          </section>` : ''}
+
+          ${practice.showBankOnQuote && practice.bankAccountNumber ? html`
+          <section>
+            <h3>Payment</h3>
+            <dl class="kv quote-doc-bank">
+              ${practice.bankAccountHolder ? html`<dt>Account holder</dt><dd>${practice.bankAccountHolder}</dd>` : ''}
+              ${practice.bankName ? html`<dt>Bank</dt><dd>${practice.bankName}</dd>` : ''}
+              <dt>Account</dt><dd><strong>${practice.bankAccountNumber}</strong></dd>
+            </dl>
+            <p class="small muted">Please quote <strong>${q.ref}</strong> as the reference. If you
+               receive an email appearing to change these details, telephone this office on the
+               number above before paying anything.</p>
+          </section>` : ''}
 
           <section class="quote-doc-terms">
             <h3>Conditions</h3>
@@ -1227,6 +1367,131 @@ export const quotesModule: AppModule = {
       await auditFrom(c, { action: 'quote.validity_set', entityType: 'quote', entityId: id,
         meta: { issuedOn, days, until } });
       return redirectWith(c, `/quotes/${id}`, `Valid until ${until}.`);
+    });
+
+
+    // --- Payment stages -----------------------------------------------------
+
+    /** Add one stage, or save edits to all of them. */
+    r.post('/:id/stages', requirePermission('quote:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const q = await one<QuoteRow>(c.env.DB, 'SELECT id FROM quotes WHERE id = ?', id);
+      if (!q) return c.notFound();
+
+      const fees = await feeSettings(c.env);
+      const form = await c.req.formData();
+      const now = nowIso();
+
+      const figures = (amountCents: number, treatment: GstTreatment) => {
+        const rateBp = fees.gstRegistered && treatment !== 'none' ? fees.gstRateBp : 0;
+        const gst = computeGst(amountCents, fees.gstRegistered ? treatment : 'none', rateBp);
+        return { rateBp, net: gst.net, gstCents: gst.gst, gross: gst.gross };
+      };
+
+      if (form.get('_action') === 'save') {
+        const existing = await quoteStages(c.env, id);
+        const problems: string[] = [];
+        let removed = 0;
+
+        for (const stage of existing) {
+          if (form.get(`remove_${stage.id}`)) {
+            await run(c.env.DB, 'DELETE FROM quote_stages WHERE id = ? AND quote_id = ?', stage.id, id);
+            removed += 1;
+            continue;
+          }
+          const description = String(form.get(`description_${stage.id}`) ?? '').trim().slice(0, 500);
+          const amount = parseMoneyToCents(String(form.get(`amount_${stage.id}`) ?? ''));
+          if (!description || amount === null) { problems.push(stage.label || stage.description); continue; }
+
+          const treatment = (GST_TREATMENTS.includes(String(form.get(`gst_${stage.id}`)) as never)
+            ? String(form.get(`gst_${stage.id}`)) : stage.gst_treatment) as GstTreatment;
+          const positionRaw = Number(String(form.get(`position_${stage.id}`) ?? ''));
+          const f2 = figures(amount, treatment);
+          await run(
+            c.env.DB,
+            `UPDATE quote_stages SET position = ?, label = ?, description = ?, amount_cents = ?,
+                gst_treatment = ?, gst_rate_bp = ?, net_cents = ?, gst_cents = ?, gross_cents = ?,
+                updated_at = ? WHERE id = ? AND quote_id = ?`,
+            Number.isFinite(positionRaw) ? Math.max(0, Math.trunc(positionRaw)) : stage.position,
+            String(form.get(`label_${stage.id}`) ?? '').trim().slice(0, 40),
+            description, amount, fees.gstRegistered ? treatment : 'none', f2.rateBp,
+            f2.net, f2.gstCents, f2.gross, now, stage.id, id,
+          );
+        }
+
+        await run(c.env.DB, 'UPDATE quotes SET stage_note = ?, updated_at = ? WHERE id = ?',
+          String(form.get('stage_note') ?? '').trim().slice(0, 1000) || null, now, id);
+        await auditFrom(c, { action: 'quote.stages_saved', entityType: 'quote', entityId: id,
+          meta: { removed, rejected: problems.length } });
+
+        return problems.length
+          ? redirectWith(c, `/quotes/${id}`,
+              `Saved, except ${problems.length} stage(s) with an amount that could not be read.`, 'err')
+          : redirectWith(c, `/quotes/${id}`, removed ? `Saved. ${removed} stage(s) removed.` : 'Stages saved.');
+      }
+
+      const f = new FormReader(form);
+      const description = f.text('description', { required: true, label: 'Description', max: 500 });
+      const amount = f.money('amount', { required: true, label: 'Amount' });
+      const treatment = f.enum('gst_treatment', GST_TREATMENTS, { fallback: 'exclusive' })!;
+      if (!f.valid || amount === null) {
+        return redirectWith(c, `/quotes/${id}`, Object.values(f.errors)[0] ?? 'Give the stage an amount.', 'err');
+      }
+
+      const position = await count(c.env.DB,
+        'SELECT COALESCE(MAX(position), -1) + 1 AS n FROM quote_stages WHERE quote_id = ?', id);
+      const fig = figures(amount, treatment);
+      await run(
+        c.env.DB,
+        `INSERT INTO quote_stages (id, quote_id, position, label, description, amount_cents,
+            gst_treatment, gst_rate_bp, net_cents, gst_cents, gross_cents, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        newId('qst'), id, position, f.optional('label', { max: 40 }) ?? '', description, amount,
+        fees.gstRegistered ? treatment : 'none', fig.rateBp, fig.net, fig.gstCents, fig.gross, now, now,
+      );
+      await auditFrom(c, { action: 'quote.stage_added', entityType: 'quote', entityId: id,
+        meta: { description } });
+      return redirectWith(c, `/quotes/${id}`, 'Stage added.');
+    });
+
+    /**
+     * A first draft of the schedule, one stage per item.
+     *
+     * A starting point, not an answer: most practices split the professional
+     * work into a deposit and a balance, which is a judgement about this client
+     * and this matter. Getting the wording and the figures onto the page is the
+     * tedious part, and this does that.
+     */
+    r.post('/:id/stages/generate', requirePermission('quote:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const existing = await quoteStages(c.env, id);
+      if (existing.length > 0) {
+        return redirectWith(c, `/quotes/${id}`, 'This quote already has stages — edit those instead.', 'err');
+      }
+      const lines = await quoteLines(c.env, id);
+      if (lines.length === 0) return redirectWith(c, `/quotes/${id}`, 'Add some items first.', 'err');
+
+      const now = nowIso();
+      let n = 0;
+      for (const line of lines) {
+        n += 1;
+        const due = line.kind === 'professional'
+          ? 'due when this part is performed'
+          : 'due when the application is ready for lodgement';
+        await run(
+          c.env.DB,
+          `INSERT INTO quote_stages (id, quote_id, position, label, description, amount_cents,
+              gst_treatment, gst_rate_bp, net_cents, gst_cents, gross_cents, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          newId('qst'), id, n - 1, `Stage ${n}`,
+          `${line.description} — ${due}.`,
+          line.unit_amount_cents * (line.quantity_milli / 1000),
+          line.gst_treatment, line.gst_rate_bp,
+          line.net_cents, line.gst_cents, line.gross_cents, now, now,
+        );
+      }
+      await auditFrom(c, { action: 'quote.stages_generated', entityType: 'quote', entityId: id, meta: { stages: n } });
+      return redirectWith(c, `/quotes/${id}`, `Drafted ${n} stage(s). Reword them to suit the matter.`);
     });
 
     r.post('/:id/to-fees', requirePermission('register:write'), async (c) => {
