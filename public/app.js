@@ -218,6 +218,48 @@
     gst.dataset.original = gst.value;
   });
 
+  // Forms split across tabs.
+  //
+  // The whole form is always in the document and always submits together; the
+  // tabs only decide what is on screen. With this file blocked every section
+  // shows at once, which is how the form worked before and still works.
+  //
+  // The one thing that needs care is validation: a browser refuses to report a
+  // problem on a field it cannot show, so an invalid field on a hidden tab
+  // would stop the form submitting with nothing to explain why. Listening for
+  // `invalid` in the capture phase lets us reveal that tab first.
+  Array.prototype.forEach.call(document.querySelectorAll('.js-tabbed'), function (form) {
+    var name = form.getAttribute('data-tabs');
+    var bar = document.querySelector('[data-tabs-for="' + name + '"]');
+    if (!bar) return;
+
+    var panels = form.querySelectorAll('[data-panel]');
+    var buttons = bar.querySelectorAll('[data-tab]');
+
+    var show = function (which) {
+      Array.prototype.forEach.call(panels, function (panel) {
+        panel.hidden = panel.getAttribute('data-panel') !== which;
+      });
+      Array.prototype.forEach.call(buttons, function (button) {
+        var on = button.getAttribute('data-tab') === which;
+        button.classList.toggle('current', on);
+        button.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+    };
+
+    Array.prototype.forEach.call(buttons, function (button) {
+      button.addEventListener('click', function () { show(button.getAttribute('data-tab')); });
+    });
+
+    form.addEventListener('invalid', function (event) {
+      var panel = event.target.closest ? event.target.closest('[data-panel]') : null;
+      if (panel && panel.hidden) show(panel.getAttribute('data-panel'));
+    }, true);
+
+    bar.hidden = false;
+    show(buttons[0].getAttribute('data-tab'));
+  });
+
   // Print buttons. Declared with data-print rather than an inline handler,
   // because the content security policy forbids inline script.
   Array.prototype.forEach.call(document.querySelectorAll('[data-print]'), function (button) {

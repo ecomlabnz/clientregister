@@ -20,12 +20,15 @@ import {
 } from '../../core/session';
 import { authenticate, requireAuth, validatePassword } from '../../core/auth';
 import { asInteger, readSettings } from '../../core/settings';
+import {
+  ALL_PREFERENCES, PREFERENCE_GROUPS, coercePreference, preferenceByKey, preferencesFor, writePreferences,
+} from '../../core/preferences';
 import { auditFrom, clientIp } from '../../core/audit';
 import { rateLimit } from '../../core/ratelimit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
-import { card, csrfField, errorList, field, pageHeader, table } from '../../ui/components';
+import { card, csrfField, errorList, field, pageHeader, table, select } from '../../ui/components';
 import { dateTime } from '../../ui/format';
 import { ROLE_LABELS } from '../../core/rbac';
 import {
@@ -69,6 +72,24 @@ function loginPage(c: any, opts: { error?: string; email?: string; next?: string
 function safeNext(value: string | undefined): string {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
   return value;
+}
+
+/**
+ * Where to send somebody after they sign in.
+ *
+ * A page they were trying to reach wins — being bounced through a sign-in
+ * should not lose where you were going. Otherwise it is wherever they chose to
+ * start, and failing that Today.
+ *
+ * The stored value is checked against the offered list rather than trusted,
+ * so a preference row edited in the database cannot become an open redirect.
+ */
+async function landingFor(env: Env, userId: string, requested: string): Promise<string> {
+  if (requested && requested !== '/') return requested;
+  const prefs = await preferencesFor(env, userId);
+  const landing = prefs['pref.landing'] ?? '/';
+  const offered = preferenceByKey('pref.landing')?.options ?? [];
+  return offered.some((o) => o.value === landing) ? landing : '/';
 }
 
 /**
@@ -235,7 +256,7 @@ export const authModule: AppModule = {
         entityType: 'user', entityId: result.user.id, meta: { email },
       });
       if (result.needsTotp) return c.redirect(`/login/verify?next=${encodeURIComponent(next)}`, 303);
-      return c.redirect(next, 303);
+      return c.redirect(await landingFor(c.env, result.user.id, next), 303);
     });
 
     // --- Two-factor challenge ----------------------------------------------
@@ -282,7 +303,7 @@ export const authModule: AppModule = {
       if (!row?.totp_secret) {
         session.verified = true;
         await saveSession(c.env, session);
-        return c.redirect(next, 303);
+        return c.redirect(await landingFor(c.env, user.id, next), 303);
       }
 
       let accepted = await verifyTotp(row.totp_secret, code);
@@ -312,7 +333,7 @@ export const authModule: AppModule = {
         action: 'login.success', entityType: 'user', entityId: user.id,
         meta: { method: usedRecovery ? 'recovery_code' : 'totp' },
       });
-      return c.redirect(next, 303);
+      return c.redirect(await landingFor(c.env, user.id, next), 303);
     });
 
     r.post('/logout', async (c) => {
@@ -334,6 +355,16 @@ export const authModule: AppModule = {
       const session = c.get('session')!;
       const theme = themeOf(user);
       const mode = colourModeOf(user);
+      const prefs = await preferencesFor(c.env, user.id);
+      // Tabs, because the account page had grown past a screen: two-factor,
+      // password, appearance, preferences and every active session.
+      const tab = c.req.query('tab') ?? 'security';
+      const tabs = [
+        { id: 'security', label: 'Security' },
+        { id: 'preferences', label: 'Preferences' },
+        { id: 'appearance', label: 'Appearance' },
+        { id: 'sessions', label: 'Devices' },
+      ];
       const sessions = await all<{
         id: string; created_at: string; last_seen_at: string; ip: string | null; user_agent: string | null;
       }>(
@@ -346,6 +377,33 @@ export const authModule: AppModule = {
 
       return page(c, { title: 'My account' }, html`
         ${pageHeader('My account', `${user.email} · ${ROLE_LABELS[user.role]}`)}
+        <nav class="tabs">
+          ${tabs.map((x) => html`
+            <a class="${x.id === tab ? 'tab current' : 'tab'}" href="/account?tab=${x.id}">${x.label}</a>`)}
+        </nav>
+
+        ${tab === 'preferences' ? html`
+          ${PREFERENCE_GROUPS.map((group) => card(group.title, html`
+            ${group.description ? html`<p class="hint mb">${group.description}</p>` : ''}
+            <form method="post" action="/account/preferences" class="form-grid settings-form">
+              ${csrfField(session.csrf)}
+              ${group.preferences.map((def) => html`
+                <div class="settings-cell">
+                  ${def.type === 'boolean'
+                    ? html`<div class="field checkbox-field">
+                             <label><input type="checkbox" name="${def.key}"
+                                      ${prefs[def.key] === 'true' ? raw('checked') : ''}> ${def.label}</label>
+                             ${def.help ? html`<p class="hint">${def.help}</p>` : ''}
+                           </div>`
+                    : select({ label: def.label, name: def.key, value: prefs[def.key],
+                               includeBlank: false, hint: def.help, options: def.options ?? [] })}
+                </div>`)}
+              <div class="form-actions">
+                <button class="btn btn-primary" type="submit">Save preferences</button>
+              </div>
+            </form>`))}` : ''}
+
+        ${tab === 'security' ? html`
         ${card('Two-factor authentication', user.totp_enabled
           ? html`<p>Two-factor authentication is <strong>on</strong>.</p>
                  <form method="post" action="/account/2fa/disable">
@@ -364,8 +422,9 @@ export const authModule: AppModule = {
             ${field({ label: 'New password', name: 'new_password', type: 'password', required: true, autocomplete: 'new-password', hint: 'At least 12 characters.' })}
             ${field({ label: 'Confirm new password', name: 'confirm_password', type: 'password', required: true, autocomplete: 'new-password' })}
             <button class="btn btn-primary" type="submit">Change password</button>
-          </form>`)}
+          </form>`)}` : ''}
 
+        ${tab === 'sessions' ? html`
         ${card('Active sessions', html`
           ${table(['Started', 'Last seen', 'IP', 'Device', ''], sessions.map((s) => html`
             <tr>
@@ -387,8 +446,9 @@ export const authModule: AppModule = {
             <input type="hidden" name="sid" value="all">
             <button class="btn btn-secondary" type="submit">Sign out everywhere else</button>
           </form>
-          <p class="hint">Session ID shown to support: <code>${sessionLabel(session.sid)}</code></p>`)}
+          <p class="hint">Session ID shown to support: <code>${sessionLabel(session.sid)}</code></p>`)}` : ''}
 
+        ${tab === 'appearance' ? html`
         ${card('Appearance', html`
           <form method="post" action="/account/appearance">
             ${csrfField(session.csrf)}
@@ -419,8 +479,37 @@ export const authModule: AppModule = {
             </fieldset>
             <p class="hint">Saved against your account, so it follows you to any device you sign in from.</p>
             <button class="btn btn-primary mt" type="submit">Save appearance</button>
-          </form>`)}
+          </form>`)}` : ''}
       `);
+    });
+
+    /**
+     * Save preferences.
+     *
+     * Only declared keys are written, and each value is coerced to its declared
+     * type before it lands — the same rule the settings framework enforces, for
+     * the same reason. A key that is not offered is ignored rather than stored,
+     * so a crafted post cannot invent a preference other code would later trust.
+     *
+     * A checkbox that is off sends nothing at all, so absence is read as false
+     * rather than as "leave it alone" — for booleans only, where absence is how
+     * a browser says no.
+     */
+    r.post('/account/preferences', async (c) => {
+      const user = c.get('user')!;
+      const form = await c.req.formData();
+      const entries: Array<{ key: string; value: string }> = [];
+
+      for (const def of ALL_PREFERENCES) {
+        if (def.type !== 'boolean' && !form.has(def.key)) continue;
+        entries.push({ key: def.key, value: coercePreference(def, form.get(def.key) as string | null) });
+      }
+      await writePreferences(c.env, user.id, entries);
+      await auditFrom(c, {
+        action: 'account.preferences_changed', entityType: 'user', entityId: user.id,
+        meta: { keys: entries.map((e) => e.key) },
+      });
+      return redirectWith(c, '/account?tab=preferences', 'Preferences saved.');
     });
 
     // Appearance is a preference, not a free-text field: only the themes and
@@ -441,7 +530,7 @@ export const authModule: AppModule = {
       await auditFrom(c, {
         action: 'account.appearance_changed', entityType: 'user', entityId: user.id, meta: { theme, colour_mode: mode },
       });
-      return redirectWith(c, '/account', 'Appearance saved.');
+      return redirectWith(c, '/account?tab=appearance', 'Appearance saved.');
     });
 
     r.post('/account/password', async (c) => {

@@ -32,6 +32,7 @@ import { addParty, partiesForCase, removeParty } from '../../core/parties';
 import { findOrCreateTag, listTags, tagCase, tagsForCase, tagsForCases, untagCase } from '../../core/tags';
 import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
+import { asPrefInteger, preferencesFor } from '../../core/preferences';
 import { storeDocument } from '../documents';
 import {
   VOCABULARY_SETTINGS, caseTypes, isTerm, labelFor, termOptions, type Term,
@@ -49,7 +50,7 @@ export interface CaseRow {
   created_by: string | null; closed_at: string | null;
 }
 
-const PAGE_SIZE = 25;
+const DEFAULT_PAGE_SIZE = 25;
 
 function caseForm(
   c: any,
@@ -144,10 +145,13 @@ export const casesModule: AppModule = {
     // --- List ---------------------------------------------------------------
     r.get('/', requirePermission('register:read'), async (c) => {
       const types = await caseTypes(c.env);
+      const prefs = await preferencesFor(c.env, c.get('user')!.id);
+      const PAGE_SIZE = asPrefInteger(prefs['pref.page_size'], DEFAULT_PAGE_SIZE);
       const q = (c.req.query('q') ?? '').trim();
       const status = c.req.query('status') ?? '';
       const assigned = c.req.query('assigned') ?? '';
-      const scope = c.req.query('scope') ?? 'open';
+      // A view the person asked for wins; otherwise where they said they like to start.
+      const scope = c.req.query('scope') ?? prefs['pref.cases_scope'] ?? 'open';
       const pageNum = Math.max(1, Number(c.req.query('page') ?? '1') || 1);
 
       const where: string[] = [];
