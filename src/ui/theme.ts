@@ -15,7 +15,7 @@
  * wrong colours before a script runs.
  */
 
-export const THEMES = ['slate', 'warm', 'ink'] as const;
+export const THEMES = ['slate', 'warm', 'ink', 'blossom', 'lagoon', 'aurora'] as const;
 export type Theme = (typeof THEMES)[number];
 
 export const COLOUR_MODES = ['system', 'light', 'dark'] as const;
@@ -41,7 +41,22 @@ export const THEME_INFO: Record<Theme, ThemeInfo> = {
   ink: {
     id: 'ink',
     name: 'Ink',
-    description: 'Deep blue-charcoal with a teal accent. Strongest contrast of the three.',
+    description: 'Deep blue-charcoal with a teal accent. The strongest contrast of the quiet three.',
+  },
+  blossom: {
+    id: 'blossom',
+    name: 'Blossom',
+    description: 'Warm pinks with a vivid magenta. Cheerful, and not remotely corporate.',
+  },
+  lagoon: {
+    id: 'lagoon',
+    name: 'Lagoon',
+    description: 'Bright mint and sea green with a strong teal. Fresh and wide awake.',
+  },
+  aurora: {
+    id: 'aurora',
+    name: 'Aurora',
+    description: 'Electric violet on soft lilac. The boldest of the six.',
   },
 };
 

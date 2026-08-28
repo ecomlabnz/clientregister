@@ -7,6 +7,35 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.18.0 — 28 August 2026
+
+### Added
+- **Three more themes**, each with day and night: **Blossom** (warm pinks, vivid
+  magenta), **Lagoon** (mint and sea green, strong teal) and **Aurora**
+  (electric violet on lilac). The quiet three are untouched.
+  - Bold means the neutrals are tinted towards the accent rather than staying
+    grey with a coloured button on top; the semantic colours stay constant, as
+    they do everywhere.
+  - Each was one CSS block and one line of TypeScript, which is what the theme
+    layer was built for.
+- **A contrast test across every theme.** Adding a theme is now easy, which
+  makes adding an unreadable one just as easy. Five pairings — body text on the
+  page and on a card, muted text, links, and a button label on its button — are
+  checked against WCAG AA (4.5:1) in both modes of all six themes. All pass;
+  the closest is 4.6:1.
+- **Tabs with counts on Alerts, Tasks and Quotes**, matching Clients and Cases:
+  Alerts by kind, Tasks by Open / Overdue / Completed / All, Quotes by
+  Live / Accepted / Closed / All.
+- **Search as you type** on those lists, and quotes gained a search box.
+
+### Changed
+- Those three lists now use declared column widths, drop their lesser columns on
+  a phone and fold that content into the first cell, and keep their headings
+  under the navigation while the list scrolls — the same treatment cases and
+  clients already had.
+- The task list opens filtered to you or to everyone according to your own
+  preference, and an explicit choice in the address still wins.
+
 ## 0.17.0 — 28 August 2026
 
 ### Added
