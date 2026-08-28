@@ -7,7 +7,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import * as z from 'zod/v4';
 import type { Env } from '../types';
-import { normaliseTriage, TRIAGE_SYSTEM_PROMPT, type AiProvider, type TriageResult } from './provider';
+import {
+  BRIEF_SYSTEM_PROMPT, TRIAGE_SYSTEM_PROMPT, normaliseTriage,
+  type AiProvider, type BriefResult, type TriageResult,
+} from './provider';
 
 /**
  * Built per request rather than once at module load, because the list of case
@@ -31,6 +34,13 @@ function triageSchema(caseTypes: string[]) {
     is_spam: z.boolean(),
   });
 }
+
+const BriefSchema = z.object({
+  summary: z.string(),
+  next_steps: z.array(z.string()),
+  questions: z.array(z.string()),
+  risks: z.array(z.string()),
+});
 
 const DEFAULT_MODEL = 'claude-opus-5';
 
@@ -57,6 +67,26 @@ export function createAnthropicProvider(env: Env): AiProvider {
 
       if (!response.parsed_output) throw new Error('model returned no structured output');
       return normaliseTriage(response.parsed_output as Partial<TriageResult>);
+    },
+
+    async brief(input): Promise<BriefResult> {
+      const response = await client.messages.parse({
+        model,
+        max_tokens: 4000,
+        system: BRIEF_SYSTEM_PROMPT,
+        output_config: { format: zodOutputFormat(BriefSchema) },
+        messages: [
+          { role: 'user', content: `File: ${input.title}\n\n${input.file.slice(0, 60_000)}` },
+        ],
+      });
+      if (!response.parsed_output) throw new Error('model returned no structured output');
+      const parsed = response.parsed_output as BriefResult;
+      return {
+        summary: parsed.summary ?? '',
+        next_steps: parsed.next_steps ?? [],
+        questions: parsed.questions ?? [],
+        risks: parsed.risks ?? [],
+      };
     },
   };
 }
