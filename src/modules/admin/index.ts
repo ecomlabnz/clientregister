@@ -19,7 +19,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import { badge, card, csrfField, field, optionsFrom, pageHeader, select, table } from '../../ui/components';
 import { dateTime, truncate } from '../../ui/format';
-import { isRole, ROLE_LABELS, type Permission } from '../../core/rbac';
+import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../core/rbac';
 import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABELS, SPLIT_BASES } from '../../core/fees';
 import { isAiEnabled } from '../../ai/provider';
 import { mailConfigured } from '../../mail/provider';
@@ -158,6 +158,9 @@ export const adminModule: AppModule = {
             ${field({ label: 'Email', name: 'email', type: 'email', required: true, maxlength: 320 })}
             ${select({ label: 'Role', name: 'role', value: 'assistant', includeBlank: false,
                        options: optionsFrom(ROLES, ROLE_LABELS) })}
+            <ul class="hint">
+              ${ROLES.map((role) => html`<li><strong>${ROLE_LABELS[role]}</strong> — ${ROLE_DESCRIPTIONS[role]}</li>`)}
+            </ul>
             <p class="hint">A temporary password is generated and shown once. The new user should
                change it and turn on two-factor authentication immediately.</p>
             <button class="btn btn-primary" type="submit">Create user</button>
