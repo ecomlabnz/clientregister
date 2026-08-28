@@ -21,7 +21,8 @@ import type { Env } from '../types';
 import { all, nowIso, one, run } from './db';
 import { newId } from './ids';
 import { readSettings, asBoolean, asInteger, type SettingsGroup } from './settings';
-import { html, join, raw, type Raw } from '../ui/html';
+import type { Raw } from '../ui/html';
+import { renderRichText } from './richtext';
 
 export const KB_STATUSES = ['draft', 'published', 'superseded', 'archived'] as const;
 export type KbStatus = (typeof KB_STATUSES)[number];
@@ -311,49 +312,12 @@ export function effectiveState(
 /**
  * Render an article body.
  *
- * Deliberately not Markdown. A parser is a dependency, and one that emits HTML
- * is a dependency in the path of everything a stranger can put in front of the
- * practice through an inbound channel. This handles the three things people
- * actually type — paragraphs, bulleted lines and links — and every fragment
- * goes through the escaping templates, so an article can hold angle brackets
- * and they arrive as angle brackets.
+ * Shared with outgoing email (src/core/richtext.ts) rather than duplicated:
+ * one renderer means one place where escaping can be got wrong, and one set of
+ * tests covering it.
  */
 export function renderBody(body: string): Raw {
-  const blocks: Raw[] = [];
-  for (const block of body.replace(/\r\n/g, '\n').split(/\n\s*\n/)) {
-    const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
-    if (lines.length === 0) continue;
-
-    if (lines.every((l) => /^[-*•]\s+/.test(l))) {
-      blocks.push(html`<ul>${lines.map((l) => html`<li>${autolink(l.replace(/^[-*•]\s+/, ''))}</li>`)}</ul>`);
-      continue;
-    }
-    if (lines.every((l) => /^\d+[.)]\s+/.test(l))) {
-      blocks.push(html`<ol>${lines.map((l) => html`<li>${autolink(l.replace(/^\d+[.)]\s+/, ''))}</li>`)}</ol>`);
-      continue;
-    }
-    if (lines.length === 1 && /^#{1,3}\s+/.test(lines[0]!)) {
-      blocks.push(html`<h4>${lines[0]!.replace(/^#{1,3}\s+/, '')}</h4>`);
-      continue;
-    }
-    blocks.push(html`<p>${join(lines.map((l, i) => (i === 0 ? autolink(l) : html`${raw('<br>')}${autolink(l)}`)))}</p>`);
-  }
-  return join(blocks);
-}
-
-/** Turn bare http(s) URLs into links. Any other scheme is left as text. */
-function autolink(text: string): Raw {
-  const parts: Raw[] = [];
-  const pattern = /https?:\/\/[^\s<>"')\]]+/g;
-  let last = 0;
-  for (const match of text.matchAll(pattern)) {
-    const at = match.index ?? 0;
-    if (at > last) parts.push(html`${text.slice(last, at)}`);
-    parts.push(html`<a href="${match[0]}" rel="noopener nofollow">${match[0]}</a>`);
-    last = at + match[0].length;
-  }
-  if (last < text.length) parts.push(html`${text.slice(last)}`);
-  return join(parts);
+  return renderRichText(body);
 }
 
 /** Tags on one article. Shares the vocabulary cases use — one set of words. */

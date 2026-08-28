@@ -36,6 +36,7 @@ import {
 import { asInteger, readSettings, type SettingsGroup } from '../../core/settings';
 import { feeSettings } from '../fees';
 import { practiceDetails } from '../../core/practice';
+import { renderEmailHtml } from '../../core/richtext';
 import { mailConfigured } from '../../mail/provider';
 import { flushQueue, queueEmail } from '../../mail/queue';
 
@@ -564,9 +565,54 @@ export const quotesModule: AppModule = {
                       <td class="num strong">${money(totals.totalCents, q.currency)}</td><td colspan="2"></td></tr>`,
                   ])}
 
+              ${writable && lines.length > 0 ? html`
+                <details class="add-block">
+                  <summary>Edit the lines</summary>
+                  <p class="hint mb">Change anything on any line, reorder them, or tick to remove.
+                     Saving recalculates the totals and rewrites the quote.</p>
+                  <form method="post" action="/quotes/${q.id}/items">
+                    ${csrfField(csrf)}
+                    <input type="hidden" name="_action" value="save">
+                    <div class="table-wrap">
+                      <table class="edit-table">
+                        <thead><tr>
+                          <th>#</th><th>Description</th><th>Qty</th><th>Unit</th>
+                          <th>Price per unit</th><th>Type</th><th>GST</th><th></th>
+                        </tr></thead>
+                        <tbody>
+                          ${lines.map((l, i) => html`
+                            <tr>
+                              <td><input name="position_${l.id}" value="${i + 1}" size="2" inputmode="numeric"
+                                         aria-label="Order"></td>
+                              <td><input name="description_${l.id}" value="${l.description}" maxlength="300"
+                                         required aria-label="Description"></td>
+                              <td><input name="quantity_${l.id}" value="${formatQuantity(l.quantity_milli)}"
+                                         size="4" inputmode="decimal" required aria-label="Quantity"></td>
+                              <td><input name="unit_${l.id}" value="${l.unit_label}" size="8" maxlength="30"
+                                         aria-label="Unit"></td>
+                              <td><input name="amount_${l.id}" value="${(l.unit_amount_cents / 100).toFixed(2)}"
+                                         size="8" inputmode="decimal" required aria-label="Price per unit"></td>
+                              <td><select name="kind_${l.id}" aria-label="Type">
+                                ${FEE_KINDS.map((k) => html`<option value="${k}" ${k === l.kind ? raw('selected') : ''}>${FEE_KIND_LABELS[k]}</option>`)}
+                              </select></td>
+                              <td><select name="gst_${l.id}" aria-label="GST">
+                                ${GST_TREATMENTS.map((g) => html`<option value="${g}" ${g === l.gst_treatment ? raw('selected') : ''}>${GST_TREATMENT_LABELS[g]}</option>`)}
+                              </select></td>
+                              <td><label class="small"><input type="checkbox" name="remove_${l.id}"> remove</label></td>
+                            </tr>`)}
+                        </tbody>
+                      </table>
+                    </div>
+                    <button class="btn btn-primary" type="submit">Save the lines</button>
+                  </form>
+                </details>` : ''}
+
               ${writable ? html`
                 <details class="add-block" ${lines.length === 0 ? raw('open') : ''}>
                   <summary>Add a line</summary>
+                  <p class="hint mb">Choosing something from the catalogue fills the rest of the line
+                     in, and you can still change any of it. Manage that list under
+                     <a href="/quotes/catalogue">standard items</a>.</p>
                   <form method="post" action="/quotes/${q.id}/items" class="row-form js-quote-line">
                     ${csrfField(csrf)}
                     <div class="field">
@@ -581,8 +627,6 @@ export const quotesModule: AppModule = {
                             data-gst="${it.gst_treatment}">${it.name}${it.unit_amount_cents
                               ? ` — ${money(it.unit_amount_cents, q.currency)}/${it.unit_label}` : ''}</option>`)}
                       </select>
-                      <p class="hint">Choosing one fills the rest in; you can still change anything.
-                         Manage the list under <a href="/quotes/catalogue">standard items</a>.</p>
                     </div>
                     ${field({ label: 'Description', name: 'description', required: true, maxlength: 300 })}
                     ${field({ label: 'Quantity', name: 'quantity', value: '1', required: true, maxlength: 10 })}
@@ -770,10 +814,11 @@ export const quotesModule: AppModule = {
                            incurred.</li>`
                 : ''}
               ${practice.termsUrl
-                ? html`<li>This quote is given on the <strong>${practice.termsLabel}</strong>, which
-                           may be downloaded from
-                           <span class="break-url"><a href="${practice.termsUrl}">${practice.termsUrl}</a></span>.
-                           Please read those terms before accepting.</li>`
+                ? html`<li>This quote is given on the
+                           <a href="${practice.termsUrl}" rel="noopener"><strong>${practice.termsLabel}</strong></a>,
+                           which may be downloaded from that link. Please read those terms before
+                           accepting.
+                           <span class="print-only break-url">${practice.termsUrl}</span></li>`
                 : ''}
             </ul>
           </section>
@@ -812,7 +857,7 @@ export const quotesModule: AppModule = {
                    be recorded and queued but not delivered. It sends as soon as one is set up —
                    see Admin → Integrations.</div>`}
 
-        <form method="post" action="/quotes/${q.id}/email" class="form-grid">
+        <form method="post" action="/quotes/${q.id}/email" class="form-grid compose">
           ${csrfField(csrf)}
           <div class="form-section">
             <h3>Message</h3>
@@ -821,8 +866,38 @@ export const quotesModule: AppModule = {
             ${field({ label: 'Copy to', name: 'cc', type: 'email', value: '', maxlength: 320 })}
             ${field({ label: 'Subject', name: 'subject', required: true, maxlength: 200,
                       value: `Fee quote ${q.ref} — ${q.description}`.slice(0, 200) })}
-            ${field({ label: 'Message', name: 'body', type: 'textarea', rows: 16, required: true,
-                      maxlength: 10000, value: defaultQuoteEmail(q, practice, items, qs.capacityNote) })}
+          </div>
+
+          ${/*
+            * The body gets the full width of the form and a monospace face:
+            * the figures are padded into columns, and in a proportional font
+            * they do not line up with each other.
+            */ ''}
+          <div class="form-section form-section-wide js-compose">
+            <div class="compose-bar">
+              <div class="compose-tools">
+                <button type="button" class="btn btn-small btn-secondary" data-wrap="**" title="Bold"><b>B</b></button>
+                <button type="button" class="btn btn-small btn-secondary" data-wrap="*" title="Italic"><i>I</i></button>
+                <button type="button" class="btn btn-small btn-secondary" data-prefix="## " title="Heading">H</button>
+                <button type="button" class="btn btn-small btn-secondary" data-prefix="- " title="Bulleted list">&bull; List</button>
+                <button type="button" class="btn btn-small btn-secondary" data-prefix="1. " title="Numbered list">1. List</button>
+              </div>
+              <fieldset class="compose-format">
+                <legend class="visually-hidden">Send as</legend>
+                <label><input type="radio" name="format" value="text" checked> Plain text</label>
+                <label><input type="radio" name="format" value="html"> Formatted</label>
+              </fieldset>
+            </div>
+            <div class="field">
+              <label for="f_body">Message <span class="req"> *</span></label>
+              <textarea id="f_body" name="body" rows="22" required maxlength="20000"
+                        class="compose-body">${defaultQuoteEmail(q, practice, items, qs.capacityNote)}</textarea>
+              <p class="hint">Written as plain text. Choosing <strong>Formatted</strong> sends a
+                 tidy HTML version as well, with a plain-text copy for clients whose mail client
+                 prefers it — <code>**bold**</code>, <code>*italic*</code>, <code>## heading</code>,
+                 lines starting <code>-</code> or <code>1.</code> for lists, and web addresses become
+                 links. Nothing else is interpreted, so what you type is what is sent.</p>
+            </div>
             <div class="field checkbox-field">
               <label><input type="checkbox" name="mark_sent" checked>
                 Mark this quote as sent</label>
@@ -845,14 +920,19 @@ export const quotesModule: AppModule = {
       const to = f.email('to', { required: true, label: 'To' });
       const cc = f.email('cc');
       const subject = f.text('subject', { required: true, label: 'Subject', max: 200 });
-      const body = f.text('body', { required: true, label: 'Message', max: 10000 });
+      const body = f.text('body', { required: true, label: 'Message', max: 20000 });
+      const asHtml = f.text('format', { max: 10 }) === 'html';
       const markSent = f.bool('mark_sent') === 1;
       if (!f.valid || !to) {
         return redirectWith(c, `/quotes/${id}/email`, Object.values(f.errors)[0] ?? 'Invalid message.', 'err');
       }
 
+      // The plain text is sent either way. A formatted message is a multipart
+      // one carrying both, so a client that cannot or will not render HTML
+      // still gets a readable letter rather than a wall of markup.
       const outboundId = await queueEmail(c.env, {
         to, cc, subject, text: body,
+        html: asHtml ? renderEmailHtml(body) : null,
         entityType: 'quote', entityId: id, createdBy: user.id,
       });
 
@@ -868,7 +948,7 @@ export const quotesModule: AppModule = {
           body: `Quote ${q.ref} emailed to ${to}.`, createdBy: user.id });
       }
       await auditFrom(c, { action: 'quote.emailed', entityType: 'quote', entityId: id,
-        meta: { to, outboundId } });
+        meta: { to, outboundId, format: asHtml ? 'html' : 'text' } });
 
       // Try to deliver straight away; the daily job picks up anything left.
       const result = await flushQueue(c.env, 5);
@@ -1012,7 +1092,68 @@ export const quotesModule: AppModule = {
 
       const fees = await feeSettings(c.env);
       const qs = await quoteSettings(c.env);
-      const f = new FormReader(await c.req.formData());
+      const form = await c.req.formData();
+      const f = new FormReader(form);
+
+      // The same route both adds a line and saves edits to the existing ones,
+      // because both end in exactly the same place: recalculate the lines, then
+      // bring the quote's header totals back into step with them.
+      if (form.get('_action') === 'save') {
+        const existing = await quoteLines(c.env, id);
+        const problems: string[] = [];
+        let removed = 0;
+
+        for (const line of existing) {
+          if (form.get(`remove_${line.id}`)) {
+            await run(c.env.DB, 'DELETE FROM quote_items WHERE id = ? AND quote_id = ?', line.id, id);
+            removed += 1;
+            continue;
+          }
+
+          const description = String(form.get(`description_${line.id}`) ?? '').trim().slice(0, 300);
+          const quantity = parseQuantityToMilli(String(form.get(`quantity_${line.id}`) ?? ''));
+          const unitAmount = parseMoneyToCents(String(form.get(`amount_${line.id}`) ?? ''));
+          const kind = FEE_KINDS.includes(String(form.get(`kind_${line.id}`)) as never)
+            ? String(form.get(`kind_${line.id}`)) : line.kind;
+          const treatment = GST_TREATMENTS.includes(String(form.get(`gst_${line.id}`)) as never)
+            ? String(form.get(`gst_${line.id}`)) : line.gst_treatment;
+          const positionRaw = Number(String(form.get(`position_${line.id}`) ?? ''));
+          const position = Number.isFinite(positionRaw) ? Math.max(0, Math.trunc(positionRaw)) : line.position;
+
+          // A line that cannot be read is left exactly as it was rather than
+          // being written half-changed or silently dropped.
+          if (!description || quantity === null || unitAmount === null) {
+            problems.push(line.description);
+            continue;
+          }
+
+          const gstRateBp = fees.gstRegistered && treatment !== 'none' ? fees.gstRateBp : 0;
+          const amounts = computeLine({
+            quantityMilli: quantity, unitAmountCents: unitAmount,
+            gstTreatment: (fees.gstRegistered ? treatment : 'none') as GstTreatment, gstRateBp,
+          });
+          await run(
+            c.env.DB,
+            `UPDATE quote_items SET position = ?, description = ?, kind = ?, unit_label = ?,
+                quantity_milli = ?, unit_amount_cents = ?, gst_treatment = ?, gst_rate_bp = ?,
+                net_cents = ?, gst_cents = ?, gross_cents = ?, updated_at = ?
+              WHERE id = ? AND quote_id = ?`,
+            position, description, kind,
+            String(form.get(`unit_${line.id}`) ?? line.unit_label).trim().slice(0, 30) || qs.defaultUnitLabel,
+            quantity, unitAmount, fees.gstRegistered ? treatment : 'none', gstRateBp,
+            amounts.netCents, amounts.gstCents, amounts.grossCents, nowIso(), line.id, id,
+          );
+        }
+
+        const totals = await refreshQuoteTotals(c.env, id);
+        await auditFrom(c, { action: 'quote.lines_saved', entityType: 'quote', entityId: id,
+          meta: { removed, rejected: problems.length, total: totals.totalCents } });
+
+        return problems.length
+          ? redirectWith(c, `/quotes/${id}`,
+              `Saved, except ${problems.length} line(s) with a quantity or price that could not be read: ${problems.join('; ')}.`, 'err')
+          : redirectWith(c, `/quotes/${id}`, removed ? `Saved. ${removed} line(s) removed.` : 'Lines saved.');
+      }
 
       const description = f.text('description', { required: true, label: 'Description', max: 300 });
       const unitAmount = f.money('unit_amount', { required: true, label: 'Price per unit' });
@@ -1154,4 +1295,17 @@ function readCatalogueForm(f: FormReader) {
     unitAmount: f.money('unit_amount') ?? 0,
     treatment: f.enum('gst_treatment', GST_TREATMENTS, { fallback: 'exclusive' })!,
   };
+}
+
+/**
+ * A typed amount as whole cents, or null if it is not a number.
+ *
+ * `FormReader.money` records an error against the form; here each line is read
+ * independently, and one unreadable line must not stop the others being saved.
+ */
+function parseMoneyToCents(input: string): number | null {
+  const clean = input.trim().replace(/[$,\s]/g, '').replace(',', '.');
+  if (!/^-?\d{0,9}(\.\d{1,2})?$/.test(clean) || clean === '' || clean === '.') return null;
+  const value = Math.round(Number(clean) * 100);
+  return Number.isFinite(value) ? value : null;
 }

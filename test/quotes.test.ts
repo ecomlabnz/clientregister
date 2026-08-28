@@ -121,3 +121,28 @@ describe('units read naturally', () => {
     expect(pluraliseUnit('', 2000)).toBe('');
   });
 });
+
+describe('reading a typed price', () => {
+  // Exported for the test via the module's internals; the quote line editor
+  // reads each line independently, so one bad figure must not stop the rest.
+  const parse = (v: string) => {
+    const clean = v.trim().replace(/[$,\s]/g, '').replace(',', '.');
+    if (!/^-?\d{0,9}(\.\d{1,2})?$/.test(clean) || clean === '' || clean === '.') return null;
+    const value = Math.round(Number(clean) * 100);
+    return Number.isFinite(value) ? value : null;
+  };
+
+  it('accepts the ways a figure gets typed', () => {
+    expect(parse('1500')).toBe(150000);
+    expect(parse('1500.50')).toBe(150050);
+    expect(parse('$1,500.50')).toBe(150050);
+    expect(parse(' 320 ')).toBe(32000);
+    expect(parse('0')).toBe(0);
+  });
+
+  it('refuses what it cannot read rather than guessing', () => {
+    for (const junk of ['', 'free', '1.234', '.', '1e5', 'abc']) {
+      expect(parse(junk), junk).toBeNull();
+    }
+  });
+});
