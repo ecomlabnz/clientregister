@@ -46,6 +46,9 @@ export interface Env {
   MAIL_PROVIDER?: string;
   MAIL_FROM?: string;
   RESEND_API_KEY?: string;
+  GMAIL_CLIENT_ID?: string;
+  GMAIL_CLIENT_SECRET?: string;
+  GMAIL_REFRESH_TOKEN?: string;
 
   AI_PROVIDER?: string;
   AI_MODEL?: string;

@@ -7,6 +7,36 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.10.0 — 28 August 2026
+
+### Added
+- **Gmail as an outbound transport.** Cloudflare Workers cannot open an SMTP
+  connection — SMTP needs a raw TCP handshake the runtime does not offer — so
+  this uses the Gmail REST API over HTTPS with OAuth. Google is also retiring
+  app passwords, so OAuth was the destination regardless. Sending this way keeps
+  the message in the practice's own Sent folder and brings replies back to the
+  inbox they already read.
+  - The refresh token is exchanged for a short-lived access token, cached in KV
+    until a minute before it expires, so a hundred messages cost one token
+    request rather than a hundred.
+  - A 401 clears the cached token, so a revoked grant is not replayed.
+  - Header injection is closed off: newlines are stripped from `From`, `To` and
+    `Cc`, and a non-ASCII subject is sent as an RFC 2047 encoded word. Tested
+    with a subject and recipient carrying `\r\nBcc:`.
+- **Step-by-step setup instructions in the application**, at
+  Help → Connecting Telegram, WhatsApp and email. Written for someone who has
+  not done this before: BotFather through to `setWebhook`, the Meta app through
+  to subscribing to the `messages` field, Cloudflare Email Routing, and the
+  Google Cloud project through to the refresh token. The webhook URLs are
+  rendered from the address the page is being served on, so they are always
+  correct to paste.
+- The guide also answers who triages what arrives, and why nothing from an
+  inbound channel is ever created without a person seeing it first.
+
+### Changed
+- **Admin → Integrations names what is still missing** for outbound email rather
+  than only reporting it as off, and links to the setup guide.
+
 ## 0.9.0 — 28 August 2026
 
 ### Added

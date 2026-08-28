@@ -32,6 +32,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.10.0', date: '28 August 2026',
+    notes: [
+      'Step-by-step instructions for connecting Telegram, WhatsApp and email — see the section above.',
+      'The register can now send from your Gmail account, so replies come back to your own inbox.',
+      'Admin → Integrations says what is still missing, not just what is off.',
+    ],
+  },
+  {
     version: '0.9.0', date: '28 August 2026',
     notes: [
       'A knowledge base for visa packs, circulars, legal material and announcements.',
@@ -109,7 +117,7 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   },
 ];
 
-function sections(): Section[] {
+function sections(origin: string): Section[] {
   return [
     {
       id: 'getting-around',
@@ -334,6 +342,173 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
            screen, as before.</p>`,
     },
     {
+      id: 'connecting',
+      title: 'Connecting Telegram, WhatsApp and email',
+      body: html`
+        <p>Four connections, each independent — set up whichever you want, in any order, and the
+           rest of the register carries on working without them.</p>
+
+        <div class="alert alert-warn">
+          <p><strong>Where secrets go.</strong> None of these keys are typed into the application.
+             They live in GitHub, under <strong>Settings → Secrets and variables → Actions →
+             New repository secret</strong>, and the deploy uploads them to Cloudflare for you.
+             That way a key is never in the database, never in a form post, and never in the audit
+             log — and rotating one leaves a trace in the deployment history.</p>
+          <p class="mb">After adding or changing any secret, go to the repository’s
+             <strong>Actions</strong> tab, open <strong>Deploy</strong>, and press
+             <strong>Run workflow</strong>. Nothing takes effect until that finishes.</p>
+        </div>
+
+        <h4>1 · Telegram — forward a message and it lands here</h4>
+        <ol>
+          <li>In Telegram, search for <strong>@BotFather</strong> and start a chat with it.</li>
+          <li>Send <code>/newbot</code>. It asks for a name (anything, e.g. “Immigration Register”)
+              and then a username, which must end in <code>bot</code> — for example
+              <code>immigration_register_bot</code>.</li>
+          <li>BotFather replies with a <strong>token</strong> that looks like
+              <code>1234567890:AAH...</code>. Save it as the repository secret
+              <code>TELEGRAM_BOT_TOKEN</code>. Treat it like a password — anyone holding it
+              controls the bot.</li>
+          <li>Make up a second, separate random string — twenty or more characters, letters and
+              numbers only. Save it as <code>TELEGRAM_WEBHOOK_SECRET</code>. This is how the
+              register knows a webhook really came from Telegram; a request arriving without it is
+              dropped before anything is read.</li>
+          <li>Find your own numeric Telegram ID: message <strong>@userinfobot</strong> and it
+              replies with a number. Save that as <code>TELEGRAM_ALLOWED_USER_IDS</code>. Several
+              people are separated by commas. Only these IDs can create records — anyone else’s
+              message is still captured for you to look at, but creates nothing by itself.</li>
+          <li>Deploy (Actions → Deploy → Run workflow), so the three secrets reach the Worker.</li>
+          <li>Now tell Telegram where to deliver. Paste this into a browser address bar, with your
+              own bot token and webhook secret substituted in:
+              <pre>https://api.telegram.org/bot<strong>YOUR_BOT_TOKEN</strong>/setWebhook?url=${origin}/api/ingest/telegram&amp;secret_token=<strong>YOUR_WEBHOOK_SECRET</strong></pre>
+              A reply of <code>{"ok":true,"result":true,...}</code> means it is connected.</li>
+          <li>Test it: send your bot any message, then open <strong>Inbox</strong> here. It should
+              be waiting.</li>
+        </ol>
+        <p class="hint">To check the connection later, visit
+           <code>https://api.telegram.org/bot<strong>YOUR_BOT_TOKEN</strong>/getWebhookInfo</code>.
+           <code>last_error_message</code> tells you what Telegram is unhappy about.</p>
+
+        <h4>2 · WhatsApp — via the Meta Cloud API</h4>
+        <p>This one is more involved, because WhatsApp is Meta’s and Meta requires a business
+           account. Allow half an hour.</p>
+        <ol>
+          <li>Go to <a href="https://developers.facebook.com" rel="noopener">developers.facebook.com</a>
+              and sign in. Choose <strong>My Apps → Create App</strong>, pick
+              <strong>Business</strong>, and give it a name.</li>
+          <li>On the app’s dashboard, find <strong>WhatsApp</strong> and press
+              <strong>Set up</strong>. Meta gives you a test number to begin with; a real number is
+              added later under <strong>API Setup</strong>.</li>
+          <li>Go to <strong>App settings → Basic</strong> and copy the <strong>App secret</strong>
+              (press Show). Save it as <code>WHATSAPP_APP_SECRET</code>. Meta signs every delivery
+              with this, and the signature is checked before the message is read.</li>
+          <li>Make up another random string and save it as <code>WHATSAPP_VERIFY_TOKEN</code>. It
+              is used once, during the handshake in step 6.</li>
+          <li>Save the phone numbers allowed to create records as
+              <code>WHATSAPP_ALLOWED_SENDERS</code> — full international form, commas between
+              them, e.g. <code>64211234567,6421999888</code>. Deploy now, before the next step.</li>
+          <li>In the app, go to <strong>WhatsApp → Configuration</strong> and press
+              <strong>Edit</strong> beside Webhook. Enter:
+              <ul>
+                <li><strong>Callback URL</strong>: <code>${origin}/api/ingest/whatsapp</code></li>
+                <li><strong>Verify token</strong>: the string from step 4</li>
+              </ul>
+              Press <strong>Verify and save</strong>. Meta calls the register to check; if it fails,
+              the deploy in step 5 has not finished.</li>
+          <li>Still on Configuration, under <strong>Webhook fields</strong>, press
+              <strong>Manage</strong> and subscribe to <strong>messages</strong>. Without this
+              nothing is delivered.</li>
+          <li>Test: message the WhatsApp number from an allowed phone, then check
+              <strong>Inbox</strong>.</li>
+        </ol>
+        <p class="hint">Meta’s test number only messages numbers you have added to it. To take
+           enquiries from the public you need a real number and Meta’s business verification, which
+           takes a few days.</p>
+
+        <h4>3 · Email in — Cloudflare Email Routing</h4>
+        <ol>
+          <li>In the Cloudflare dashboard, open the domain you want to receive on and choose
+              <strong>Email → Email Routing</strong>. Enable it and add the DNS records it offers —
+              it can do this for you.</li>
+          <li>Under <strong>Routing rules → Create address</strong>, make an address such as
+              <code>register@yourdomain</code>.</li>
+          <li>For the action, choose <strong>Send to a Worker</strong> and pick
+              <strong>clientregister</strong>.</li>
+          <li>Save the addresses whose mail should create records as
+              <code>INGEST_EMAIL_ALLOWED_SENDERS</code> — commas between them. Mail from anyone
+              else is still captured in the inbox for triage.</li>
+          <li>Deploy, then send a test email to the address.</li>
+        </ol>
+
+        <h4>4 · Email out — sending from your Gmail</h4>
+        <p>Cloudflare Workers cannot use SMTP: it needs a kind of network connection the platform
+           does not offer. Gmail is therefore connected through Google’s own API, which also means
+           the messages this register sends appear in your Gmail <strong>Sent</strong> folder and
+           replies come back to the inbox you already read.</p>
+        <p>Google is retiring app passwords, so this uses OAuth — a one-off authorisation you give
+           to your own application. It looks long written down; it is about fifteen minutes.</p>
+        <ol>
+          <li>Go to <a href="https://console.cloud.google.com" rel="noopener">console.cloud.google.com</a>
+              and sign in <em>with the Gmail account you want to send from</em>. Create a project
+              (top bar → New project); call it anything.</li>
+          <li>Open <strong>APIs &amp; Services → Library</strong>, search for
+              <strong>Gmail API</strong>, and press <strong>Enable</strong>.</li>
+          <li>Open <strong>APIs &amp; Services → OAuth consent screen</strong>. Choose
+              <strong>External</strong>, fill in the app name and your email where asked, and save.
+              On the <strong>Audience</strong> page, add your own Gmail address under
+              <strong>Test users</strong> — you do not need to publish or be verified, because you
+              are the only user.</li>
+          <li>Open <strong>APIs &amp; Services → Credentials → Create credentials → OAuth client
+              ID</strong>. Choose <strong>Web application</strong>. Under
+              <strong>Authorised redirect URIs</strong> add exactly:
+              <pre>https://developers.google.com/oauthplayground</pre>
+              Create it, and copy the <strong>Client ID</strong> and <strong>Client secret</strong>.</li>
+          <li>Go to <a href="https://developers.google.com/oauthplayground" rel="noopener">the OAuth
+              Playground</a>. Press the gear at the top right, tick <strong>Use your own OAuth
+              credentials</strong>, and paste the client ID and secret in.</li>
+          <li>In the left-hand list, ignore the categories and type this into the box marked
+              “Input your own scopes”:
+              <pre>https://www.googleapis.com/auth/gmail.send</pre>
+              Press <strong>Authorize APIs</strong>, sign in as your Gmail account and allow it.
+              Google warns that the app is not verified — that is expected; choose
+              <strong>Advanced → Go to (your app)</strong>.</li>
+          <li>Back in the Playground, press <strong>Exchange authorization code for tokens</strong>.
+              Copy the <strong>Refresh token</strong> — the long one starting <code>1//</code>.
+              It does not expire unless you revoke it.</li>
+          <li>Save four repository secrets:
+              <ul>
+                <li><code>MAIL_PROVIDER</code> = <code>gmail</code></li>
+                <li><code>MAIL_FROM</code> = how you want to appear, e.g.
+                    <code>Tai &lt;you@gmail.com&gt;</code> — the address must be the account you
+                    just authorised</li>
+                <li><code>GMAIL_CLIENT_ID</code> and <code>GMAIL_CLIENT_SECRET</code> from step 4</li>
+                <li><code>GMAIL_REFRESH_TOKEN</code> from step 7</li>
+              </ul>
+          </li>
+          <li>Deploy. <strong>Admin → Integrations</strong> should now show outbound email as
+              configured. Send a quote by email to test it.</li>
+        </ol>
+        <p class="hint">Gmail allows roughly 500 messages a day on a personal account and 2,000 on
+           Workspace — far above what a practice sends by hand, but not a bulk mailing tool. If you
+           ever need to send from <code>@yourdomain</code> rather than Gmail, the register also
+           speaks to Resend: set <code>MAIL_PROVIDER</code> to <code>resend</code> and supply
+           <code>RESEND_API_KEY</code> instead.</p>
+
+        <h4>Who triages what arrives</h4>
+        <p>Everything from every channel lands in <strong>Inbox</strong> first, verbatim, and
+           nothing is created from it automatically. That is deliberate: an inbound channel is an
+           address a stranger can write to, and no stranger should be able to put a record into a
+           client register unattended.</p>
+        <p>Anyone with the <strong>triage</strong> permission — Owner, Administrator, Specialist or
+           Assistant — can work the inbox. Each message offers three things: create an inquiry from
+           it, file it in the knowledge base, or ignore it. A message from a sender who is not on
+           that channel’s allow-list is flagged in orange, and the message is captured but nothing
+           is offered until a person decides.</p>
+        <p>In practice: whoever opens the office works the inbox each morning, converts genuine
+           enquiries into inquiries, files circulars into the knowledge base, and ignores the rest.
+           The <strong>Today</strong> screen shows how many are waiting.</p>`,
+    },
+    {
       id: 'admin',
       title: 'Administration',
       body: html`
@@ -383,7 +558,7 @@ export const helpModule: AppModule = {
     r.use('*', requireAuth);
 
     r.get('/', async (c) => {
-      const all = sections();
+      const all = sections(new URL(c.req.url).origin);
       return page(c, { title: 'Help', active: '/help' }, html`
         ${pageHeader('How to use the register',
           `A practical guide to the parts of this system. Version ${APP_VERSION}.`)}
