@@ -7,6 +7,58 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.12.0 — 28 August 2026
+
+### Added
+- **Itemised quotes.** A quote is now a list of lines — description, quantity,
+  unit, price per unit — rather than one description and one figure, which is
+  not what a client receives from a professional practice.
+  - Professional fees and disbursements are shown and totalled separately on
+    the printed quote, because a client is entitled to see what is the
+    practice's fee and what is money passed through on their behalf.
+  - Subtotal, GST and total payable. The GST line is omitted entirely when
+    nothing on the quote carries any, rather than printing a zero.
+  - Quantities are stored in thousandths, so a quarter of an hour is exactly
+    250 rather than a float that multiplies into a rounding error. The quantity
+    is applied and rounded once, then GST separated from that single figure —
+    doing it the other way multiplies the rounding error by the quantity.
+  - Each line keeps the GST rate that applied when it was written, so reopening
+    an old quote shows the arithmetic that was actually sent.
+- **A catalogue of standard items** behind the description dropdown, at
+  Quotes → standard items: add, edit and retire. Choosing one fills the line in
+  (client-side, from data attributes — no request). A quote keeps its own copy
+  of the wording and price, so editing the catalogue never alters a quote
+  already sent. Items are retired rather than deleted.
+- **Validity as a date, never a number of days.** Set the date of issue and how
+  long the quote stands; the register works out the last day, counted
+  **inclusive of the day of issue** — issued on the 28th, seven days means good
+  through the 3rd. Both are stored on the quote, so changing the practice
+  default later does not silently rewrite what a client was promised.
+- **Practice GST number and postal address** on every quote, from
+  Settings → Practice.
+- **Settings → Quotes**: default validity, the capacity wording ("subject to our
+  capacity to accept the work at the time you accept it"), payment wording, and
+  the default unit.
+
+### Changed
+- **Converting a quote to case fees copies one fee line per quote line** instead
+  of two lumps, and marks only professional fees as included in the revenue
+  split. Disbursements are never apportioned — splitting them would hand the
+  practice a share of somebody else's fee.
+- The covering email is itemised to match the printed quote, with figures
+  aligned for a plain-text mail client and a long description taking its own
+  line rather than being truncated.
+
+### Fixed
+- `/quotes/catalogue` was being matched by the `/:id` route and returning 404.
+  Routes are matched in registration order; the literal path now comes first.
+
+### Documentation
+- The manual explains itemising, the fee/disbursement distinction and why it
+  matters to the split, standard items, and how validity is counted.
+- The role descriptions on Admin → Users moved out of the form's column layout,
+  where they collided with the text beside them, into their own block below it.
+
 ## 0.11.0 — 28 August 2026
 
 ### Added

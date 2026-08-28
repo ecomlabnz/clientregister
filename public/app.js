@@ -48,6 +48,38 @@
     }
   }
 
+  // Choosing a standard item on a quote fills the rest of the line in. The
+  // values ride on the option's data attributes, so this costs no request and
+  // works the moment the page is painted. Without scripting the dropdown still
+  // records which catalogue item was meant; the typist just fills the rest in.
+  Array.prototype.forEach.call(document.querySelectorAll('.js-quote-line'), function (form) {
+    var picker = form.querySelector('.js-catalogue');
+    if (!picker) return;
+    picker.addEventListener('change', function () {
+      var option = picker.options[picker.selectedIndex];
+      if (!option || !option.value) return;
+      var set = function (name, value) {
+        var input = form.querySelector('[name="' + name + '"]');
+        // Never overwrite something the person has already typed.
+        if (input && (!input.value || input.dataset.fromCatalogue === '1')) {
+          input.value = value;
+          input.dataset.fromCatalogue = '1';
+        }
+      };
+      var force = function (name, value) {
+        var input = form.querySelector('[name="' + name + '"]');
+        if (input) input.value = value;
+      };
+      force('description', option.getAttribute('data-description') || option.textContent.trim());
+      force('kind', option.getAttribute('data-kind') || 'professional');
+      force('unit_label', option.getAttribute('data-unit') || 'item');
+      force('gst_treatment', option.getAttribute('data-gst') || 'exclusive');
+      var amount = option.getAttribute('data-amount');
+      if (amount && amount !== '0.00') force('unit_amount', amount);
+      else set('unit_amount', '');
+    });
+  });
+
   // Print buttons. Declared with data-print rather than an inline handler,
   // because the content security policy forbids inline script.
   Array.prototype.forEach.call(document.querySelectorAll('[data-print]'), function (button) {

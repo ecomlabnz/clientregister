@@ -7,9 +7,9 @@
  */
 
 import { Hono } from 'hono';
-import type { AppContext } from '../../types';
+import type { AppContext, Env } from '../../types';
 import type { AppModule } from '../../core/module';
-import { all, nextRef, nowIso, one, run } from '../../core/db';
+import { all, count, nextRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
@@ -25,17 +25,115 @@ import { QUOTE_STATUS_LABELS, QUOTE_STATUSES, type QuoteStatus } from '../../dom
 import { clientOptions } from '../../core/lookups';
 import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
-import { computeGst, GST_TREATMENT_LABELS, GST_TREATMENTS, type GstTreatment } from '../../core/fees';
+import {
+  computeGst, FEE_KIND_LABELS, FEE_KINDS, GST_TREATMENT_LABELS, GST_TREATMENTS,
+  type FeeKind, type GstTreatment,
+} from '../../core/fees';
+import {
+  computeLine, formatQuantity, parseQuantityToMilli, pluraliseUnit, summariseQuote, validUntil,
+  type QuoteTotals,
+} from '../../core/quotes';
+import { asInteger, readSettings, type SettingsGroup } from '../../core/settings';
 import { feeSettings } from '../fees';
 import { practiceDetails } from '../../core/practice';
 import { mailConfigured } from '../../mail/provider';
 import { flushQueue, queueEmail } from '../../mail/queue';
+
+export const QUOTE_SETTINGS: SettingsGroup = {
+  id: 'quotes',
+  title: 'Quotes',
+  description: 'How quotes are put together and how long they stand.',
+  order: 35,
+  settings: [
+    { key: 'quotes.validity_days', type: 'integer', label: 'A quote stands for (days)', default: '7',
+      min: 1, max: 365,
+      help: 'Counted inclusive of the day it is issued — issued on the 28th, seven days means it is good through the 3rd. The quote shows the date, never a number of days, so the client does not have to work it out.' },
+    { key: 'quotes.capacity_note', type: 'text', label: 'Capacity wording', maxLength: 400,
+      default: 'This quote is subject to our capacity to accept the work at the time you accept it.',
+      help: 'Printed on every quote beneath the total. Leave blank to omit it.' },
+    { key: 'quotes.payment_terms', type: 'text', label: 'Payment wording', maxLength: 400,
+      default: 'Fees are payable in advance into the practice trust account. Disbursements are payable as they fall due.',
+      help: 'Printed on every quote. Leave blank to omit it.' },
+    { key: 'quotes.default_unit_label', type: 'string', label: 'Default unit', default: 'item', maxLength: 30,
+      help: 'What one of something is called when a line does not say otherwise.' },
+  ],
+};
+
+export interface QuoteSettings {
+  validityDays: number;
+  capacityNote: string;
+  paymentTerms: string;
+  defaultUnitLabel: string;
+}
+
+export async function quoteSettings(env: Env): Promise<QuoteSettings> {
+  const values = await readSettings(env, QUOTE_SETTINGS.settings);
+  return {
+    validityDays: asInteger(values['quotes.validity_days'], 7),
+    capacityNote: values['quotes.capacity_note'] ?? '',
+    paymentTerms: values['quotes.payment_terms'] ?? '',
+    defaultUnitLabel: values['quotes.default_unit_label'] || 'item',
+  };
+}
+
+export interface ServiceItemRow {
+  id: string; name: string; description: string | null; kind: FeeKind;
+  unit_label: string; unit_amount_cents: number; gst_treatment: GstTreatment;
+  active: number; sort_order: number;
+}
+
+export interface QuoteItemRow {
+  id: string; quote_id: string; position: number; service_item_id: string | null;
+  description: string; kind: FeeKind; unit_label: string; quantity_milli: number;
+  unit_amount_cents: number; gst_treatment: GstTreatment; gst_rate_bp: number;
+  net_cents: number; gst_cents: number; gross_cents: number;
+}
+
+export async function quoteLines(env: Env, quoteId: string): Promise<QuoteItemRow[]> {
+  return all<QuoteItemRow>(
+    env.DB,
+    'SELECT * FROM quote_items WHERE quote_id = ? ORDER BY position, created_at',
+    quoteId,
+  );
+}
+
+export async function catalogue(env: Env, includeRetired = false): Promise<ServiceItemRow[]> {
+  return all<ServiceItemRow>(
+    env.DB,
+    `SELECT * FROM service_items ${includeRetired ? '' : 'WHERE active = 1'}
+      ORDER BY sort_order, name`,
+  );
+}
+
+/**
+ * Recalculate the header figures from the lines.
+ *
+ * `quotes.amount_cents`, `gst_cents` and `disbursements_cents` remain the
+ * columns every list, dashboard and conversion-to-fees already reads. Rather
+ * than change all of that, the lines are the truth and these are kept in step
+ * with them after every edit — one place that writes them, so they cannot
+ * disagree with the itemisation a client was sent.
+ */
+export async function refreshQuoteTotals(env: Env, quoteId: string): Promise<QuoteTotals> {
+  const lines = await quoteLines(env, quoteId);
+  const totals = summariseQuote(lines.map((l) => ({
+    kind: l.kind, lineAmountCents: l.unit_amount_cents, netCents: l.net_cents,
+    gstCents: l.gst_cents, grossCents: l.gross_cents,
+  })));
+  await run(
+    env.DB,
+    `UPDATE quotes SET amount_cents = ?, gst_cents = ?, disbursements_cents = ?, updated_at = ? WHERE id = ?`,
+    totals.feesNetCents, totals.gstCents, totals.disbursementsNetCents, nowIso(), quoteId,
+  );
+  return totals;
+}
 
 export interface QuoteRow {
   id: string; ref: string; client_id: string | null; case_id: string | null; inquiry_id: string | null;
   description: string; amount_cents: number; gst_cents: number; disbursements_cents: number;
   currency: string; status: QuoteStatus; valid_until: string | null; sent_at: string | null;
   responded_at: string | null; notes: string | null; created_at: string; updated_at: string;
+  issued_on: string | null; validity_days: number | null;
 }
 
 function quoteTotal(q: Pick<QuoteRow, 'amount_cents' | 'gst_cents' | 'disbursements_cents'>): number {
@@ -50,22 +148,59 @@ function quoteTotal(q: Pick<QuoteRow, 'amount_cents' | 'gst_cents' | 'disburseme
 function defaultQuoteEmail(
   q: QuoteRow & { client_name: string | null },
   practice: { legalName: string; termsLabel: string; termsUrl: string; contactEmail: string; contactPhone: string },
+  items: QuoteItemRow[] = [],
+  capacityNote = '',
 ): string {
+  const totals = summariseQuote(items.map((l) => ({
+    kind: l.kind, lineAmountCents: l.unit_amount_cents,
+    netCents: l.net_cents, gstCents: l.gst_cents, grossCents: l.gross_cents,
+  })));
+
+  // Padded so the figures line up in a plain-text mail client, which is where a
+  // quote is most often read. A description longer than the column takes its own
+  // line rather than being cut off — a truncated description on a fee quote is
+  // worse than an untidy one.
+  const WIDTH = 58;
+  const row = (label: string, amount: number) => {
+    const figure = money(amount, q.currency).padStart(12);
+    return label.length <= WIDTH ? `${label.padEnd(WIDTH)}${figure}` : `${label}\n${''.padEnd(WIDTH)}${figure}`;
+  };
+  const itemRow = (l: QuoteItemRow) => {
+    const qty = l.quantity_milli === 1000
+      ? ''
+      : ` (${formatQuantity(l.quantity_milli)} ${pluraliseUnit(l.unit_label, l.quantity_milli)} × ${money(l.unit_amount_cents, q.currency)})`;
+    return row(`  ${l.description}${qty}`, l.net_cents);
+  };
+
+  const fees = items.filter((l) => l.kind === 'professional');
+  const disbursements = items.filter((l) => l.kind !== 'professional');
+
   const lines = [
     `Dear ${q.client_name ?? 'Sir or Madam'},`,
     '',
-    `Thank you for your enquiry. I am pleased to quote for the following work:`,
+    'Thank you for your enquiry. I am pleased to quote for the following work:',
     '',
     q.description,
     '',
-    `Professional fee:   ${money(q.amount_cents, q.currency)}`,
-    `GST:                ${money(q.gst_cents, q.currency)}`,
-    `Disbursements:      ${money(q.disbursements_cents, q.currency)}`,
-    `Total payable:      ${money(quoteTotal(q), q.currency)}`,
-    '',
   ];
 
+  if (fees.length) lines.push('Professional fees', ...fees.map(itemRow), '');
+  if (disbursements.length) {
+    lines.push('Disbursements — paid on your behalf', ...disbursements.map(itemRow), '');
+  }
+  lines.push(row('Subtotal', totals.subtotalNetCents));
+  if (totals.hasGst) lines.push(row('GST', totals.gstCents));
+  lines.push(row('Total payable', totals.totalCents), '');
+
   if (q.valid_until) lines.push(`This quote is valid until ${dateShort(q.valid_until)}.`, '');
+  if (capacityNote) lines.push(capacityNote, '');
+  if (disbursements.length) {
+    lines.push(
+      'Disbursements are amounts paid to third parties on your behalf and are passed',
+      'on to you without margin.',
+      '',
+    );
+  }
 
   if (practice.termsUrl) {
     lines.push(
@@ -94,6 +229,7 @@ export const quotesModule: AppModule = {
   title: 'Quotes',
   basePaths: ['/quotes'],
   nav: [{ href: '/quotes', label: 'Quotes', permission: 'register:read', order: 60 }],
+  settings: [QUOTE_SETTINGS],
 
   register(app) {
     const r = new Hono<AppContext>();
@@ -145,15 +281,15 @@ export const quotesModule: AppModule = {
 
     r.get('/new', requirePermission('quote:write'), async (c) => {
       const csrf = c.get('session')!.csrf;
-      const clients = await clientOptions(c.env);
-      const settings = await feeSettings(c.env);
+      const [clients, qs] = await Promise.all([clientOptions(c.env), quoteSettings(c.env)]);
       const presetClient = c.req.query('client_id') ?? '';
       const presetCase = c.req.query('case_id') ?? '';
       const presetInquiry = c.req.query('inquiry_id') ?? '';
+      const today = nowIso().slice(0, 10);
 
       return page(c, { title: 'New quote', active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { label: 'New' }])}
-        ${pageHeader('New quote')}
+        ${pageHeader('New quote', 'Start with who it is for and what it covers. The items go on next.')}
         <form method="post" action="/quotes" class="form-grid">
           ${csrfField(csrf)}
           <input type="hidden" name="case_id" value="${presetCase}">
@@ -161,25 +297,23 @@ export const quotesModule: AppModule = {
           <div class="form-section">
             <h3>Who and what</h3>
             ${select({ label: 'Client', name: 'client_id', value: presetClient, options: clients, includeBlank: 'No client yet' })}
-            ${field({ label: 'Description', name: 'description', required: true, maxlength: 500,
-                      placeholder: 'e.g. Partnership work visa — preparation and lodgement' })}
+            ${field({ label: 'Scope', name: 'description', required: true, maxlength: 500,
+                      placeholder: 'e.g. Partnership work visa — preparation and lodgement',
+                      hint: 'One line describing the work. The itemisation comes next.' })}
           </div>
           <div class="form-section">
-            <h3>Money</h3>
-            ${field({ label: 'Professional fee', name: 'amount', required: true, placeholder: '2500.00' })}
-            ${select({ label: 'GST treatment', name: 'gst_treatment',
-                       value: settings.gstRegistered ? settings.defaultTreatment : 'none', includeBlank: false,
-                       options: optionsFrom(GST_TREATMENTS, GST_TREATMENT_LABELS) })}
-            ${field({ label: 'Disbursements (INZ fees, medicals)', name: 'disbursements', placeholder: '0.00',
-                      hint: 'Passed through at cost; no GST is added by this register.' })}
-            ${field({ label: 'Valid until', name: 'valid_until', type: 'date' })}
+            <h3>Validity</h3>
+            ${field({ label: 'Date of issue', name: 'issued_on', type: 'date', value: today })}
+            ${field({ label: 'Stands for (days)', name: 'validity_days', value: String(qs.validityDays), maxlength: 3,
+                      hint: `Counted inclusive of the day of issue, so ${qs.validityDays} days from ${today} means it is good through ${validUntil(today, qs.validityDays)}. The quote prints that date, not a number of days.` })}
           </div>
           <div class="form-section">
             <h3>Notes</h3>
-            ${field({ label: 'Internal notes', name: 'notes', type: 'textarea', rows: 4, maxlength: 4000 })}
+            ${field({ label: 'Internal notes', name: 'notes', type: 'textarea', rows: 4, maxlength: 4000,
+                      hint: 'For the file. Never printed on the quote.' })}
           </div>
           <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Create quote</button>
+            <button class="btn btn-primary" type="submit">Create and add items</button>
             <a class="btn btn-secondary" href="/quotes">Cancel</a>
           </div>
         </form>`);
@@ -187,34 +321,35 @@ export const quotesModule: AppModule = {
 
     r.post('/', requirePermission('quote:write'), async (c) => {
       const user = c.get('user')!;
-      const settings = await feeSettings(c.env);
+      const qs = await quoteSettings(c.env);
       const f = new FormReader(await c.req.formData());
       const clientId = f.optional('client_id', { max: 60 });
       const caseId = f.optional('case_id', { max: 60 });
       const inquiryId = f.optional('inquiry_id', { max: 60 });
-      const description = f.text('description', { required: true, label: 'Description', max: 500 });
-      const amount = f.money('amount', { required: true, label: 'Professional fee' });
-      const treatment = f.enum('gst_treatment', GST_TREATMENTS, { fallback: settings.defaultTreatment })! as GstTreatment;
-      const disbursements = f.money('disbursements') ?? 0;
-      const validUntil = f.date('valid_until');
+      const description = f.text('description', { required: true, label: 'Scope', max: 500 });
+      const issuedOn = f.date('issued_on') ?? nowIso().slice(0, 10);
+      const days = f.int('validity_days', { min: 1, max: 365 }) ?? qs.validityDays;
       const notes = f.optional('notes', { max: 4000 });
-      if (!f.valid || amount === null) return redirectWith(c, '/quotes/new', Object.values(f.errors)[0] ?? 'Invalid quote.', 'err');
+      if (!f.valid) return redirectWith(c, '/quotes/new', Object.values(f.errors)[0] ?? 'Invalid quote.', 'err');
 
-      const rateBp = settings.gstRegistered ? settings.gstRateBp : 0;
-      const { net, gst } = computeGst(amount, treatment, rateBp);
+      // The date is worked out and stored now. A quote that says "valid for
+      // 7 days" makes the reader do arithmetic from a date they have to find
+      // first, and they will do it differently from you.
+      const until = validUntil(issuedOn, days);
 
       const id = newId('quo');
       const ref = await nextRef(c.env.DB, 'quote', 'Q');
       await run(
         c.env.DB,
         `INSERT INTO quotes (id, ref, client_id, case_id, inquiry_id, description, amount_cents, gst_cents,
-            disbursements_cents, currency, status, valid_until, notes, created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?, 'NZD', 'draft', ?,?,?,?,?)`,
+            disbursements_cents, currency, status, issued_on, validity_days, valid_until, notes,
+            created_at, updated_at, created_by)
+         VALUES (?,?,?,?,?,?, 0, 0, 0, 'NZD', 'draft', ?,?,?,?,?,?,?)`,
         id, ref, clientId || null, caseId || null, inquiryId || null, description,
-        net, gst, disbursements, validUntil, notes, nowIso(), nowIso(), user.id,
+        issuedOn, days, until, notes, nowIso(), nowIso(), user.id,
       );
       await addEntry(c.env, { entityType: 'quote', entityId: id, kind: 'system',
-        body: `Quote ${ref} drafted — ${money(net + gst + disbursements)} total.`, createdBy: user.id });
+        body: `Quote ${ref} started — valid until ${until}.`, createdBy: user.id });
       if (clientId) {
         await addEntry(c.env, { entityType: 'client', entityId: clientId, kind: 'system',
           body: `Quote ${ref} drafted: ${description}.`, createdBy: user.id });
@@ -223,7 +358,120 @@ export const quotesModule: AppModule = {
         await run(c.env.DB, `UPDATE inquiries SET status = 'quoted', updated_at = ? WHERE id = ? AND status IN ('new','triaged','responded')`, nowIso(), inquiryId);
       }
       await auditFrom(c, { action: 'quote.created', entityType: 'quote', entityId: id, meta: { ref } });
-      return redirectWith(c, `/quotes/${id}`, `Quote ${ref} created.`);
+      return redirectWith(c, `/quotes/${id}`, `Quote ${ref} started. Add the items below.`);
+    });
+
+    // Registered before the ':id' routes below: Hono matches in the order
+    // routes are added, so '/catalogue' would otherwise be read as a quote id.
+    // --- The catalogue behind the description dropdown ----------------------
+
+    r.get('/catalogue', requirePermission('quote:write'), async (c) => {
+      const items = await catalogue(c.env, true);
+      const csrf = c.get('session')!.csrf;
+      const fees = await feeSettings(c.env);
+      const qs = await quoteSettings(c.env);
+      const editing = c.req.query('edit');
+      const item = editing ? items.find((i) => i.id === editing) ?? null : null;
+
+      return page(c, { title: 'Standard items', active: '/quotes' }, html`
+        ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { label: 'Standard items' }])}
+        ${pageHeader('Standard items',
+          'The things this practice quotes for, and what they usually cost. Choosing one on a quote fills the line in; the quote then keeps its own copy, so changing a price here never alters a quote already sent.')}
+
+        ${table(['Item', 'Type', 'Unit', 'Usual price', 'GST', ''], items.map((it) => html`
+          <tr class="${it.active ? '' : 'row-muted'}">
+            <td><span class="strong">${it.name}</span>
+              ${it.description ? html`<div class="muted small">${it.description}</div>` : ''}</td>
+            <td class="small">${FEE_KIND_LABELS[it.kind]}</td>
+            <td class="small">${it.unit_label}</td>
+            <td class="num">${it.unit_amount_cents ? money(it.unit_amount_cents) : html`<span class="muted">not set</span>`}</td>
+            <td class="small">${GST_TREATMENT_LABELS[it.gst_treatment]}</td>
+            <td>
+              <a class="btn btn-small btn-secondary" href="/quotes/catalogue?edit=${it.id}">Edit</a>
+              ${actionButton(`/quotes/catalogue/${it.id}/toggle`, csrf, it.active ? 'Retire' : 'Restore',
+                { className: 'btn btn-small btn-link' })}
+            </td>
+          </tr>`))}
+
+        ${card(item ? `Edit “${item.name}”` : 'Add a standard item', html`
+          <form method="post" action="${item ? `/quotes/catalogue/${item.id}` : '/quotes/catalogue'}" class="form-grid">
+            ${csrfField(csrf)}
+            <div class="form-section">
+              ${field({ label: 'Name', name: 'name', required: true, maxlength: 120, value: item?.name,
+                        hint: 'What appears in the dropdown.' })}
+              ${field({ label: 'Description', name: 'description', type: 'textarea', rows: 2, maxlength: 300,
+                        value: item?.description,
+                        hint: 'What is written on the quote line. Left blank, the name is used.' })}
+            </div>
+            <div class="form-section">
+              ${select({ label: 'Type', name: 'kind', value: item?.kind ?? 'professional', includeBlank: false,
+                         options: optionsFrom(FEE_KINDS, FEE_KIND_LABELS),
+                         hint: 'Only professional fees are apportioned in the revenue split. Disbursements are passed through whole.' })}
+              ${field({ label: 'Unit', name: 'unit_label', maxlength: 30,
+                        value: item?.unit_label ?? qs.defaultUnitLabel,
+                        hint: 'hour, application, response, item…' })}
+              ${field({ label: 'Usual price per unit', name: 'unit_amount',
+                        value: item ? (item.unit_amount_cents / 100).toFixed(2) : '',
+                        placeholder: '0.00', hint: 'Leave blank if it varies every time.' })}
+              ${select({ label: 'GST', name: 'gst_treatment',
+                         value: item?.gst_treatment ?? (fees.gstRegistered ? fees.defaultTreatment : 'none'),
+                         includeBlank: false, options: optionsFrom(GST_TREATMENTS, GST_TREATMENT_LABELS) })}
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" type="submit">${item ? 'Save changes' : 'Add item'}</button>
+              ${item ? html`<a class="btn btn-secondary" href="/quotes/catalogue">Cancel</a>` : ''}
+            </div>
+          </form>`)}`);
+    });
+
+    r.post('/catalogue', requirePermission('quote:write'), async (c) => {
+      const f = new FormReader(await c.req.formData());
+      const fields = readCatalogueForm(f);
+      if (!f.valid) return redirectWith(c, '/quotes/catalogue', Object.values(f.errors)[0]!, 'err');
+      const now = nowIso();
+      try {
+        await run(
+          c.env.DB,
+          `INSERT INTO service_items (id, name, description, kind, unit_label, unit_amount_cents,
+              gst_treatment, active, sort_order, created_at, updated_at, created_by)
+           VALUES (?,?,?,?,?,?,?,1,100,?,?,?)`,
+          newId('svc'), fields.name, fields.description, fields.kind, fields.unitLabel,
+          fields.unitAmount, fields.treatment, now, now, c.get('user')!.id,
+        );
+      } catch {
+        // The unique index on the name is what refuses a duplicate; saying so
+        // is more use than the generic error page.
+        return redirectWith(c, '/quotes/catalogue', `There is already an item called “${fields.name}”.`, 'err');
+      }
+      await auditFrom(c, { action: 'quote.catalogue_added', entityType: 'service_item', meta: { name: fields.name } });
+      return redirectWith(c, '/quotes/catalogue', `Added “${fields.name}”.`);
+    });
+
+    r.post('/catalogue/:itemId', requirePermission('quote:write'), async (c) => {
+      const itemId = c.req.param('itemId')!;
+      const f = new FormReader(await c.req.formData());
+      const fields = readCatalogueForm(f);
+      if (!f.valid) return redirectWith(c, `/quotes/catalogue?edit=${itemId}`, Object.values(f.errors)[0]!, 'err');
+      await run(
+        c.env.DB,
+        `UPDATE service_items SET name = ?, description = ?, kind = ?, unit_label = ?,
+            unit_amount_cents = ?, gst_treatment = ?, updated_at = ? WHERE id = ?`,
+        fields.name, fields.description, fields.kind, fields.unitLabel,
+        fields.unitAmount, fields.treatment, nowIso(), itemId,
+      );
+      await auditFrom(c, { action: 'quote.catalogue_updated', entityType: 'service_item', entityId: itemId,
+        meta: { name: fields.name } });
+      return redirectWith(c, '/quotes/catalogue', 'Saved.');
+    });
+
+    r.post('/catalogue/:itemId/toggle', requirePermission('quote:write'), async (c) => {
+      const itemId = c.req.param('itemId')!;
+      // Retired rather than deleted: quotes that used it keep their own copy of
+      // the wording and the price, and reporting can still resolve the link.
+      await run(c.env.DB,
+        'UPDATE service_items SET active = 1 - active, updated_at = ? WHERE id = ?', nowIso(), itemId);
+      await auditFrom(c, { action: 'quote.catalogue_toggled', entityType: 'service_item', entityId: itemId });
+      return redirectWith(c, '/quotes/catalogue', 'Updated.');
     });
 
     r.get('/:id', requirePermission('register:read'), async (c) => {
@@ -239,12 +487,20 @@ export const quotesModule: AppModule = {
       );
       if (!q) return c.notFound();
 
-      const [entries, terms] = await Promise.all([
+      const [entries, terms, lines, items, fees, qSettings] = await Promise.all([
         listEntries(c.env, 'quote', id),
         practiceDetails(c.env),
+        quoteLines(c.env, id),
+        catalogue(c.env),
+        feeSettings(c.env),
+        quoteSettings(c.env),
       ]);
       const csrf = c.get('session')!.csrf;
       const writable = can(c.get('user'), 'quote:write');
+      const totals = summariseQuote(lines.map((l) => ({
+        kind: l.kind, lineAmountCents: l.unit_amount_cents,
+        netCents: l.net_cents, gstCents: l.gst_cents, grossCents: l.gross_cents,
+      })));
 
       return page(c, { title: q.ref, active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { label: q.ref }])}
@@ -269,12 +525,77 @@ export const quotesModule: AppModule = {
                      </div>`
               : ''}
 
-            ${card('Amounts', table(['Item', 'Amount'], [
-              html`<tr><td>Professional fee (net)</td><td class="num">${money(q.amount_cents, q.currency)}</td></tr>`,
-              html`<tr><td>GST</td><td class="num">${money(q.gst_cents, q.currency)}</td></tr>`,
-              html`<tr><td>Disbursements</td><td class="num">${money(q.disbursements_cents, q.currency)}</td></tr>`,
-              html`<tr class="totals-row"><td class="strong">Total payable</td><td class="num strong">${money(quoteTotal(q), q.currency)}</td></tr>`,
-            ]))}
+            ${card('Items', html`
+              ${lines.length === 0
+                ? emptyState('No lines yet. Add the first one below.')
+                : table(['Description', 'Qty', 'Unit', 'Amount', 'GST', ''], [
+                    ...lines.map((l) => html`
+                      <tr>
+                        <td>
+                          <span class="strong">${l.description}</span>
+                          <div class="muted small">${FEE_KIND_LABELS[l.kind]}</div>
+                        </td>
+                        <td class="num">${formatQuantity(l.quantity_milli)}
+                          <div class="muted small">${pluraliseUnit(l.unit_label, l.quantity_milli)}</div></td>
+                        <td class="num">${money(l.unit_amount_cents, q.currency)}</td>
+                        <td class="num strong">${money(l.net_cents, q.currency)}</td>
+                        <td class="num">${l.gst_cents ? money(l.gst_cents, q.currency)
+                          : html`<span class="muted">—</span>`}</td>
+                        <td>${writable
+                          ? actionButton(`/quotes/${q.id}/items/${l.id}/remove`, csrf, 'Remove',
+                              { className: 'btn btn-link-danger btn-small',
+                                confirm: `Remove “${l.description}” from this quote?` })
+                          : ''}</td>
+                      </tr>`),
+                    html`<tr class="totals-row">
+                      <td colspan="3">Professional fees</td>
+                      <td class="num strong">${money(totals.feesNetCents, q.currency)}</td><td colspan="2"></td></tr>`,
+                    ...(totals.disbursementsNetCents !== 0 ? [html`<tr class="totals-row">
+                      <td colspan="3">Disbursements</td>
+                      <td class="num strong">${money(totals.disbursementsNetCents, q.currency)}</td><td colspan="2"></td></tr>`] : []),
+                    html`<tr class="totals-row">
+                      <td colspan="3">Subtotal</td>
+                      <td class="num strong">${money(totals.subtotalNetCents, q.currency)}</td><td colspan="2"></td></tr>`,
+                    ...(totals.hasGst ? [html`<tr class="totals-row">
+                      <td colspan="3">GST</td>
+                      <td class="num strong">${money(totals.gstCents, q.currency)}</td><td colspan="2"></td></tr>`] : []),
+                    html`<tr class="totals-row">
+                      <td colspan="3" class="strong">Total payable</td>
+                      <td class="num strong">${money(totals.totalCents, q.currency)}</td><td colspan="2"></td></tr>`,
+                  ])}
+
+              ${writable ? html`
+                <details class="add-block" ${lines.length === 0 ? raw('open') : ''}>
+                  <summary>Add a line</summary>
+                  <form method="post" action="/quotes/${q.id}/items" class="row-form js-quote-line">
+                    ${csrfField(csrf)}
+                    <div class="field">
+                      <label for="f_service_item_id">From the catalogue</label>
+                      <select id="f_service_item_id" name="service_item_id" class="js-catalogue">
+                        <option value="">— type it in below —</option>
+                        ${items.map((it) => html`<option value="${it.id}"
+                            data-description="${it.description || it.name}"
+                            data-kind="${it.kind}"
+                            data-unit="${it.unit_label}"
+                            data-amount="${(it.unit_amount_cents / 100).toFixed(2)}"
+                            data-gst="${it.gst_treatment}">${it.name}${it.unit_amount_cents
+                              ? ` — ${money(it.unit_amount_cents, q.currency)}/${it.unit_label}` : ''}</option>`)}
+                      </select>
+                      <p class="hint">Choosing one fills the rest in; you can still change anything.
+                         Manage the list under <a href="/quotes/catalogue">standard items</a>.</p>
+                    </div>
+                    ${field({ label: 'Description', name: 'description', required: true, maxlength: 300 })}
+                    ${field({ label: 'Quantity', name: 'quantity', value: '1', required: true, maxlength: 10 })}
+                    ${field({ label: 'Unit', name: 'unit_label', value: qSettings.defaultUnitLabel, maxlength: 30 })}
+                    ${field({ label: 'Price per unit', name: 'unit_amount', required: true, placeholder: '0.00' })}
+                    ${select({ label: 'Type', name: 'kind', value: 'professional', includeBlank: false,
+                               options: optionsFrom(FEE_KINDS, FEE_KIND_LABELS) })}
+                    ${select({ label: 'GST', name: 'gst_treatment',
+                               value: fees.gstRegistered ? fees.defaultTreatment : 'none',
+                               includeBlank: false, options: optionsFrom(GST_TREATMENTS, GST_TREATMENT_LABELS) })}
+                    <button class="btn btn-primary" type="submit">Add line</button>
+                  </form>
+                </details>` : ''}`)}
 
             ${writable && q.case_id && q.status === 'accepted' ? card('Record as case fees', html`
               <p>Copy this quote onto case <code>${q.case_ref}</code> as fee lines, so the money is tracked and split.</p>
@@ -307,10 +628,25 @@ export const quotesModule: AppModule = {
                 <dt>Client</dt><dd>${q.client_id ? html`<a href="/clients/${q.client_id}">${q.client_name}</a>` : '—'}</dd>
                 <dt>Case</dt><dd>${q.case_id ? html`<a href="/cases/${q.case_id}"><code>${q.case_ref}</code></a>` : '—'}</dd>
                 <dt>Inquiry</dt><dd>${q.inquiry_id ? html`<a href="/inquiries/${q.inquiry_id}"><code>${q.inquiry_ref}</code></a>` : '—'}</dd>
-                <dt>Valid until</dt><dd>${dateShort(q.valid_until)}</dd>
+                <dt>Issued</dt><dd>${dateShort(q.issued_on)}</dd>
+                <dt>Valid until</dt><dd>${q.valid_until
+                  ? html`${dateShort(q.valid_until)}
+                         <div class="muted small">${q.validity_days ?? qSettings.validityDays} days including the day of issue</div>`
+                  : '—'}</dd>
                 <dt>Sent</dt><dd>${dateShort(q.sent_at)}</dd>
                 <dt>Answered</dt><dd>${dateShort(q.responded_at)}</dd>
-              </dl>`)}
+              </dl>
+              ${writable ? html`
+                <form method="post" action="/quotes/${q.id}/issue" class="mt">
+                  ${csrfField(csrf)}
+                  ${field({ label: 'Date of issue', name: 'issued_on', type: 'date',
+                            value: dateInputValue(q.issued_on ?? nowIso()) })}
+                  ${field({ label: 'Stands for (days)', name: 'validity_days',
+                            value: String(q.validity_days ?? qSettings.validityDays), maxlength: 3 })}
+                  <button class="btn btn-secondary btn-small" type="submit">Set validity</button>
+                  <p class="hint">Counted inclusive of the day of issue. The quote prints the date,
+                     not the number of days.</p>
+                </form>` : ''}`)}
 
             ${card('Notes', html`<p class="prewrap">${q.notes || '—'}</p>`)}
           </div>
@@ -332,8 +668,26 @@ export const quotesModule: AppModule = {
         id,
       );
       if (!q) return c.notFound();
-      const practice = await practiceDetails(c.env);
+      const [practice, lines, qs] = await Promise.all([
+        practiceDetails(c.env), quoteLines(c.env, id), quoteSettings(c.env),
+      ]);
+      const totals = summariseQuote(lines.map((l) => ({
+        kind: l.kind, lineAmountCents: l.unit_amount_cents,
+        netCents: l.net_cents, gstCents: l.gst_cents, grossCents: l.gross_cents,
+      })));
+      const issuedOn = q.issued_on ?? q.created_at.slice(0, 10);
+      const validTo = q.valid_until ?? validUntil(issuedOn, q.validity_days ?? qs.validityDays);
+      const fees = lines.filter((l) => l.kind === 'professional');
+      const disbursements = lines.filter((l) => l.kind !== 'professional');
       await auditFrom(c, { action: 'quote.printed', entityType: 'quote', entityId: id });
+
+      const lineRows = (rows: QuoteItemRow[]) => rows.map((l) => html`
+        <tr>
+          <td>${l.description}</td>
+          <td class="num">${formatQuantity(l.quantity_milli)} ${pluraliseUnit(l.unit_label, l.quantity_milli)}</td>
+          <td class="num">${money(l.unit_amount_cents, q.currency)}</td>
+          <td class="num">${money(l.net_cents, q.currency)}</td>
+        </tr>`);
 
       return page(c, { title: `Quote ${q.ref}`, bare: true }, html`
         <article class="quote-doc">
@@ -341,47 +695,88 @@ export const quotesModule: AppModule = {
             <div>
               <h1>${practice.legalName}</h1>
               ${practice.adviserDetails ? html`<p class="prewrap small">${practice.adviserDetails}</p>` : ''}
+              ${practice.postalAddress ? html`<p class="prewrap small">${practice.postalAddress}</p>` : ''}
               <p class="small">
                 ${practice.contactEmail ? html`${practice.contactEmail}<br>` : ''}
-                ${practice.contactPhone ?? ''}
+                ${practice.contactPhone ? html`${practice.contactPhone}<br>` : ''}
+                ${practice.gstNumber ? html`GST number ${practice.gstNumber}` : ''}
               </p>
             </div>
             <div class="quote-doc-ref">
               <h2>Fee quote</h2>
-              <p class="small"><strong>${q.ref}</strong><br>
-                 ${dateShort(q.created_at)}
-                 ${q.valid_until ? html`<br>Valid until ${dateShort(q.valid_until)}` : ''}</p>
+              <dl class="quote-doc-meta">
+                <dt>Quote</dt><dd class="strong">${q.ref}</dd>
+                <dt>Issued</dt><dd>${dateShort(issuedOn)}</dd>
+                <dt>Valid until</dt><dd class="strong">${dateShort(validTo)}</dd>
+                ${q.case_ref ? html`<dt>Matter</dt><dd>${q.case_ref}</dd>` : ''}
+              </dl>
             </div>
           </header>
 
           <section>
             <h3>Prepared for</h3>
-            <p>${q.client_name ?? '—'}${q.case_ref ? html`<br><span class="muted small">Matter ${q.case_ref}</span>` : ''}</p>
+            <p class="strong">${q.client_name ?? '—'}</p>
           </section>
 
-          <section>
-            <h3>Scope</h3>
-            <p class="prewrap">${q.description}</p>
-          </section>
+          ${q.description ? html`
+            <section>
+              <h3>Scope</h3>
+              <p class="prewrap">${q.description}</p>
+            </section>` : ''}
 
+          ${lines.length === 0
+            ? html`<p class="muted">No items have been added to this quote yet.</p>`
+            : html`
           <table class="quote-doc-table">
+            <thead>
+              <tr><th>Description</th><th class="num">Quantity</th><th class="num">Unit price</th><th class="num">Amount</th></tr>
+            </thead>
             <tbody>
-              <tr><td>Professional fee</td><td class="num">${money(q.amount_cents, q.currency)}</td></tr>
-              <tr><td>GST</td><td class="num">${money(q.gst_cents, q.currency)}</td></tr>
-              <tr><td>Disbursements</td><td class="num">${money(q.disbursements_cents, q.currency)}</td></tr>
-              <tr class="totals-row"><td class="strong">Total payable</td>
-                  <td class="num strong">${money(quoteTotal(q), q.currency)}</td></tr>
+              ${fees.length ? html`
+                <tr class="quote-doc-group"><td colspan="4">Professional fees</td></tr>
+                ${lineRows(fees)}` : ''}
+              ${disbursements.length ? html`
+                <tr class="quote-doc-group"><td colspan="4">Disbursements — paid on your behalf</td></tr>
+                ${lineRows(disbursements)}` : ''}
             </tbody>
-          </table>
+            <tfoot>
+              ${fees.length && disbursements.length ? html`
+                <tr><td colspan="3">Professional fees</td>
+                    <td class="num">${money(totals.feesNetCents, q.currency)}</td></tr>
+                <tr><td colspan="3">Disbursements</td>
+                    <td class="num">${money(totals.disbursementsNetCents, q.currency)}</td></tr>` : ''}
+              <tr><td colspan="3">Subtotal</td>
+                  <td class="num">${money(totals.subtotalNetCents, q.currency)}</td></tr>
+              ${totals.hasGst
+                ? html`<tr><td colspan="3">GST</td>
+                           <td class="num">${money(totals.gstCents, q.currency)}</td></tr>`
+                : html`<tr><td colspan="4" class="small muted">No GST applies to this quote.</td></tr>`}
+              <tr class="totals-row">
+                <td colspan="3" class="strong">Total payable</td>
+                <td class="num strong">${money(totals.totalCents, q.currency)}</td></tr>
+            </tfoot>
+          </table>`}
 
-          ${practice.termsUrl
-            ? html`<section class="quote-doc-terms">
-                     <h3>Terms of engagement</h3>
-                     <p>This quote is given on the <strong>${practice.termsLabel}</strong>, which may
-                        be downloaded from:</p>
-                     <p class="break-url"><a href="${practice.termsUrl}">${practice.termsUrl}</a></p>
-                   </section>`
-            : ''}
+          <section class="quote-doc-terms">
+            <h3>Conditions</h3>
+            <ul class="quote-doc-conditions">
+              <li>This quote is valid until <strong>${dateShort(validTo)}</strong>.</li>
+              ${qs.capacityNote ? html`<li>${qs.capacityNote}</li>` : ''}
+              ${qs.paymentTerms ? html`<li>${qs.paymentTerms}</li>` : ''}
+              ${disbursements.length
+                ? html`<li>Disbursements are amounts paid to third parties on your behalf and are
+                           passed on to you without margin. Where an exact figure is not yet known,
+                           the amount shown is an estimate and you will be told before it is
+                           incurred.</li>`
+                : ''}
+              ${practice.termsUrl
+                ? html`<li>This quote is given on the <strong>${practice.termsLabel}</strong>, which
+                           may be downloaded from
+                           <span class="break-url"><a href="${practice.termsUrl}">${practice.termsUrl}</a></span>.
+                           Please read those terms before accepting.</li>`
+                : ''}
+            </ul>
+          </section>
 
           <footer class="quote-doc-foot no-print">
             <button class="btn btn-primary" data-print type="button">Print this quote</button>
@@ -401,7 +796,9 @@ export const quotesModule: AppModule = {
       );
       if (!q) return c.notFound();
 
-      const practice = await practiceDetails(c.env);
+      const [practice, items, qs] = await Promise.all([
+        practiceDetails(c.env), quoteLines(c.env, id), quoteSettings(c.env),
+      ]);
       const csrf = c.get('session')!.csrf;
       const configured = mailConfigured(c.env);
 
@@ -425,7 +822,7 @@ export const quotesModule: AppModule = {
             ${field({ label: 'Subject', name: 'subject', required: true, maxlength: 200,
                       value: `Fee quote ${q.ref} — ${q.description}`.slice(0, 200) })}
             ${field({ label: 'Message', name: 'body', type: 'textarea', rows: 16, required: true,
-                      maxlength: 10000, value: defaultQuoteEmail(q, practice) })}
+                      maxlength: 10000, value: defaultQuoteEmail(q, practice, items, qs.capacityNote) })}
             <div class="field checkbox-field">
               <label><input type="checkbox" name="mark_sent" checked>
                 Mark this quote as sent</label>
@@ -605,6 +1002,92 @@ export const quotesModule: AppModule = {
     });
 
     /** Turn an accepted quote into fee lines on its case. */
+
+    // --- Quote lines --------------------------------------------------------
+
+    r.post('/:id/items', requirePermission('quote:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const q = await one<QuoteRow>(c.env.DB, 'SELECT * FROM quotes WHERE id = ?', id);
+      if (!q) return c.notFound();
+
+      const fees = await feeSettings(c.env);
+      const qs = await quoteSettings(c.env);
+      const f = new FormReader(await c.req.formData());
+
+      const description = f.text('description', { required: true, label: 'Description', max: 300 });
+      const unitAmount = f.money('unit_amount', { required: true, label: 'Price per unit' });
+      const quantity = parseQuantityToMilli(f.text('quantity', { max: 10 }) || '1');
+      const kind = f.enum('kind', FEE_KINDS, { fallback: 'professional' })!;
+      const treatment = f.enum('gst_treatment', GST_TREATMENTS, { fallback: 'exclusive' })!;
+      const serviceItemId = f.optional('service_item_id', { max: 40 });
+      if (!f.valid) return redirectWith(c, `/quotes/${id}`, Object.values(f.errors)[0]!, 'err');
+      if (quantity === null) {
+        return redirectWith(c, `/quotes/${id}`, 'Give the quantity as a number, e.g. 1, 2 or 0.25.', 'err');
+      }
+
+      // The rate is stamped on the line, not looked up later, so reopening an
+      // old quote shows the arithmetic that was actually sent.
+      const gstRateBp = fees.gstRegistered && treatment !== 'none' ? fees.gstRateBp : 0;
+      const amounts = computeLine({
+        quantityMilli: quantity, unitAmountCents: unitAmount!,
+        gstTreatment: fees.gstRegistered ? treatment : 'none', gstRateBp,
+      });
+
+      const nextPosition = await count(c.env.DB,
+        'SELECT COALESCE(MAX(position), -1) + 1 AS n FROM quote_items WHERE quote_id = ?', id);
+      const now = nowIso();
+      await run(
+        c.env.DB,
+        `INSERT INTO quote_items (id, quote_id, position, service_item_id, description, kind, unit_label,
+            quantity_milli, unit_amount_cents, gst_treatment, gst_rate_bp,
+            net_cents, gst_cents, gross_cents, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        newId('qit'), id, nextPosition, serviceItemId || null, description, kind,
+        f.optional('unit_label', { max: 30 }) || qs.defaultUnitLabel,
+        quantity, unitAmount, fees.gstRegistered ? treatment : 'none', gstRateBp,
+        amounts.netCents, amounts.gstCents, amounts.grossCents, now, now,
+      );
+
+      const totals = await refreshQuoteTotals(c.env, id);
+      await auditFrom(c, { action: 'quote.line_added', entityType: 'quote', entityId: id,
+        meta: { description, total: totals.totalCents } });
+      return redirectWith(c, `/quotes/${id}`, `Added “${description}”.`);
+    });
+
+    r.post('/:id/items/:itemId/remove', requirePermission('quote:write'), async (c) => {
+      const id = c.req.param('id')!;
+      await run(c.env.DB, 'DELETE FROM quote_items WHERE id = ? AND quote_id = ?', c.req.param('itemId')!, id);
+      await refreshQuoteTotals(c.env, id);
+      await auditFrom(c, { action: 'quote.line_removed', entityType: 'quote', entityId: id });
+      return redirectWith(c, `/quotes/${id}`, 'Line removed.');
+    });
+
+    /**
+     * Set the date of issue and how long the quote stands.
+     *
+     * Both are stored on the quote rather than read from settings at print
+     * time: a quote already given to a client promised a particular date, and
+     * changing the practice's default afterwards must not silently rewrite it.
+     */
+    r.post('/:id/issue', requirePermission('quote:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const qs = await quoteSettings(c.env);
+      const f = new FormReader(await c.req.formData());
+      const issuedOn = f.date('issued_on') ?? nowIso().slice(0, 10);
+      const days = f.int('validity_days', { min: 1, max: 365 }) ?? qs.validityDays;
+      if (!f.valid) return redirectWith(c, `/quotes/${id}`, Object.values(f.errors)[0]!, 'err');
+
+      const until = validUntil(issuedOn, days);
+      await run(
+        c.env.DB,
+        'UPDATE quotes SET issued_on = ?, validity_days = ?, valid_until = ?, updated_at = ? WHERE id = ?',
+        issuedOn, days, until, nowIso(), id,
+      );
+      await auditFrom(c, { action: 'quote.validity_set', entityType: 'quote', entityId: id,
+        meta: { issuedOn, days, until } });
+      return redirectWith(c, `/quotes/${id}`, `Valid until ${until}.`);
+    });
+
     r.post('/:id/to-fees', requirePermission('register:write'), async (c) => {
       const id = c.req.param('id')!;
       const user = c.get('user')!;
@@ -617,27 +1100,41 @@ export const quotesModule: AppModule = {
       );
       if ((existing?.n ?? 0) > 0) return redirectWith(c, `/quotes/${id}`, 'This quote has already been copied to case fees.', 'err');
 
-      const settings = await feeSettings(c.env);
-      const rateBp = settings.gstRegistered ? settings.gstRateBp : 0;
-      const stmts: D1PreparedStatement[] = [];
-      const insert = (description: string, kind: string, net: number, gst: number, includeInSplit: number) =>
-        c.env.DB.prepare(
+      const lines = await quoteLines(c.env, id);
+      if (lines.length === 0) return redirectWith(c, `/quotes/${id}`, 'This quote has no items to record.', 'err');
+
+      // One fee line per quote line, not one lump. The quote's itemisation is
+      // what the client agreed to, so it is what the case should show — and it
+      // is the only way the split can be right, because only professional fees
+      // are apportioned. Disbursements are money passed through on the client's
+      // behalf; apportioning them would hand the practice a share of somebody
+      // else's fee.
+      const stmts: D1PreparedStatement[] = lines.map((l) => {
+        const quantity = l.quantity_milli === 1000
+          ? ''
+          : ` (${formatQuantity(l.quantity_milli)} ${pluraliseUnit(l.unit_label, l.quantity_milli)} × ${money(l.unit_amount_cents, q.currency)})`;
+        return c.env.DB.prepare(
           `INSERT INTO fee_items (id, case_id, description, kind, amount_cents, gst_treatment, gst_rate_bp,
              net_cents, gst_cents, gross_cents, currency, include_in_split, status, notes, created_at, updated_at, created_by)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'quoted',?,?,?,?)`,
         ).bind(
-          newId('fee'), q.case_id, description, kind, net, gst > 0 ? 'exclusive' : 'none', gst > 0 ? rateBp : 0,
-          net, gst, net + gst, q.currency, includeInSplit, `From quote ${q.ref}`, nowIso(), nowIso(), user.id,
+          newId('fee'), q.case_id, `${l.description}${quantity}`, l.kind,
+          l.unit_amount_cents === l.net_cents ? l.net_cents : l.net_cents,
+          l.gst_treatment, l.gst_rate_bp,
+          l.net_cents, l.gst_cents, l.gross_cents, q.currency,
+          l.kind === 'professional' ? 1 : 0,
+          `From quote ${q.ref}`, nowIso(), nowIso(), user.id,
         );
-
-      stmts.push(insert(q.description, 'professional', q.amount_cents, q.gst_cents, 1));
-      if (q.disbursements_cents > 0) {
-        stmts.push(insert(`Disbursements (quote ${q.ref})`, 'disbursement', q.disbursements_cents, 0, 0));
-      }
+      });
       await c.env.DB.batch(stmts);
 
+      const totals = summariseQuote(lines.map((l) => ({
+        kind: l.kind, lineAmountCents: l.unit_amount_cents,
+        netCents: l.net_cents, gstCents: l.gst_cents, grossCents: l.gross_cents,
+      })));
       await addEntry(c.env, { entityType: 'case', entityId: q.case_id, kind: 'system',
-        body: `Fees recorded from quote ${q.ref} — ${money(quoteTotal(q), q.currency)} total.`, createdBy: user.id });
+        body: `Fees recorded from quote ${q.ref} — ${lines.length} line(s), ${money(totals.totalCents, q.currency)} total.`,
+        createdBy: user.id });
       await auditFrom(c, { action: 'quote.copied_to_fees', entityType: 'quote', entityId: id, meta: { caseId: q.case_id } });
       return redirectWith(c, `/cases/${q.case_id}`, `Fees recorded from quote ${q.ref}.`);
     });
@@ -645,3 +1142,16 @@ export const quotesModule: AppModule = {
     app.route('/quotes', r);
   },
 };
+
+/** The catalogue form, read the same way whether adding or editing. */
+function readCatalogueForm(f: FormReader) {
+  const name = f.text('name', { required: true, label: 'Name', max: 120 });
+  return {
+    name,
+    description: f.optional('description', { max: 300 }),
+    kind: f.enum('kind', FEE_KINDS, { fallback: 'professional' })!,
+    unitLabel: f.optional('unit_label', { max: 30 }) || 'item',
+    unitAmount: f.money('unit_amount') ?? 0,
+    treatment: f.enum('gst_treatment', GST_TREATMENTS, { fallback: 'exclusive' })!,
+  };
+}
