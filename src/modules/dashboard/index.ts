@@ -20,6 +20,7 @@ import {
   INQUIRY_STATUS_LABELS, OPEN_CASE_STATUSES, PRIORITY_LABELS, TASK_STATUS_LABELS,
 } from '../../domain';
 import { can } from '../../core/rbac';
+import { documentAlerts } from '../alerts';
 
 export const dashboardModule: AppModule = {
   name: 'dashboard',
@@ -36,7 +37,7 @@ export const dashboardModule: AppModule = {
       const today = new Date().toISOString().slice(0, 10);
       const openPlaceholders = OPEN_CASE_STATUSES.map(() => '?').join(',');
 
-      const [deadlines, overdueTasks, newInquiries, pendingInbox, myCases, statusCounts, sentQuotes, unpaid] =
+      const [deadlines, overdueTasks, newInquiries, pendingInbox, myCases, statusCounts, sentQuotes, unpaid, expiring] =
         await Promise.all([
           all<any>(
             c.env.DB,
@@ -84,6 +85,7 @@ export const dashboardModule: AppModule = {
             c.env.DB,
             `SELECT COALESCE(SUM(gross_cents), 0) AS total FROM fee_items WHERE status = 'invoiced'`,
           ),
+          documentAlerts(c.env, 90),
         ]);
 
       const openTotal = statusCounts.reduce((s, row) => s + row.n, 0);
@@ -100,6 +102,8 @@ export const dashboardModule: AppModule = {
             <span class="stat-label">Tasks due</span><span class="stat-value">${overdueTasks.length}</span></div>
           <div class="stat ${pendingInbox ? 'stat-warn' : ''}">
             <span class="stat-label">Inbox</span><span class="stat-value">${pendingInbox}</span></div>
+          <div class="stat ${expiring.some((e) => e.severity !== 'soon') ? 'stat-warn' : ''}">
+            <span class="stat-label">Documents expiring</span><span class="stat-value">${expiring.length}</span></div>
           <div class="stat"><span class="stat-label">Invoiced unpaid</span><span class="stat-value">${money(outstanding)}</span></div>
         </div>
 
@@ -145,6 +149,15 @@ export const dashboardModule: AppModule = {
           </div>
 
           <div class="col-side">
+            ${card('Documents expiring', expiring.length === 0
+              ? emptyState('No passports, visas, police or medical certificates expiring in the next 90 days.')
+              : html`
+                <ul class="list">${expiring.slice(0, 8).map((e) => html`
+                  <li><a href="${e.href}">${e.title}</a>
+                      <div class="muted small ${e.severity === 'overdue' ? 'warn' : ''}">
+                        ${dateShort(e.date)} · ${relativeDays(e.date)}</div></li>`)}</ul>
+                <p class="hint"><a href="/alerts">See every deadline and expiry</a></p>`)}
+
             ${card('New inquiries', newInquiries.length === 0 ? emptyState('Nothing new.') : html`
               <ul class="list">${newInquiries.map((i: any) => html`
                 <li><a href="/inquiries/${i.id}">${truncate(i.subject ?? i.contact_name ?? i.ref, 44)}</a>

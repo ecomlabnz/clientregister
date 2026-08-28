@@ -9,6 +9,7 @@
 import type { AppModule } from './core/module';
 import { authModule } from './modules/auth';
 import { dashboardModule } from './modules/dashboard';
+import { alertsModule } from './modules/alerts';
 import { clientsModule } from './modules/clients';
 import { casesModule } from './modules/cases';
 import { feesModule } from './modules/fees';
@@ -22,6 +23,7 @@ import { adminModule } from './modules/admin';
 export const registeredModules: AppModule[] = [
   authModule,
   dashboardModule,
+  alertsModule,
   inboxModule,
   inquiriesModule,
   clientsModule,

@@ -22,6 +22,7 @@ import { dateTime, truncate } from '../../ui/format';
 import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../core/rbac';
 import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABELS, SPLIT_BASES } from '../../core/fees';
 import { isAiEnabled } from '../../ai/provider';
+import { nzbnConfigured } from '../../integrations/nzbn';
 import { mailConfigured } from '../../mail/provider';
 import { flushQueue } from '../../mail/queue';
 import { registeredModules } from '../../registry';
@@ -80,6 +81,8 @@ export const adminModule: AppModule = {
             'Forward messages to your bot. Webhook: /api/ingest/telegram'),
           statusRow('WhatsApp', Boolean(env.WHATSAPP_APP_SECRET && env.WHATSAPP_VERIFY_TOKEN),
             'Meta Cloud API webhook: /api/ingest/whatsapp'),
+          statusRow('NZBN register lookup', nzbnConfigured(env),
+            'NZBN_API_KEY — free key from portal.api.business.govt.nz. Lets you create a company client from the register.'),
           statusRow('AI layer', isAiEnabled(env),
             `AI_PROVIDER=${env.AI_PROVIDER ?? 'none'} — suggestions only, never applied automatically.`),
           statusRow('Outbound email', mailConfigured(env),

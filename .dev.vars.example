@@ -26,6 +26,13 @@ WHATSAPP_ALLOWED_SENDERS=
 # stored as untrusted and requires manual triage.
 INGEST_EMAIL_ALLOWED_SENDERS=
 
+# --- NZBN register lookup (optional) ---
+# Free subscriber key from https://portal.api.business.govt.nz
+# Register, subscribe to the NZBN API, then copy the subscription key.
+NZBN_API_KEY=
+# Set to true to point at the sandbox while testing.
+NZBN_USE_SANDBOX=
+
 # --- Outbound email (optional, disabled until set) ---
 # Provider: "resend" or "none".
 MAIL_PROVIDER=none

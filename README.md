@@ -13,7 +13,10 @@ in from email, Telegram and WhatsApp so nothing sits unread in a phone.
 
 | Area | What you get |
 |---|---|
-| **Clients** | Contact details, nationality, current visa and expiry, an encrypted passport field, a full timeline. |
+| **Clients** | People (given names and family name kept separate) or organisations (NZBN and Companies Office number). Nationality, visa, an encrypted passport field, and a full timeline. |
+| **Document expiry** | Passport, current visa, police certificate, medical certificate and chest x-ray dates, all watched. |
+| **Alerts** | One page for everything with a date: case deadlines, overdue tasks, expiring quotes and expiring documents, ordered by how soon they bite. |
+| **NZBN lookup** | Optional. Create a company client from MBIE's business register instead of retyping its details. |
 | **Cases** | 16-status lifecycle with enforced transitions, INZ application/client numbers, lodgement and deadline dates, priority, owner, next action. |
 | **Fees** | Per-case fee lines with GST treatment per line (exclusive / inclusive / none), disbursements kept separate, and an adjustable revenue split between you and the admin team — allocated to the cent. |
 | **Quotes** | Draft → sent → accepted/declined/expired, with one-click conversion of an accepted quote into case fee lines. |

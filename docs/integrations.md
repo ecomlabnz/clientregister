@@ -115,6 +115,46 @@ them.
 
 ---
 
+## NZBN register lookup
+
+MBIE publishes New Zealand's business registers as APIs at
+[portal.api.business.govt.nz](https://portal.api.business.govt.nz). Several are
+offered; for this register the right one is the **NZBN API**, because it is the
+one that answers "who is this company, officially": it covers every company and
+other entity type on the Companies Office registers, all public sector
+entities, and the sole traders, partnerships and trusts that have registered
+for an NZBN. The others are narrower — the Companies Register API for
+company-specific register operations, Companies Entity Role Search for finding
+directors and shareholders by name, PPSR for security interests, and the
+Insolvency Register.
+
+Two of those are worth knowing about for later. **Companies Entity Role Search**
+would let you check who the directors and shareholders of an employer actually
+are, which is exactly the question accreditation and job-check work raises. The
+**Insolvency Register** speaks to whether an employer is viable. Neither is
+wired up; say the word and either is a small addition on the same key.
+
+**Setting it up:**
+
+1. Register at [portal.api.business.govt.nz](https://portal.api.business.govt.nz).
+2. Subscribe to the **NZBN** API. It is free.
+3. Copy your subscription key.
+4. Add it as the repository secret `NZBN_API_KEY`, then re-run the Deploy workflow.
+
+To test against MBIE's sandbox first, also set `NZBN_USE_SANDBOX` to `true`
+(with a sandbox subscription key).
+
+**How to use it.** Clients → **New from NZBN register**, search by company name
+or paste a 13-digit NZBN, and create the client from the registered details —
+legal name, NZBN, Companies Office number, registered address and any published
+contact details. A company already on file is recognised by its NZBN rather
+than duplicated.
+
+Without the key nothing breaks: the NZBN and Companies Office number fields are
+on the ordinary client form and can be typed in.
+
+---
+
 ## The AI layer
 
 Off by default. It reads an inbound message and suggests contact details, a

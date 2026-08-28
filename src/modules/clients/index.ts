@@ -2,8 +2,17 @@
  * Module: clients.
  *
  * The person or organisation the practice acts for. A client owns cases,
- * quotes, inquiries and a timeline. Passport numbers are the one field held
- * encrypted at rest, and reading one is an audited action.
+ * quotes, inquiries and a timeline.
+ *
+ * Two shapes share the table. An individual has given names and a family name
+ * kept separate, plus the identity documents and compliance dates a matter
+ * depends on. An organisation has a registered name, an NZBN and a Companies
+ * Office number, and can be looked up against the NZBN register rather than
+ * retyped. `full_name` is the single display name and is derived from
+ * whichever shape applies, so the parts and the whole cannot disagree.
+ *
+ * Passport numbers are the one field held encrypted at rest, and reading one
+ * is an audited action.
  */
 
 import { Hono } from 'hono';
@@ -21,7 +30,7 @@ import {
   actionButton, badge, card, csrfField, emptyState, errorList, field, optionsFrom,
   pageHeader, select, statusTone, table,
 } from '../../ui/components';
-import { dateInputValue, dateShort, dateTime, money, truncate } from '../../ui/format';
+import { dateInputValue, dateShort, dateTime, isOverdue, money, relativeDays, truncate } from '../../ui/format';
 import {
   CASE_STATUS_LABELS, CASE_TYPE_LABELS, CLIENT_STATUSES, CLIENT_STATUS_LABELS,
   ENTRY_KINDS, ENTRY_KIND_LABELS, QUOTE_STATUS_LABELS, type ClientStatus,
@@ -29,12 +38,23 @@ import {
 import { userOptions } from '../../core/lookups';
 import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
+import { composeFullName, splitFullName, type ClientKind } from '../../core/names';
+import {
+  fetchEntity, isValidNzbnFormat, normaliseNzbn, nzbnConfigured, searchEntities,
+} from '../../integrations/nzbn';
 
 export interface ClientRow {
-  id: string; ref: string; kind: string; full_name: string; preferred_name: string | null;
+  id: string; ref: string; kind: ClientKind; full_name: string; preferred_name: string | null;
+  given_names: string | null; family_name: string | null;
+  nzbn: string | null; company_number: string | null;
   email: string | null; phone: string | null; whatsapp: string | null;
   telegram_username: string | null; telegram_user_id: string | null;
   nationality: string | null; date_of_birth: string | null; passport_sealed: string | null;
+  passport_country: string | null; passport_expiry: string | null;
+  police_certificate_date: string | null; police_certificate_expiry: string | null;
+  police_certificate_country: string | null;
+  medical_certificate_date: string | null; medical_certificate_expiry: string | null;
+  chest_xray_expiry: string | null;
   current_visa_type: string | null; current_visa_expiry: string | null;
   address: string | null; status: ClientStatus; assigned_to: string | null; notes: string | null;
   created_at: string; updated_at: string; created_by: string | null;
@@ -42,29 +62,72 @@ export interface ClientRow {
 
 const PAGE_SIZE = 25;
 
-function clientForm(c: any, values: Partial<ClientRow>, users: Array<{ value: string; label: string }>, errors?: Record<string, string>): Raw {
+/** Show a date with a warning when it has passed or is close. */
+function expiryCell(value: string | null, warnDays = 90): Raw {
+  if (!value) return html`<span class="muted">—</span>`;
+  const due = Date.parse(value);
+  const soon = !Number.isNaN(due) && due - Date.now() < warnDays * 86_400_000;
+  return html`<span class="${isOverdue(value) ? 'warn' : ''}">${dateShort(value)}</span>
+    ${soon ? html`<div class="muted small">${relativeDays(value)}</div>` : ''}`;
+}
+
+function clientForm(
+  c: any,
+  values: Partial<ClientRow>,
+  users: Array<{ value: string; label: string }>,
+  errors?: Record<string, string>,
+): Raw {
   const csrf = c.get('session').csrf;
   const sealingAvailable = Boolean(c.env.FIELD_KEY);
   const action = values.id ? `/clients/${values.id}` : '/clients';
+  const kind: ClientKind = values.kind ?? 'individual';
+
+  // Records created before names were split have no parts stored. Suggest a
+  // split so the form can be confirmed rather than retyped — the guess is only
+  // ever shown, never saved without someone accepting it.
+  const suggested = values.id && kind === 'individual' && !values.family_name
+    ? splitFullName(values.full_name)
+    : null;
+  const givenNames = values.given_names ?? suggested?.givenNames ?? '';
+  const familyName = values.family_name ?? suggested?.familyName ?? '';
+
   return html`
     ${errorList(errors)}
-    <form method="post" action="${action}" class="form-grid">
+    ${suggested && (suggested.givenNames || suggested.familyName)
+      ? html`<div class="alert alert-warn">This record was created before names were kept in two
+               parts. We have suggested a split of “${values.full_name}” below — correct it if it
+               is wrong, then save.</div>`
+      : ''}
+    <form method="post" action="${action}" class="form-grid js-client-form">
       ${csrfField(csrf)}
       <div class="form-section">
-        <h3>Identity</h3>
-        ${select({ label: 'Record type', name: 'kind', value: values.kind ?? 'individual', includeBlank: false,
-                   options: [{ value: 'individual', label: 'Individual' }, { value: 'organisation', label: 'Organisation' }] })}
-        ${field({ label: 'Full legal name', name: 'full_name', value: values.full_name, required: true, maxlength: 200 })}
-        ${field({ label: 'Preferred name', name: 'preferred_name', value: values.preferred_name, maxlength: 120 })}
-        ${field({ label: 'Nationality', name: 'nationality', value: values.nationality, maxlength: 100 })}
-        ${field({ label: 'Date of birth', name: 'date_of_birth', type: 'date', value: dateInputValue(values.date_of_birth) })}
-        ${sealingAvailable
-          ? field({ label: 'Passport number', name: 'passport_number', value: '',
-                    hint: values.passport_sealed
-                      ? 'A passport number is on file (encrypted). Enter a new one to replace it, or leave blank to keep it.'
-                      : 'Stored encrypted at rest. Leave blank if not needed.' })
-          : html`<div class="field"><label>Passport number</label>
-                 <p class="hint">Disabled: set the <code>FIELD_KEY</code> secret to store passport numbers encrypted.</p></div>`}
+        <h3>Who this is</h3>
+        ${select({ label: 'Record type', name: 'kind', value: kind, includeBlank: false,
+                   options: [{ value: 'individual', label: 'Individual' },
+                             { value: 'organisation', label: 'Company or organisation' }] })}
+
+        <div data-kind="individual">
+          ${field({ label: 'Given names', name: 'given_names', value: givenNames, maxlength: 120,
+                    hint: 'As they appear in the passport.' })}
+          ${field({ label: 'Family name', name: 'family_name', value: familyName, required: true, maxlength: 120 })}
+          ${field({ label: 'Preferred name', name: 'preferred_name', value: values.preferred_name, maxlength: 120,
+                    hint: 'What to call them in conversation, if different.' })}
+          ${field({ label: 'Nationality', name: 'nationality', value: values.nationality, maxlength: 100 })}
+          ${field({ label: 'Date of birth', name: 'date_of_birth', type: 'date', value: dateInputValue(values.date_of_birth) })}
+        </div>
+
+        <div data-kind="organisation">
+          ${field({ label: 'Registered name', name: 'organisation_name',
+                    value: kind === 'organisation' ? values.full_name : '', maxlength: 200,
+                    hint: 'Exactly as registered — the NZBN register is the authority.' })}
+          ${field({ label: 'NZBN', name: 'nzbn', value: values.nzbn, maxlength: 13,
+                    hint: '13 digits, starting 9429.' })}
+          ${field({ label: 'Companies Office number', name: 'company_number', value: values.company_number, maxlength: 30 })}
+          ${nzbnConfigured(c.env)
+            ? html`<p class="hint"><a href="/clients/lookup">Search the NZBN register</a> to create a
+                     company client from its registered details.</p>`
+            : ''}
+        </div>
       </div>
 
       <div class="form-section">
@@ -72,17 +135,38 @@ function clientForm(c: any, values: Partial<ClientRow>, users: Array<{ value: st
         ${field({ label: 'Email', name: 'email', type: 'email', value: values.email, maxlength: 320 })}
         ${field({ label: 'Phone', name: 'phone', value: values.phone, maxlength: 60 })}
         ${field({ label: 'WhatsApp number', name: 'whatsapp', value: values.whatsapp, maxlength: 60,
-                  hint: 'E.164 without the plus, e.g. 6421234567. Used to match incoming WhatsApp messages.' })}
+                  hint: 'Digits only with country code, e.g. 6421234567. Used to match incoming WhatsApp messages.' })}
         ${field({ label: 'Telegram username', name: 'telegram_username', value: values.telegram_username, maxlength: 60 })}
         ${field({ label: 'Telegram user ID', name: 'telegram_user_id', value: values.telegram_user_id, maxlength: 40,
                   hint: 'Numeric ID. Used to match forwarded Telegram messages.' })}
         ${field({ label: 'Address', name: 'address', type: 'textarea', value: values.address, rows: 3, maxlength: 500 })}
       </div>
 
-      <div class="form-section">
-        <h3>Immigration status</h3>
+      <div class="form-section" data-kind="individual">
+        <h3>Identity documents</h3>
+        ${sealingAvailable
+          ? field({ label: 'Passport number', name: 'passport_number', value: '',
+                    hint: values.passport_sealed
+                      ? 'A passport number is on file (encrypted). Enter a new one to replace it, or leave blank to keep it.'
+                      : 'Stored encrypted at rest.' })
+          : html`<div class="field"><label>Passport number</label>
+                 <p class="hint">Disabled: set the <code>FIELD_KEY</code> secret to store passport numbers encrypted.</p></div>`}
+        ${field({ label: 'Passport country', name: 'passport_country', value: values.passport_country, maxlength: 100 })}
+        ${field({ label: 'Passport expiry', name: 'passport_expiry', type: 'date', value: dateInputValue(values.passport_expiry),
+                  hint: 'Watched on the alerts page — a passport expiring mid-application stalls it.' })}
+      </div>
+
+      <div class="form-section" data-kind="individual">
+        <h3>Immigration and compliance</h3>
         ${field({ label: 'Current visa type', name: 'current_visa_type', value: values.current_visa_type, maxlength: 120 })}
         ${field({ label: 'Current visa expiry', name: 'current_visa_expiry', type: 'date', value: dateInputValue(values.current_visa_expiry) })}
+        ${field({ label: 'Police certificate country', name: 'police_certificate_country', value: values.police_certificate_country, maxlength: 100 })}
+        ${field({ label: 'Police certificate issued', name: 'police_certificate_date', type: 'date', value: dateInputValue(values.police_certificate_date) })}
+        ${field({ label: 'Police certificate expires', name: 'police_certificate_expiry', type: 'date', value: dateInputValue(values.police_certificate_expiry),
+                  hint: 'Certificates age out — INZ generally wants one issued within the last 6 months at lodgement.' })}
+        ${field({ label: 'Medical certificate date', name: 'medical_certificate_date', type: 'date', value: dateInputValue(values.medical_certificate_date) })}
+        ${field({ label: 'Medical certificate expires', name: 'medical_certificate_expiry', type: 'date', value: dateInputValue(values.medical_certificate_expiry) })}
+        ${field({ label: 'Chest x-ray expires', name: 'chest_xray_expiry', type: 'date', value: dateInputValue(values.chest_xray_expiry) })}
       </div>
 
       <div class="form-section">
@@ -100,10 +184,33 @@ function clientForm(c: any, values: Partial<ClientRow>, users: Array<{ value: st
     </form>`;
 }
 
+/**
+ * Read the client form. The required fields depend on which kind of client it
+ * is, and `full_name` is derived rather than accepted from the browser.
+ */
 function readClientForm(f: FormReader) {
+  const kind = f.enum('kind', ['individual', 'organisation'] as const, { fallback: 'individual' })!;
+
+  const givenNames = f.optional('given_names', { max: 120 });
+  const familyName = kind === 'individual'
+    ? f.text('family_name', { required: true, label: 'Family name', max: 120 })
+    : f.optional('family_name', { max: 120 }) ?? '';
+  const organisationName = kind === 'organisation'
+    ? f.text('organisation_name', { required: true, label: 'Registered name', max: 200 })
+    : '';
+
+  const nzbn = f.optional('nzbn', { max: 20 });
+  if (nzbn && !isValidNzbnFormat(nzbn)) {
+    f.errors['nzbn'] = 'An NZBN is 13 digits, starting 9429.';
+  }
+
   return {
-    kind: f.enum('kind', ['individual', 'organisation'] as const, { fallback: 'individual' })!,
-    full_name: f.text('full_name', { required: true, label: 'Full legal name', max: 200 }),
+    kind,
+    given_names: givenNames,
+    family_name: familyName || null,
+    full_name: composeFullName(kind, { givenNames, familyName }, organisationName),
+    nzbn: nzbn ? normaliseNzbn(nzbn) : null,
+    company_number: f.optional('company_number', { max: 30 }),
     preferred_name: f.optional('preferred_name', { max: 120 }),
     email: f.email('email'),
     phone: f.optional('phone', { max: 60 }),
@@ -112,6 +219,14 @@ function readClientForm(f: FormReader) {
     telegram_user_id: f.optional('telegram_user_id', { max: 40, pattern: /^\d+$/, patternMessage: 'Telegram user ID must be numeric.' }),
     nationality: f.optional('nationality', { max: 100 }),
     date_of_birth: f.date('date_of_birth'),
+    passport_country: f.optional('passport_country', { max: 100 }),
+    passport_expiry: f.date('passport_expiry'),
+    police_certificate_country: f.optional('police_certificate_country', { max: 100 }),
+    police_certificate_date: f.date('police_certificate_date'),
+    police_certificate_expiry: f.date('police_certificate_expiry'),
+    medical_certificate_date: f.date('medical_certificate_date'),
+    medical_certificate_expiry: f.date('medical_certificate_expiry'),
+    chest_xray_expiry: f.date('chest_xray_expiry'),
     current_visa_type: f.optional('current_visa_type', { max: 120 }),
     current_visa_expiry: f.date('current_visa_expiry'),
     address: f.optional('address', { max: 500 }),
@@ -142,7 +257,9 @@ export const clientsModule: AppModule = {
       const where: string[] = [];
       const params: unknown[] = [];
       if (q) {
-        where.push('(full_name LIKE ?1 OR email LIKE ?1 OR phone LIKE ?1 OR ref LIKE ?1 OR preferred_name LIKE ?1)');
+        where.push(`(full_name LIKE ?1 OR family_name LIKE ?1 OR given_names LIKE ?1
+                     OR email LIKE ?1 OR phone LIKE ?1 OR ref LIKE ?1
+                     OR preferred_name LIKE ?1 OR nzbn LIKE ?1 OR company_number LIKE ?1)`);
         params.push(`%${q}%`);
       }
       if (status && (CLIENT_STATUSES as readonly string[]).includes(status)) {
@@ -160,12 +277,18 @@ export const clientsModule: AppModule = {
       );
       const hasMore = rows.length > PAGE_SIZE;
       const shown = rows.slice(0, PAGE_SIZE);
+      const writable = can(c.get('user'), 'register:write');
 
       return page(c, { title: 'Clients', active: '/clients' }, html`
         ${pageHeader('Clients', 'Everyone the practice acts for.',
-          can(c.get('user'), 'register:write') ? html`<a class="btn btn-primary" href="/clients/new">New client</a>` : undefined)}
+          writable
+            ? html`<a class="btn btn-primary" href="/clients/new">New client</a>
+                   ${nzbnConfigured(c.env)
+                     ? html`<a class="btn btn-secondary" href="/clients/lookup">New from NZBN register</a>`
+                     : ''}`
+            : undefined)}
         <form method="get" action="/clients" class="filters">
-          <input type="search" name="q" value="${q}" placeholder="Search name, email, phone or reference">
+          <input type="search" name="q" value="${q}" placeholder="Search name, email, phone, reference or NZBN">
           <select name="status">
             <option value="">All statuses</option>
             ${CLIENT_STATUSES.map((s) => html`<option value="${s}" ${s === status ? raw('selected') : ''}>${CLIENT_STATUS_LABELS[s]}</option>`)}
@@ -176,7 +299,11 @@ export const clientsModule: AppModule = {
           <tr>
             <td><a href="/clients/${row.id}"><code>${row.ref}</code></a></td>
             <td><a href="/clients/${row.id}">${row.full_name}</a>
-                ${row.nationality ? html`<div class="muted small">${row.nationality}</div>` : ''}</td>
+                <div class="muted small">
+                  ${row.kind === 'organisation'
+                    ? html`Organisation${row.nzbn ? html` · NZBN ${row.nzbn}` : ''}`
+                    : row.nationality ?? ''}
+                </div></td>
             <td class="small">${row.email ?? ''}${row.email && row.phone ? raw('<br>') : ''}${row.phone ?? ''}</td>
             <td>${badge(CLIENT_STATUS_LABELS[row.status], statusTone(row.status))}</td>
             <td>${row.open_cases || '—'}</td>
@@ -191,10 +318,120 @@ export const clientsModule: AppModule = {
     // --- Create -------------------------------------------------------------
     r.get('/new', requirePermission('register:write'), async (c) => {
       const users = await userOptions(c.env);
+      const kind = c.req.query('kind') === 'organisation' ? 'organisation' : 'individual';
       return page(c, { title: 'New client', active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { label: 'New' }])}
         ${pageHeader('New client')}
-        ${clientForm(c, {}, users)}`);
+        ${clientForm(c, { kind }, users)}`);
+    });
+
+    // --- NZBN register lookup ----------------------------------------------
+    // Registered before '/:id' so the literal path is not read as an id.
+    r.get('/lookup', requirePermission('register:write'), async (c) => {
+      const term = (c.req.query('q') ?? '').trim();
+      const csrf = c.get('session')!.csrf;
+
+      if (!nzbnConfigured(c.env)) {
+        return page(c, { title: 'NZBN lookup', active: '/clients' }, html`
+          ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { label: 'NZBN lookup' }])}
+          ${pageHeader('NZBN register lookup', 'Not configured yet.')}
+          ${card('Connect the register', html`
+            <p>MBIE publishes the New Zealand Business Number register as a free API. Once
+               connected, you can search it by company name and create a client from the
+               registered details rather than retyping them.</p>
+            <ol>
+              <li>Register at <code>portal.api.business.govt.nz</code>.</li>
+              <li>Subscribe to the <strong>NZBN</strong> API and copy your subscription key.</li>
+              <li>Add it as the repository secret <code>NZBN_API_KEY</code> and re-run the Deploy workflow.</li>
+            </ol>
+            <p class="hint">Company clients can be recorded by hand in the meantime — the NZBN and
+               Companies Office number fields are on the ordinary client form.</p>`)}`);
+      }
+
+      let results: Awaited<ReturnType<typeof searchEntities>> = [];
+      let error: string | null = null;
+      if (term) {
+        try {
+          results = isValidNzbnFormat(normaliseNzbn(term))
+            ? [await fetchEntity(c.env, term)].filter((e): e is NonNullable<typeof e> => e !== null)
+            : await searchEntities(c.env, term);
+        } catch (err) {
+          error = err instanceof Error ? err.message : 'The NZBN register could not be reached.';
+        }
+      }
+
+      return page(c, { title: 'NZBN lookup', active: '/clients' }, html`
+        ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { label: 'NZBN lookup' }])}
+        ${pageHeader('NZBN register lookup', 'Search the register by company name or NZBN.')}
+        <form method="get" action="/clients/lookup" class="filters">
+          <input type="search" name="q" value="${term}" placeholder="Company name, or a 13-digit NZBN" autofocus>
+          <button class="btn btn-primary" type="submit">Search</button>
+        </form>
+        ${error ? html`<div class="alert alert-error">${error}</div>` : ''}
+        ${term && !error && results.length === 0
+          ? emptyState('Nothing on the register matched that.')
+          : ''}
+        ${results.length > 0
+          ? table(['Registered name', 'NZBN', 'Type', 'Status', ''], results.map((entity) => html`
+              <tr>
+                <td><strong>${entity.name}</strong>
+                    ${entity.address ? html`<div class="muted small">${entity.address}</div>` : ''}</td>
+                <td class="small"><code>${entity.nzbn}</code>
+                    ${entity.companyNumber ? html`<div class="muted">Co. ${entity.companyNumber}</div>` : ''}</td>
+                <td class="small">${entity.entityType ?? '—'}</td>
+                <td>${entity.entityStatus
+                  ? badge(entity.entityStatus, /regist|active/i.test(entity.entityStatus) ? 'green' : 'grey')
+                  : '—'}</td>
+                <td>${actionButton('/clients/lookup/create', csrf, 'Create client',
+                       { className: 'btn btn-small btn-primary', fields: { nzbn: entity.nzbn } })}</td>
+              </tr>`))
+          : ''}`);
+    });
+
+    r.post('/lookup/create', requirePermission('register:write'), async (c) => {
+      if (!nzbnConfigured(c.env)) return redirectWith(c, '/clients', 'The NZBN register is not configured.', 'err');
+      const user = c.get('user')!;
+      const f = new FormReader(await c.req.formData());
+      const nzbn = f.text('nzbn', { required: true, label: 'NZBN', max: 20 });
+      if (!f.valid) return redirectWith(c, '/clients/lookup', 'Choose an entity from the results.', 'err');
+
+      const existing = await one<{ id: string; ref: string }>(
+        c.env.DB, 'SELECT id, ref FROM clients WHERE nzbn = ?', normaliseNzbn(nzbn),
+      );
+      if (existing) {
+        return redirectWith(c, `/clients/${existing.id}`, `Already on file as ${existing.ref}.`);
+      }
+
+      let entity;
+      try {
+        entity = await fetchEntity(c.env, nzbn);
+      } catch (err) {
+        return redirectWith(c, `/clients/lookup?q=${encodeURIComponent(nzbn)}`,
+          err instanceof Error ? err.message : 'The NZBN register could not be reached.', 'err');
+      }
+      if (!entity) return redirectWith(c, '/clients/lookup', 'That entity is no longer on the register.', 'err');
+
+      const id = newId('cli');
+      const ref = await nextRef(c.env.DB, 'client', 'CL');
+      await run(
+        c.env.DB,
+        `INSERT INTO clients (id, ref, kind, full_name, nzbn, company_number, email, phone, address,
+            status, created_at, updated_at, created_by)
+         VALUES (?,?,'organisation',?,?,?,?,?,?, 'prospect', ?,?,?)`,
+        id, ref, entity.name, entity.nzbn, entity.companyNumber,
+        entity.emailAddress, entity.phoneNumber, entity.address,
+        nowIso(), nowIso(), user.id,
+      );
+      await addEntry(c.env, {
+        entityType: 'client', entityId: id, kind: 'system',
+        body: `Client created from the NZBN register: ${entity.name} (NZBN ${entity.nzbn}`
+          + `${entity.entityType ? `, ${entity.entityType}` : ''}`
+          + `${entity.entityStatus ? `, ${entity.entityStatus}` : ''}).`,
+        createdBy: user.id,
+      });
+      await auditFrom(c, { action: 'client.created_from_nzbn', entityType: 'client', entityId: id,
+        meta: { ref, nzbn: entity.nzbn } });
+      return redirectWith(c, `/clients/${id}`, `Client ${ref} created from the NZBN register.`);
     });
 
     r.post('/', requirePermission('register:write'), async (c) => {
@@ -215,18 +452,24 @@ export const clientsModule: AppModule = {
 
       await run(
         c.env.DB,
-        `INSERT INTO clients (id, ref, kind, full_name, preferred_name, email, phone, whatsapp,
-            telegram_username, telegram_user_id, nationality, date_of_birth, passport_sealed,
+        `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name, preferred_name,
+            nzbn, company_number, email, phone, whatsapp, telegram_username, telegram_user_id,
+            nationality, date_of_birth, passport_sealed, passport_country, passport_expiry,
+            police_certificate_country, police_certificate_date, police_certificate_expiry,
+            medical_certificate_date, medical_certificate_expiry, chest_xray_expiry,
             current_visa_type, current_visa_expiry, address, status, assigned_to, notes,
             created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        id, ref, v.kind, v.full_name, v.preferred_name, v.email, v.phone, v.whatsapp,
-        v.telegram_username, v.telegram_user_id, v.nationality, v.date_of_birth, passportSealed,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        id, ref, v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
+        v.nzbn, v.company_number, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
+        v.nationality, v.date_of_birth, passportSealed, v.passport_country, v.passport_expiry,
+        v.police_certificate_country, v.police_certificate_date, v.police_certificate_expiry,
+        v.medical_certificate_date, v.medical_certificate_expiry, v.chest_xray_expiry,
         v.current_visa_type, v.current_visa_expiry, v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), nowIso(), user.id,
       );
       await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system', body: `Client record created (${ref}).`, createdBy: user.id });
-      await auditFrom(c, { action: 'client.created', entityType: 'client', entityId: id, meta: { ref } });
+      await auditFrom(c, { action: 'client.created', entityType: 'client', entityId: id, meta: { ref, kind: v.kind } });
       return redirectWith(c, `/clients/${id}`, `Client ${ref} created.`);
     });
 
@@ -256,11 +499,13 @@ export const clientsModule: AppModule = {
 
       const csrf = c.get('session')!.csrf;
       const writable = can(c.get('user'), 'register:write');
+      const isOrg = client.kind === 'organisation';
 
       return page(c, { title: client.full_name, active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { label: client.ref }])}
         ${pageHeader(client.full_name,
-          `${client.ref} · ${CLIENT_STATUS_LABELS[client.status]}${client.assignee_name ? ` · ${client.assignee_name}` : ''}`,
+          `${client.ref} · ${isOrg ? 'Organisation' : 'Individual'} · ${CLIENT_STATUS_LABELS[client.status]}`
+            + `${client.assignee_name ? ` · ${client.assignee_name}` : ''}`,
           writable ? html`
             <a class="btn btn-secondary" href="/clients/${client.id}/edit">Edit</a>
             <a class="btn btn-primary" href="/cases/new?client_id=${client.id}">New case</a>
@@ -290,10 +535,8 @@ export const clientsModule: AppModule = {
               ${writable ? html`
               <form method="post" action="/clients/${client.id}/entries" class="entry-form">
                 ${csrfField(csrf)}
-                <div class="row">
-                  ${select({ label: 'Kind', name: 'kind', value: 'note', includeBlank: false,
-                             options: optionsFrom(ENTRY_KINDS.filter((k) => k !== 'system') as any, ENTRY_KIND_LABELS as any) })}
-                </div>
+                ${select({ label: 'Kind', name: 'kind', value: 'note', includeBlank: false,
+                           options: optionsFrom(ENTRY_KINDS.filter((k) => k !== 'system') as any, ENTRY_KIND_LABELS as any) })}
                 ${field({ label: 'Entry', name: 'body', type: 'textarea', rows: 3, required: true, maxlength: 5000,
                           placeholder: 'What happened, what was advised, what was agreed.' })}
                 <button class="btn btn-primary" type="submit">Add to timeline</button>
@@ -314,6 +557,10 @@ export const clientsModule: AppModule = {
           <div class="col-side">
             ${card('Contact', html`
               <dl class="kv">
+                ${isOrg ? '' : html`
+                  <dt>Given names</dt><dd>${client.given_names ?? '—'}</dd>
+                  <dt>Family name</dt><dd>${client.family_name ?? '—'}</dd>
+                  <dt>Preferred</dt><dd>${client.preferred_name ?? '—'}</dd>`}
                 <dt>Email</dt><dd>${client.email ? html`<a href="mailto:${client.email}">${client.email}</a>` : '—'}</dd>
                 <dt>Phone</dt><dd>${client.phone ?? '—'}</dd>
                 <dt>WhatsApp</dt><dd>${client.whatsapp ?? '—'}</dd>
@@ -321,17 +568,29 @@ export const clientsModule: AppModule = {
                 <dt>Address</dt><dd>${client.address ?? '—'}</dd>
               </dl>`)}
 
-            ${card('Immigration', html`
-              <dl class="kv">
-                <dt>Nationality</dt><dd>${client.nationality ?? '—'}</dd>
-                <dt>Date of birth</dt><dd>${dateShort(client.date_of_birth)}</dd>
-                <dt>Current visa</dt><dd>${client.current_visa_type ?? '—'}</dd>
-                <dt>Visa expiry</dt><dd>${dateShort(client.current_visa_expiry)}</dd>
-                <dt>Passport</dt><dd>${client.passport_sealed
-                  ? html`<span class="muted">On file (encrypted)</span>
-                         ${actionButton(`/clients/${client.id}/passport`, csrf, 'Reveal', { className: 'btn btn-small btn-secondary' })}`
-                  : html`<span class="muted">—</span>`}</dd>
-              </dl>`)}
+            ${isOrg
+              ? card('Registration', html`
+                  <dl class="kv">
+                    <dt>NZBN</dt><dd>${client.nzbn ?? '—'}</dd>
+                    <dt>Company no.</dt><dd>${client.company_number ?? '—'}</dd>
+                  </dl>`)
+              : card('Identity and compliance', html`
+                  <dl class="kv">
+                    <dt>Nationality</dt><dd>${client.nationality ?? '—'}</dd>
+                    <dt>Date of birth</dt><dd>${dateShort(client.date_of_birth)}</dd>
+                    <dt>Passport</dt><dd>${client.passport_sealed
+                      ? html`<span class="muted">On file (encrypted)</span>
+                             ${actionButton(`/clients/${client.id}/passport`, csrf, 'Reveal', { className: 'btn btn-small btn-secondary' })}`
+                      : html`<span class="muted">—</span>`}</dd>
+                    <dt>Passport country</dt><dd>${client.passport_country ?? '—'}</dd>
+                    <dt>Passport expiry</dt><dd>${expiryCell(client.passport_expiry, 180)}</dd>
+                    <dt>Current visa</dt><dd>${client.current_visa_type ?? '—'}</dd>
+                    <dt>Visa expiry</dt><dd>${expiryCell(client.current_visa_expiry)}</dd>
+                    <dt>Police cert.</dt><dd>${client.police_certificate_country
+                      ? html`${client.police_certificate_country}<br>` : ''}${expiryCell(client.police_certificate_expiry)}</dd>
+                    <dt>Medical</dt><dd>${expiryCell(client.medical_certificate_expiry)}</dd>
+                    <dt>Chest x-ray</dt><dd>${expiryCell(client.chest_xray_expiry)}</dd>
+                  </dl>`)}
 
             ${card('Open tasks', tasks.length === 0
               ? emptyState('Nothing outstanding.')
@@ -371,7 +630,8 @@ export const clientsModule: AppModule = {
       if (!f.valid) {
         const users = await userOptions(c.env);
         return page(c, { title: 'Edit client', active: '/clients', status: 400 }, html`
-          ${pageHeader(`Edit ${existing.full_name}`)}${clientForm(c, { ...existing, ...v } as Partial<ClientRow>, users, f.errors)}`);
+          ${pageHeader(`Edit ${existing.full_name}`)}
+          ${clientForm(c, { ...existing, ...v } as Partial<ClientRow>, users, f.errors)}`);
       }
 
       const passportSealed = v.passport_number && c.env.FIELD_KEY
@@ -380,24 +640,31 @@ export const clientsModule: AppModule = {
 
       await run(
         c.env.DB,
-        `UPDATE clients SET kind=?, full_name=?, preferred_name=?, email=?, phone=?, whatsapp=?,
-           telegram_username=?, telegram_user_id=?, nationality=?, date_of_birth=?, passport_sealed=?,
+        `UPDATE clients SET kind=?, full_name=?, given_names=?, family_name=?, preferred_name=?,
+           nzbn=?, company_number=?, email=?, phone=?, whatsapp=?, telegram_username=?, telegram_user_id=?,
+           nationality=?, date_of_birth=?, passport_sealed=?, passport_country=?, passport_expiry=?,
+           police_certificate_country=?, police_certificate_date=?, police_certificate_expiry=?,
+           medical_certificate_date=?, medical_certificate_expiry=?, chest_xray_expiry=?,
            current_visa_type=?, current_visa_expiry=?, address=?, status=?, assigned_to=?, notes=?, updated_at=?
          WHERE id=?`,
-        v.kind, v.full_name, v.preferred_name, v.email, v.phone, v.whatsapp,
-        v.telegram_username, v.telegram_user_id, v.nationality, v.date_of_birth, passportSealed,
+        v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
+        v.nzbn, v.company_number, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
+        v.nationality, v.date_of_birth, passportSealed, v.passport_country, v.passport_expiry,
+        v.police_certificate_country, v.police_certificate_date, v.police_certificate_expiry,
+        v.medical_certificate_date, v.medical_certificate_expiry, v.chest_xray_expiry,
         v.current_visa_type, v.current_visa_expiry, v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), id,
       );
 
-      const changed = Object.entries(v)
-        .filter(([k, val]) => k !== 'passport_number' && (existing as any)[k] !== val && !(val === null && (existing as any)[k] === null))
-        .map(([k]) => k);
       if (existing.status !== v.status) {
         await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system',
           body: `Status changed from ${CLIENT_STATUS_LABELS[existing.status]} to ${CLIENT_STATUS_LABELS[v.status]}.`, createdBy: user.id });
       }
-      await auditFrom(c, { action: 'client.updated', entityType: 'client', entityId: id, meta: { changed } });
+      if (existing.full_name !== v.full_name) {
+        await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system',
+          body: `Name changed from “${existing.full_name}” to “${v.full_name}”.`, createdBy: user.id });
+      }
+      await auditFrom(c, { action: 'client.updated', entityType: 'client', entityId: id });
       return redirectWith(c, `/clients/${id}`, 'Client updated.');
     });
 

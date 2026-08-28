@@ -1,0 +1,240 @@
+/**
+ * Module: alerts.
+ *
+ * One page answering "what is about to go wrong". A practice loses matters to
+ * dates, not to decisions: a police certificate that ages out before
+ * lodgement, a passport that expires mid-application, an RFI deadline, a task
+ * nobody picked up. Those live in four different tables, so this module
+ * gathers them into a single list ordered by how soon they bite.
+ *
+ * Nothing here stores state — it is a read-only view over the register, so it
+ * can never disagree with the records it summarises.
+ */
+
+import { Hono } from 'hono';
+import type { AppContext, Env } from '../../types';
+import type { AppModule } from '../../core/module';
+import { all } from '../../core/db';
+import { requireAuth, requirePermission } from '../../core/auth';
+import { page } from '../../ui/layout';
+import { html, raw } from '../../ui/html';
+import { badge, card, emptyState, pageHeader, table } from '../../ui/components';
+import { dateShort, relativeDays } from '../../ui/format';
+import { CASE_STATUS_LABELS, DEADLINE_CASE_STATUSES, OPEN_CASE_STATUSES } from '../../domain';
+
+export type AlertKind = 'case_deadline' | 'task' | 'document' | 'quote';
+export type AlertSeverity = 'overdue' | 'urgent' | 'soon';
+
+export interface Alert {
+  kind: AlertKind;
+  severity: AlertSeverity;
+  /** ISO date the thing is due or expires. */
+  date: string;
+  title: string;
+  detail: string;
+  href: string;
+}
+
+const KIND_LABELS: Record<AlertKind, string> = {
+  case_deadline: 'Case deadline',
+  task: 'Task',
+  document: 'Document expiry',
+  quote: 'Quote expiry',
+};
+
+const SEVERITY_TONES: Record<AlertSeverity, 'red' | 'amber' | 'neutral'> = {
+  overdue: 'red', urgent: 'amber', soon: 'neutral',
+};
+
+const URGENT_DAYS = 14;
+
+function severityFor(date: string, today: string): AlertSeverity {
+  if (date < today) return 'overdue';
+  const days = Math.round((Date.parse(date) - Date.parse(today)) / 86_400_000);
+  return days <= URGENT_DAYS ? 'urgent' : 'soon';
+}
+
+/** Today and the horizon, as plain YYYY-MM-DD so they compare with stored dates. */
+function window(horizonDays: number): { today: string; horizon: string } {
+  const now = Date.now();
+  return {
+    today: new Date(now).toISOString().slice(0, 10),
+    horizon: new Date(now + horizonDays * 86_400_000).toISOString().slice(0, 10),
+  };
+}
+
+/**
+ * Client identity and compliance documents due to expire.
+ *
+ * One UNION rather than five queries: each column is a different document but
+ * they answer the same question, and the database is better placed to merge
+ * and order them than we are.
+ */
+export async function documentAlerts(env: Env, horizonDays = 90): Promise<Alert[]> {
+  const { today, horizon } = window(horizonDays);
+
+  const rows = await all<{ id: string; ref: string; full_name: string; document: string; expires: string }>(
+    env.DB,
+    `SELECT id, ref, full_name, 'Passport' AS document, passport_expiry AS expires FROM clients
+       WHERE passport_expiry IS NOT NULL AND passport_expiry <= ?1 AND status != 'archived'
+     UNION ALL
+     SELECT id, ref, full_name, 'Current visa', current_visa_expiry FROM clients
+       WHERE current_visa_expiry IS NOT NULL AND current_visa_expiry <= ?1 AND status != 'archived'
+     UNION ALL
+     SELECT id, ref, full_name, 'Police certificate', police_certificate_expiry FROM clients
+       WHERE police_certificate_expiry IS NOT NULL AND police_certificate_expiry <= ?1 AND status != 'archived'
+     UNION ALL
+     SELECT id, ref, full_name, 'Medical certificate', medical_certificate_expiry FROM clients
+       WHERE medical_certificate_expiry IS NOT NULL AND medical_certificate_expiry <= ?1 AND status != 'archived'
+     UNION ALL
+     SELECT id, ref, full_name, 'Chest x-ray', chest_xray_expiry FROM clients
+       WHERE chest_xray_expiry IS NOT NULL AND chest_xray_expiry <= ?1 AND status != 'archived'
+     ORDER BY expires
+     LIMIT 200`,
+    horizon,
+  );
+
+  return rows.map((row) => ({
+    kind: 'document' as const,
+    severity: severityFor(row.expires, today),
+    date: row.expires,
+    title: `${row.document} — ${row.full_name}`,
+    detail: row.ref,
+    href: `/clients/${row.id}`,
+  }));
+}
+
+/** Everything with a date attached, in one list. */
+export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]> {
+  const { today, horizon } = window(horizonDays);
+  const openPlaceholders = OPEN_CASE_STATUSES.map(() => '?').join(',');
+
+  const [cases, tasks, quotes, documents] = await Promise.all([
+    all<any>(
+      env.DB,
+      `SELECT k.id, k.ref, k.title, k.status, k.decision_due_at, cl.full_name AS client_name
+         FROM cases k JOIN clients cl ON cl.id = k.client_id
+        WHERE k.decision_due_at IS NOT NULL AND k.decision_due_at <= ?
+          AND k.status IN (${openPlaceholders})
+        ORDER BY k.decision_due_at LIMIT 100`,
+      horizon, ...OPEN_CASE_STATUSES,
+    ),
+    all<any>(
+      env.DB,
+      `SELECT t.id, t.title, t.due_at, t.entity_type, t.entity_id, u.name AS assignee_name
+         FROM tasks t LEFT JOIN users u ON u.id = t.assigned_to
+        WHERE t.status IN ('open','in_progress','blocked')
+          AND t.due_at IS NOT NULL AND t.due_at <= ?
+        ORDER BY t.due_at LIMIT 100`,
+      horizon,
+    ),
+    all<any>(
+      env.DB,
+      `SELECT q.id, q.ref, q.description, q.valid_until, cl.full_name AS client_name
+         FROM quotes q LEFT JOIN clients cl ON cl.id = q.client_id
+        WHERE q.status = 'sent' AND q.valid_until IS NOT NULL AND q.valid_until <= ?
+        ORDER BY q.valid_until LIMIT 100`,
+      horizon,
+    ),
+    documentAlerts(env, horizonDays),
+  ]);
+
+  const alerts: Alert[] = [
+    ...cases.map((k: any) => ({
+      kind: 'case_deadline' as const,
+      severity: severityFor(k.decision_due_at, today),
+      date: k.decision_due_at,
+      title: `${k.title} — ${k.client_name}`,
+      detail: `${k.ref} · ${CASE_STATUS_LABELS[k.status as keyof typeof CASE_STATUS_LABELS] ?? k.status}`
+        + (DEADLINE_CASE_STATUSES.includes(k.status) ? ' · response required' : ''),
+      href: `/cases/${k.id}`,
+    })),
+    ...tasks.map((t: any) => ({
+      kind: 'task' as const,
+      severity: severityFor(t.due_at, today),
+      date: t.due_at,
+      title: t.title,
+      detail: t.assignee_name ? `Assigned to ${t.assignee_name}` : 'Unassigned',
+      href: t.entity_type === 'case' ? `/cases/${t.entity_id}` : '/tasks',
+    })),
+    ...quotes.map((q: any) => ({
+      kind: 'quote' as const,
+      severity: severityFor(q.valid_until, today),
+      date: q.valid_until,
+      title: `Quote expiring — ${q.client_name ?? q.ref}`,
+      detail: `${q.ref} · awaiting a reply`,
+      href: `/quotes/${q.id}`,
+    })),
+    ...documents,
+  ];
+
+  return alerts.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function countBySeverity(alerts: Alert[]): Record<AlertSeverity, number> {
+  return alerts.reduce(
+    (acc, alert) => ({ ...acc, [alert.severity]: acc[alert.severity] + 1 }),
+    { overdue: 0, urgent: 0, soon: 0 } as Record<AlertSeverity, number>,
+  );
+}
+
+export const alertsModule: AppModule = {
+  name: 'alerts',
+  title: 'Alerts',
+  basePaths: ['/alerts'],
+  nav: [{ href: '/alerts', label: 'Alerts', permission: 'register:read', order: 98 }],
+
+  register(app) {
+    const r = new Hono<AppContext>();
+    r.use('*', requireAuth);
+
+    r.get('/', requirePermission('register:read'), async (c) => {
+      const horizon = Math.min(365, Math.max(7, Number(c.req.query('days') ?? '90') || 90));
+      const kindFilter = c.req.query('kind') ?? '';
+
+      const alerts = await collectAlerts(c.env, horizon);
+      const shown = kindFilter && kindFilter in KIND_LABELS
+        ? alerts.filter((a) => a.kind === kindFilter)
+        : alerts;
+      const counts = countBySeverity(alerts);
+
+      return page(c, { title: 'Alerts', active: '/alerts' }, html`
+        ${pageHeader('Alerts', `Everything with a date attached, across the whole register, for the next ${horizon} days.`)}
+
+        <div class="fee-summary">
+          <div class="stat ${counts.overdue ? 'stat-warn' : ''}">
+            <span class="stat-label">Overdue</span><span class="stat-value">${counts.overdue}</span></div>
+          <div class="stat ${counts.urgent ? 'stat-warn' : ''}">
+            <span class="stat-label">Within ${URGENT_DAYS} days</span><span class="stat-value">${counts.urgent}</span></div>
+          <div class="stat"><span class="stat-label">Later</span><span class="stat-value">${counts.soon}</span></div>
+        </div>
+
+        <form method="get" action="/alerts" class="filters">
+          <select name="kind">
+            <option value="">Everything</option>
+            ${(Object.keys(KIND_LABELS) as AlertKind[]).map((k) =>
+              html`<option value="${k}" ${k === kindFilter ? raw('selected') : ''}>${KIND_LABELS[k]}</option>`)}
+          </select>
+          <select name="days">
+            ${[30, 60, 90, 180, 365].map((d) =>
+              html`<option value="${d}" ${d === horizon ? raw('selected') : ''}>Next ${d} days</option>`)}
+          </select>
+          <button class="btn btn-secondary" type="submit">Apply</button>
+        </form>
+
+        ${shown.length === 0
+          ? card('Nothing due', emptyState('No deadlines, expiries or overdue tasks in this window.'))
+          : table(['Due', 'What', 'Type', 'Detail'], shown.map((alert) => html`
+              <tr class="${alert.severity === 'overdue' ? 'row-urgent' : ''}">
+                <td class="small ${alert.severity === 'overdue' ? 'warn' : ''}">
+                  ${dateShort(alert.date)}
+                  <div class="muted">${relativeDays(alert.date)}</div></td>
+                <td><a href="${alert.href}">${alert.title}</a></td>
+                <td>${badge(KIND_LABELS[alert.kind], SEVERITY_TONES[alert.severity])}</td>
+                <td class="small muted">${alert.detail}</td>
+              </tr>`))}`);
+    });
+
+    app.route('/alerts', r);
+  },
+};
