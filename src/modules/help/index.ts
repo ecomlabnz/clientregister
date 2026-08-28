@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.22.0', date: '28 August 2026',
+    notes: [
+      'Conversations: Telegram and WhatsApp as two-way threads, replied to from inside the app.',
+      'A conversation can be linked to a client, putting it on their file.',
+      'Every reply carries the name of whoever wrote it, and is recorded before it is sent.',
+      'The inbox now has tabs, counts and search as you type, like every other list.',
+    ],
+  },
+  {
     version: '0.21.0', date: '28 August 2026',
     notes: [
       'Automations: rules that watch the register\'s dates and propose what to do about them.',
@@ -692,6 +701,13 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
         <p class="hint">Meta’s test number only messages numbers you have added to it. To take
            enquiries from the public you need a real number and Meta’s business verification, which
            takes a few days.</p>
+        <p><strong>To reply from inside the app as well as receive</strong>, add two more secrets:
+           <code>WHATSAPP_TOKEN</code> (the access token on the same API Setup page) and
+           <code>WHATSAPP_PHONE_NUMBER_ID</code> (shown beside the number there). Without them
+           WhatsApp still arrives; a reply is saved and marked as waiting rather than sent.</p>
+        <p class="hint">WhatsApp only accepts free text within 24 hours of the person's last
+           message. Outside that window Meta refuses it and only an approved template may be sent;
+           the refusal is shown on the message rather than hidden.</p>
 
         <h4>3 · Email in — Cloudflare Email Routing</h4>
         <ol>
@@ -800,6 +816,25 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
         <p>In practice: whoever opens the office works the inbox each morning, converts genuine
            enquiries into inquiries, files circulars into the knowledge base, and ignores the rest.
            The <strong>Today</strong> screen shows how many are waiting.</p>`,
+    },
+    {
+      id: 'conversations',
+      title: 'Conversations',
+      body: html`
+        <p>Under <strong>Inbox → Conversations</strong> each channel is a two-way thread: what
+           somebody sent, and what the practice sent back, in one place and on the file.</p>
+        <p>A thread is one counterpart on one channel — a Telegram chat, a WhatsApp number. It
+           starts by itself the first time they write. Link it to a client and the conversation is
+           part of that client's record.</p>
+        <p><strong>Linking changes nothing about trust.</strong> Whether a sender may create
+           records is decided by that channel's allow-list, which is a secret rather than a
+           setting, and putting a name to a conversation does not touch it.</p>
+        <p>Every reply is written by a person and stored with their name against it — nothing in
+           this register writes on a channel by itself. If the channel is not connected yet the
+           reply is saved and marked as waiting rather than lost, the same way outbound email has
+           always worked.</p>
+        <p>Email conversations are held as ordinary outbound mail, so they use whichever provider
+           is configured and appear in the same queue.</p>`,
     },
     {
       id: 'lists',

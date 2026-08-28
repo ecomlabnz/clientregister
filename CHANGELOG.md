@@ -7,6 +7,34 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.22.0 — 28 August 2026
+
+### Added
+- **Channels are conversations, not just a direction.** Until now a channel was
+  somewhere messages arrived from: a Telegram message became a row in the inbox
+  and the practice answered it somewhere else, on a phone, with nothing on the
+  file to say what was said. A thread is one counterpart on one channel and
+  holds both halves — Inbox → Conversations. Telegram and WhatsApp can be
+  replied to from inside the register; email replies go through the outbound
+  queue the rest of the application uses.
+- **A conversation can be linked to a client**, which puts it on their file.
+  Linking changes nothing about trust: whether a sender may create records is
+  still the channel's allow-list, which is a secret rather than a setting.
+- **Every reply has a person behind it.** `channel_replies.created_by` is
+  NOT NULL and `ON DELETE RESTRICT`, so a reply cannot exist without an author
+  and a sent message keeps the person who sent it. Nothing in this application
+  writes on a channel by itself.
+- **A reply is recorded before it is attempted.** What the practice said is on
+  the file whether or not the transport was working, and a failed send is a row
+  saying so with the provider's own reason — including WhatsApp's refusal
+  outside the 24-hour window, which is shown rather than guessed at.
+- **WhatsApp sending**, behind two new secrets (`WHATSAPP_TOKEN`,
+  `WHATSAPP_PHONE_NUMBER_ID`). Receiving does not need them; without them a
+  reply is saved and marked as waiting.
+- **The inbox is tabbed and searchable**, like every other list: Waiting,
+  Processed, Ignored, Failed, All, and Conversations, with counts, columns that
+  give way on a phone, and search that answers as you type.
+
 ## 0.21.0 — 28 August 2026
 
 ### Added

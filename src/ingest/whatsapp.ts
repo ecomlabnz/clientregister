@@ -104,6 +104,8 @@ export async function handleWhatsAppWebhook(c: Context<AppContext>): Promise<Res
           attachments,
           trusted: allowed.length > 0 && isAllowed(allowed, message.from, digitsOnly),
           receivedAt: new Date(Number(message.timestamp) * 1000).toISOString(),
+          peerId: digitsOnly(message.from),
+          peerLabel: nameByWaId.get(message.from) ?? null,
           meta: { wa_id: message.from, type: message.type },
         });
         captured++;
