@@ -110,6 +110,10 @@ export const inboxModule: AppModule = {
         : [];
       const aiAvailable = isAiEnabled(c.env) && can(c.get('user'), 'ai:run');
       const suggestion = await latestTriage(c.env, 'ingest_message', id);
+      // A circular can be filed in the knowledge base as well as — or instead
+      // of — becoming an inquiry, so the two actions are independent.
+      const filed = await all<{ id: string; ref: string }>(
+        c.env.DB, 'SELECT id, ref FROM kb_articles WHERE ingest_message_id = ? ORDER BY created_at', id);
 
       return page(c, { title: 'Inbox message', active: '/inbox' }, html`
         ${breadcrumbs([{ href: '/inbox', label: 'Inbox' }, { label: msg.channel }])}
@@ -163,10 +167,15 @@ export const inboxModule: AppModule = {
                     ${csrfField(csrf)}
                     <button class="btn btn-primary btn-block" type="submit">Create an inquiry from this</button>
                   </form>
+                  <a class="btn btn-secondary btn-block" href="/knowledge/new?from=${msg.id}">
+                    File in the knowledge base
+                  </a>
                   <form method="post" action="/inbox/${msg.id}/ignore">
                     ${csrfField(csrf)}
                     <button class="btn btn-secondary btn-block" type="submit">Ignore</button>
-                  </form>`}`)}
+                  </form>`}
+              ${filed.length ? html`<p class="hint">Filed as
+                  ${filed.map((a) => html`<a href="/knowledge/${a.id}">${a.ref}</a>`)}.</p>` : ''}`)}
 
             ${card('Details', html`
               <dl class="kv">
