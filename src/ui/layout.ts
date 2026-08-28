@@ -15,6 +15,15 @@ export interface PageOpts {
   active?: string;
   /** Rendered without the nav chrome (login, setup). */
   bare?: boolean;
+  /** The public website: no application chrome — the page supplies its own. */
+  landing?: boolean;
+  /** Meta description, for the one page that has an audience outside the office. */
+  description?: string;
+  /**
+   * Everything here is a private register, so pages are kept out of search
+   * indexes unless a page explicitly opts in.
+   */
+  indexable?: boolean;
   status?: number;
 }
 
@@ -24,7 +33,8 @@ export function page(c: Context<AppContext>, opts: PageOpts, body: Raw): Respons
   const appName = c.env.APP_NAME || 'Client Register';
   const ok = c.req.query('ok');
   const err = c.req.query('err');
-  const nav = opts.bare ? [] : visibleNav(getNavItems(), user);
+  const chrome = !opts.bare && !opts.landing;
+  const nav = chrome ? visibleNav(getNavItems(), user) : [];
 
   // Appearance is two attributes rendered by the server from the user's own
   // record: no theme script, nothing extra to load, and no flash of the wrong
@@ -37,13 +47,16 @@ export function page(c: Context<AppContext>, opts: PageOpts, body: Raw): Respons
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
-<title>${opts.title} · ${appName}</title>
+<meta name="robots" content="${opts.indexable ? 'index, follow' : 'noindex, nofollow'}">
+${opts.description ? html`<meta name="description" content="${opts.description}">` : ''}
+<title>${opts.landing ? opts.title : `${opts.title} · ${appName}`}</title>
 <link rel="stylesheet" href="/app.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 </head>
-<body class="${opts.bare ? 'bare' : 'app'}">
-${opts.bare
+<body class="${opts.landing ? 'site' : opts.bare ? 'bare' : 'app'}">
+${opts.landing
+    ? body
+    : opts.bare
     ? html`<main class="bare-main">${body}</main>`
     : html`
 <header class="topbar">

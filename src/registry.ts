@@ -8,6 +8,7 @@
 
 import type { AppModule } from './core/module';
 import { authModule } from './modules/auth';
+import { landingModule } from './modules/landing';
 import { dashboardModule } from './modules/dashboard';
 import { alertsModule } from './modules/alerts';
 import { clientsModule } from './modules/clients';
@@ -23,6 +24,9 @@ import { helpModule } from './modules/help';
 
 export const registeredModules: AppModule[] = [
   authModule,
+  // Ahead of the dashboard: both answer for '/', and the website only takes it
+  // when nobody is signed in.
+  landingModule,
   dashboardModule,
   alertsModule,
   inboxModule,
