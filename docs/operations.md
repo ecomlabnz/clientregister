@@ -110,6 +110,24 @@ On the Paid plan, raise the password work factor to the OWASP figure by setting
 `PBKDF2_ROUNDS` to `6` in `src/core/crypto.ts` and deploying. Existing users are
 re-hashed transparently the next time they sign in.
 
+## Demonstration data
+
+The register can be loaded with a fabricated caseload — 20 clients and 15 cases
+covering families, employers and deadline-driven matters — to see how it
+behaves with something in it.
+
+Run the **Demonstration data** workflow from the Actions tab and choose `load`
+or `remove`. Dates are generated relative to the day it runs, so the deadlines
+and expiries are always meaningful.
+
+It is marked three ways, because it sits in the same tables as real client
+files: every identifier begins `demo_`, every client note starts `[TEST DATA]`,
+and every case carries a red **Test data** tag. Admin also offers one-click
+removal, constrained to that prefix so it cannot reach a real record.
+
+`scripts/seed-demo.mjs` prints SQL to stdout and touches no database itself, so
+the output can be read before it is applied.
+
 ## Backups
 
 **There is no automated backup.** Set one up before the register holds anything

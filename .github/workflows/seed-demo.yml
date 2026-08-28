@@ -1,0 +1,62 @@
+name: Demonstration data
+
+# Loading or removing demonstration data is an operational action, so it lives
+# in the pipeline rather than in somebody's terminal: it uses the same
+# credentials as a deploy, it is recorded in the Actions history, and anyone
+# with repository access can repeat it.
+#
+# It never runs on a push — only when a person starts it and chooses what to do.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        required: true
+        default: load
+        options:
+          - load
+          - remove
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-data
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Dates are generated relative to the day it runs, so deadlines and
+      # expiries are meaningful whenever the data is loaded.
+      - name: Generate the seed
+        if: ${{ inputs.action == 'load' }}
+        run: node scripts/seed-demo.mjs > /tmp/seed.sql
+
+      - name: Load demonstration data
+        if: ${{ inputs.action == 'load' }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 execute clientregister-db --remote --yes --file=/tmp/seed.sql
+
+      - name: Remove demonstration data
+        if: ${{ inputs.action == 'remove' }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 execute clientregister-db --remote --yes --file=scripts/seed-demo-remove.sql
