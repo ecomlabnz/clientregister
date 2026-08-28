@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.8.0', date: '28 August 2026',
+    notes: [
+      'A public page for the practice, shown to anyone arriving without signing in.',
+      'All of its wording is edited under Settings → Website — no deployment needed.',
+      'It can accept enquiries straight into the register, once you switch that on.',
+      'It is kept out of search results until you say otherwise.',
+    ],
+  },
+  {
     version: '0.7.0', date: '28 August 2026',
     notes: [
       'Day and night modes, and three themes to switch between, under My account → Appearance.',
@@ -238,6 +247,35 @@ function sections(): Section[] {
            <strong>Ink</strong> — and choose whether the register follows your device's day and
            night setting or stays light or dark all the time. The choice is saved against your
            account rather than the browser, so it travels with you to your phone and back.</p>`,
+    },
+    {
+      id: 'website',
+      title: 'The public page',
+      body: html`
+        <p>The address of this register also serves a public page, shown to anyone who arrives
+           without being signed in. Signing in takes you past it to your own first screen.</p>
+        <p>Everything on it is edited under <strong>Admin → Settings → Website</strong> — the
+           headline, the services, the steps, the questions and the closing invitation — so the
+           wording is yours to change without anyone touching code.</p>
+        <p>Four of those fields are lists. Put <strong>one item per line</strong>, with a vertical
+           bar between the heading and the text:</p>
+        <pre>Work visas | AEWV applications, job changes and employer accreditation.
+Residence | Skilled Migrant, partnership and parent category.</pre>
+        <p>A line with no bar becomes a heading on its own. Blank lines are ignored, so you can
+           space the box out while you write.</p>
+        <h4>Two switches worth understanding</h4>
+        <ul>
+          <li><strong>Accept enquiries through the page</strong> is off to begin with. Turn it on
+              and the page grows a short form; anything sent through it arrives as a new inquiry in
+              the register, marked as coming from the web, ready to triage like any other. With it
+              off, the page shows your email address instead.</li>
+          <li><strong>Allow search engines to index it</strong> is also off. This address serves
+              your client register as well as this page, so putting it into search results is a
+              decision to take deliberately — turn it on once the page is on a domain you are happy
+              to see listed.</li>
+        </ul>
+        <p>Turning <strong>Show the public page</strong> off sends visitors straight to the sign-in
+           screen, as before.</p>`,
     },
     {
       id: 'admin',

@@ -7,6 +7,46 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.8.0 — 28 August 2026
+
+### Added
+- **A public page for the practice**, served at the root of the site to anyone
+  who arrives without a session. Signing in falls through to the dashboard as
+  before, so the register is unchanged for the people who use it.
+- Hero, services, process, about, questions and a closing invitation — all of
+  the wording held in settings under **Settings → Website**, edited by the
+  practice without a deployment. The four list fields take one item per line as
+  `Heading | text`; a line with no bar is a heading on its own, blank lines are
+  ignored, and a missing field renders as an absent section rather than an
+  error.
+- **Optional public enquiry form**, off by default. When switched on it creates
+  an inquiry in the register with source `web`, ready for triage alongside
+  everything arriving by email, Telegram and WhatsApp.
+
+### Security
+- The public page is **not indexed** unless the practice turns indexing on:
+  this address also serves the client register, and putting it in a search
+  index is a decision for a person rather than a default.
+- The enquiry route **only writes**. It creates an inquiry and says thank you;
+  it never reads the register back, so there is nothing for a probe to learn
+  from it. It returns 404 when the form is switched off, so the endpoint does
+  not exist until the practice says it does.
+- Protected by the existing same-origin check (verified: a cross-origin post is
+  refused with 403), a hidden field no browser fills in — answered with the same
+  thank-you a person gets, so an automated caller learns nothing from the
+  difference — five submissions per hour per address, and length limits on every
+  field. The rate-limit key is a hash of the address, so KV never holds an IP.
+- The website carries no design tokens of its own; it renders in the same
+  palette as the register, which means it inherits the same CSP with no inline
+  script, no inline style and no third-party origin.
+
+### Fixed
+- A redirect back to an anchor was building `/#enquire?ok=…`, which puts the
+  query inside the fragment where the server never sees it — the visitor would
+  have been told nothing after sending an enquiry.
+- The two settings tables that scroll horizontally on a narrow screen were
+  missing the box that lets them.
+
 ## 0.7.0 — 28 August 2026
 
 ### Added

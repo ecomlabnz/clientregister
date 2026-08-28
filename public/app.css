@@ -551,6 +551,124 @@ details[open] > summary { margin-bottom: 12px; }
 .swatch .sw-accent-d { background: var(--d-accent); }
 
 
+/* --- Public website ------------------------------------------------------- */
+/* The one page with an audience outside the office. It runs on exactly the same
+   tokens as the register — the same palette, the same borders, the same type —
+   so the site a client sees and the tool behind it read as one practice. What
+   changes here is scale and air: an editorial page can afford a large headline
+   and long measures where a working screen cannot. */
+
+body.site { background: var(--bg); }
+
+.site-head {
+  display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+  max-width: 1080px; margin: 0 auto; padding: 20px;
+}
+.site-brand {
+  font-size: 1rem; font-weight: 640; letter-spacing: -0.02em; color: var(--text);
+}
+.site-brand:hover { text-decoration: none; }
+.site-nav { display: flex; gap: 20px; flex: 1; flex-wrap: wrap; }
+.site-nav a { color: var(--muted); font-size: 0.86rem; font-weight: 500; }
+.site-nav a:hover { color: var(--text); text-decoration: none; }
+.site-head-actions { margin-left: auto; }
+
+.site-main { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+.site-flash { margin: 16px 0 0; }
+
+.hero { padding: 72px 0 56px; max-width: 780px; }
+.eyebrow {
+  display: inline-block; margin: 0 0 18px; padding: 3px 10px;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--surface);
+  font-size: 0.74rem; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted);
+}
+.hero-title {
+  font-size: clamp(2.1rem, 6vw, 3.4rem); line-height: 1.06;
+  font-weight: 650; letter-spacing: -0.035em; margin: 0 0 20px;
+}
+.hero-lede {
+  font-size: clamp(1rem, 2.2vw, 1.15rem); line-height: 1.6;
+  color: var(--muted); max-width: 60ch; margin: 0 0 28px;
+}
+.hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-lg { padding: 11px 22px; font-size: 0.95rem; }
+.hero-fine { margin: 26px 0 0; font-size: 0.82rem; color: var(--muted); max-width: 60ch; }
+
+.stat-strip {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px; background: var(--border);
+  border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+}
+.stat-cell { background: var(--surface); padding: 20px; display: flex; flex-direction: column; gap: 4px; }
+.stat-figure { font-size: 1.5rem; font-weight: 640; letter-spacing: -0.02em; }
+.stat-caption { font-size: 0.82rem; color: var(--muted); }
+
+.site-section { padding: 72px 0; border-top: 1px solid var(--border); margin-top: 72px; }
+.stat-strip + .site-section { margin-top: 0; }
+.section-head { max-width: 60ch; margin-bottom: 32px; }
+.section-title {
+  font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 640;
+  letter-spacing: -0.025em; line-height: 1.2; margin: 0 0 8px;
+}
+.section-sub { color: var(--muted); margin: 0; font-size: 0.98rem; }
+
+.service-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1px; background: var(--border);
+  border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.service { background: var(--surface); padding: 24px; }
+.service-name { font-size: 0.98rem; font-weight: 620; letter-spacing: -0.01em; margin: 0 0 8px; }
+.service p { color: var(--muted); font-size: 0.9rem; margin: 0; line-height: 1.6; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px;
+  background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.step { background: var(--surface); padding: 24px; display: flex; gap: 20px; align-items: flex-start; }
+.step-number {
+  font-variant-numeric: tabular-nums; font-size: 0.8rem; font-weight: 650;
+  color: var(--accent); padding-top: 2px; letter-spacing: 0.04em; flex-shrink: 0;
+}
+.step-name { font-size: 0.98rem; font-weight: 620; margin: 0 0 6px; }
+.step p { color: var(--muted); font-size: 0.9rem; margin: 0; line-height: 1.6; max-width: 68ch; }
+
+.site-section-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 40px; align-items: start; }
+.prose { max-width: 68ch; }
+.prose p { font-size: 1rem; line-height: 1.7; color: var(--muted); margin: 0 0 16px; }
+.prose p:last-child { margin-bottom: 0; }
+
+.faq { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.faq-item { border-bottom: 1px solid var(--border); }
+.faq-item:last-child { border-bottom: none; }
+.faq-item > summary {
+  padding: 18px 22px; font-size: 0.98rem; font-weight: 600; color: var(--text);
+  letter-spacing: -0.008em; list-style: none;
+}
+.faq-item > summary::-webkit-details-marker { display: none; }
+.faq-item > summary::after { content: '+'; float: right; color: var(--muted); font-weight: 400; }
+.faq-item[open] > summary { margin-bottom: 0; }
+.faq-item[open] > summary::after { content: '−'; }
+.faq-item > summary:hover { background: var(--surface-2); }
+.faq-item p { margin: 0; padding: 0 22px 20px; color: var(--muted); line-height: 1.65; max-width: 72ch; }
+
+.enquire { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+.contact-list { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 24px 0 0; font-size: 0.92rem; }
+.contact-list dt { color: var(--muted); }
+.contact-list dd { margin: 0; }
+.enquiry-form {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow);
+}
+.enquiry-static { display: flex; flex-direction: column; gap: 16px; }
+/* Off-screen rather than display:none, so a bot filling every field still
+   finds it while nobody using the page ever does. */
+.trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+.site-foot {
+  max-width: 1080px; margin: 72px auto 0; padding: 28px 20px 48px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+}
+.site-foot p { margin: 0; }
+.site-foot-links { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; font-size: 0.86rem; }
+
 /* --- Small screens -------------------------------------------------------- */
 /* This register is read on a phone between appointments as often as at a desk,
    so a narrow screen is a first-class layout, not a fallback. Every page has to
@@ -612,6 +730,24 @@ details[open] > summary { margin-bottom: 12px; }
   .btn-block { margin-bottom: 10px; }
   .checkbox-field input, .appearance-option input[type="radio"] { width: 18px; height: 18px; }
   .appearance-option { padding: 14px; }
+
+  /* The website on a phone: the nav sits under the wordmark, sections lose
+     roughly a third of their air, and every two-column block becomes one. */
+  .site-head { padding: 14px 16px; gap: 12px; row-gap: 10px; }
+  .site-nav { order: 3; width: 100%; flex: none; gap: 16px; }
+  .site-head-actions { margin-left: auto; }
+  .site-main, .site-foot { padding-left: 16px; padding-right: 16px; }
+  .hero { padding: 44px 0 36px; }
+  .site-section { padding: 44px 0; margin-top: 44px; }
+  .section-head { margin-bottom: 24px; }
+  .site-section-split, .enquire { grid-template-columns: 1fr; gap: 24px; }
+  .service, .step, .stat-cell { padding: 18px; }
+  .step { gap: 14px; }
+  .enquiry-form { padding: 18px; }
+  .faq-item > summary { padding: 15px 18px; }
+  .faq-item p { padding: 0 18px 16px; }
+  .site-foot { margin-top: 44px; padding-bottom: 36px; }
+  .hero-actions .btn { flex: 1; min-width: 160px; }
 }
 
 @media (max-width: 420px) {
