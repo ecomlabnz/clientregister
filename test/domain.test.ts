@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { dateOrDateTime, dateShort, instantForDate } from '../src/ui/format';
 import {
   CASE_STATUSES, CASE_STATUS_HELP, CASE_STATUS_LABELS, CASE_TRANSITIONS, canTransition, isCaseStatus, isOpenStatus, OPEN_CASE_STATUSES,
 } from '../src/domain';
@@ -67,5 +68,22 @@ describe('case status lifecycle', () => {
     for (const status of ['approved', 'declined', 'closed', 'withdrawn']) {
       expect(isOpenStatus(status), status).toBe(false);
     }
+  });
+});
+
+describe('storing a date somebody typed', () => {
+  it('lands on that calendar date in New Zealand, not the day after', () => {
+    // Midday UTC would be the small hours of the following morning here, and a
+    // note backdated to Thursday would appear on the file as Friday.
+    expect(instantForDate('2026-08-20')).toBe('2026-08-20T00:00:00.000Z');
+    expect(dateShort(instantForDate('2026-08-20'))).toBe('20 Aug 2026');
+    // Both New Zealand offsets: standard time in August, daylight time in January.
+    expect(dateShort(instantForDate('2027-01-15'))).toBe('15 Jan 2027');
+    expect(dateShort(instantForDate('2026-12-31'))).toBe('31 Dec 2026');
+  });
+
+  it('shows a date on its own when no real time was recorded', () => {
+    expect(dateOrDateTime(instantForDate('2026-08-20'))).toBe('20 Aug 2026');
+    expect(dateOrDateTime('2026-08-20T03:45:00.000Z')).toContain(':');
   });
 });

@@ -113,6 +113,30 @@ function statusRow(label: string, ok: boolean, detail: string) {
     </tr>`;
 }
 
+
+/**
+ * One bar across every administration page.
+ *
+ * Users, settings and the audit log are separate pages rather than sections of
+ * one, so they were reached by buttons while the rest of the section used tabs.
+ * That is the same navigation wearing two faces. A tab may lead to another page
+ * as readily as to another part of this one; what matters to a reader is that
+ * the whole section is visible from anywhere in it.
+ */
+function adminTabs(current: string): Raw {
+  const tabs: Array<{ id: string; label: string; href: string }> = [
+    { id: 'overview', label: 'Overview', href: '/admin' },
+    { id: 'users', label: 'Users', href: '/admin/users' },
+    { id: 'settings', label: 'Practice settings', href: '/admin/settings' },
+    { id: 'audit', label: 'Audit log', href: '/admin/audit' },
+    { id: 'integrations', label: 'Integrations', href: '/admin?tab=integrations' },
+    { id: 'modules', label: 'Modules', href: '/admin?tab=modules' },
+    { id: 'maintenance', label: 'Maintenance', href: '/admin?tab=maintenance' },
+  ];
+  return html`<nav class="tabs">${tabs.map((x) => html`
+    <a class="${x.id === current ? 'tab current' : 'tab'}" href="${x.href}">${x.label}</a>`)}</nav>`;
+}
+
 export const adminModule: AppModule = {
   name: 'admin',
   title: 'Administration',
@@ -139,20 +163,9 @@ export const adminModule: AppModule = {
                             + (SELECT COUNT(*) FROM cases WHERE id LIKE 'demo\\_%' ESCAPE '\\') AS n`),
       ]);
 
-      const tabs: Array<{ id: string; label: string }> = [
-        { id: 'overview', label: 'Overview' },
-        { id: 'integrations', label: 'Integrations' },
-        { id: 'modules', label: 'Modules' },
-        { id: 'maintenance', label: 'Maintenance' },
-      ];
-
       return page(c, { title: 'Administration', active: '/admin' }, html`
         ${pageHeader('Administration', 'Who can get in, how the practice is configured, and what is wired up.')}
-
-        <nav class="tabs">
-          ${tabs.map((x) => html`
-            <a class="${x.id === tab ? 'tab current' : 'tab'}" href="/admin?tab=${x.id}">${x.label}</a>`)}
-        </nav>
+        ${adminTabs(tab)}
 
         ${tab === 'overview' ? html`
         <div class="fee-summary">
@@ -160,12 +173,7 @@ export const adminModule: AppModule = {
           <div class="stat"><span class="stat-label">Inbox pending</span><span class="stat-value">${pendingIngest}</span></div>
           <div class="stat"><span class="stat-label">Mail queued</span><span class="stat-value">${queuedMail}</span></div>
         </div>
-
-        <div class="admin-links">
-          <a class="btn btn-secondary" href="/admin/users">Users</a>
-          <a class="btn btn-secondary" href="/admin/settings">Practice settings</a>
-          <a class="btn btn-secondary" href="/admin/audit">Audit log</a>
-        </div>` : ''}
+        <p class="hint">Everything in this section is on the bar above.</p>` : ''}
 
         ${tab === 'integrations' ? card('Integrations', html`
           <p class="hint mb">Step-by-step instructions for connecting each of these are in
@@ -285,8 +293,8 @@ export const adminModule: AppModule = {
       const me = c.get('user')!;
 
       return page(c, { title: 'Users', active: '/admin' }, html`
-        ${breadcrumbs([{ href: '/admin', label: 'Admin' }, { label: 'Users' }])}
         ${pageHeader('Users', 'Everyone who can sign in.')}
+        ${adminTabs('users')}
 
         ${/*
           * One form per person, holding everything about them that can be
@@ -493,10 +501,12 @@ export const adminModule: AppModule = {
       const csrf = c.get('session')!.csrf;
 
       return page(c, { title: `Settings — ${group.title}`, active: '/admin' }, html`
-        ${breadcrumbs([{ href: '/admin', label: 'Admin' }, { label: 'Settings' }])}
         ${pageHeader('Settings', 'Parameters of the system, grouped by what they affect.')}
+        ${adminTabs('settings')}
 
-        <nav class="tabs">
+        ${/* Two bars: the section, then the groups within it. The second is
+             indented so it reads as belonging to the first. */ ''}
+        <nav class="tabs tabs-sub">
           ${groups.map((g) => html`
             <a class="${g.id === group.id ? 'tab current' : 'tab'}"
                href="/admin/settings?tab=${g.id}">${g.title}</a>`)}
@@ -623,7 +633,7 @@ export const adminModule: AppModule = {
           Object.entries(over).map(([k, v]) => [k, String(v)])) }).toString();
 
       return page(c, { title: 'Audit log', active: '/admin' }, html`
-        ${breadcrumbs([{ href: '/admin', label: 'Admin' }, { label: 'Audit log' }])}
+        ${adminTabs('audit')}
         ${pageHeader(
           subject ? `Activity — ${subject.name}` : 'Audit log',
           subject

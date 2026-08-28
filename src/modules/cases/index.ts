@@ -20,7 +20,7 @@ import {
   badge, card, csrfField, emptyState, errorList, field, optionsFrom,
   pageHeader, select, statusTone, table,
 } from '../../ui/components';
-import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate } from '../../ui/format';
+import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate, dateOrDateTime, instantForDate } from '../../ui/format';
 import {
   canTransition, CASE_STATUS_HELP, CASE_STATUS_LABELS, CASE_STATUSES, CASE_TRANSITIONS,
   DEADLINE_CASE_STATUSES, ENTRY_KIND_LABELS, ENTRY_KINDS,
@@ -32,6 +32,7 @@ import { addParty, partiesForCase, removeParty } from '../../core/parties';
 import { findOrCreateTag, listTags, tagCase, tagsForCase, tagsForCases, untagCase } from '../../core/tags';
 import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
+import { storeDocument } from '../documents';
 import {
   VOCABULARY_SETTINGS, caseTypes, isTerm, labelFor, termOptions, type Term,
 } from '../../core/vocabulary';
@@ -338,6 +339,7 @@ export const casesModule: AppModule = {
       const types = await caseTypes(c.env);
       const id = c.req.param('id')!;
       const viewer = c.get('user')!;
+      const docsEnabled = Boolean(c.env.DOCS);
       const kase = await one<CaseRow & { client_name: string; client_ref: string; assignee_name: string | null }>(
         c.env.DB,
         `SELECT k.*, cl.full_name AS client_name, cl.ref AS client_ref, u.name AS assignee_name
@@ -508,24 +510,55 @@ export const casesModule: AppModule = {
                   </form>
                 </details>` : ''}`)}
 
-            ${card('Timeline', html`
+            ${card('File notes', html`
               ${writable ? html`
-                <form method="post" action="/cases/${kase.id}/entries" class="entry-form">
+                <form method="post" action="/cases/${kase.id}/entries" class="entry-form"
+                      enctype="multipart/form-data">
                   ${csrfField(csrf)}
-                  ${select({ label: 'Kind', name: 'kind', value: 'note', includeBlank: false,
-                             options: optionsFrom(ENTRY_KINDS.filter((k) => k !== 'system') as any, ENTRY_KIND_LABELS as any) })}
-                  ${field({ label: 'Entry', name: 'body', type: 'textarea', rows: 3, required: true, maxlength: 5000 })}
-                  <button class="btn btn-primary" type="submit">Add to timeline</button>
+                  ${field({ label: 'Note', name: 'body', type: 'textarea', rows: 4, required: true,
+                            maxlength: 20000,
+                            placeholder: 'What happened, what was said, what was advised.' })}
+                  <div class="row-form">
+                    ${select({ label: 'Kind', name: 'kind', value: 'note', includeBlank: false,
+                               options: optionsFrom(ENTRY_KINDS.filter((k) => k !== 'system') as any, ENTRY_KIND_LABELS as any) })}
+                    ${field({ label: 'It happened on', name: 'occurred_at', type: 'date',
+                              value: nowIso().slice(0, 10),
+                              hint: 'Backdate a note written up later.' })}
+                    ${docsEnabled
+                      ? html`<div class="field">
+                               <label for="f_attachment">Attach a file</label>
+                               <input id="f_attachment" type="file" name="attachment">
+                               <p class="hint">Stored against this case and linked from the note.</p>
+                             </div>`
+                      : html`<div class="field">
+                               <label>Attach a file</label>
+                               <p class="hint">Document storage is not switched on yet — enable R2 in
+                                  Cloudflare and the file box appears here.</p>
+                             </div>`}
+                  </div>
+                  <button class="btn btn-primary" type="submit">Add the note</button>
+                  <p class="hint">A note cannot be edited or deleted once saved — the database
+                     refuses it, not just this screen. That is what makes the file worth something
+                     later. If you get something wrong, add a correction: both stand, in order.</p>
                 </form>` : ''}
+
               ${entries.length === 0 ? emptyState('Nothing recorded yet.') : html`
                 <ul class="timeline">
                   ${entries.map((e) => html`
                     <li class="timeline-item">
                       <div class="timeline-meta">
                         ${badge(ENTRY_KIND_LABELS[e.kind] ?? e.kind, e.kind === 'system' ? 'grey' : 'neutral')}
-                        <span class="muted small">${dateTime(e.occurred_at)}${e.author_name ? ` · ${e.author_name}` : ''}</span>
+                        <span class="muted small">${dateOrDateTime(e.occurred_at)}${e.author_name ? ` · ${e.author_name}` : ''}</span>
+                        ${e.occurred_at.slice(0, 10) !== e.created_at.slice(0, 10)
+                          ? html`<span class="muted small">written up ${dateShort(e.created_at)}</span>`
+                          : ''}
                       </div>
                       <div class="timeline-body">${e.body}</div>
+                      ${e.document_id
+                        ? html`<p class="small mt">
+                                 <a href="/documents/${e.document_id}">${e.document_name ?? 'Attached file'}</a>
+                               </p>`
+                        : ''}
                     </li>`)}
                 </ul>`}`)}
           </div>
@@ -757,15 +790,41 @@ export const casesModule: AppModule = {
       const exists = await one<{ id: string }>(c.env.DB, 'SELECT id FROM cases WHERE id = ?', id);
       if (!exists) return c.notFound();
 
-      const f = new FormReader(await c.req.formData());
+      const form = await c.req.formData();
+      const f = new FormReader(form);
       const kind = f.enum('kind', ENTRY_KINDS, { fallback: 'note' })!;
-      const body = f.text('body', { required: true, label: 'Entry', max: 5000 });
+      const body = f.text('body', { required: true, label: 'Note', max: 20000 });
+      // A note written up on Thursday about a call on Monday belongs on Monday,
+      // but the file must still show when it was actually written — the created
+      // date records that, and the page shows both when they differ.
+      const occurredAt = f.date('occurred_at');
       if (!f.valid) return redirectWith(c, `/cases/${id}`, Object.values(f.errors)[0]!, 'err');
 
-      await addEntry(c.env, { entityType: 'case', entityId: id, kind, body, createdBy: user.id });
+      // The attachment is stored first: if it fails, the note is still written
+      // and the person is told, rather than losing what they typed.
+      let documentId: string | null = null;
+      let attachmentWarning = '';
+      const file = form.get('attachment') as unknown as File | string | null;
+      if (file && typeof file !== 'string' && file.size > 0) {
+        const stored = await storeDocument(c.env, {
+          entityType: 'case', entityId: id, file, uploadedBy: user.id,
+          description: 'Attached to a file note',
+        });
+        if (stored && 'error' in stored) attachmentWarning = ` ${stored.error}`;
+        else if (stored) documentId = stored.id;
+      }
+
+      await addEntry(c.env, {
+        entityType: 'case', entityId: id, kind, body, createdBy: user.id,
+        occurredAt: occurredAt ? instantForDate(occurredAt) : undefined,
+        documentId,
+      });
       await run(c.env.DB, 'UPDATE cases SET updated_at = ? WHERE id = ?', nowIso(), id);
-      await auditFrom(c, { action: 'case.entry_added', entityType: 'case', entityId: id, meta: { kind } });
-      return redirectWith(c, `/cases/${id}`, 'Timeline updated.');
+      await auditFrom(c, { action: 'case.entry_added', entityType: 'case', entityId: id,
+        meta: { kind, documentId } });
+      return redirectWith(c, `/cases/${id}`,
+        `Note added — it is now part of the file and cannot be changed.${attachmentWarning}`,
+        attachmentWarning ? 'err' : 'ok');
     });
 
     app.route('/cases', r);

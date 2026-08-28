@@ -7,6 +7,46 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.16.0 — 28 August 2026
+
+### Added
+- **File notes that cannot be altered.** The timeline is where the story of a
+  matter is told, and it is worth something precisely because it cannot be
+  tidied up afterwards. `entries` is now append-only at the database: an edit to
+  the wording, the kind, the dates or the author is refused, and so is a delete.
+  Verified by attempting each directly against the database.
+  - Two things stay changeable because neither alters what was said: whether a
+    note is pinned, and attaching a file to a note already written — and that
+    only ever goes from nothing to something, enforced by the same trigger.
+  - The one exception is the fabricated demonstration data, whose identifiers
+    all begin `demo_`, so it can still be removed.
+  - A correction is a new note. Both stand, in order.
+- **Backdating.** A note can be filed under the day the call or meeting happened
+  while the file still records when it was written up; the timeline shows both
+  when they differ.
+- **A note can carry a file**, linked from the note and listed under Documents.
+  Needs R2; until then the box says so. If an upload fails the note is still
+  saved and the person told — what they typed is never lost to a failed upload.
+- Document storage now has step-by-step instructions in the setup guide,
+  including what R2 is, what it costs, and that everything else works without it.
+
+### Changed
+- **Administration is one set of tabs.** Users, Practice settings and the Audit
+  log were reached by buttons while the rest of the section used tabs — the same
+  navigation wearing two faces. A tab may lead to another page as readily as to
+  another part of this one; what matters is that the whole section is visible
+  from anywhere in it.
+- Settings shows a second, quieter bar for the groups within it, so the two read
+  as an outline rather than two equal choices.
+
+### Fixed
+- **A date somebody typed was stored at midday UTC**, which is the small hours
+  of the following morning in New Zealand — a note backdated to Thursday would
+  have appeared on the file as Friday. Dates are now stored at an instant that
+  falls on the intended day here, in either of our offsets, and a date-only
+  value shows as a date rather than with a fabricated time. Covered by tests
+  across both standard and daylight time.
+
 ## 0.15.0 — 28 August 2026
 
 ### Added

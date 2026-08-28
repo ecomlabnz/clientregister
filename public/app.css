@@ -442,6 +442,14 @@ details[open] > summary { margin-bottom: 12px; }
   background: var(--surface); color: var(--accent);
   border-color: var(--border); border-bottom-color: var(--surface);
 }
+/* A second bar below the first, for the groups within a section. Quieter, so
+   the two read as an outline rather than as two equal choices. */
+.tabs-sub { border-bottom: none; margin-top: -6px; margin-bottom: 14px; gap: 4px; }
+.tabs-sub .tab {
+  border-radius: 999px; border: 1px solid transparent; margin-bottom: 0;
+  padding: 4px 12px; font-size: 0.82rem;
+}
+.tabs-sub .tab.current { background: var(--blue-bg); border-color: transparent; color: var(--accent); }
 
 /* The manual reads as prose rather than as a form. */
 .manual h4 { margin: 18px 0 6px; font-size: 0.95rem; }

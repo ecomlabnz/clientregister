@@ -25,6 +25,29 @@ export function dateTime(value: string | null | undefined): string {
   }).format(d);
 }
 
+/**
+ * The instant to store for a date somebody typed.
+ *
+ * A date-only value has to be stored at a moment that falls on that calendar
+ * date *in New Zealand*, because that is where it will be read back. Midnight
+ * UTC is midday here, which is safely inside the day in either of our offsets;
+ * midday UTC would be the small hours of the following morning, and a note
+ * backdated to Thursday would appear on Friday.
+ */
+export function instantForDate(date: string): string {
+  return `${date.slice(0, 10)}T00:00:00.000Z`;
+}
+
+/** True for a value stored by `instantForDate` — a date, not a moment. */
+export function isDateOnly(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.endsWith('T00:00:00.000Z');
+}
+
+/** A date on its own where no real time was recorded; date and time otherwise. */
+export function dateOrDateTime(value: string | null | undefined): string {
+  return isDateOnly(value) ? dateShort(value) : dateTime(value);
+}
+
 /** "in 3 days" / "5 days ago" / "today". */
 export function relativeDays(value: string | null | undefined, now = Date.now()): string {
   if (!value) return '';

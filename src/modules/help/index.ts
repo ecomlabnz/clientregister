@@ -292,6 +292,33 @@ function sections(origin: string): Section[] {
            match someone already on file, the page says so rather than making a duplicate.</p>`,
     },
     {
+      id: 'notes',
+      title: 'File notes',
+      body: html`
+        <p>Every case has <strong>File notes</strong>: what the client said on the telephone, what
+           was advised, what was decided and when. This is where the story of a matter is told.</p>
+        <p><strong>A note cannot be edited or deleted once saved.</strong> The database refuses it —
+           not merely this screen, so it holds however the record is reached. That is what makes the
+           file worth something later: a note that can be tidied up months afterwards is not a
+           record of what happened, it is a record of what somebody now wishes had happened, and it
+           is worth nothing in a complaint, a standards inquiry or a Tribunal appeal.</p>
+        <p>If you get something wrong, <strong>add a correction as a new note</strong>. Both stand,
+           in order, which is exactly what an honest file looks like.</p>
+        <h4>Backdating</h4>
+        <p>Set <strong>It happened on</strong> to the day of the call or meeting; the note is filed
+           under that date while the file still records the day you wrote it up, and the timeline
+           shows both when they differ. Nothing is hidden by writing a note late — only by not
+           writing it at all.</p>
+        <h4>Attachments</h4>
+        <p>A note can carry a file — a letter, a scan, a signed form — which is then linked from the
+           note and listed under Documents. This needs R2 storage switched on; until it is, the file
+           box says so and everything else works. See
+           <a href="/help#connecting">Connecting Telegram, WhatsApp and email</a> for how to enable
+           it.</p>
+        <p>If a file cannot be stored for any reason, the note is still saved and you are told —
+           what you typed is never lost because an upload failed.</p>`,
+    },
+    {
       id: 'tasks',
       title: 'Tasks',
       body: html`
@@ -556,6 +583,31 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
            ever need to send from <code>@yourdomain</code> rather than Gmail, the register also
            speaks to Resend: set <code>MAIL_PROVIDER</code> to <code>resend</code> and supply
            <code>RESEND_API_KEY</code> instead.</p>
+
+        <h4>5 · Document storage — turning on R2</h4>
+        <p><strong>R2</strong> is Cloudflare's file storage. The register keeps its records in a
+           database, which holds text and numbers well but is the wrong place for a passport scan or
+           a signed employment agreement. R2 is where those files go: the register stores the file
+           there and keeps a note of where it is, who uploaded it and when.</p>
+        <p>Until it is switched on, everything else works — you simply cannot attach files. The
+           upload boxes say so rather than failing.</p>
+        <ol>
+          <li>Open the <a href="https://dash.cloudflare.com" rel="noopener">Cloudflare dashboard</a>
+              and choose <strong>R2 Object Storage</strong> in the left-hand menu.</li>
+          <li>Press <strong>Enable R2</strong>. Cloudflare asks for a card even for the free
+              allowance. That allowance is <strong>10 GB of storage</strong> and generous monthly
+              operation limits, with no charge for data leaving it — a practice storing scans and
+              PDFs is unlikely to approach it, and there is no charge below the limit.</li>
+          <li>Create a bucket called <code>clientregister-docs</code>. Leave the location
+              automatic.</li>
+          <li>In the repository, open <code>wrangler.jsonc</code> and uncomment the
+              <code>r2_buckets</code> block near the bottom — it is already written, with the right
+              bucket name and binding.</li>
+          <li>Commit that change. The deploy that follows connects the two, and the file boxes
+              appear throughout the register.</li>
+        </ol>
+        <p class="hint">If you would rather not give Cloudflare a card, everything except file
+           attachment carries on working indefinitely. Nothing is broken by leaving it off.</p>
 
         <h4>Who triages what arrives</h4>
         <p>Everything from every channel lands in <strong>Inbox</strong> first, verbatim, and
