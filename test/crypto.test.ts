@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   base32Decode, base32Encode, generateTotpSecret, hashPassword, hmacSha256Hex,
   passwordNeedsRehash, sealField, sha256Hex, timingSafeEqualStr, unsealField,
-  totpCode, verifyPassword, verifyTotp,
+  PASSWORD_HASH_PARAMS, totpCode, verifyPassword, verifyTotp,
 } from '../src/core/crypto';
 import { base64Encode } from '../src/core/ids';
 import { validatePassword } from '../src/core/auth';
@@ -10,7 +10,7 @@ import { validatePassword } from '../src/core/auth';
 describe('password hashing', () => {
   it('verifies a correct password and rejects a wrong one', async () => {
     const hash = await hashPassword('correct horse battery staple');
-    expect(hash.startsWith('pbkdf2-sha256$600000$')).toBe(true);
+    expect(hash.startsWith('pbkdf2-sha256$1x100000$')).toBe(true);
     expect(await verifyPassword('correct horse battery staple', hash)).toBe(true);
     expect(await verifyPassword('Correct horse battery staple', hash)).toBe(false);
     expect(await verifyPassword('', hash)).toBe(false);
@@ -30,10 +30,53 @@ describe('password hashing', () => {
     }
   });
 
+  it('never asks the platform for more iterations than it will do', async () => {
+    // Cloudflare Workers throws NotSupportedError above 100,000 iterations in a
+    // single deriveBits call. Local development does not enforce this, so the
+    // only thing standing between a working sign-in and a 500 is this check.
+    expect(PASSWORD_HASH_PARAMS.maxIterationsPerCall).toBe(100_000);
+    expect(PASSWORD_HASH_PARAMS.iterations).toBeLessThanOrEqual(PASSWORD_HASH_PARAMS.maxIterationsPerCall);
+
+    const hash = await hashPassword('a reasonable passphrase');
+    const perCall = Number(hash.split('$')[1]!.split('x')[1]);
+    expect(perCall).toBeLessThanOrEqual(PASSWORD_HASH_PARAMS.maxIterationsPerCall);
+  });
+
+  it('clamps a caller who asks for more iterations than the platform allows', async () => {
+    const hash = await hashPassword('a reasonable passphrase', { rounds: 1, iterations: 600_000 });
+    expect(hash).toContain('$1x100000$');
+    expect(await verifyPassword('a reasonable passphrase', hash)).toBe(true);
+  });
+
+  it('reaches a higher work factor by chaining rounds', async () => {
+    const hash = await hashPassword('a reasonable passphrase', { rounds: 3, iterations: 20_000 });
+    expect(hash).toContain('$3x20000$');
+    expect(await verifyPassword('a reasonable passphrase', hash)).toBe(true);
+    expect(await verifyPassword('a different passphrase', hash)).toBe(false);
+  });
+
+  it('still verifies hashes written in the older single-count format', async () => {
+    // Same derivation as one round, so a bare count must remain readable.
+    const chained = await hashPassword('a reasonable passphrase', { rounds: 1, iterations: 50_000 });
+    const [, , salt, digest] = chained.split('$');
+    const legacy = `pbkdf2-sha256$50000$${salt}$${digest}`;
+    expect(await verifyPassword('a reasonable passphrase', legacy)).toBe(true);
+  });
+
+  it('rejects a stored hash whose parameters the platform could not run', async () => {
+    // Rather than throwing and turning the sign-in page into a 500.
+    const impossible = 'pbkdf2-sha256$1x600000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+    expect(await verifyPassword('anything', impossible)).toBe(false);
+    expect(await verifyPassword('anything', 'pbkdf2-sha256$0x50000$AA==$AA==')).toBe(false);
+    expect(await verifyPassword('anything', 'pbkdf2-sha256$999x50000$AA==$AA==')).toBe(false);
+  });
+
   it('flags hashes made with weaker parameters for rehashing', async () => {
     expect(passwordNeedsRehash(await hashPassword('x'.repeat(12)))).toBe(false);
-    expect(passwordNeedsRehash('pbkdf2-sha256$1000$AAAA$BBBB')).toBe(true);
+    expect(passwordNeedsRehash('pbkdf2-sha256$1x1000$AAAA$BBBB')).toBe(true);
     expect(passwordNeedsRehash('garbage')).toBe(true);
+    // A higher work factor than we currently use does not need redoing.
+    expect(passwordNeedsRehash('pbkdf2-sha256$6x100000$AAAA$BBBB')).toBe(false);
   });
 
   it('enforces a length-first password policy', () => {

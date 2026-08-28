@@ -6,12 +6,29 @@ arrangements for real people. What follows is what is actually implemented, and
 
 ## Authentication
 
-**Passwords.** PBKDF2-SHA256, 600,000 iterations, 16-byte random salt per user,
-256-bit derived key. Argon2 and scrypt are not available in the Workers runtime,
-so the iteration count carries the cost. The count is stored inside the hash, so
-raising it later re-hashes each user transparently on their next sign-in.
+**Passwords.** PBKDF2-SHA256 with a 16-byte random salt per user and a 256-bit
+derived key. Argon2 and scrypt are not available in the Workers runtime, so the
+iteration count carries the cost — and the platform caps a single `deriveBits`
+call at **100,000 iterations**, well under the 600,000 OWASP recommends for
+PBKDF2-SHA256.
+
+The cap is per call, not per password, so the work factor is expressed as
+`rounds × iterations`: each round's output is fed in as the next round's input,
+and an attacker has to repeat every round to test a candidate. The default is
+one round of 100,000 — the most the platform will do in about 15ms of CPU,
+which is what the Workers **Free** plan allows per request. On the Workers Paid
+plan (30s of CPU) raise `PBKDF2_ROUNDS` in `src/core/crypto.ts`; six rounds
+reaches the OWASP figure. Both parameters are stored inside each hash, so
+raising them re-hashes each user transparently on their next sign-in.
+
 Minimum length 12 characters, with no composition rules — length beats
 "must contain a symbol".
+
+Be honest about where this sits: one round of 100,000 is below current guidance
+and is a platform ceiling, not a considered choice. It is mitigated by the
+12-character minimum, per-account lockout, per-IP and per-account throttling,
+and the fact that the hashes are only reachable through a D1 compromise. If you
+are on the Paid plan, raise the rounds.
 
 **Unknown accounts.** A password verification always runs, against a fixed dummy
 hash, so sign-in timing does not reveal which addresses exist.
@@ -173,6 +190,9 @@ Stated plainly, so nobody assumes otherwise:
   self-service login for clients, by design.
 - **No penetration test.** This is a careful build, not an assured one. If the
   practice's obligations call for assurance, commission a test.
+- **Password hashing is capped by the platform**, as described above — one
+  round of 100,000 PBKDF2-SHA256 iterations by default rather than the 600,000
+  OWASP recommends.
 
 ## Reporting a problem
 

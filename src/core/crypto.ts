@@ -11,13 +11,39 @@
 
 import { base64Decode, base64Encode } from './ids';
 
-const PBKDF2_ITERATIONS = 600_000;
+/**
+ * Workers refuses more than 100,000 PBKDF2 iterations in a single deriveBits
+ * call — it throws NotSupportedError rather than doing the work. Local
+ * development does not enforce this, so the cap has to be respected in code.
+ */
+const MAX_PBKDF2_ITERATIONS = 100_000;
+
+/**
+ * The cap is per call, not per password. Chaining rounds — feeding each
+ * round's output in as the next round's input — multiplies the work an
+ * attacker must repeat, without any single call breaching the platform limit.
+ * `PBKDF2_ROUNDS x PBKDF2_ITERATIONS` is therefore the real work factor.
+ *
+ * One round (100,000) is the most the platform will do in roughly 15ms of CPU,
+ * which is what the Workers Free plan allows per request. On the Paid plan the
+ * rounds can be raised — six of them reaches the 600,000 OWASP recommends for
+ * PBKDF2-SHA256 — and because the parameters are stored inside each hash,
+ * raising it re-hashes users transparently as they next sign in.
+ */
+const PBKDF2_ITERATIONS = MAX_PBKDF2_ITERATIONS;
+const PBKDF2_ROUNDS = 1;
 const PBKDF2_KEYLEN_BITS = 256;
+
+export const PASSWORD_HASH_PARAMS = {
+  rounds: PBKDF2_ROUNDS,
+  iterations: PBKDF2_ITERATIONS,
+  maxIterationsPerCall: MAX_PBKDF2_ITERATIONS,
+} as const;
 
 const enc = new TextEncoder();
 
-async function pbkdf2(password: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> {
-  const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+async function deriveOnce(material: Uint8Array, salt: Uint8Array, iterations: number): Promise<Uint8Array> {
+  const key = await crypto.subtle.importKey('raw', material as BufferSource, 'PBKDF2', false, ['deriveBits']);
   const bits = await crypto.subtle.deriveBits(
     { name: 'PBKDF2', salt: salt as BufferSource, iterations, hash: 'SHA-256' },
     key,
@@ -26,17 +52,64 @@ async function pbkdf2(password: string, salt: Uint8Array, iterations: number): P
   return new Uint8Array(bits);
 }
 
-export async function hashPassword(password: string): Promise<string> {
+async function pbkdf2(
+  password: string,
+  salt: Uint8Array,
+  iterations: number,
+  rounds: number,
+): Promise<Uint8Array> {
+  let block: Uint8Array = enc.encode(password);
+  for (let i = 0; i < rounds; i++) {
+    block = await deriveOnce(block, salt, iterations);
+  }
+  return block;
+}
+
+/** Total iterations a stored hash represents. */
+function workFactor(rounds: number, iterations: number): number {
+  return rounds * iterations;
+}
+
+/**
+ * Hash a password. The cost parameters are written into the returned string,
+ * so raising them later leaves existing credentials verifiable and lets
+ * `passwordNeedsRehash` upgrade them on next sign-in.
+ */
+export async function hashPassword(
+  password: string,
+  params: { rounds: number; iterations: number } = PASSWORD_HASH_PARAMS,
+): Promise<string> {
+  const iterations = Math.min(params.iterations, MAX_PBKDF2_ITERATIONS);
+  const rounds = Math.max(1, params.rounds);
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const hash = await pbkdf2(password, salt, PBKDF2_ITERATIONS);
-  return `pbkdf2-sha256$${PBKDF2_ITERATIONS}$${base64Encode(salt)}$${base64Encode(hash)}`;
+  const hash = await pbkdf2(password, salt, iterations, rounds);
+  return `pbkdf2-sha256$${rounds}x${iterations}$${base64Encode(salt)}$${base64Encode(hash)}`;
+}
+
+interface HashParams { rounds: number; iterations: number }
+
+/**
+ * Read the cost parameters out of a stored hash. Accepts both the current
+ * `<rounds>x<iterations>` form and the earlier bare iteration count.
+ */
+function parseParams(field: string): HashParams | null {
+  const [roundsPart, iterationsPart] = field.includes('x')
+    ? field.split('x')
+    : ['1', field];
+  const rounds = Number(roundsPart);
+  const iterations = Number(iterationsPart);
+  if (!Number.isInteger(rounds) || rounds < 1 || rounds > 64) return null;
+  if (!Number.isInteger(iterations) || iterations < 1000 || iterations > MAX_PBKDF2_ITERATIONS) return null;
+  return { rounds, iterations };
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const parts = stored.split('$');
   if (parts.length !== 4 || parts[0] !== 'pbkdf2-sha256') return false;
-  const iterations = Number(parts[1]);
-  if (!Number.isInteger(iterations) || iterations < 1000 || iterations > 5_000_000) return false;
+
+  const params = parseParams(parts[1]!);
+  if (!params) return false;
+
   let salt: Uint8Array;
   let expected: Uint8Array;
   try {
@@ -45,16 +118,28 @@ export async function verifyPassword(password: string, stored: string): Promise<
   } catch {
     return false;
   }
-  const actual = await pbkdf2(password, salt, iterations);
-  return timingSafeEqual(actual, expected);
+
+  // A stored hash is data, and data can be wrong — truncated by a bad
+  // migration, or written by a build with different parameters. A bad row
+  // must fail the sign-in, never take the sign-in page down with it.
+  try {
+    const actual = await pbkdf2(password, salt, params.iterations, params.rounds);
+    return timingSafeEqual(actual, expected);
+  } catch (err) {
+    console.error('password verification failed against a stored hash', err);
+    return false;
+  }
 }
 
-/** True when the hash was made with weaker parameters than we now use. */
+/** True when the hash was made with a weaker work factor than we now use. */
 export function passwordNeedsRehash(stored: string): boolean {
   const parts = stored.split('$');
   if (parts.length !== 4 || parts[0] !== 'pbkdf2-sha256') return true;
-  return Number(parts[1]) < PBKDF2_ITERATIONS;
+  const params = parseParams(parts[1]!);
+  if (!params) return true;
+  return workFactor(params.rounds, params.iterations) < workFactor(PBKDF2_ROUNDS, PBKDF2_ITERATIONS);
 }
+
 
 export function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;

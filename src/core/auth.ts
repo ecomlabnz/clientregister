@@ -9,7 +9,7 @@
 import type { Context, Next } from 'hono';
 import type { AppContext, Env, User } from '../types';
 import { one, nowIso, run } from './db';
-import { hashPassword, passwordNeedsRehash, verifyPassword } from './crypto';
+import { hashPassword, PASSWORD_HASH_PARAMS, passwordNeedsRehash, verifyPassword } from './crypto';
 import { readSession, sessionTokenFrom } from './session';
 import { can, type Permission } from './rbac';
 
@@ -132,9 +132,14 @@ export async function authenticate(env: Env, email: string, password: string): P
   return { ok: true, user, needsTotp: row.totp_enabled === 1 && !!row.totp_secret };
 }
 
-/** A syntactically valid hash that no password matches. */
-const DUMMY_HASH =
-  'pbkdf2-sha256$600000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+/**
+ * A syntactically valid hash that no password matches, used to keep the work
+ * done for an unknown email indistinguishable from the work done for a real
+ * one. Its cost parameters must stay in step with `hashPassword`, or the
+ * timing difference it exists to hide reappears.
+ */
+const DUMMY_HASH = `pbkdf2-sha256$${PASSWORD_HASH_PARAMS.rounds}x${PASSWORD_HASH_PARAMS.iterations}$` +
+  'AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 
 /** Minimum viable password policy: length beats composition rules. */
 export function validatePassword(password: string): string | null {
