@@ -21,6 +21,7 @@ import { handleWhatsAppVerify, handleWhatsAppWebhook } from './ingest/whatsapp';
 import { page } from './ui/layout';
 import { html } from './ui/html';
 import { pageHeader } from './ui/components';
+import { audit, clientIp } from './core/audit';
 
 /** Paths that authenticate by signature and must bypass the CSRF cookie check. */
 const WEBHOOK_PATHS = ['/api/ingest/telegram', '/api/ingest/whatsapp'];
@@ -58,7 +59,31 @@ export function createApp(): Hono<AppContext> {
   app.onError((err, c) => {
     // Never leak internals to the browser; the detail goes to the log with the
     // request id so it can be correlated.
-    console.error('unhandled error', c.get('requestId'), c.req.method, c.req.path, err);
+    const requestId = c.get('requestId');
+    console.error('unhandled error', requestId, c.req.method, c.req.path, err);
+
+    // Also record it where an administrator can actually find it. Logs are
+    // ephemeral and need a live tail; the audit log is queryable after the
+    // fact, which is what you have when a user reports a reference number.
+    try {
+      c.executionCtx.waitUntil(
+        audit(c.env, {
+          action: 'app.error',
+          actorId: c.get('user')?.id ?? null,
+          actorLabel: c.get('user')?.email ?? 'anonymous',
+          ip: clientIp(c.req.raw),
+          meta: {
+            requestId,
+            method: c.req.method,
+            path: c.req.path,
+            message: err instanceof Error ? err.message : String(err),
+            name: err instanceof Error ? err.name : undefined,
+          },
+        }),
+      );
+    } catch {
+      // No execution context (or the audit write failed): the console line above stands.
+    }
     if (c.req.path.startsWith('/api/')) return c.json({ error: 'internal error' }, 500);
     return page(c, { title: 'Something went wrong', status: 500 }, html`
       ${pageHeader('Something went wrong', 'The error has been logged.')}

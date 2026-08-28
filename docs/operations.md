@@ -96,6 +96,20 @@ The initial four migrations (`0001`–`0004`) were applied directly through the
 Cloudflare API when the register was built, and recorded in `d1_migrations`, so
 `wrangler d1 migrations apply` picks up cleanly from `0005` onward.
 
+## Plan requirements
+
+The Workers **Free** plan allows 10ms of CPU per request. Hashing a password
+costs roughly 15ms, so sign-in sits just over the line and relies on the burst
+allowance Cloudflare grants to workers that exceed the limit infrequently. If
+sign-in ever fails with Cloudflare error 1102 (`Worker exceeded resource
+limits`), that is what happened — the Workers **Paid** plan ($5/month) raises
+the limit to 30 seconds and removes the question. R2 document storage needs a
+payment method on the account anyway.
+
+On the Paid plan, raise the password work factor to the OWASP figure by setting
+`PBKDF2_ROUNDS` to `6` in `src/core/crypto.ts` and deploying. Existing users are
+re-hashed transparently the next time they sign in.
+
 ## Backups
 
 **There is no automated backup.** Set one up before the register holds anything
