@@ -7,6 +7,45 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.23.0 — 28 August 2026
+
+### Added
+- **Invoices.** Raised from a quote in one press, or found under Quotes →
+  Invoices. An invoice is a new record rather than a quote in another state: a
+  quote is an offer that can be withdrawn or superseded, an invoice is a demand
+  with a number in a sequence, and those are different lifetimes. The lines are
+  copied, so editing the quote or the catalogue afterwards changes nothing, and
+  the quote is not consumed — it can reasonably be invoiced more than once,
+  which is what staged fees are.
+- **An issued invoice cannot be altered.** Not the amounts, not the dates, not
+  the lines, not the number. Triggers refuse every change but the ones that
+  legitimately happen afterwards: payment, voiding, and the record of a push to
+  Xero. Proved by attacking the database directly rather than through the
+  application — every one of those updates is refused, and an issued invoice
+  cannot gain or lose a line while a draft still can.
+- **Nothing is deleted; a wrong invoice is voided** with its reason, and its
+  number stays in the sequence. A gap in an invoice sequence is the first thing
+  an auditor asks about.
+- **Payments are added, never edited.** A mistake is corrected by a second
+  entry marked as an adjustment, which is how a ledger stays a record rather
+  than an opinion. Every payment carries the person who recorded it —
+  `created_by` is NOT NULL and RESTRICT.
+- **A printable tax invoice** on the practice's letterhead, with the GST
+  number, bank account, payments already received and what is now due. Headed
+  *Tax invoice* when GST applies and *Invoice* when it does not.
+- **An invoice must be addressed to somebody.** A quote may sit against an
+  inquiry that has not become a client yet; an invoice may not, and neither
+  raising nor issuing one will proceed without a client on it.
+- **Somewhere for Xero to land**, before it is connected: the invoice carries
+  the Xero identifier, when it was pushed and any error, so the two systems can
+  later agree about which invoice is which rather than being matched by amount.
+
+### Fixed
+- **A trigger that would never have fired.** The one meant to stop lines being
+  deleted from an issued invoice was written `NOT IN ('draft', NULL)`, and
+  `NULL NOT IN (…)` is NULL — which is not true, so it never fired at all. It
+  uses IFNULL now, and a test names the mistake so it is not made twice.
+
 ## 0.22.0 — 28 August 2026
 
 ### Added

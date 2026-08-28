@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.23.0', date: '28 August 2026',
+    notes: [
+      'Invoices, raised from a quote in one press. The quote is left as it is.',
+      'Once issued, an invoice cannot be altered — the database refuses. Void it and raise another.',
+      'Payments are recorded and never edited; a mistake is corrected by a second entry.',
+      'A printable tax invoice on your letterhead, with your bank details and payments received.',
+    ],
+  },
+  {
     version: '0.22.0', date: '28 August 2026',
     notes: [
       'Conversations: Telegram and WhatsApp as two-way threads, replied to from inside the app.',
@@ -361,6 +370,36 @@ function sections(origin: string): Section[] {
            copies it across — one fee line per quote line, keeping the split treatment right — so
            the money is entered once, not twice. Editing the quote afterwards does not change those
            fee lines; edit them on the case.</p>`,
+    },
+    {
+      id: 'invoices',
+      title: 'Invoices',
+      body: html`
+        <p>An invoice is raised from a quote — the <strong>Invoices</strong> panel on any quote —
+           or found under <strong>Quotes → Invoices</strong>. The lines are copied onto a new draft;
+           the quote is left exactly as it is, because a quote can reasonably be invoiced more than
+           once. Staged fees are precisely that.</p>
+        <h4>Draft, then issued</h4>
+        <p>While it is a draft you can add and remove lines like anything else. When you issue it
+           you set the date, the due date is worked out from your payment terms, and after that
+           <strong>it cannot be altered</strong> — not the amounts, not the dates, not the lines,
+           not the number. That is the database refusing, not the screen being polite: an invoice is
+           a tax document, and one that can be edited afterwards is not evidence of anything.</p>
+        <p>If an issued invoice is wrong, <strong>void</strong> it with a reason and raise another.
+           The number stays in the sequence — a gap is the first thing somebody asks about.</p>
+        <h4>Payments</h4>
+        <p>Record what arrives and the invoice moves itself to part paid or paid. Payments are added
+           and never edited: a mistake is corrected by a second entry, marked
+           <strong>Adjustment</strong> with a negative amount, which is how a ledger stays a record
+           rather than an opinion.</p>
+        <h4>The document</h4>
+        <p><strong>Print view</strong> gives the invoice on your letterhead with your GST number,
+           your bank account and the payments already received. It is headed <em>Tax invoice</em>
+           when GST applies and simply <em>Invoice</em> when it does not.</p>
+        <h4>Xero</h4>
+        <p>Not connected yet. The invoice already carries somewhere to record a push — the Xero
+           identifier and when it went — so that when it is connected the two systems can agree
+           about which invoice is which, rather than matching them up by amount and hoping.</p>`,
     },
     {
       id: 'inquiries',

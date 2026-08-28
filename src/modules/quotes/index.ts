@@ -36,6 +36,7 @@ import {
 import { asInteger, readSettings, type SettingsGroup } from '../../core/settings';
 import { feeSettings } from '../fees';
 import { practiceDetails } from '../../core/practice';
+import { invoiceFromQuote } from '../../core/invoices';
 import { renderEmailHtml } from '../../core/richtext';
 import { mailConfigured } from '../../mail/provider';
 import { flushQueue, queueEmail } from '../../mail/queue';
@@ -277,6 +278,8 @@ export const quotesModule: AppModule = {
       const accepted = rows.filter((q) => q.status === 'accepted');
       const outstanding = rows.filter((q) => q.status === 'sent');
 
+      const invoiceCount = await count(c.env.DB,
+        `SELECT COUNT(*) AS n FROM invoices WHERE status IN ('issued','part_paid')`);
       const counts = await one<{ live: number; accepted: number; closed: number; total: number }>(
         c.env.DB,
         `SELECT SUM(status IN ('draft','sent')) AS live,
@@ -303,6 +306,7 @@ export const quotesModule: AppModule = {
           ${views.map((v) => html`
             <a class="${v.id === view && !status ? 'tab current' : 'tab'}"
                href="/quotes?view=${v.id}">${v.label} <span class="muted">${v.count}</span></a>`)}
+          <a class="tab" href="/invoices">Invoices <span class="muted">${invoiceCount}</span></a>
         </nav>
         <form method="get" action="/quotes" class="filters" data-live-search>
           <input type="hidden" name="view" value="${view}">
@@ -546,7 +550,7 @@ export const quotesModule: AppModule = {
       );
       if (!q) return c.notFound();
 
-      const [entries, terms, lines, items, fees, qSettings, stages] = await Promise.all([
+      const [entries, terms, lines, items, fees, qSettings, stages, quoteInvoices] = await Promise.all([
         listEntries(c.env, 'quote', id),
         practiceDetails(c.env),
         quoteLines(c.env, id),
@@ -554,6 +558,8 @@ export const quotesModule: AppModule = {
         feeSettings(c.env),
         quoteSettings(c.env),
         quoteStages(c.env, id),
+        all<{ id: string; ref: string; status: string; gross_cents: number }>(
+          c.env.DB, `SELECT id, ref, status, gross_cents FROM invoices WHERE quote_id = ? ORDER BY created_at`, id),
       ]);
       const stageTotal = stages.reduce((sum, s) => sum + s.gross_cents, 0);
       const csrf = c.get('session')!.csrf;
@@ -798,6 +804,24 @@ export const quotesModule: AppModule = {
                 ${csrfField(csrf)}
                 <button class="btn btn-primary" type="submit">Add to case fees</button>
               </form>`) : ''}
+
+            ${writable ? card('Invoices', html`
+              ${quoteInvoices.length === 0
+                ? html`<p class="small muted">Nothing has been invoiced from this quote yet.</p>`
+                : html`<ul class="list">${quoteInvoices.map((inv) => html`
+                    <li class="list-row">
+                      <div><a href="/invoices/${inv.id}"><code>${inv.ref}</code></a>
+                        <span class="muted small">${money(inv.gross_cents, q.currency)}</span></div>
+                      <div>${badge(inv.status, statusTone(inv.status === 'paid' ? 'approved' : inv.status))}</div>
+                    </li>`)}</ul>`}
+              <form method="post" action="/quotes/${q.id}/invoice" class="row-form mt">
+                ${csrfField(csrf)}
+                ${field({ label: 'Payment terms (days)', name: 'term_days', type: 'number', value: '7' })}
+                <button class="btn btn-primary" type="submit">Raise an invoice</button>
+              </form>
+              <p class="hint">The lines are copied onto a new draft invoice; this quote is left
+                 exactly as it is. A quote can reasonably be invoiced more than once — staged fees
+                 are precisely that — so nothing here consumes it.</p>`) : ''}
 
             ${card('Timeline', entries.length === 0 ? emptyState('Nothing recorded yet.') : html`
               <ul class="timeline">${entries.map((e) => html`
@@ -1539,6 +1563,21 @@ export const quotesModule: AppModule = {
       }
       await auditFrom(c, { action: 'quote.stages_generated', entityType: 'quote', entityId: id, meta: { stages: n } });
       return redirectWith(c, `/quotes/${id}`, `Drafted ${n} stage(s). Reword them to suit the matter.`);
+    });
+
+    r.post('/:id/invoice', requirePermission('quote:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const f = new FormReader(await c.req.formData());
+      const raw0 = Number(f.optional('term_days', { max: 4 }) ?? '7');
+      const termDays = Number.isFinite(raw0) ? Math.max(0, Math.min(365, Math.round(raw0))) : 7;
+
+      const result = await invoiceFromQuote(c.env, id, c.get('user')!.id, { termDays });
+      if (!result.ok) return redirectWith(c, `/quotes/${id}`, result.message, 'err');
+
+      await auditFrom(c, { action: 'quote.invoiced', entityType: 'quote', entityId: id,
+        meta: { invoice: result.ref } });
+      return redirectWith(c, `/invoices/${result.id}`,
+        `${result.ref} raised as a draft. Check it, then issue it.`, 'ok');
     });
 
     r.post('/:id/to-fees', requirePermission('register:write'), async (c) => {

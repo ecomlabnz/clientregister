@@ -16,6 +16,7 @@ import { casesModule } from './modules/cases';
 import { feesModule } from './modules/fees';
 import { inquiriesModule } from './modules/inquiries';
 import { quotesModule } from './modules/quotes';
+import { invoicesModule } from './modules/invoices';
 import { tasksModule } from './modules/tasks';
 import { documentsModule } from './modules/documents';
 import { inboxModule } from './modules/inbox';
@@ -38,6 +39,7 @@ export const registeredModules: AppModule[] = [
   casesModule,
   feesModule,
   quotesModule,
+  invoicesModule,
   tasksModule,
   documentsModule,
   knowledgeModule,
