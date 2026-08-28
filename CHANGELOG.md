@@ -7,7 +7,32 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
-## 0.5.0 — 28 August 2026
+## 0.6.0 — 28 August 2026
+
+### Added
+- **Case tags.** Free-form labels created the moment you type one — no
+  administrator required. Shown on the case list, filterable, and matched
+  case-insensitively so "AEWV" and "aewv" are one tag.
+- **Case parties.** A case can now have several clients on it, each in a role:
+  principal applicant, secondary applicant, supporting partner, dependent
+  child, employer, sponsor, agent. The role belongs to the link, so a company
+  can be the client of its own accreditation and the employer on somebody
+  else's work visa at the same time.
+- **Related people** on a client page — everyone appearing on a matter with
+  them, which is how a family group shows itself without a second list to
+  maintain.
+- **Organisation contacts.** A person can be linked to a company client with
+  their role there, and one of them named as its primary contact.
+- **Leads and clients** are now separate views of the same list, with
+  conversion as a one-click status change.
+- **Demonstration data**: 20 clients and 15 cases covering families, employers
+  and the deadline-driven matters. Marked three ways and removable in one click
+  from Admin.
+
+### Changed
+- "Prospect" is now called **Lead**, and "Active" is called **Client**.
+
+
 
 ### Added
 - **Settings page with tabs.** Practice, Security, Fees and GST, Alerts and

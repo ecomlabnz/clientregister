@@ -27,3 +27,13 @@ export async function clientOptions(env: Env, limit = 500): Promise<Array<{ valu
   );
   return rows.map((r) => ({ value: r.id, label: `${r.full_name} (${r.ref})` }));
 }
+
+/** Organisation clients, for linking a person to the company they work for. */
+export async function organisationOptions(env: Env): Promise<Array<{ value: string; label: string }>> {
+  const rows = await all<ClientOption>(
+    env.DB,
+    `SELECT id, ref, full_name FROM clients
+      WHERE kind = 'organisation' AND status != 'archived' ORDER BY full_name LIMIT 500`,
+  );
+  return rows.map((r) => ({ value: r.id, label: `${r.full_name} (${r.ref})` }));
+}
