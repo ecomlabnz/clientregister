@@ -32,6 +32,72 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.20.0', date: '28 August 2026',
+    notes: [
+      'A banner when a message arrives in the inbox, in whichever corner you choose.',
+      'A choice of five sounds, made by the browser rather than downloaded — or none.',
+      'You set how often the register looks, or turn the checking off altogether.',
+    ],
+  },
+  {
+    version: '0.19.0', date: '28 August 2026',
+    notes: [
+      'An Assistant page: paste an email or notes, and it proposes an inquiry or a client.',
+      '“Brief me on this matter” on every case — where things stand and what to do next.',
+      'Nothing the AI proposes is saved until somebody presses the button.',
+      'The register works exactly as before with the AI switched off.',
+    ],
+  },
+  {
+    version: '0.18.0', date: '28 August 2026',
+    notes: [
+      'Three more themes — Blossom, Lagoon and Aurora — each with day and night.',
+      'Alerts, Tasks and Quotes now have the same tabs with counts as Clients and Cases.',
+      'Search answers as you type on those lists.',
+    ],
+  },
+  {
+    version: '0.17.0', date: '28 August 2026',
+    notes: [
+      'Preferences of your own: where you land, how many rows, which tab opens first.',
+      'My account is tabbed, and so is the new client form.',
+      'Settings lay out across the page instead of one narrow column.',
+      'Tab bars stay under the navigation while a page scrolls.',
+    ],
+  },
+  {
+    version: '0.16.0', date: '28 August 2026',
+    notes: [
+      'File notes on every case that cannot be altered or deleted, only added to.',
+      'A note can be backdated to the day it happened, and can carry a file.',
+      'Administration is one set of tabs rather than a page of buttons.',
+    ],
+  },
+  {
+    version: '0.15.0', date: '28 August 2026',
+    notes: [
+      'Payment stages on a quote, and your bank details — off by default.',
+      'Quote lines can be edited, not only added and removed.',
+    ],
+  },
+  {
+    version: '0.14.0', date: '28 August 2026',
+    notes: [
+      'Emails can be sent as formatted HTML as well as plain text.',
+      'Case types are yours to edit under Settings, with sixty-six to start from.',
+      'The working area is wider on a desktop, and compose uses all of it.',
+    ],
+  },
+  {
+    version: '0.13.0', date: '28 August 2026',
+    notes: [
+      'Search that answers as you type on cases and clients.',
+      'Column headings stay put while a long list scrolls.',
+      'Names and email addresses are editable under Admin → Users.',
+      'Lists fit a phone: columns give way rather than being crushed.',
+    ],
+  },
+  {
     version: '0.12.0', date: '28 August 2026',
     notes: [
       'Quotes are now itemised: description, quantity, unit price, and a line for each thing.',
@@ -440,8 +506,20 @@ function sections(origin: string): Section[] {
            practice works and one answer serves everybody, so an administrator owns it; a
            <strong>preference</strong> is yours, and needing an administrator to change where you
            land after signing in would be absurd.</p>
+        <h4>Being told when something arrives</h4>
+        <p>Under <strong>My account → Preferences → Alerts</strong> you decide whether a small
+           banner appears when a message lands in the inbox, which corner it appears in, which
+           sound it makes, and how often the register looks. Set the check to <strong>Never</strong>
+           and it stops asking altogether — no banner, no sound, and no request going out.</p>
+        <p>The sounds are made by the browser rather than downloaded, so nothing is fetched and
+           there is nothing to load. Two things worth knowing: a browser will not make a sound
+           until you have clicked something on the page, so the first alert after opening a fresh
+           tab may be silent; and while the tab is in the background the register does not check at
+           all, because the answer would only be shown when you came back to it.</p>
+        <p>The banner carries the channel and the subject line and nothing else — never the body of
+           a message — and clicking it opens that message in the inbox.</p>
         <h4>Appearance</h4>
-        <p>Pick one of three themes — <strong>Slate</strong>, <strong>Warm</strong> or
+        <p>Pick one of six themes — <strong>Slate</strong>, <strong>Warm</strong> or
            <strong>Ink</strong> for quiet working colours, or <strong>Blossom</strong>,
            <strong>Lagoon</strong> and <strong>Aurora</strong> for bold ones — and choose whether
            the register follows your device's day and night setting or stays light or dark all the

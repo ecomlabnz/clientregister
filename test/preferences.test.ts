@@ -67,3 +67,24 @@ describe('every declared preference is usable', () => {
     expect(PREFERENCE_GROUPS.length).toBeGreaterThan(0);
   });
 });
+
+describe('a group of preferences is saved on its own', () => {
+  it('puts every preference in exactly one group', () => {
+    const seen = new Map<string, string>();
+    for (const group of PREFERENCE_GROUPS) {
+      for (const def of group.preferences) {
+        expect(seen.has(def.key), `${def.key} appears in two groups`).toBe(false);
+        seen.set(def.key, group.id);
+      }
+    }
+    // Each group is its own form. A handler that iterated every preference
+    // instead of the submitted group's would read the other group's unticked
+    // boxes as "off" and quietly turn them off.
+    expect([...seen.keys()].sort()).toEqual(ALL_PREFERENCES.map((p) => p.key).sort());
+  });
+
+  it('gives every group a distinct id to submit under', () => {
+    const ids = PREFERENCE_GROUPS.map((g) => g.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});

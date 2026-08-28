@@ -266,6 +266,126 @@
     button.addEventListener('click', function () { window.print(); });
   });
 
+  // Being told when something arrives.
+  //
+  // A small poll rather than a socket: this is a practice of a few people, the
+  // answer is two numbers, and a connection held open for a message that comes
+  // twice an hour is a cost with nothing to show for it. The interval is the
+  // person's own, and "never" really means no request at all.
+  //
+  // The sounds are synthesised rather than downloaded. Partly because it is
+  // lighter — no files, no requests — and partly because the content policy
+  // permits no media at all, so an audio file would be blocked outright.
+  (function notifications() {
+    var body = document.body;
+    if (body.getAttribute('data-notify') !== '1') return;
+    var every = parseInt(body.getAttribute('data-notify-every') || '0', 10);
+    if (!every || !window.fetch) return;
+
+    var position = body.getAttribute('data-notify-position') || 'bottom-right';
+    var soundName = body.getAttribute('data-notify-sound') || 'chime';
+    // Two pieces of state, not one: "we have not asked yet" and "the inbox is
+    // empty" are different things, and conflating them swallows the first
+    // message to arrive into an empty inbox.
+    var primed = false;
+    var lastSeen = null;
+    var audio = null;
+
+    // Two soft notes, one clear note, two low taps, a short run, three warm
+    // ones. Each is a frequency list and a shape; nothing here is a recording.
+    var SOUNDS = {
+      chime: { notes: [880, 1318.5], gap: 0.12, type: 'sine', length: 0.5 },
+      ping: { notes: [1046.5], gap: 0, type: 'sine', length: 0.35 },
+      knock: { notes: [196, 196], gap: 0.14, type: 'triangle', length: 0.16 },
+      rise: { notes: [523.25, 659.25, 784, 1046.5], gap: 0.07, type: 'sine', length: 0.22 },
+      marimba: { notes: [659.25, 783.99, 1046.5], gap: 0.11, type: 'triangle', length: 0.4 },
+    };
+
+    var play = function (name) {
+      var spec = SOUNDS[name];
+      if (!spec) return;
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      try {
+        // Created on demand and kept: browsers refuse to start one before the
+        // page has been interacted with, so the first alert may be silent.
+        // That is the browser's rule, not a fault here.
+        if (!audio) audio = new Ctx();
+        if (audio.state === 'suspended') audio.resume();
+        spec.notes.forEach(function (frequency, i) {
+          var at = audio.currentTime + i * spec.gap;
+          var osc = audio.createOscillator();
+          var gain = audio.createGain();
+          osc.type = spec.type;
+          osc.frequency.setValueAtTime(frequency, at);
+          // A quick attack and a long tail: a square-edged note sounds like a
+          // fault, a rounded one sounds like a notification.
+          gain.gain.setValueAtTime(0.0001, at);
+          gain.gain.exponentialRampToValueAtTime(0.16, at + 0.012);
+          gain.gain.exponentialRampToValueAtTime(0.0001, at + spec.length);
+          osc.connect(gain).connect(audio.destination);
+          osc.start(at);
+          osc.stop(at + spec.length + 0.05);
+        });
+      } catch (e) { /* No audio available; the banner still appears. */ }
+    };
+
+    var banner = function (message, href) {
+      var host = document.querySelector('.toasts');
+      if (!host) {
+        host = document.createElement('div');
+        host.className = 'toasts toasts-' + position;
+        document.body.appendChild(host);
+      }
+      var toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.setAttribute('role', 'status');
+      var link = document.createElement('a');
+      link.href = href;
+      link.textContent = message;
+      var close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'toast-close';
+      close.setAttribute('aria-label', 'Dismiss');
+      close.textContent = '×';
+      close.addEventListener('click', function () { toast.remove(); });
+      toast.appendChild(link);
+      toast.appendChild(close);
+      host.appendChild(toast);
+      window.setTimeout(function () { toast.remove(); }, 12000);
+    };
+
+    var check = function () {
+      // Nothing is asked for while the tab is in the background: the answer
+      // would only be shown when it comes forward anyway.
+      if (document.hidden) return;
+      window.fetch('/inbox/api/pending', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (data) {
+          var latest = data && data.latest;
+          var id = latest ? latest.id : null;
+          // The first answer after a page load sets the mark rather than
+          // announcing what was already waiting before you arrived.
+          if (!primed) { primed = true; lastSeen = id; return; }
+          if (id === lastSeen) return;
+          lastSeen = id;
+          // The top of the queue changed because someone triaged it, not
+          // because anything arrived. Nothing to announce.
+          if (!latest) return;
+          var channel = latest.channel ? latest.channel.charAt(0).toUpperCase() + latest.channel.slice(1) : 'Inbox';
+          banner(
+            channel + ': ' + (latest.subject || 'a new message is waiting'),
+            '/inbox/' + latest.id,
+          );
+          play(soundName);
+        })
+        .catch(function () { /* Offline or signed out; try again next time. */ });
+    };
+
+    check();
+    window.setInterval(check, Math.max(15, every) * 1000);
+  })();
+
   // "/" focuses the first search box on the page.
   document.addEventListener('keydown', function (event) {
     if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;

@@ -164,6 +164,51 @@ export const PREFERENCE_GROUPS: PreferenceGroup[] = [
       },
     ],
   },
+  {
+    id: 'notifications',
+    title: 'Being told about things',
+    description:
+      'When something arrives in the inbox while you have the register open, a banner appears and, '
+      + 'if you want, a sound plays. Browsers only allow a sound after you have interacted with the '
+      + 'page, so the first one may be silent — that is the browser, not the setting.',
+    order: 20,
+    preferences: [
+      {
+        key: 'pref.notify', type: 'boolean', default: 'true', label: 'Show a banner when something arrives',
+      },
+      {
+        key: 'pref.notify_position', type: 'enum', default: 'bottom-right', label: 'Where the banner appears',
+        options: [
+          { value: 'top-left', label: 'Top left' },
+          { value: 'top-right', label: 'Top right' },
+          { value: 'bottom-left', label: 'Bottom left' },
+          { value: 'bottom-right', label: 'Bottom right' },
+        ],
+      },
+      {
+        key: 'pref.notify_sound', type: 'enum', default: 'chime', label: 'Sound',
+        help: 'Played once when something new arrives.',
+        options: [
+          { value: 'none', label: 'Silent' },
+          { value: 'chime', label: 'Chime — two soft notes' },
+          { value: 'ping', label: 'Ping — one clear note' },
+          { value: 'knock', label: 'Knock — two low taps' },
+          { value: 'rise', label: 'Rise — a short upward run' },
+          { value: 'marimba', label: 'Marimba — three warm notes' },
+        ],
+      },
+      {
+        key: 'pref.notify_check_seconds', type: 'enum', default: '60', label: 'Check for new arrivals every',
+        help: 'Less often is lighter on the connection and the battery.',
+        options: [
+          { value: '30', label: '30 seconds' },
+          { value: '60', label: 'A minute' },
+          { value: '180', label: 'Three minutes' },
+          { value: '0', label: 'Never — I will look myself' },
+        ],
+      },
+    ],
+  },
 ];
 
 export const ALL_PREFERENCES: PreferenceDef[] = PREFERENCE_GROUPS.flatMap((g) => g.preferences);

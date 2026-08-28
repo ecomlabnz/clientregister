@@ -81,11 +81,21 @@ export interface SessionData {
 }
 
 /** Hono context variables set by middleware. */
+/** What the banner in the corner needs, resolved once per request. */
+export interface NotifySettings {
+  on: boolean;
+  position: string;
+  sound: string;
+  everySeconds: number;
+}
+
 export interface Vars {
   user: User | null;
   session: SessionData | null;
   requestId: string;
   nonce: string;
+  /** Resolved once per request for the banner in the corner. */
+  notify: NotifySettings | null;
 }
 
 export type AppContext = { Bindings: Env; Variables: Vars };

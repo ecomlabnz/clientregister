@@ -12,6 +12,7 @@ import { getBoolSetting, one, nowIso, run } from './db';
 import { hashPassword, PASSWORD_HASH_PARAMS, passwordNeedsRehash, verifyPassword } from './crypto';
 import { readSession, sessionTokenFrom } from './session';
 import { can, type Permission } from './rbac';
+import { asPrefBoolean, asPrefInteger, preferencesFor } from './preferences';
 
 interface UserRow extends User {
   password_hash: string;
@@ -26,6 +27,7 @@ const MAX_LOCKOUT_MINUTES = 30;
 export async function attachSession(c: Context<AppContext>, next: Next): Promise<void> {
   c.set('user', null);
   c.set('session', null);
+  c.set('notify', null);
 
   const token = sessionTokenFrom(c);
   if (token) {
@@ -39,6 +41,17 @@ export async function attachSession(c: Context<AppContext>, next: Next): Promise
       if (row && row.status === 'active') {
         c.set('session', session);
         c.set('user', row);
+
+        // Read here, where the request is already touching this person's row,
+        // so the layout can render their notification settings without a query
+        // of its own on every page.
+        const prefs = await preferencesFor(c.env, row.id);
+        c.set('notify', {
+          on: asPrefBoolean(prefs['pref.notify'], true),
+          position: prefs['pref.notify_position'] ?? 'bottom-right',
+          sound: prefs['pref.notify_sound'] ?? 'chime',
+          everySeconds: asPrefInteger(prefs['pref.notify_check_seconds'], 60),
+        });
       }
     }
   }
