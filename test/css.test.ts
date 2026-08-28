@@ -92,3 +92,13 @@ describe('hiding something actually hides it', () => {
     expect(offender).toBeGreaterThan(guard);
   });
 });
+
+describe('clamping works at every width', () => {
+  it('defines the clamp classes outside the narrow-screen query', () => {
+    // They lived inside `@media (max-width: 720px)`, so on a desktop they did
+    // nothing — which is how the audit log came to have four-line rows.
+    const beforeMedia = css.slice(0, css.indexOf('@media (max-width: 720px)'));
+    expect(beforeMedia).toContain('.clamp-2 { -webkit-line-clamp: 2; }');
+    expect(beforeMedia).toContain('.clamp-1 { -webkit-line-clamp: 1; }');
+  });
+});

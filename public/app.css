@@ -329,6 +329,21 @@ body.bare {
 .num { text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: normal; word-break: normal; }
 .warn { color: var(--red); font-weight: 550; }
 .prewrap { white-space: pre-wrap; word-break: break-word; }
+.nowrap { white-space: nowrap; }
+/* A cell that would otherwise run to eight lines. Two lines of title is enough
+   to recognise a matter; the whole of it is on the record's own page. Defined
+   globally rather than only on a phone — these were inside the narrow-screen
+   media query, so on a desktop they did nothing at all, and a log of JSON blobs
+   made rows four lines tall. */
+.clamp-2, .clamp-1 {
+  display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;
+}
+.clamp-2 { -webkit-line-clamp: 2; }
+.clamp-1 { -webkit-line-clamp: 1; }
+
+/* Long identifiers and JSON break wherever they must, rather than pushing a
+   column wider than its share of the table. */
+.break-any { overflow-wrap: anywhere; word-break: break-word; }
 .ellipsis { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mt { margin-top: 12px; }
 .mb { margin-bottom: 12px; }
@@ -1089,13 +1104,6 @@ body.site { background: var(--bg); }
   .table-fixed { table-layout: auto; }
   .table-fixed col { width: auto; }
 
-  /* A cell that would otherwise run to eight lines. Two lines of title is
-     enough to recognise a matter; the whole of it is on the case page. */
-  .clamp-2, .clamp-1 {
-    display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;
-  }
-  .clamp-2 { -webkit-line-clamp: 2; }
-  .clamp-1 { -webkit-line-clamp: 1; }
   .tag-row.hide-sm { display: none; }
   .show-sm { display: flex; }
 

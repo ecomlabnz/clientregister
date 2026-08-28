@@ -22,7 +22,7 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import { badge, card, csrfField, field, optionsFrom, pageHeader, select, table } from '../../ui/components';
-import { dateTime, truncate } from '../../ui/format';
+import { dateShort, dateTime, timeShort, truncate } from '../../ui/format';
 import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../core/rbac';
 import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABELS, SPLIT_BASES } from '../../core/fees';
 import { isAiEnabled } from '../../ai/provider';
@@ -123,13 +123,13 @@ function statusRow(label: string, ok: boolean, detail: string) {
  * as readily as to another part of this one; what matters to a reader is that
  * the whole section is visible from anywhere in it.
  */
-function adminTabs(current: string): Raw {
+export function adminTabs(current: string): Raw {
   const tabs: Array<{ id: string; label: string; href: string }> = [
     { id: 'overview', label: 'Overview', href: '/admin' },
     { id: 'users', label: 'Users', href: '/admin/users' },
     { id: 'settings', label: 'Practice settings', href: '/admin/settings' },
     { id: 'audit', label: 'Audit log', href: '/admin/audit' },
-    { id: 'automations', label: 'Automations', href: '/workflows/rules' },
+    { id: 'automations', label: 'Automations', href: '/admin/automations' },
     { id: 'integrations', label: 'Integrations', href: '/admin?tab=integrations' },
     { id: 'modules', label: 'Modules', href: '/admin?tab=modules' },
     { id: 'maintenance', label: 'Maintenance', href: '/admin?tab=maintenance' },
@@ -665,15 +665,41 @@ export const adminModule: AppModule = {
           <button class="btn btn-secondary" type="submit">Filter</button>
           ${action || actor || since ? html`<a class="btn btn-secondary" href="/admin/audit">Clear</a>` : ''}
         </form>
-        ${table(['When', 'Who', 'Action', 'Entity', 'IP', 'Detail'], rows.slice(0, 100).map((row: any) => html`
+        ${'' /* Six columns of mostly short values, one of which is a blob of
+                 JSON. Given no widths they share the page equally, and a date
+                 that reads on one line breaks across four while the detail is
+                 squeezed into a strip. The widths below give the space to the
+                 column that needs it and let the two least useful go on a
+                 phone. */}
+        ${table([
+          { label: 'When', width: '14' },
+          { label: 'Who', width: '16', hideOn: 'sm' },
+          { label: 'Action', width: '16' },
+          { label: 'Entity', width: '14', hideOn: 'sm' },
+          { label: 'IP', width: '12', hideOn: 'sm' },
+          { label: 'Detail', width: '28' },
+        ], rows.slice(0, 100).map((row: any) => {
+          // "Tai <ecomlabnz@pm.me>" is two facts in one string, and stacking
+          // them beats wrapping them mid-address.
+          const who = String(row.actor_label ?? '');
+          const split = who.indexOf(' <');
+          const name = split > 0 ? who.slice(0, split) : who;
+          const email = split > 0 ? who.slice(split + 2).replace(/>$/, '') : '';
+          return html`
           <tr>
-            <td class="small">${dateTime(row.at)}</td>
-            <td class="small">${row.actor_label}</td>
-            <td><code>${row.action}</code></td>
-            <td class="small">${row.entity_type ? html`${row.entity_type}<div class="muted">${truncate(row.entity_id, 20)}</div>` : '—'}</td>
-            <td class="small">${row.ip ?? '—'}</td>
-            <td class="small muted">${truncate(row.meta_json, 80)}</td>
-          </tr>`))}
+            <td class="small nowrap">${dateShort(row.at)}
+              <div class="muted nowrap">${timeShort(row.at)}</div></td>
+            <td class="small col-sm-hide">${name}
+              ${email ? html`<div class="muted clamp-1">${email}</div>` : ''}</td>
+            <td class="small"><code class="break-any">${row.action}</code>
+              <div class="row-meta show-sm"><span class="muted">${name}</span></div></td>
+            <td class="small col-sm-hide">${row.entity_type
+              ? html`${row.entity_type}<div class="muted clamp-1">${truncate(row.entity_id, 20)}</div>`
+              : '—'}</td>
+            <td class="small muted col-sm-hide nowrap">${row.ip ?? '—'}</td>
+            <td class="small muted"><span class="clamp-2 break-any">${truncate(row.meta_json, 160)}</span></td>
+          </tr>`;
+        }), { sticky: true, fixed: true, empty: 'Nothing recorded in this window.' })}
         <div class="pager">
           ${pageNum > 1 ? html`<a class="btn btn-secondary" href="/admin/audit?${raw(qs({ page: pageNum - 1 }))}">Previous</a>` : ''}
           ${hasMore ? html`<a class="btn btn-secondary" href="/admin/audit?${raw(qs({ page: pageNum + 1 }))}">Next</a>` : ''}
