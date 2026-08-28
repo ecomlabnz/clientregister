@@ -8,7 +8,7 @@
 
 import type { Context, Next } from 'hono';
 import type { AppContext, Env, User } from '../types';
-import { one, nowIso, run } from './db';
+import { getBoolSetting, one, nowIso, run } from './db';
 import { hashPassword, PASSWORD_HASH_PARAMS, passwordNeedsRehash, verifyPassword } from './crypto';
 import { readSession, sessionTokenFrom } from './session';
 import { can, type Permission } from './rbac';
@@ -141,10 +141,47 @@ export async function authenticate(env: Env, email: string, password: string): P
 const DUMMY_HASH = `pbkdf2-sha256$${PASSWORD_HASH_PARAMS.rounds}x${PASSWORD_HASH_PARAMS.iterations}$` +
   'AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 
-/** Minimum viable password policy: length beats composition rules. */
-export function validatePassword(password: string): string | null {
-  if (password.length < 12) return 'Password must be at least 12 characters.';
+/**
+ * Minimum viable password policy: length beats composition rules.
+ *
+ * The floor is a constant, not a setting — the configurable minimum can be
+ * raised above it but never lowered below it, so no administrator can weaken
+ * the policy past what the application considers safe.
+ */
+export const PASSWORD_MIN_LENGTH_FLOOR = 12;
+
+export function validatePassword(password: string, minLength = PASSWORD_MIN_LENGTH_FLOOR): string | null {
+  const min = Math.max(PASSWORD_MIN_LENGTH_FLOOR, minLength);
+  if (password.length < min) return `Password must be at least ${min} characters.`;
   if (password.length > 256) return 'Password must be 256 characters or fewer.';
   if (/^(.)\1+$/.test(password)) return 'Password must not be a single repeated character.';
   return null;
+}
+
+/**
+ * Enforce the two-factor requirement, once an administrator has switched it on.
+ *
+ * A user without it can still reach their account pages and sign out — being
+ * told to enable two-factor must not lock someone out of the screen where they
+ * enable it.
+ */
+export function requireTwoFactorWhenPolicyDemands() {
+  const EXEMPT = ['/account/2fa', '/account/password', '/logout', '/help'];
+
+  return async (c: Context<AppContext>, next: Next): Promise<Response | void> => {
+    const user = c.get('user');
+    if (!user || user.totp_enabled === 1) return next();
+
+    const path = new URL(c.req.url).pathname;
+    if (EXEMPT.some((p) => path === p || path.startsWith(`${p}/`))) return next();
+
+    const required = await getBoolSetting(c.env, 'security.require_two_factor', false);
+    if (!required) return next();
+
+    return c.redirect(
+      '/account/2fa?err=' + encodeURIComponent(
+        'Two-factor authentication is required for everyone in this practice. Set it up to continue.'),
+      302,
+    );
+  };
 }

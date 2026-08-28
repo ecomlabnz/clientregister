@@ -10,6 +10,7 @@
 import { Hono } from 'hono';
 import type { AppContext, Env } from '../../types';
 import type { AppModule } from '../../core/module';
+import type { SettingsGroup } from '../../core/settings';
 import { all, getSetting, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
@@ -236,9 +237,31 @@ export async function feesSection(c: any, caseId: string, currency: string, canW
     </details>` : ''}`);
 }
 
+export const FEE_SETTINGS: SettingsGroup = {
+  id: 'fees',
+  title: 'Fees and GST',
+  description: 'Defaults applied to new fee lines and quotes. Existing lines keep the rate and '
+    + 'treatment they were entered under.',
+  order: 20,
+  settings: [
+    { key: 'fees.gst_registered', type: 'boolean', label: 'The practice is GST registered',
+      default: 'true', help: 'When off, no GST is calculated on new fee lines.' },
+    { key: 'fees.gst_rate_bp', type: 'percent', label: 'GST rate', default: '1500',
+      min: 0, max: 10000, help: 'New Zealand GST is 15%.' },
+    { key: 'fees.default_gst_treatment', type: 'enum', label: 'Default treatment for new fee lines',
+      default: 'exclusive',
+      options: GST_TREATMENTS.map((t) => ({ value: t, label: GST_TREATMENT_LABELS[t] })) },
+    { key: 'fees.split_base', type: 'enum', label: 'The revenue split is calculated on',
+      default: 'net_professional',
+      options: SPLIT_BASES.map((b) => ({ value: b, label: SPLIT_BASE_LABELS[b] })) },
+  ],
+  note: 'default-shares',
+};
+
 export const feesModule: AppModule = {
   name: 'fees',
   title: 'Fees',
+  settings: [FEE_SETTINGS],
   basePaths: ['/cases/:id/fees', '/fees'],
   nav: [{ href: '/fees', label: 'Fees', permission: 'register:read', order: 40 }],
 

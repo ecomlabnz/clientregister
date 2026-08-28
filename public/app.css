@@ -250,6 +250,32 @@ details[open] > summary { margin-bottom: 12px; }
 .btn-link { color: var(--accent); }
 .btn-link-danger { color: var(--red); }
 .admin-links { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+
+.tabs {
+  display: flex; gap: 2px; flex-wrap: wrap; margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  padding: 8px 14px; font-size: 0.9rem; font-weight: 600; color: var(--muted);
+  border: 1px solid transparent; border-bottom: none;
+  border-radius: 6px 6px 0 0; margin-bottom: -1px;
+}
+.tab:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
+.tab.current {
+  background: var(--surface); color: var(--accent);
+  border-color: var(--border); border-bottom-color: var(--surface);
+}
+
+/* The manual reads as prose rather than as a form. */
+.manual h4 { margin: 18px 0 6px; font-size: 0.95rem; }
+.manual ul, .manual ol { margin: 0 0 10px; padding-left: 20px; }
+.manual li { margin-bottom: 4px; }
+.manual .kv { margin-top: 8px; }
+.manual kbd {
+  font-family: var(--mono); font-size: 0.8em; padding: 1px 5px;
+  border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px;
+  background: var(--surface-2);
+}
 .pager { display: flex; gap: 8px; margin-top: 14px; }
 
 /* --- Alerts ------------------------------------------------------------- */
@@ -302,3 +328,40 @@ details[open] > summary { margin-bottom: 12px; }
 .stat-warn { border-color: var(--amber); }
 .split-head { margin-top: 22px; }
 .status-now { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+
+
+/* --- Printable documents ------------------------------------------------- */
+
+.quote-doc {
+  max-width: 720px; margin: 0 auto; padding: 32px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.quote-doc h1 { font-size: 1.3rem; margin-bottom: 4px; }
+.quote-doc h2 { font-size: 1rem; }
+.quote-doc h3 {
+  font-size: 0.8rem; margin: 22px 0 6px; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--muted);
+}
+.quote-doc-head {
+  display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap;
+  padding-bottom: 18px; border-bottom: 2px solid var(--border);
+}
+.quote-doc-ref { text-align: right; }
+.quote-doc-table { margin-top: 10px; }
+.quote-doc-table td { padding: 7px 0; }
+.quote-doc-terms { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); }
+.break-url { word-break: break-all; font-size: 0.85rem; }
+.quote-doc-foot { margin-top: 28px; display: flex; gap: 8px; }
+
+@media print {
+  body { background: #fff; }
+  .topbar, .footer, .no-print, .crumbs, .page-actions { display: none !important; }
+  .quote-doc {
+    max-width: none; margin: 0; padding: 0; border: none; border-radius: 0;
+    background: #fff; color: #000;
+  }
+  .quote-doc a { color: #000; text-decoration: underline; }
+  .main { padding: 0; }
+  .bare-main { max-width: none; }
+  body.bare { display: block; min-height: 0; padding: 0; }
+}

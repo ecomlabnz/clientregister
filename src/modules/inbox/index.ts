@@ -10,6 +10,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
+import type { SettingsGroup } from '../../core/settings';
 import { all, count, nowIso, one, run } from '../../core/db';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
@@ -31,10 +32,26 @@ interface IngestRow {
   error: string | null; meta_json: string | null;
 }
 
+export const CHANNEL_SETTINGS: SettingsGroup = {
+  id: 'channels',
+  title: 'Inbound channels',
+  description: 'What happens to a message the moment it arrives. Which senders are trusted is set '
+    + 'by allow-list secrets, not here — a message from anyone else always waits for triage, '
+    + 'whatever these say.',
+  order: 40,
+  settings: [
+    { key: 'ingest.auto_create_inquiries', type: 'boolean',
+      label: 'Create an inquiry automatically from allow-listed senders',
+      default: 'true',
+      help: 'When off, every captured message waits in the inbox until someone acts on it.' },
+  ],
+};
+
 export const inboxModule: AppModule = {
   name: 'inbox',
   title: 'Inbox',
   basePaths: ['/inbox'],
+  settings: [CHANNEL_SETTINGS],
   nav: [{ href: '/inbox', label: 'Inbox', permission: 'ingest:triage', order: 95 }],
 
   register(app) {

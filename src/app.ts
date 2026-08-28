@@ -12,7 +12,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from './types';
 import { securityHeaders, csrfProtection } from './core/security';
-import { attachSession } from './core/auth';
+import { attachSession, requireTwoFactorWhenPolicyDemands } from './core/auth';
 import { registeredModules } from './registry';
 import { setNavItems } from './ui/nav-store';
 import { collectNav } from './core/module';
@@ -32,6 +32,9 @@ export function createApp(): Hono<AppContext> {
   app.use('*', securityHeaders);
   app.use('*', attachSession);
   app.use('*', csrfProtection(WEBHOOK_PATHS));
+  // Applied after the session is resolved, so it only ever affects a signed-in
+  // user, and never the pages they need in order to comply.
+  app.use('*', requireTwoFactorWhenPolicyDemands());
 
   // --- Liveness -------------------------------------------------------------
   app.get('/healthz', (c) => c.json({ ok: true, env: c.env.APP_ENV, time: new Date().toISOString() }));

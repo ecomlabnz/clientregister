@@ -79,7 +79,14 @@ and filtered per user by permission, so a role that cannot use a feature never
 sees it.
 
 Current modules: `auth`, `dashboard`, `alerts`, `inbox`, `inquiries`, `clients`,
-`cases`, `fees`, `quotes`, `tasks`, `documents`, `admin`.
+`cases`, `fees`, `quotes`, `tasks`, `documents`, `admin`, `help`.
+
+A module may also declare `settings`: a group of typed definitions rendered as
+a tab on the settings page. The save handler will only write a key that appears
+in a declared group, and only after coercing the value to the declared type and
+range — so a crafted post cannot introduce a setting, reach into another
+group, or store a value of the wrong shape in a key other code trusts. Secrets
+are deliberately not settings; they stay outside the database.
 
 `src/integrations/` holds read-only connectors to outside registers — currently
 the NZBN register. They are separate from `src/ingest/` (which receives things

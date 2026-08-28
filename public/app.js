@@ -48,6 +48,12 @@
     }
   }
 
+  // Print buttons. Declared with data-print rather than an inline handler,
+  // because the content security policy forbids inline script.
+  Array.prototype.forEach.call(document.querySelectorAll('[data-print]'), function (button) {
+    button.addEventListener('click', function () { window.print(); });
+  });
+
   // "/" focuses the first search box on the page.
   document.addEventListener('keydown', function (event) {
     if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
