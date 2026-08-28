@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.7.0', date: '28 August 2026',
+    notes: [
+      'Day and night modes, and three themes to switch between, under My account → Appearance.',
+      'Your choice is saved to your account, so it follows you to any device you sign in on.',
+      'The whole register is now laid out for a phone as deliberately as for a desk.',
+      'Lighter, tighter typography throughout.',
+    ],
+  },
+  {
     version: '0.6.0', date: '28 August 2026',
     notes: [
       'Cases can be tagged with anything you type; new tags are created as you go.',
@@ -223,7 +232,12 @@ function sections(): Section[] {
            immigration histories and fee arrangements. Two-factor is the single biggest thing you
            can do to protect it. You will be given eight recovery codes when you set it up — save
            them somewhere safe, because they are shown once.</p>
-        <p>Changing your password signs out every other device automatically.</p>`,
+        <p>Changing your password signs out every other device automatically.</p>
+        <h4>Appearance</h4>
+        <p>Pick one of three themes — <strong>Slate</strong>, <strong>Warm</strong> or
+           <strong>Ink</strong> — and choose whether the register follows your device's day and
+           night setting or stays light or dark all the time. The choice is saved against your
+           account rather than the browser, so it travels with you to your phone and back.</p>`,
     },
     {
       id: 'admin',

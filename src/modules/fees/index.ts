@@ -212,6 +212,7 @@ export async function feesSection(c: any, caseId: string, currency: string, canW
       <summary>Adjust the split</summary>
       <form method="post" action="/cases/${caseId}/fees/shares">
         ${csrfField(csrf)}
+        <div class="table-wrap">
         <table class="edit-table">
           <thead><tr><th>Label</th><th>Key</th><th>Percent</th><th></th></tr></thead>
           <tbody>
@@ -230,6 +231,7 @@ export async function feesSection(c: any, caseId: string, currency: string, canW
             </tr>
           </tbody>
         </table>
+        </div>
         <button class="btn btn-primary" type="submit">Save split</button>
         <p class="hint">Percentages should total 100%. Amounts are allocated to the cent — leftover
           cents go to the largest remainders, so the parts always add back to the base.</p>

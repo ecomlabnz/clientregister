@@ -82,6 +82,7 @@ async function defaultSharesCard(c: any, csrf: string): Promise<Raw> {
        total 100%.</p>
     <form method="post" action="/admin/settings/default-shares">
       ${csrfField(csrf)}
+      <div class="table-wrap">
       <table class="edit-table">
         <thead><tr><th>Label</th><th>Key</th><th>Percent</th></tr></thead>
         <tbody>
@@ -98,6 +99,7 @@ async function defaultSharesCard(c: any, csrf: string): Promise<Raw> {
           })}
         </tbody>
       </table>
+      </div>
       <button class="btn btn-primary" type="submit">Save default split</button>
     </form>`);
 }

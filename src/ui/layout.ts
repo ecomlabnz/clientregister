@@ -7,6 +7,7 @@ import { getNavItems } from './nav-store';
 import { visibleNav } from '../core/module';
 import { initials } from './format';
 import { APP_VERSION } from '../version';
+import { themeOf, colourModeOf } from './theme';
 
 export interface PageOpts {
   title: string;
@@ -25,8 +26,14 @@ export function page(c: Context<AppContext>, opts: PageOpts, body: Raw): Respons
   const err = c.req.query('err');
   const nav = opts.bare ? [] : visibleNav(getNavItems(), user);
 
+  // Appearance is two attributes rendered by the server from the user's own
+  // record: no theme script, nothing extra to load, and no flash of the wrong
+  // colours. Signed-out pages get the defaults.
+  const theme = themeOf(user ?? null);
+  const mode = colourModeOf(user ?? null);
+
   const doc = html`<!doctype html>
-<html lang="en-NZ">
+<html lang="en-NZ" data-theme="${theme}" data-mode="${mode}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
