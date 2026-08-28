@@ -124,9 +124,20 @@ plus `nosniff` and a sandboxing CSP. 25 MB limit.
 paths, so no form can be turned into an open redirect.
 
 **Audit.** Sign-ins and failures, every record mutation, status change, fee
-change, passport reveal, document download, AI run, settings change and admin
-action. Append-only; no route deletes from it. Audit writes never throw into the
-request path — a failed audit write is logged, not fatal.
+change, passport reveal, document download, AI run, settings change, admin
+action and unhandled error.
+
+Append-only **at the database**, not by convention: triggers on `audit_log`
+refuse every UPDATE and DELETE, whatever the caller — this application, the
+Cloudflare dashboard console, the D1 HTTP API, wrangler. Removing that takes a
+deliberate migration that drops the triggers, which is itself recorded in the
+repository's history. The consequence is that the log cannot be pruned in
+place; export and archive it instead.
+
+Administrators read it at **Admin → Audit log**, filtered by person, by action
+prefix, or since a date; each user row links straight to that person's own
+activity. Audit writes never throw into the request path — a failed audit write
+is logged, not fatal.
 
 ## Inbound channels
 

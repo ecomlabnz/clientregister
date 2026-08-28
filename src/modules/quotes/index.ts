@@ -19,7 +19,7 @@ import { html, raw } from '../../ui/html';
 import {
   badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, statusTone, table,
 } from '../../ui/components';
-import { dateShort, money } from '../../ui/format';
+import { dateInputValue, dateShort, money } from '../../ui/format';
 import { QUOTE_STATUS_LABELS, QUOTE_STATUSES, type QuoteStatus } from '../../domain';
 import { clientOptions } from '../../core/lookups';
 import { addEntry, listEntries } from '../../core/timeline';
@@ -194,7 +194,8 @@ export const quotesModule: AppModule = {
 
       return page(c, { title: q.ref, active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { label: q.ref }])}
-        ${pageHeader(q.description, `${q.ref} · ${QUOTE_STATUS_LABELS[q.status]}`)}
+        ${pageHeader(q.description, `${q.ref} · ${QUOTE_STATUS_LABELS[q.status]}`,
+          writable ? html`<a class="btn btn-secondary" href="/quotes/${q.id}/edit">Edit</a>` : undefined)}
 
         <div class="cols">
           <div class="col-main">
@@ -244,6 +245,101 @@ export const quotesModule: AppModule = {
             ${card('Notes', html`<p class="prewrap">${q.notes || '—'}</p>`)}
           </div>
         </div>`);
+    });
+
+    r.get('/:id/edit', requirePermission('quote:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const q = await one<QuoteRow>(c.env.DB, 'SELECT * FROM quotes WHERE id = ?', id);
+      if (!q) return c.notFound();
+
+      const [clients, settings, copied] = await Promise.all([
+        clientOptions(c.env),
+        feeSettings(c.env),
+        one<{ n: number }>(c.env.DB,
+          'SELECT COUNT(*) AS n FROM fee_items WHERE notes = ?', `From quote ${q.ref}`),
+      ]);
+      const csrf = c.get('session')!.csrf;
+
+      // The stored figures are already net and GST, so present the treatment
+      // that reproduces them rather than guessing what was originally typed.
+      const treatment: GstTreatment = q.gst_cents > 0 ? 'exclusive' : 'none';
+
+      return page(c, { title: `Edit ${q.ref}`, active: '/quotes' }, html`
+        ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { href: `/quotes/${q.id}`, label: q.ref }, { label: 'Edit' }])}
+        ${pageHeader(`Edit ${q.ref}`)}
+        ${(copied?.n ?? 0) > 0
+          ? html`<div class="alert alert-warn">This quote has already been copied onto the case as fee
+                   lines. Changing it here does not change those fee lines — edit them on the case.</div>`
+          : ''}
+        <form method="post" action="/quotes/${q.id}" class="form-grid">
+          ${csrfField(csrf)}
+          <div class="form-section">
+            <h3>Who and what</h3>
+            ${select({ label: 'Client', name: 'client_id', value: q.client_id ?? '', options: clients, includeBlank: 'No client yet' })}
+            ${field({ label: 'Description', name: 'description', value: q.description, required: true, maxlength: 500 })}
+          </div>
+          <div class="form-section">
+            <h3>Money</h3>
+            ${field({ label: 'Professional fee', name: 'amount', value: (q.amount_cents / 100).toFixed(2), required: true,
+                      hint: 'Enter it the way the GST treatment below describes.' })}
+            ${select({ label: 'GST treatment', name: 'gst_treatment', value: treatment, includeBlank: false,
+                       options: optionsFrom(GST_TREATMENTS, GST_TREATMENT_LABELS) })}
+            ${field({ label: 'Disbursements', name: 'disbursements', value: (q.disbursements_cents / 100).toFixed(2) })}
+            ${field({ label: 'Valid until', name: 'valid_until', type: 'date', value: dateInputValue(q.valid_until) })}
+            <p class="hint">GST is recalculated at the practice's current rate
+               (${(settings.gstRateBp / 100).toFixed(2)}%).</p>
+          </div>
+          <div class="form-section">
+            <h3>Notes</h3>
+            ${field({ label: 'Internal notes', name: 'notes', type: 'textarea', rows: 4, value: q.notes, maxlength: 4000 })}
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Save changes</button>
+            <a class="btn btn-secondary" href="/quotes/${q.id}">Cancel</a>
+          </div>
+        </form>`);
+    });
+
+    r.post('/:id', requirePermission('quote:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const user = c.get('user')!;
+      const existing = await one<QuoteRow>(c.env.DB, 'SELECT * FROM quotes WHERE id = ?', id);
+      if (!existing) return c.notFound();
+
+      const settings = await feeSettings(c.env);
+      const f = new FormReader(await c.req.formData());
+      const clientId = f.optional('client_id', { max: 60 });
+      const description = f.text('description', { required: true, label: 'Description', max: 500 });
+      const amount = f.money('amount', { required: true, label: 'Professional fee' });
+      const treatment = f.enum('gst_treatment', GST_TREATMENTS, { fallback: settings.defaultTreatment })! as GstTreatment;
+      const disbursements = f.money('disbursements') ?? 0;
+      const validUntil = f.date('valid_until');
+      const notes = f.optional('notes', { max: 4000 });
+      if (!f.valid || amount === null) {
+        return redirectWith(c, `/quotes/${id}/edit`, Object.values(f.errors)[0] ?? 'Invalid quote.', 'err');
+      }
+
+      const rateBp = settings.gstRegistered ? settings.gstRateBp : 0;
+      const { net, gst } = computeGst(amount, treatment, rateBp);
+
+      await run(
+        c.env.DB,
+        `UPDATE quotes SET client_id = ?, description = ?, amount_cents = ?, gst_cents = ?,
+           disbursements_cents = ?, valid_until = ?, notes = ?, updated_at = ?
+         WHERE id = ?`,
+        clientId || null, description, net, gst, disbursements, validUntil, notes, nowIso(), id,
+      );
+
+      const before = existing.amount_cents + existing.gst_cents + existing.disbursements_cents;
+      const after = net + gst + disbursements;
+      if (before !== after) {
+        await addEntry(c.env, { entityType: 'quote', entityId: id, kind: 'system',
+          body: `Quote total changed from ${money(before, existing.currency)} to ${money(after, existing.currency)}.`,
+          createdBy: user.id });
+      }
+      await auditFrom(c, { action: 'quote.updated', entityType: 'quote', entityId: id,
+        meta: { before, after } });
+      return redirectWith(c, `/quotes/${id}`, 'Quote updated.');
     });
 
     r.post('/:id/status', requirePermission('quote:write'), async (c) => {

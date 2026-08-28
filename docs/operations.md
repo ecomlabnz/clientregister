@@ -156,6 +156,28 @@ a user can quote it.
 `/healthz` returns `{ok: true}` without touching the database — suitable for an
 uptime check.
 
+## The audit log cannot be pruned
+
+`audit_log` is append-only at the database: triggers refuse UPDATE and DELETE
+from every caller. That is deliberate, and it means the table only grows. It is
+small — a row is a few hundred bytes — so this is a question for years from
+now, not months.
+
+When it does need trimming, export first and drop the triggers deliberately in
+a numbered migration, so the repository records that history was truncated and
+by whom:
+
+```sql
+-- migrations/00XX_archive_audit.sql
+DROP TRIGGER audit_log_is_append_only_delete;
+DELETE FROM audit_log WHERE at < '2027-01-01';
+CREATE TRIGGER audit_log_is_append_only_delete
+BEFORE DELETE ON audit_log
+BEGIN
+  SELECT RAISE(ABORT, 'audit_log is append-only: rows cannot be deleted');
+END;
+```
+
 ## Routine checks
 
 - **Admin → Audit log** — sign-ins, failures, record changes, passport reveals,

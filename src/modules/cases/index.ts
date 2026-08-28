@@ -363,13 +363,18 @@ export const casesModule: AppModule = {
                           ${t.assignee_name ? ` · ${t.assignee_name}` : ''}</div>
                         ${t.details ? html`<div class="small prewrap">${t.details}</div>` : ''}
                       </div>
-                      ${writable && t.status !== 'done' && t.status !== 'cancelled' ? html`
-                        <form method="post" action="/tasks/${t.id}/status" class="inline-form">
-                          ${csrfField(csrf)}
-                          <input type="hidden" name="status" value="done">
-                          <input type="hidden" name="return_to" value="/cases/${kase.id}">
-                          <button class="btn btn-small btn-secondary" type="submit">Mark done</button>
-                        </form>` : ''}
+                      ${writable ? html`
+                        <div class="task-actions">
+                          ${t.status !== 'done' && t.status !== 'cancelled' ? html`
+                            <form method="post" action="/tasks/${t.id}/status" class="inline-form">
+                              ${csrfField(csrf)}
+                              <input type="hidden" name="status" value="done">
+                              <input type="hidden" name="return_to" value="/cases/${kase.id}">
+                              <button class="btn btn-small btn-secondary" type="submit">Mark done</button>
+                            </form>` : ''}
+                          <a class="btn btn-small btn-secondary"
+                             href="/tasks/${t.id}/edit?return_to=/cases/${kase.id}">Edit</a>
+                        </div>` : ''}
                     </li>`)}
                 </ul>`}
               ${writable ? html`

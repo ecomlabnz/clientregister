@@ -20,7 +20,7 @@ import {
   badge, card, csrfField, emptyState, errorList, field, optionsFrom,
   pageHeader, select, statusTone, table,
 } from '../../ui/components';
-import { dateShort, dateTime, truncate } from '../../ui/format';
+import { dateInputValue, dateShort, dateTime, truncate } from '../../ui/format';
 import {
   CASE_STATUS_LABELS, CASE_TYPE_LABELS, CASE_TYPES, ENTRY_KIND_LABELS, ENTRY_KINDS,
   INQUIRY_SOURCE_LABELS, INQUIRY_SOURCES, INQUIRY_STATUS_LABELS, INQUIRY_STATUSES,
@@ -232,8 +232,11 @@ export const inquiriesModule: AppModule = {
         ${breadcrumbs([{ href: '/inquiries', label: 'Inquiries' }, { label: inq.ref }])}
         ${pageHeader(inq.subject || `Inquiry ${inq.ref}`,
           `${inq.ref} · ${INQUIRY_SOURCE_LABELS[inq.source]} · received ${dateTime(inq.received_at)}`,
-          writable && inq.client_id
-            ? html`<a class="btn btn-secondary" href="/quotes/new?client_id=${inq.client_id}&inquiry_id=${inq.id}">Quote this</a>`
+          writable
+            ? html`<a class="btn btn-secondary" href="/inquiries/${inq.id}/edit">Edit</a>
+                   ${inq.client_id
+                     ? html`<a class="btn btn-secondary" href="/quotes/new?client_id=${inq.client_id}&inquiry_id=${inq.id}">Quote this</a>`
+                     : ''}`
             : undefined)}
 
         <div class="cols">
@@ -307,6 +310,81 @@ export const inquiriesModule: AppModule = {
                 <li><a href="/quotes/${qt.id}"><code>${qt.ref}</code></a> <span class="muted small">${qt.status}</span></li>`)}</ul>`)}
           </div>
         </div>`);
+    });
+
+    r.get('/:id/edit', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const inq = await one<InquiryRow>(c.env.DB, 'SELECT * FROM inquiries WHERE id = ?', id);
+      if (!inq) return c.notFound();
+
+      const [clients, users] = await Promise.all([clientOptions(c.env), userOptions(c.env)]);
+      const csrf = c.get('session')!.csrf;
+
+      return page(c, { title: `Edit ${inq.ref}`, active: '/inquiries' }, html`
+        ${breadcrumbs([{ href: '/inquiries', label: 'Inquiries' }, { href: `/inquiries/${inq.id}`, label: inq.ref }, { label: 'Edit' }])}
+        ${pageHeader(`Edit ${inq.ref}`)}
+        <form method="post" action="/inquiries/${inq.id}" class="form-grid">
+          ${csrfField(csrf)}
+          <div class="form-section">
+            <h3>Where it came from</h3>
+            ${select({ label: 'Source', name: 'source', value: inq.source, required: true, includeBlank: false,
+                       options: optionsFrom(INQUIRY_SOURCES, INQUIRY_SOURCE_LABELS) })}
+            ${field({ label: 'Received', name: 'received_at', type: 'date', value: dateInputValue(inq.received_at) })}
+            ${select({ label: 'Client', name: 'client_id', value: inq.client_id ?? '', options: clients, includeBlank: 'Not an existing client' })}
+            ${select({ label: 'Assigned to', name: 'assigned_to', value: inq.assigned_to ?? '', options: users, includeBlank: 'Unassigned' })}
+          </div>
+          <div class="form-section">
+            <h3>Who</h3>
+            ${field({ label: 'Name', name: 'contact_name', value: inq.contact_name, maxlength: 200 })}
+            ${field({ label: 'Email', name: 'contact_email', type: 'email', value: inq.contact_email, maxlength: 320 })}
+            ${field({ label: 'Phone', name: 'contact_phone', value: inq.contact_phone, maxlength: 60 })}
+          </div>
+          <div class="form-section">
+            <h3>What they asked</h3>
+            ${field({ label: 'Subject', name: 'subject', value: inq.subject, maxlength: 200 })}
+            ${field({ label: 'Details', name: 'body', type: 'textarea', rows: 8, value: inq.body, maxlength: 10000,
+                      hint: inq.ingest_message_id
+                        ? 'This arrived through a channel. Editing changes the inquiry, not the captured original in the inbox.'
+                        : undefined })}
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Save changes</button>
+            <a class="btn btn-secondary" href="/inquiries/${inq.id}">Cancel</a>
+          </div>
+        </form>`);
+    });
+
+    r.post('/:id', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const existing = await one<InquiryRow>(c.env.DB, 'SELECT * FROM inquiries WHERE id = ?', id);
+      if (!existing) return c.notFound();
+
+      const f = new FormReader(await c.req.formData());
+      const source = f.enum('source', INQUIRY_SOURCES, { required: true, label: 'Source' });
+      const receivedAt = f.date('received_at');
+      const clientId = f.optional('client_id', { max: 60 });
+      const assignedTo = f.optional('assigned_to', { max: 60 });
+      const contactName = f.optional('contact_name', { max: 200 });
+      const contactEmail = f.email('contact_email');
+      const contactPhone = f.optional('contact_phone', { max: 60 });
+      const subject = f.optional('subject', { max: 200 });
+      const body = f.optional('body', { max: 10000 });
+      if (!f.valid || !source) {
+        return redirectWith(c, `/inquiries/${id}/edit`, Object.values(f.errors)[0] ?? 'Invalid inquiry.', 'err');
+      }
+
+      await run(
+        c.env.DB,
+        `UPDATE inquiries SET source = ?, received_at = ?, client_id = ?, assigned_to = ?,
+           contact_name = ?, contact_email = ?, contact_phone = ?, subject = ?, body = ?, updated_at = ?
+         WHERE id = ?`,
+        source,
+        receivedAt ? `${receivedAt}T00:00:00.000Z` : existing.received_at,
+        clientId || null, assignedTo || null,
+        contactName, contactEmail, contactPhone, subject, body, nowIso(), id,
+      );
+      await auditFrom(c, { action: 'inquiry.updated', entityType: 'inquiry', entityId: id });
+      return redirectWith(c, `/inquiries/${id}`, 'Inquiry updated.');
     });
 
     r.post('/:id/status', requirePermission('register:write'), async (c) => {
