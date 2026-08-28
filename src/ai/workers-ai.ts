@@ -6,7 +6,10 @@
  */
 
 import type { Env } from '../types';
-import { parseTriageJson, TRIAGE_SYSTEM_PROMPT, type AiProvider, type TriageResult } from './provider';
+import {
+  BRIEF_SYSTEM_PROMPT, TRIAGE_SYSTEM_PROMPT, parseBriefJson, parseTriageJson,
+  type AiProvider, type BriefResult, type TriageResult,
+} from './provider';
 
 const DEFAULT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
 
@@ -38,6 +41,24 @@ Reply with a single JSON object and nothing else, using exactly these keys:
 
       if (!result?.response) throw new Error('workers-ai returned no response');
       return parseTriageJson(result.response);
+    },
+
+    async brief(input): Promise<BriefResult> {
+      const instruction = `${BRIEF_SYSTEM_PROMPT}
+
+Reply with a single JSON object and nothing else, using exactly these keys:
+{"summary":string,"next_steps":string[],"questions":string[],"risks":string[]}`;
+
+      const result = (await env.AI!.run(model as never, {
+        messages: [
+          { role: 'system', content: instruction },
+          { role: 'user', content: `File: ${input.title}\n\n${input.file.slice(0, 12_000)}` },
+        ],
+        max_tokens: 1500,
+      } as never)) as { response?: string };
+
+      if (!result?.response) throw new Error('workers-ai returned no response');
+      return parseBriefJson(result.response);
     },
   };
 }

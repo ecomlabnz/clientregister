@@ -34,6 +34,8 @@ import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
 import { asPrefInteger, preferencesFor } from '../../core/preferences';
 import { storeDocument } from '../documents';
+import { isAiEnabled } from '../../ai/provider';
+import { briefCase, latestBrief } from '../../ai/brief';
 import {
   VOCABULARY_SETTINGS, caseTypes, isTerm, labelFor, termOptions, type Term,
 } from '../../core/vocabulary';
@@ -344,6 +346,8 @@ export const casesModule: AppModule = {
       const id = c.req.param('id')!;
       const viewer = c.get('user')!;
       const docsEnabled = Boolean(c.env.DOCS);
+      const aiAvailable = isAiEnabled(c.env) && can(viewer, 'ai:run');
+      const brief = aiAvailable ? await latestBrief(c.env, id) : null;
       const kase = await one<CaseRow & { client_name: string; client_ref: string; assignee_name: string | null }>(
         c.env.DB,
         `SELECT k.*, cl.full_name AS client_name, cl.ref AS client_ref, u.name AS assignee_name
@@ -513,6 +517,32 @@ export const casesModule: AppModule = {
                     <button class="btn btn-primary" type="submit">Add task</button>
                   </form>
                 </details>` : ''}`)}
+
+            ${aiAvailable ? card('Brief me on this matter', html`
+              ${brief ? html`
+                <p class="lede-sm">${brief.result.summary}</p>
+                ${brief.result.next_steps.length ? html`
+                  <h4>Next steps it suggests</h4>
+                  <ol class="list">${brief.result.next_steps.map((s) => html`<li>${s}</li>`)}</ol>` : ''}
+                ${brief.result.risks.length ? html`
+                  <h4>Worth watching</h4>
+                  <ul class="list">${brief.result.risks.map((s) => html`<li>${s}</li>`)}</ul>` : ''}
+                ${brief.result.questions.length ? html`
+                  <h4>What the file does not say</h4>
+                  <ul class="list">${brief.result.questions.map((s) => html`<li>${s}</li>`)}</ul>` : ''}
+                <p class="hint">Drafted ${dateTime(brief.at)} from this file alone. A suggestion,
+                   not advice, and nothing has been written to the matter.</p>` : ''}
+              ${writable ? html`
+                <form method="post" action="/cases/${kase.id}/brief" class="mt">
+                  ${csrfField(csrf)}
+                  <button class="btn btn-secondary" type="submit">
+                    ${brief ? 'Draft it again' : 'Read this file and brief me'}
+                  </button>
+                  ${brief ? html`
+                    <button class="btn btn-primary" type="submit" name="save" value="1">
+                      Save the brief as a file note
+                    </button>` : ''}
+                </form>` : ''}`) : ''}
 
             ${card('File notes', html`
               ${writable ? html`
@@ -786,6 +816,53 @@ export const casesModule: AppModule = {
       await untagCase(c.env, id, c.req.param('tagId')!);
       await auditFrom(c, { action: 'case.untagged', entityType: 'case', entityId: id });
       return redirectWith(c, `/cases/${id}`, 'Tag removed.');
+    });
+
+
+    /**
+     * Draft a brief on this matter, or save the last one to the file.
+     *
+     * Two actions on one form because they are two halves of one thought:
+     * read the file, then decide whether the reading is worth keeping. Saving
+     * writes an ordinary file note — which then cannot be edited, like any
+     * other — and says plainly in the note that it was drafted by the AI layer,
+     * because a file that does not distinguish what a person wrote from what a
+     * model drafted is a file nobody can rely on.
+     */
+    r.post('/:id/brief', requirePermission('ai:run'), async (c) => {
+      const id = c.req.param('id')!;
+      const user = c.get('user')!;
+      const form = await c.req.formData();
+
+      if (form.get('save')) {
+        const existing = await latestBrief(c.env, id);
+        if (!existing) return redirectWith(c, `/cases/${id}`, 'There is no brief to save yet.', 'err');
+        const lines = [
+          'Brief drafted by the AI layer from this file. Reviewed and kept by ' + user.name + '.',
+          '',
+          existing.result.summary,
+        ];
+        if (existing.result.next_steps.length) {
+          lines.push('', 'Next steps suggested:', ...existing.result.next_steps.map((s) => `- ${s}`));
+        }
+        if (existing.result.risks.length) {
+          lines.push('', 'Worth watching:', ...existing.result.risks.map((s) => `- ${s}`));
+        }
+        if (existing.result.questions.length) {
+          lines.push('', 'Not answered by the file:', ...existing.result.questions.map((s) => `- ${s}`));
+        }
+        await addEntry(c.env, {
+          entityType: 'case', entityId: id, kind: 'note', body: lines.join('\n'), createdBy: user.id,
+        });
+        await auditFrom(c, { action: 'case.brief_saved', entityType: 'case', entityId: id });
+        return redirectWith(c, `/cases/${id}`, 'Brief saved to the file. Like any note, it cannot now be changed.');
+      }
+
+      const result = await briefCase(c.env, id, user.id);
+      await auditFrom(c, { action: 'case.briefed', entityType: 'case', entityId: id, meta: { ok: result.ok } });
+      return result.ok
+        ? redirectWith(c, `/cases/${id}`, 'Brief drafted from the file.')
+        : redirectWith(c, `/cases/${id}`, result.error, 'err');
     });
 
     r.post('/:id/entries', requirePermission('register:write'), async (c) => {

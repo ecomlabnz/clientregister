@@ -154,9 +154,19 @@ export const inquiriesModule: AppModule = {
     r.get('/new', requirePermission('register:write'), async (c) => {
       const csrf = c.get('session')!.csrf;
       const clients = await clientOptions(c.env);
+      // A starting point proposed through the address — by the assistant, or by
+      // any link. It is a draft in a form somebody submits; the create route
+      // below does the validating, as it does for anything typed by hand.
+      const pre = (name: string, max = 320) => (c.req.query(name) ?? '').slice(0, max);
+      const prefilled = Boolean(pre('contact_name') || pre('contact_email') || pre('subject'));
+
       return page(c, { title: 'Record an inquiry', active: '/inquiries' }, html`
         ${breadcrumbs([{ href: '/inquiries', label: 'Inquiries' }, { label: 'New' }])}
         ${pageHeader('Record an inquiry')}
+        ${prefilled
+          ? html`<div class="alert alert-ok">Filled in from what the assistant read. Check it before
+                   saving — it is a reading, not a fact.</div>`
+          : ''}
         <form method="post" action="/inquiries" class="form-grid">
           ${csrfField(csrf)}
           <div class="form-section">
@@ -168,13 +178,13 @@ export const inquiriesModule: AppModule = {
           </div>
           <div class="form-section">
             <h3>Who</h3>
-            ${field({ label: 'Name', name: 'contact_name', maxlength: 200 })}
-            ${field({ label: 'Email', name: 'contact_email', type: 'email', maxlength: 320 })}
-            ${field({ label: 'Phone', name: 'contact_phone', maxlength: 60 })}
+            ${field({ label: 'Name', name: 'contact_name', maxlength: 200, value: pre('contact_name', 200) })}
+            ${field({ label: 'Email', name: 'contact_email', type: 'email', maxlength: 320, value: pre('contact_email') })}
+            ${field({ label: 'Phone', name: 'contact_phone', maxlength: 60, value: pre('contact_phone', 60) })}
           </div>
           <div class="form-section">
             <h3>What they asked</h3>
-            ${field({ label: 'Subject', name: 'subject', maxlength: 200 })}
+            ${field({ label: 'Subject', name: 'subject', maxlength: 200, value: pre('subject', 200) })}
             ${field({ label: 'Details', name: 'body', type: 'textarea', rows: 6, maxlength: 10000 })}
           </div>
           <div class="form-actions">

@@ -7,6 +7,43 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.19.0 — 28 August 2026
+
+### Added
+- **An Assistant page.** Paste text — a forwarded email, a scanned letter, notes
+  from a call — and it extracts the name, contact details, dates and likely
+  matter type, then offers to start an inquiry or a client record with those
+  filled in. The create forms accept a proposed starting point through the
+  address, so the suggestion arrives as a form somebody submits.
+- **Brief me on this matter**, on every case. The register assembles the file —
+  statuses, dates, parties, notes, tasks, fees — and hands that text to the
+  model, which proposes where things stand, what to do next, what is worth
+  watching, and what the file does not say. A brief can be saved to the file as
+  an ordinary note.
+
+### Security
+- **Read access is granted by assembling what may be read, not by handing over
+  the keys.** The model never queries the database, holds no credentials, and
+  cannot reach anything the person asking could not already see. Passport
+  numbers are never included in a brief: they are encrypted at rest precisely so
+  they are not casually handled, and no brief needs one.
+- **Nothing the AI layer produces is written without a person pressing the
+  button.** Every suggestion is a form to submit or a note to save.
+- A brief saved to the file says in the note that it was drafted by the AI layer
+  and who kept it. A file that does not distinguish what a person wrote from what
+  a model drafted is a file nobody can rely on. Being an ordinary note, it then
+  cannot be edited.
+- Every run is recorded with its input hash, output, latency and any error —
+  failures included, so a provider that is quietly failing is visible rather
+  than silent.
+
+### Changed
+- The provider interface gained briefing alongside triage, implemented for both
+  Anthropic and Workers AI, and is still handed the practice's configured case
+  types per request rather than importing a list.
+- **The register works with the AI layer switched off**, as it always has. The
+  Assistant page says so plainly and every other workflow is untouched.
+
 ## 0.18.0 — 28 August 2026
 
 ### Added

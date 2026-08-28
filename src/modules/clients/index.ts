@@ -394,10 +394,29 @@ export const clientsModule: AppModule = {
     r.get('/new', requirePermission('register:write'), async (c) => {
       const [users, organisations] = await Promise.all([userOptions(c.env), organisationOptions(c.env)]);
       const kind = c.req.query('kind') === 'organisation' ? 'organisation' : 'individual';
+
+      // The assistant, or any other page, may propose a starting point through
+      // the address. It is only ever a draft in a form somebody submits, so the
+      // limits here are about length rather than trust — nothing is stored
+      // until the ordinary create route validates it.
+      const prefill = (name: string, max = 200) => (c.req.query(name) ?? '').slice(0, max) || undefined;
+      const proposed: Partial<ClientRow> = {
+        kind,
+        given_names: prefill('given_names', 120),
+        family_name: prefill('family_name', 120),
+        email: prefill('email', 320),
+        phone: prefill('phone', 60),
+        nationality: prefill('nationality', 100),
+      };
+
       return page(c, { title: 'New client', active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { label: 'New' }])}
         ${pageHeader('New client')}
-        ${clientForm(c, { kind }, users, organisations)}`);
+        ${Object.values(proposed).filter(Boolean).length > 1
+          ? html`<div class="alert alert-ok">Filled in from what the assistant read. Check it before
+                   saving — it is a reading, not a fact.</div>`
+          : ''}
+        ${clientForm(c, proposed, users, organisations)}`);
     });
 
     // --- NZBN register lookup ----------------------------------------------

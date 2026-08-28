@@ -292,6 +292,42 @@ function sections(origin: string): Section[] {
            match someone already on file, the page says so rather than making a duplicate.</p>`,
     },
     {
+      id: 'assistant',
+      title: 'The assistant, and what it will not do',
+      body: html`
+        <p>With the AI layer switched on you get two things. <strong>Assistant</strong> reads text
+           you paste — a forwarded email, a scanned letter, your notes from a call — and pulls out
+           the name, the contact details, the dates and what kind of matter it looks like, then
+           offers to start an inquiry or a client record with that filled in.
+           <strong>Brief me on this matter</strong>, on any case, reads that file and proposes
+           where things stand, what to do next, what is worth watching, and what the file does not
+           say.</p>
+        <h4>What it will not do</h4>
+        <p><strong>It never writes to the register.</strong> Every suggestion arrives as a form you
+           look at and submit, or a note you press save on. Nothing it offers is a step you could
+           not take by hand — which is exactly why the register works with it switched off. If the
+           provider is down, over quota or was never configured, the page says so and every
+           workflow still completes.</p>
+        <p>It is given the file, not the keys. When you ask for a brief, the register assembles the
+           statuses, dates, parties, notes, tasks and fees and hands that text over. It does not
+           query the database itself and cannot reach anything you could not already see on the
+           page. Passport numbers are never included: they are encrypted at rest precisely so they
+           are not casually handled, and no brief needs one.</p>
+        <p>A brief saved to the file says in the note that it was drafted by the AI layer and who
+           kept it. A file that does not distinguish what a person wrote from what a model drafted
+           is a file nobody can rely on.</p>
+        <h4>What is recorded</h4>
+        <p>Every run — what was asked, what came back, how long it took, and whether it failed — is
+           kept, so a suggestion acted on months ago can still be traced to the thing that produced
+           it.</p>
+        <h4>Switching it on</h4>
+        <p>Set <code>AI_PROVIDER</code> to <code>anthropic</code> with an
+           <code>ANTHROPIC_API_KEY</code> for the better reading, or to <code>workers-ai</code> to
+           use Cloudflare's own models with nothing leaving their network. Both are repository
+           secrets, set the same way as everything else in
+           <a href="/help#connecting">the setup guide</a>.</p>`,
+    },
+    {
       id: 'notes',
       title: 'File notes',
       body: html`

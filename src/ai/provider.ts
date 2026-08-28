@@ -32,6 +32,34 @@ export interface TriageResult {
   is_spam: boolean;
 }
 
+/**
+ * A brief on one record, drawn from what the register already holds.
+ *
+ * The model is given the file, not the internet: statuses, dates, parties,
+ * notes, fees. It summarises and proposes; a person decides. `questions` is the
+ * useful part in practice — what the file does not say and probably should.
+ */
+export interface BriefResult {
+  summary: string;
+  /** Concrete next steps, in the order they should happen. */
+  next_steps: string[];
+  /** What the file does not answer. */
+  questions: string[];
+  /** Anything with a date attached that looks like it could bite. */
+  risks: string[];
+}
+
+export const BRIEF_SYSTEM_PROMPT = `You assist a New Zealand immigration practice.
+You are given the file for one matter, exactly as the practice recorded it.
+Summarise where the matter stands in a few sentences, then propose concrete next
+steps in the order they should happen.
+Use only what the file says. Never invent facts, dates, instructions or
+correspondence. If the file does not say something, put it in "questions"
+instead of guessing.
+Do not give immigration advice to the client and do not draft correspondence.
+You are briefing an experienced adviser on their own file, not advising them on
+the law.`;
+
 export interface AiProvider {
   readonly name: string;
   readonly model: string;
@@ -42,6 +70,8 @@ export interface AiProvider {
    * list contains.
    */
   triage(input: { subject: string | null; body: string; caseTypes: string[] }): Promise<TriageResult>;
+  /** Read a record the practice already holds and brief its owner on it. */
+  brief(input: { title: string; file: string }): Promise<BriefResult>;
 }
 
 export const TRIAGE_SYSTEM_PROMPT = `You assist a New Zealand licensed immigration adviser.
@@ -52,6 +82,22 @@ Assess urgency from any stated deadline: an Immigration New Zealand request for
 further information (RFI), a potentially prejudicial information (PPI) letter, a
 visa expiring within 30 days, or a removal or deportation reference are "urgent".
 Do not give immigration advice and do not draft a reply; only summarise and classify.`;
+
+/** Loose parsing for models that will not honour a schema. */
+export function parseBriefJson(text: string): BriefResult {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end <= start) throw new Error('no JSON object in the response');
+  const raw = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
+  const list = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string').slice(0, 12) : [];
+  return {
+    summary: typeof raw['summary'] === 'string' ? raw['summary'] : '',
+    next_steps: list(raw['next_steps']),
+    questions: list(raw['questions']),
+    risks: list(raw['risks']),
+  };
+}
 
 export function isAiEnabled(env: Env): boolean {
   const provider = (env.AI_PROVIDER ?? 'none').toLowerCase();
