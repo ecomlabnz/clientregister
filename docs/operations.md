@@ -48,11 +48,30 @@ npx wrangler deploy
 | `AI_PROVIDER`, `ANTHROPIC_API_KEY`, `AI_MODEL` | for AI triage | the AI layer |
 | `MAIL_PROVIDER`, `MAIL_FROM`, `RESEND_API_KEY` | for outbound mail | draining the mail queue |
 
+**Set them as GitHub repository secrets**, under Settings → Secrets and
+variables → Actions. On every deploy, `scripts/collect-secrets.mjs` gathers the
+ones that are actually set and `wrangler secret bulk` uploads them to the
+Worker. Names not on that script's list are ignored, and secrets already on the
+Worker that are not in the upload are left alone.
+
+Managing them this way rather than through the Cloudflare dashboard means the
+Worker's configuration is reproducible: a fresh deploy into a new account gets
+the same secrets without anyone remembering to re-enter them. To add a new
+secret name, add it to the list in `scripts/collect-secrets.mjs` and to the
+`env:` block of the *Collect configured secrets* step in
+`.github/workflows/deploy.yml`.
+
+By hand, if you prefer:
+
 ```bash
 npx wrangler secret put NAME     # set
 npx wrangler secret list         # see what is set (never the values)
 npx wrangler secret delete NAME  # remove
 ```
+
+Note that a secret set only in the Cloudflare dashboard is invisible to this
+repository, so nobody reviewing the code can tell it exists. Prefer the
+pipeline.
 
 **`FIELD_KEY` cannot be rotated casually.** Passport numbers sealed under the old
 key cannot be read with a new one. To rotate, decrypt and re-encrypt every
