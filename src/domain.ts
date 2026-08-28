@@ -184,8 +184,17 @@ export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
 export const CLIENT_STATUSES = ['prospect', 'active', 'inactive', 'archived'] as const;
 export type ClientStatus = (typeof CLIENT_STATUSES)[number];
 export const CLIENT_STATUS_LABELS: Record<ClientStatus, string> = {
-  prospect: 'Prospect', active: 'Active', inactive: 'Inactive', archived: 'Archived',
+  prospect: 'Lead', active: 'Client', inactive: 'Inactive', archived: 'Archived',
 };
+
+/**
+ * The register keeps leads and clients in one table separated by status, so
+ * converting one to the other is a status change and nothing is re-keyed. The
+ * stored value stays `prospect` — renaming it would mean rebuilding the
+ * table's CHECK constraint for a wording change.
+ */
+export const LEAD_STATUS: ClientStatus = 'prospect';
+export const CLIENT_ACTIVE_STATUS: ClientStatus = 'active';
 
 export const PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
 export type Priority = (typeof PRIORITIES)[number];
@@ -207,3 +216,43 @@ export const ENTRY_KIND_LABELS: Record<EntryKind, string> = {
   note: 'Note', call: 'Phone call', meeting: 'Meeting', email_in: 'Email received',
   email_out: 'Email sent', message: 'Message', system: 'System', file: 'Document',
 };
+
+/**
+ * How a client relates to a particular case.
+ *
+ * The role sits on the link between a case and a client, not on the client, so
+ * the same company can be the client of its own accreditation case and the
+ * employer on somebody else's work visa without contradiction.
+ */
+export const PARTY_ROLES = [
+  'principal_applicant',
+  'secondary_applicant',
+  'supporting_partner',
+  'dependent_child',
+  'employer',
+  'sponsor',
+  'agent',
+  'other',
+] as const;
+
+export type PartyRole = (typeof PARTY_ROLES)[number];
+
+export const PARTY_ROLE_LABELS: Record<PartyRole, string> = {
+  principal_applicant: 'Principal applicant',
+  secondary_applicant: 'Secondary applicant',
+  supporting_partner: 'Supporting partner',
+  dependent_child: 'Dependent child',
+  employer: 'Employer',
+  sponsor: 'Sponsor',
+  agent: 'Agent or representative',
+  other: 'Other party',
+};
+
+/** Roles that make the holder an applicant in their own right. */
+export const APPLICANT_ROLES: PartyRole[] = [
+  'principal_applicant', 'secondary_applicant', 'dependent_child',
+];
+
+export function isPartyRole(value: string): value is PartyRole {
+  return (PARTY_ROLES as readonly string[]).includes(value);
+}

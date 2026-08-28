@@ -125,10 +125,12 @@ export const adminModule: AppModule = {
     // --- Overview -----------------------------------------------------------
     r.get('/', requirePermission('admin:settings'), async (c) => {
       const env = c.env;
-      const [users, pendingIngest, queuedMail] = await Promise.all([
+      const [users, pendingIngest, queuedMail, demoCount] = await Promise.all([
         count(env.DB, 'SELECT COUNT(*) AS n FROM users'),
         count(env.DB, `SELECT COUNT(*) AS n FROM ingest_messages WHERE status = 'pending'`),
         count(env.DB, `SELECT COUNT(*) AS n FROM outbound_emails WHERE status = 'queued'`),
+        count(env.DB, `SELECT (SELECT COUNT(*) FROM clients WHERE id LIKE 'demo\\_%' ESCAPE '\\')
+                            + (SELECT COUNT(*) FROM cases WHERE id LIKE 'demo\\_%' ESCAPE '\\') AS n`),
       ]);
 
       return page(c, { title: 'Administration', active: '/admin' }, html`
@@ -169,12 +171,65 @@ export const adminModule: AppModule = {
           <tr><td>${m.title} <span class="muted small"><code>${m.name}</code></span></td>
               <td class="small">${(m.basePaths ?? []).map((p) => html`<code>${p}</code> `)}</td></tr>`)))}
 
+        ${demoCount > 0 ? card('Demonstration data', html`
+          <p>This register contains <strong>${demoCount}</strong> fabricated client and case records,
+             loaded to show how the system behaves with a realistic caseload.</p>
+          <p>They are marked three ways so none of it can be mistaken for a real file: every
+             identifier begins <code>demo_</code>, every client note starts <code>[TEST DATA]</code>,
+             and every case carries the red <strong>Test data</strong> tag —
+             <a href="/cases?tag=Test+data&scope=all">see them all</a>.</p>
+          <form method="post" action="/admin/demo-data/remove"
+                data-confirm="Delete all ${demoCount} demonstration records? Real records are untouched.">
+            ${csrfField(c.get('session')!.csrf)}
+            <button class="btn btn-danger" type="submit">Remove all demonstration data</button>
+          </form>
+          <p class="hint">Only rows whose identifier begins <code>demo_</code> are removed. The audit
+             log is append-only and keeps the record that this data existed.</p>`) : ''}
+
         ${card('Outbound mail queue', html`
           <p>${queuedMail} message(s) waiting.</p>
           <form method="post" action="/admin/mail/flush">
             ${csrfField(c.get('session')!.csrf)}
             <button class="btn btn-secondary" type="submit">Attempt delivery now</button>
           </form>`)}`);
+    });
+
+    /**
+     * Remove the demonstration data.
+     *
+     * Every statement is constrained to identifiers beginning `demo_`, which is
+     * the only thing that makes this safe to expose as a button: it cannot
+     * reach a real record however it is called.
+     */
+    r.post('/demo-data/remove', requirePermission('admin:settings'), async (c) => {
+      const like = `demo\\_%`;
+      const tables = [
+        'DELETE FROM case_tags WHERE case_id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM tags WHERE id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM case_parties WHERE id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM fee_shares WHERE id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM fee_items WHERE id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM quotes WHERE id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM tasks WHERE id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM entries WHERE id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM case_status_history WHERE id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM cases WHERE id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM clients WHERE id LIKE ? ESCAPE \'\\\'',
+      ];
+      await c.env.DB.batch(tables.map((sql) => c.env.DB.prepare(sql).bind(like)));
+
+      // Hand the next real record a reference that is not already in use.
+      await c.env.DB.batch([
+        c.env.DB.prepare(`UPDATE counters SET value =
+          (SELECT COALESCE(MAX(CAST(SUBSTR(ref, 4) AS INTEGER)), 0) FROM clients) WHERE name = 'client'`),
+        c.env.DB.prepare(`UPDATE counters SET value =
+          (SELECT COALESCE(MAX(CAST(SUBSTR(ref, 6) AS INTEGER)), 0) FROM cases) WHERE name = 'case'`),
+        c.env.DB.prepare(`UPDATE counters SET value =
+          (SELECT COALESCE(MAX(CAST(SUBSTR(ref, 3) AS INTEGER)), 0) FROM quotes) WHERE name = 'quote'`),
+      ]);
+
+      await auditFrom(c, { action: 'admin.demo_data_removed' });
+      return redirectWith(c, '/admin', 'Demonstration data removed. Real records are untouched.');
     });
 
     r.post('/mail/flush', requirePermission('admin:settings'), async (c) => {

@@ -365,3 +365,23 @@ details[open] > summary { margin-bottom: 12px; }
   .bare-main { max-width: none; }
   body.bare { display: block; min-height: 0; padding: 0; }
 }
+
+
+/* --- Tags and parties ---------------------------------------------------- */
+
+.tag-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 4px; }
+.tag-row .inline-form { display: inline-flex; }
+.btn-tag-remove {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 0.95rem; line-height: 1; padding: 0 2px; width: auto;
+}
+.btn-tag-remove:hover { color: var(--red); }
+.tag-form { margin-top: 12px; }
+.tag-form input { margin-bottom: 6px; }
+
+.party-list { list-style: none; margin: 0; padding: 0; }
+.party-list li {
+  display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;
+  padding: 9px 0; border-bottom: 1px solid var(--border);
+}
+.party-list li:last-child { border-bottom: none; }

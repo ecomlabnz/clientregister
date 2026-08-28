@@ -24,10 +24,12 @@ import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate 
 import {
   canTransition, CASE_STATUS_HELP, CASE_STATUS_LABELS, CASE_STATUSES, CASE_TRANSITIONS,
   CASE_TYPE_LABELS, CASE_TYPES, DEADLINE_CASE_STATUSES, ENTRY_KIND_LABELS, ENTRY_KINDS,
-  isOpenStatus, OPEN_CASE_STATUSES, PRIORITIES, PRIORITY_LABELS, TASK_STATUS_LABELS,
-  type CaseStatus, type CaseType,
+  isOpenStatus, isPartyRole, OPEN_CASE_STATUSES, PARTY_ROLE_LABELS, PARTY_ROLES, PRIORITIES,
+  PRIORITY_LABELS, TASK_STATUS_LABELS, type CaseStatus, type CaseType,
 } from '../../domain';
 import { clientOptions, userOptions } from '../../core/lookups';
+import { addParty, partiesForCase, removeParty } from '../../core/parties';
+import { findOrCreateTag, listTags, tagCase, tagsForCase, tagsForCases, untagCase } from '../../core/tags';
 import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
 import { feesSection } from '../fees';
@@ -155,6 +157,12 @@ export const casesModule: AppModule = {
         params.push(c.get('user')!.id);
         where.push(`k.assigned_to = ${p()}`);
       }
+      const tagFilter = c.req.query('tag') ?? '';
+      if (tagFilter) {
+        params.push(tagFilter);
+        where.push(`EXISTS (SELECT 1 FROM case_tags ct JOIN tags t ON t.id = ct.tag_id
+                             WHERE ct.case_id = k.id AND t.name = ${p()})`);
+      }
       const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
       params.push(PAGE_SIZE + 1, (pageNum - 1) * PAGE_SIZE);
 
@@ -173,9 +181,13 @@ export const casesModule: AppModule = {
       );
       const hasMore = rows.length > PAGE_SIZE;
       const shown = rows.slice(0, PAGE_SIZE);
+      const [tagsByCase, allTags] = await Promise.all([
+        tagsForCases(c.env, shown.map((row) => row.id)),
+        listTags(c.env),
+      ]);
 
       const qs = (over: Record<string, string | number>) =>
-        new URLSearchParams({ q, status, assigned, scope, page: String(pageNum), ...Object.fromEntries(Object.entries(over).map(([k2, v]) => [k2, String(v)])) }).toString();
+        new URLSearchParams({ q, status, assigned, scope, tag: tagFilter, page: String(pageNum), ...Object.fromEntries(Object.entries(over).map(([k2, v]) => [k2, String(v)])) }).toString();
 
       return page(c, { title: 'Cases', active: '/cases' }, html`
         ${pageHeader('Cases', 'Every matter the practice is running.',
@@ -194,6 +206,10 @@ export const casesModule: AppModule = {
             <option value="">Anyone</option>
             <option value="me" ${assigned === 'me' ? raw('selected') : ''}>Assigned to me</option>
           </select>
+          <select name="tag">
+            <option value="">Any tag</option>
+            ${allTags.map((tag) => html`<option value="${tag.name}" ${tag.name === tagFilter ? raw('selected') : ''}>${tag.name} (${tag.uses})</option>`)}
+          </select>
           <button class="btn btn-secondary" type="submit">Filter</button>
         </form>
         ${table(['Reference', 'Matter', 'Client', 'Status', 'Key date', 'Owner'], shown.map((row) => html`
@@ -201,7 +217,10 @@ export const casesModule: AppModule = {
             <td><a href="/cases/${row.id}"><code>${row.ref}</code></a>
                 ${row.priority !== 'normal' ? badge(PRIORITY_LABELS[row.priority as keyof typeof PRIORITY_LABELS], row.priority === 'urgent' ? 'red' : 'amber') : ''}</td>
             <td><a href="/cases/${row.id}">${row.title}</a>
-                <div class="muted small">${CASE_TYPE_LABELS[row.case_type] ?? row.case_type}</div></td>
+                <div class="muted small">${CASE_TYPE_LABELS[row.case_type] ?? row.case_type}</div>
+                ${(tagsByCase.get(row.id) ?? []).length > 0
+                  ? html`<div class="tag-row">${(tagsByCase.get(row.id) ?? []).map((tag) => badge(tag.name, tag.colour))}</div>`
+                  : ''}</td>
             <td class="small"><a href="/clients/${row.client_id}">${row.client_name}</a></td>
             <td>${badge(CASE_STATUS_LABELS[row.status] ?? row.status, statusTone(row.status))}</td>
             <td class="small ${isOverdue(row.decision_due_at) && isOpenStatus(row.status) ? 'warn' : ''}">
@@ -286,7 +305,7 @@ export const casesModule: AppModule = {
       const writable = can(c.get('user'), 'register:write');
       const csrf = c.get('session')!.csrf;
 
-      const [entries, history, tasks, quotes, users, fees] = await Promise.all([
+      const [entries, history, tasks, quotes, users, fees, parties, caseTags, allTags, clients] = await Promise.all([
         listEntries(c.env, 'case', id),
         all<any>(c.env.DB, `SELECT h.*, u.name AS by_name FROM case_status_history h
                               LEFT JOIN users u ON u.id = h.by_user_id
@@ -300,6 +319,10 @@ export const casesModule: AppModule = {
                               FROM quotes WHERE case_id = ? ORDER BY created_at DESC`, id),
         userOptions(c.env),
         feesSection(c, id, kase.currency, writable),
+        partiesForCase(c.env, id),
+        tagsForCase(c.env, id),
+        listTags(c.env),
+        clientOptions(c.env),
       ]);
 
       const nextStatuses = CASE_TRANSITIONS[kase.status] ?? [];
@@ -346,6 +369,48 @@ export const casesModule: AppModule = {
                       <strong>${CASE_STATUS_LABELS[h.to_status as CaseStatus] ?? h.to_status}</strong>
                       ${h.by_name ? ` · ${h.by_name}` : ''}${h.note ? ` · ${h.note}` : ''}</li>`)}
                   </ul>
+                </details>` : ''}`)}
+
+            ${card('Parties', html`
+              ${parties.length === 0 ? emptyState('No parties recorded.') : html`
+                <ul class="party-list">
+                  ${parties.map((party) => html`
+                    <li>
+                      <div>
+                        <a href="/clients/${party.client_id}">${party.client_name}</a>
+                        ${badge(PARTY_ROLE_LABELS[party.role] ?? party.role,
+                                party.role === 'principal_applicant' ? 'blue'
+                                : party.role === 'employer' ? 'amber' : 'neutral')}
+                        <div class="muted small">
+                          <code>${party.client_ref}</code>
+                          ${party.client_kind === 'organisation' ? ' · organisation' : ''}
+                          ${party.notes ? ` · ${party.notes}` : ''}
+                        </div>
+                      </div>
+                      ${writable && party.client_id !== kase.client_id ? html`
+                        <form method="post" action="/cases/${kase.id}/parties/${party.id}/remove"
+                              class="inline-form" data-confirm="Remove this party from the case?">
+                          ${csrfField(csrf)}
+                          <button class="btn btn-small btn-link-danger" type="submit">Remove</button>
+                        </form>` : ''}
+                    </li>`)}
+                </ul>`}
+              ${writable ? html`
+                <details class="add-block" ${parties.length <= 1 ? raw('open') : ''}>
+                  <summary>Add a party</summary>
+                  <form method="post" action="/cases/${kase.id}/parties" class="row-form">
+                    ${csrfField(csrf)}
+                    ${select({ label: 'Client', name: 'client_id', value: '', required: true,
+                               options: clients, includeBlank: 'Choose an existing client' })}
+                    ${select({ label: 'Role on this case', name: 'role', value: 'secondary_applicant',
+                               includeBlank: false, options: optionsFrom(PARTY_ROLES, PARTY_ROLE_LABELS) })}
+                    ${field({ label: 'Note', name: 'notes', maxlength: 200,
+                              placeholder: 'e.g. accredited employer, NZ citizen partner' })}
+                    <button class="btn btn-primary" type="submit">Add party</button>
+                  </form>
+                  <p class="hint">Everyone on a matter is a client in their own right — a partner, a
+                     child, an employer — so each has their own documents and expiry dates.
+                     <a href="/clients/new">Create a client</a> first if they are not on file.</p>
                 </details>` : ''}`)}
 
             ${fees}
@@ -419,6 +484,29 @@ export const casesModule: AppModule = {
           </div>
 
           <div class="col-side">
+            ${card('Tags', html`
+              ${caseTags.length === 0
+                ? html`<p class="muted small">No tags yet.</p>`
+                : html`<p class="tag-row">${caseTags.map((tag) => html`
+                    ${badge(tag.name, tag.colour)}
+                    ${writable ? html`
+                      <form method="post" action="/cases/${kase.id}/tags/${tag.id}/remove" class="inline-form">
+                        ${csrfField(csrf)}
+                        <button class="btn-tag-remove" type="submit" title="Remove ${tag.name}">×</button>
+                      </form>` : ''}`)}</p>`}
+              ${writable ? html`
+                <form method="post" action="/cases/${kase.id}/tags" class="tag-form">
+                  ${csrfField(csrf)}
+                  <label for="f_tag">Add a tag</label>
+                  <input id="f_tag" name="tag" list="tag-options" maxlength="40" required
+                         placeholder="Type a new tag or pick one" autocomplete="off">
+                  <datalist id="tag-options">
+                    ${allTags.map((tag) => html`<option value="${tag.name}"></option>`)}
+                  </datalist>
+                  <button class="btn btn-secondary btn-small" type="submit">Add</button>
+                  <p class="hint">Anything you type that does not exist yet is created.</p>
+                </form>` : ''}`)}
+
             ${card('Key details', html`
               <dl class="kv">
                 <dt>Client</dt><dd><a href="/clients/${kase.client_id}">${kase.client_name}</a> <code>${kase.client_ref}</code></dd>
@@ -533,6 +621,84 @@ export const casesModule: AppModule = {
       });
       await auditFrom(c, { action: 'case.status_changed', entityType: 'case', entityId: id, meta: { from: kase.status, to: status } });
       return redirectWith(c, `/cases/${id}`, `Status updated to ${CASE_STATUS_LABELS[status]}.`);
+    });
+
+    // --- Parties ------------------------------------------------------------
+    r.post('/:id/parties', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const user = c.get('user')!;
+      const kase = await one<{ id: string; ref: string }>(c.env.DB, 'SELECT id, ref FROM cases WHERE id = ?', id);
+      if (!kase) return c.notFound();
+
+      const f = new FormReader(await c.req.formData());
+      const clientId = f.text('client_id', { required: true, label: 'Client', max: 60 });
+      const roleRaw = f.text('role', { required: true, label: 'Role', max: 40 });
+      const notes = f.optional('notes', { max: 200 });
+      if (!f.valid || !isPartyRole(roleRaw)) {
+        return redirectWith(c, `/cases/${id}`, 'Choose a client and a role.', 'err');
+      }
+
+      const client = await one<{ full_name: string }>(c.env.DB, 'SELECT full_name FROM clients WHERE id = ?', clientId);
+      if (!client) return redirectWith(c, `/cases/${id}`, 'That client no longer exists.', 'err');
+
+      const result = await addParty(c.env, { caseId: id, clientId, role: roleRaw, notes, createdBy: user.id });
+      if (!result.ok) return redirectWith(c, `/cases/${id}`, result.reason, 'err');
+
+      await addEntry(c.env, { entityType: 'case', entityId: id, kind: 'system',
+        body: `${client.full_name} added as ${PARTY_ROLE_LABELS[roleRaw].toLowerCase()}.`, createdBy: user.id });
+      await addEntry(c.env, { entityType: 'client', entityId: clientId, kind: 'system',
+        body: `Added to case ${kase.ref} as ${PARTY_ROLE_LABELS[roleRaw].toLowerCase()}.`, createdBy: user.id });
+      await auditFrom(c, { action: 'case.party_added', entityType: 'case', entityId: id,
+        meta: { clientId, role: roleRaw } });
+      return redirectWith(c, `/cases/${id}`, `${client.full_name} added as ${PARTY_ROLE_LABELS[roleRaw].toLowerCase()}.`);
+    });
+
+    r.post('/:id/parties/:partyId/remove', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const partyId = c.req.param('partyId')!;
+      const user = c.get('user')!;
+
+      const kase = await one<{ client_id: string }>(c.env.DB, 'SELECT client_id FROM cases WHERE id = ?', id);
+      if (!kase) return c.notFound();
+
+      const party = await removeParty(c.env, id, partyId);
+      if (!party) return redirectWith(c, `/cases/${id}`, 'That party is not on this case.', 'err');
+      // The case's own client is the principal applicant and cannot be removed
+      // without removing the case; the button is hidden for them, and this is
+      // the check behind it.
+      if (party.client_id === kase.client_id) {
+        await addParty(c.env, { caseId: id, clientId: party.client_id, role: party.role, notes: party.notes, createdBy: user.id });
+        return redirectWith(c, `/cases/${id}`, 'The principal applicant cannot be removed from their own case.', 'err');
+      }
+
+      await addEntry(c.env, { entityType: 'case', entityId: id, kind: 'system',
+        body: `${party.client_name ?? 'A party'} removed from the case.`, createdBy: user.id });
+      await auditFrom(c, { action: 'case.party_removed', entityType: 'case', entityId: id,
+        meta: { clientId: party.client_id, role: party.role } });
+      return redirectWith(c, `/cases/${id}`, 'Party removed.');
+    });
+
+    // --- Tags -----------------------------------------------------------------
+    r.post('/:id/tags', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const user = c.get('user')!;
+      const f = new FormReader(await c.req.formData());
+      const name = f.text('tag', { required: true, label: 'Tag', max: 40 });
+      if (!f.valid) return redirectWith(c, `/cases/${id}`, 'Type a tag.', 'err');
+
+      const tag = await findOrCreateTag(c.env, name, user.id);
+      if (!tag) return redirectWith(c, `/cases/${id}`, 'That tag name is empty.', 'err');
+
+      await tagCase(c.env, id, tag.id, user.id);
+      await auditFrom(c, { action: 'case.tagged', entityType: 'case', entityId: id, meta: { tag: tag.name } });
+      return redirectWith(c, `/cases/${id}`, `Tagged “${tag.name}”.`);
+    });
+
+    r.post('/:id/tags/:tagId/remove', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      await untagCase(c.env, id, c.req.param('tagId')!);
+      await auditFrom(c, { action: 'case.untagged', entityType: 'case', entityId: id });
+      return redirectWith(c, `/cases/${id}`, 'Tag removed.');
     });
 
     r.post('/:id/entries', requirePermission('register:write'), async (c) => {

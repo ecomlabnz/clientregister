@@ -33,10 +33,11 @@ import {
 import { dateInputValue, dateShort, dateTime, isOverdue, money, relativeDays, truncate } from '../../ui/format';
 import {
   CASE_STATUS_LABELS, CASE_TYPE_LABELS, CLIENT_STATUSES, CLIENT_STATUS_LABELS,
-  ENTRY_KINDS, ENTRY_KIND_LABELS, QUOTE_STATUS_LABELS, type ClientStatus,
+  ENTRY_KINDS, ENTRY_KIND_LABELS, PARTY_ROLE_LABELS, QUOTE_STATUS_LABELS, type ClientStatus,
 } from '../../domain';
-import { userOptions } from '../../core/lookups';
+import { organisationOptions, userOptions } from '../../core/lookups';
 import { addEntry, listEntries } from '../../core/timeline';
+import { casesForClient, relatedClients } from '../../core/parties';
 import { can } from '../../core/rbac';
 import { composeFullName, splitFullName, type ClientKind } from '../../core/names';
 import {
@@ -47,6 +48,8 @@ export interface ClientRow {
   id: string; ref: string; kind: ClientKind; full_name: string; preferred_name: string | null;
   given_names: string | null; family_name: string | null;
   nzbn: string | null; company_number: string | null;
+  organisation_id: string | null; organisation_role: string | null;
+  primary_contact_id: string | null;
   email: string | null; phone: string | null; whatsapp: string | null;
   telegram_username: string | null; telegram_user_id: string | null;
   nationality: string | null; date_of_birth: string | null; passport_sealed: string | null;
@@ -75,6 +78,7 @@ function clientForm(
   c: any,
   values: Partial<ClientRow>,
   users: Array<{ value: string; label: string }>,
+  organisations: Array<{ value: string; label: string }>,
   errors?: Record<string, string>,
 ): Raw {
   const csrf = c.get('session').csrf;
@@ -114,6 +118,12 @@ function clientForm(
                     hint: 'What to call them in conversation, if different.' })}
           ${field({ label: 'Nationality', name: 'nationality', value: values.nationality, maxlength: 100 })}
           ${field({ label: 'Date of birth', name: 'date_of_birth', type: 'date', value: dateInputValue(values.date_of_birth) })}
+          ${select({ label: 'Works for', name: 'organisation_id', value: values.organisation_id ?? '',
+                     options: organisations, includeBlank: 'Not linked to an organisation',
+                     hint: 'Links this person to a company client. One of them can then be named as '
+                       + 'its primary contact.' })}
+          ${field({ label: 'Role there', name: 'organisation_role', value: values.organisation_role,
+                    maxlength: 100, placeholder: 'e.g. Director, HR Manager' })}
         </div>
 
         <div data-kind="organisation">
@@ -211,6 +221,8 @@ function readClientForm(f: FormReader) {
     full_name: composeFullName(kind, { givenNames, familyName }, organisationName),
     nzbn: nzbn ? normaliseNzbn(nzbn) : null,
     company_number: f.optional('company_number', { max: 30 }),
+    organisation_id: f.optional('organisation_id', { max: 60 }),
+    organisation_role: f.optional('organisation_role', { max: 100 }),
     preferred_name: f.optional('preferred_name', { max: 120 }),
     email: f.email('email'),
     phone: f.optional('phone', { max: 60 }),
@@ -254,8 +266,16 @@ export const clientsModule: AppModule = {
       const pageNum = Math.max(1, Number(c.req.query('page') ?? '1') || 1);
       const offset = (pageNum - 1) * PAGE_SIZE;
 
+      // Leads and clients are the same records at different stages, so the
+      // split is a filter over status rather than a separate list.
+      const view = c.req.query('view') ?? 'clients';
       const where: string[] = [];
       const params: unknown[] = [];
+      if (!status) {
+        if (view === 'leads') where.push(`status = 'prospect'`);
+        else if (view === 'clients') where.push(`status = 'active'`);
+        else if (view === 'open') where.push(`status IN ('prospect','active')`);
+      }
       if (q) {
         where.push(`(full_name LIKE ?1 OR family_name LIKE ?1 OR given_names LIKE ?1
                      OR email LIKE ?1 OR phone LIKE ?1 OR ref LIKE ?1
@@ -279,6 +299,17 @@ export const clientsModule: AppModule = {
       const shown = rows.slice(0, PAGE_SIZE);
       const writable = can(c.get('user'), 'register:write');
 
+      const counts = await one<{ leads: number; clients: number; total: number }>(
+        c.env.DB,
+        `SELECT SUM(status = 'prospect') AS leads, SUM(status = 'active') AS clients,
+                COUNT(*) AS total FROM clients`,
+      );
+      const views: Array<{ id: string; label: string; count: number }> = [
+        { id: 'leads', label: 'Leads', count: counts?.leads ?? 0 },
+        { id: 'clients', label: 'Clients', count: counts?.clients ?? 0 },
+        { id: 'all', label: 'Everyone', count: counts?.total ?? 0 },
+      ];
+
       return page(c, { title: 'Clients', active: '/clients' }, html`
         ${pageHeader('Clients', 'Everyone the practice acts for.',
           writable
@@ -287,7 +318,14 @@ export const clientsModule: AppModule = {
                      ? html`<a class="btn btn-secondary" href="/clients/lookup">New from NZBN register</a>`
                      : ''}`
             : undefined)}
+        <nav class="tabs">
+          ${views.map((v) => html`
+            <a class="${v.id === view && !status ? 'tab current' : 'tab'}"
+               href="/clients?view=${v.id}">${v.label} <span class="muted">${v.count}</span></a>`)}
+        </nav>
+
         <form method="get" action="/clients" class="filters">
+          <input type="hidden" name="view" value="${view}">
           <input type="search" name="q" value="${q}" placeholder="Search name, email, phone, reference or NZBN">
           <select name="status">
             <option value="">All statuses</option>
@@ -310,19 +348,19 @@ export const clientsModule: AppModule = {
             <td class="small">${dateShort(row.updated_at)}</td>
           </tr>`))}
         <div class="pager">
-          ${pageNum > 1 ? html`<a class="btn btn-secondary" href="/clients?q=${q}&status=${status}&page=${pageNum - 1}">Previous</a>` : ''}
-          ${hasMore ? html`<a class="btn btn-secondary" href="/clients?q=${q}&status=${status}&page=${pageNum + 1}">Next</a>` : ''}
+          ${pageNum > 1 ? html`<a class="btn btn-secondary" href="/clients?view=${view}&q=${q}&status=${status}&page=${pageNum - 1}">Previous</a>` : ''}
+          ${hasMore ? html`<a class="btn btn-secondary" href="/clients?view=${view}&q=${q}&status=${status}&page=${pageNum + 1}">Next</a>` : ''}
         </div>`);
     });
 
     // --- Create -------------------------------------------------------------
     r.get('/new', requirePermission('register:write'), async (c) => {
-      const users = await userOptions(c.env);
+      const [users, organisations] = await Promise.all([userOptions(c.env), organisationOptions(c.env)]);
       const kind = c.req.query('kind') === 'organisation' ? 'organisation' : 'individual';
       return page(c, { title: 'New client', active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { label: 'New' }])}
         ${pageHeader('New client')}
-        ${clientForm(c, { kind }, users)}`);
+        ${clientForm(c, { kind }, users, organisations)}`);
     });
 
     // --- NZBN register lookup ----------------------------------------------
@@ -439,9 +477,9 @@ export const clientsModule: AppModule = {
       const f = new FormReader(await c.req.formData());
       const v = readClientForm(f);
       if (!f.valid) {
-        const users = await userOptions(c.env);
+        const [users, organisations] = await Promise.all([userOptions(c.env), organisationOptions(c.env)]);
         return page(c, { title: 'New client', active: '/clients', status: 400 }, html`
-          ${pageHeader('New client')}${clientForm(c, v as Partial<ClientRow>, users, f.errors)}`);
+          ${pageHeader('New client')}${clientForm(c, v as Partial<ClientRow>, users, organisations, f.errors)}`);
       }
 
       const id = newId('cli');
@@ -453,15 +491,16 @@ export const clientsModule: AppModule = {
       await run(
         c.env.DB,
         `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name, preferred_name,
-            nzbn, company_number, email, phone, whatsapp, telegram_username, telegram_user_id,
+            nzbn, company_number, organisation_id, organisation_role,
+            email, phone, whatsapp, telegram_username, telegram_user_id,
             nationality, date_of_birth, passport_sealed, passport_country, passport_expiry,
             police_certificate_country, police_certificate_date, police_certificate_expiry,
             medical_certificate_date, medical_certificate_expiry, chest_xray_expiry,
             current_visa_type, current_visa_expiry, address, status, assigned_to, notes,
             created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, ref, v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
-        v.nzbn, v.company_number, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
+        v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.nationality, v.date_of_birth, passportSealed, v.passport_country, v.passport_expiry,
         v.police_certificate_country, v.police_certificate_date, v.police_certificate_expiry,
         v.medical_certificate_date, v.medical_certificate_expiry, v.chest_xray_expiry,
@@ -484,7 +523,7 @@ export const clientsModule: AppModule = {
       );
       if (!client) return c.notFound();
 
-      const [cases, quotes, inquiries, entries, tasks] = await Promise.all([
+      const [cases, quotes, inquiries, entries, tasks, partyCases, related, employer, people] = await Promise.all([
         all<any>(c.env.DB, `SELECT id, ref, title, case_type, status, priority, next_action, next_action_due, updated_at
                               FROM cases WHERE client_id = ? ORDER BY updated_at DESC`, id),
         all<any>(c.env.DB, `SELECT id, ref, description, amount_cents, gst_cents, disbursements_cents, currency, status, created_at
@@ -495,7 +534,22 @@ export const clientsModule: AppModule = {
         all<any>(c.env.DB, `SELECT id, title, status, due_at FROM tasks
                              WHERE entity_type = 'client' AND entity_id = ? AND status IN ('open','in_progress','blocked')
                              ORDER BY due_at`, id),
+        casesForClient(c.env, id),
+        relatedClients(c.env, id),
+        // For an individual: the organisation they work for. For an
+        // organisation: its people, and which of them is the primary contact.
+        one<{ id: string; ref: string; full_name: string; primary_contact_id: string | null }>(
+          c.env.DB, 'SELECT id, ref, full_name, primary_contact_id FROM clients WHERE id = (SELECT organisation_id FROM clients WHERE id = ?)', id),
+        all<{ id: string; ref: string; full_name: string; organisation_role: string | null }>(
+          c.env.DB,
+          `SELECT id, ref, full_name, organisation_role FROM clients
+            WHERE organisation_id = ? ORDER BY full_name`, id),
       ]);
+
+      // Cases where this client is a party but not the file owner — an
+      // employer, a supporting partner, a child on a parent's application.
+      const ownCaseIds = new Set(cases.map((k: any) => k.id));
+      const otherRoles = partyCases.filter((pc) => !ownCaseIds.has(pc.case_id));
 
       const csrf = c.get('session')!.csrf;
       const writable = can(c.get('user'), 'register:write');
@@ -507,8 +561,13 @@ export const clientsModule: AppModule = {
           `${client.ref} · ${isOrg ? 'Organisation' : 'Individual'} · ${CLIENT_STATUS_LABELS[client.status]}`
             + `${client.assignee_name ? ` · ${client.assignee_name}` : ''}`,
           writable ? html`
+            ${client.status === 'prospect'
+              ? actionButton(`/clients/${client.id}/status`, csrf, 'Convert to client',
+                  { className: 'btn btn-primary', fields: { status: 'active' } })
+              : ''}
             <a class="btn btn-secondary" href="/clients/${client.id}/edit">Edit</a>
-            <a class="btn btn-primary" href="/cases/new?client_id=${client.id}">New case</a>
+            <a class="btn ${client.status === 'prospect' ? 'btn-secondary' : 'btn-primary'}"
+               href="/cases/new?client_id=${client.id}">New case</a>
             <a class="btn btn-secondary" href="/quotes/new?client_id=${client.id}">New quote</a>` : undefined)}
 
         <div class="cols">
@@ -569,13 +628,47 @@ export const clientsModule: AppModule = {
               </dl>`)}
 
             ${isOrg
-              ? card('Registration', html`
+              ? html`
+                ${card('Registration', html`
                   <dl class="kv">
                     <dt>NZBN</dt><dd>${client.nzbn ?? '—'}</dd>
                     <dt>Company no.</dt><dd>${client.company_number ?? '—'}</dd>
-                  </dl>`)
+                    <dt>Primary contact</dt><dd>${(() => {
+                      const primary = people.find((person) => person.id === client.primary_contact_id);
+                      return primary
+                        ? html`<a href="/clients/${primary.id}">${primary.full_name}</a>`
+                        : html`<span class="muted">Not set</span>`;
+                    })()}</dd>
+                  </dl>`)}
+
+                ${card('People at this organisation', people.length === 0
+                  ? emptyState('Nobody linked yet. Open a person’s record and set “Works for”.')
+                  : html`
+                    <ul class="party-list">
+                      ${people.map((person) => html`
+                        <li>
+                          <div>
+                            <a href="/clients/${person.id}">${person.full_name}</a>
+                            ${person.id === client.primary_contact_id ? badge('Primary contact', 'green') : ''}
+                            <div class="muted small">${person.organisation_role ?? 'Role not recorded'}
+                              · <code>${person.ref}</code></div>
+                          </div>
+                          ${writable && person.id !== client.primary_contact_id
+                            ? actionButton(`/clients/${client.id}/primary-contact`, csrf, 'Make primary',
+                                { className: 'btn btn-small btn-secondary', fields: { contact_id: person.id } })
+                            : ''}
+                        </li>`)}
+                    </ul>
+                    ${writable && client.primary_contact_id
+                      ? actionButton(`/clients/${client.id}/primary-contact`, csrf, 'Clear primary contact',
+                          { className: 'btn btn-small btn-link-danger', fields: { contact_id: '' } })
+                      : ''}`)}`
               : card('Identity and compliance', html`
                   <dl class="kv">
+                    ${employer ? html`
+                      <dt>Works for</dt><dd><a href="/clients/${employer.id}">${employer.full_name}</a>
+                        ${client.organisation_role ? html`<div class="muted small">${client.organisation_role}</div>` : ''}
+                        ${employer.primary_contact_id === client.id ? badge('Primary contact', 'green') : ''}</dd>` : ''}
                     <dt>Nationality</dt><dd>${client.nationality ?? '—'}</dd>
                     <dt>Date of birth</dt><dd>${dateShort(client.date_of_birth)}</dd>
                     <dt>Passport</dt><dd>${client.passport_sealed
@@ -591,6 +684,24 @@ export const clientsModule: AppModule = {
                     <dt>Medical</dt><dd>${expiryCell(client.medical_certificate_expiry)}</dd>
                     <dt>Chest x-ray</dt><dd>${expiryCell(client.chest_xray_expiry)}</dd>
                   </dl>`)}
+
+            ${otherRoles.length > 0
+              ? card('Also a party to', html`
+                  <ul class="list">${otherRoles.map((pc) => html`
+                    <li><a href="/cases/${pc.case_id}">${pc.case_title}</a>
+                        <div class="muted small"><code>${pc.case_ref}</code> ·
+                          ${PARTY_ROLE_LABELS[pc.role] ?? pc.role}</div></li>`)}</ul>`)
+              : ''}
+
+            ${related.length > 0
+              ? card('Related people and organisations', html`
+                  <ul class="list">${related.map((rel) => html`
+                    <li><a href="/clients/${rel.id}">${rel.full_name}</a>
+                        <div class="muted small">${PARTY_ROLE_LABELS[rel.role] ?? rel.role}
+                          on <a href="/cases/${rel.via_case_id}">${rel.via_case_ref}</a></div></li>`)}</ul>
+                  <p class="hint">Everyone who appears on a matter together — which is how a family
+                     group shows itself, without anyone having to maintain a second list.</p>`)
+              : ''}
 
             ${card('Open tasks', tasks.length === 0
               ? emptyState('Nothing outstanding.')
@@ -612,11 +723,11 @@ export const clientsModule: AppModule = {
     r.get('/:id/edit', requirePermission('register:write'), async (c) => {
       const client = await one<ClientRow>(c.env.DB, 'SELECT * FROM clients WHERE id = ?', c.req.param('id')!);
       if (!client) return c.notFound();
-      const users = await userOptions(c.env);
+      const [users, organisations] = await Promise.all([userOptions(c.env), organisationOptions(c.env)]);
       return page(c, { title: `Edit ${client.full_name}`, active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { href: `/clients/${client.id}`, label: client.ref }, { label: 'Edit' }])}
         ${pageHeader(`Edit ${client.full_name}`)}
-        ${clientForm(c, client, users)}`);
+        ${clientForm(c, client, users, organisations)}`);
     });
 
     r.post('/:id', requirePermission('register:write'), async (c) => {
@@ -628,10 +739,10 @@ export const clientsModule: AppModule = {
       const f = new FormReader(await c.req.formData());
       const v = readClientForm(f);
       if (!f.valid) {
-        const users = await userOptions(c.env);
+        const [users, organisations] = await Promise.all([userOptions(c.env), organisationOptions(c.env)]);
         return page(c, { title: 'Edit client', active: '/clients', status: 400 }, html`
           ${pageHeader(`Edit ${existing.full_name}`)}
-          ${clientForm(c, { ...existing, ...v } as Partial<ClientRow>, users, f.errors)}`);
+          ${clientForm(c, { ...existing, ...v } as Partial<ClientRow>, users, organisations, f.errors)}`);
       }
 
       const passportSealed = v.passport_number && c.env.FIELD_KEY
@@ -641,14 +752,15 @@ export const clientsModule: AppModule = {
       await run(
         c.env.DB,
         `UPDATE clients SET kind=?, full_name=?, given_names=?, family_name=?, preferred_name=?,
-           nzbn=?, company_number=?, email=?, phone=?, whatsapp=?, telegram_username=?, telegram_user_id=?,
+           nzbn=?, company_number=?, organisation_id=?, organisation_role=?, email=?, phone=?, whatsapp=?, telegram_username=?, telegram_user_id=?,
            nationality=?, date_of_birth=?, passport_sealed=?, passport_country=?, passport_expiry=?,
            police_certificate_country=?, police_certificate_date=?, police_certificate_expiry=?,
            medical_certificate_date=?, medical_certificate_expiry=?, chest_xray_expiry=?,
            current_visa_type=?, current_visa_expiry=?, address=?, status=?, assigned_to=?, notes=?, updated_at=?
          WHERE id=?`,
         v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
-        v.nzbn, v.company_number, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
+        v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role,
+        v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.nationality, v.date_of_birth, passportSealed, v.passport_country, v.passport_expiry,
         v.police_certificate_country, v.police_certificate_date, v.police_certificate_expiry,
         v.medical_certificate_date, v.medical_certificate_expiry, v.chest_xray_expiry,
@@ -687,6 +799,71 @@ export const clientsModule: AppModule = {
           ? html`<p class="key-block"><code>${value}</code></p>`
           : html`<p class="alert alert-error">The stored value could not be decrypted with the current key.</p>`)}
         <p><a class="btn btn-secondary" href="/clients/${id}">Back to client</a></p>`);
+    });
+
+    /**
+     * A lead and a client are the same record at different stages, so becoming
+     * one is a status change rather than a re-keying.
+     */
+    r.post('/:id/status', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const user = c.get('user')!;
+      const existing = await one<ClientRow>(c.env.DB, 'SELECT * FROM clients WHERE id = ?', id);
+      if (!existing) return c.notFound();
+
+      const f = new FormReader(await c.req.formData());
+      const status = f.enum('status', CLIENT_STATUSES, { required: true, label: 'Status' });
+      if (!status) return redirectWith(c, `/clients/${id}`, 'Unknown status.', 'err');
+
+      await run(c.env.DB, 'UPDATE clients SET status = ?, updated_at = ? WHERE id = ?', status, nowIso(), id);
+      await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system',
+        body: `Status changed from ${CLIENT_STATUS_LABELS[existing.status]} to ${CLIENT_STATUS_LABELS[status]}.`,
+        createdBy: user.id });
+      await auditFrom(c, { action: 'client.status_changed', entityType: 'client', entityId: id,
+        meta: { from: existing.status, to: status } });
+      return redirectWith(c, `/clients/${id}`, `Now recorded as a ${CLIENT_STATUS_LABELS[status].toLowerCase()}.`);
+    });
+
+    /**
+     * Name (or clear) an organisation's primary contact.
+     *
+     * SQLite cannot express "must be an individual linked to this
+     * organisation" as a constraint across rows, so it is checked here — the
+     * only place that sets the column.
+     */
+    r.post('/:id/primary-contact', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const user = c.get('user')!;
+      const org = await one<ClientRow>(c.env.DB, 'SELECT * FROM clients WHERE id = ?', id);
+      if (!org) return c.notFound();
+      if (org.kind !== 'organisation') {
+        return redirectWith(c, `/clients/${id}`, 'Only an organisation has a primary contact.', 'err');
+      }
+
+      const f = new FormReader(await c.req.formData());
+      const contactId = f.optional('contact_id', { max: 60 });
+
+      if (!contactId) {
+        await run(c.env.DB, 'UPDATE clients SET primary_contact_id = NULL, updated_at = ? WHERE id = ?', nowIso(), id);
+        await auditFrom(c, { action: 'client.primary_contact_cleared', entityType: 'client', entityId: id });
+        return redirectWith(c, `/clients/${id}`, 'Primary contact cleared.');
+      }
+
+      const contact = await one<ClientRow>(c.env.DB, 'SELECT * FROM clients WHERE id = ?', contactId);
+      if (!contact || contact.kind !== 'individual' || contact.organisation_id !== id) {
+        return redirectWith(c, `/clients/${id}`,
+          'A primary contact must be a person already linked to this organisation.', 'err');
+      }
+
+      await run(c.env.DB, 'UPDATE clients SET primary_contact_id = ?, updated_at = ? WHERE id = ?',
+        contactId, nowIso(), id);
+      await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system',
+        body: `${contact.full_name} named as the primary contact.`, createdBy: user.id });
+      await addEntry(c.env, { entityType: 'client', entityId: contactId, kind: 'system',
+        body: `Named as the primary contact for ${org.full_name}.`, createdBy: user.id });
+      await auditFrom(c, { action: 'client.primary_contact_set', entityType: 'client', entityId: id,
+        meta: { contactId } });
+      return redirectWith(c, `/clients/${id}`, `${contact.full_name} is now the primary contact.`);
     });
 
     r.post('/:id/entries', requirePermission('register:write'), async (c) => {

@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.6.0', date: '28 August 2026',
+    notes: [
+      'Cases can be tagged with anything you type; new tags are created as you go.',
+      'A case can have several parties — applicant, partner, child, employer — each a client in their own right.',
+      'A person can be linked to a company and named as its primary contact.',
+      'Clients are split into Leads and Clients; converting is one click.',
+      'The register is loaded with demonstration data, removable from Admin.',
+    ],
+  },
+  {
     version: '0.5.0', date: '28 August 2026',
     notes: [
       'Settings page with tabs for practice details, security, fees, alerts and channels.',
