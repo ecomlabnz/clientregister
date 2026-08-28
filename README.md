@@ -54,32 +54,39 @@ the schema has been applied. To bring up a fresh copy elsewhere, see
 
 ### 1. Set the secrets you need
 
-Only `SETUP_TOKEN` is required to get in the door.
+**Every secret lives as a GitHub repository secret** (Settings → Secrets and
+variables → Actions). The deploy workflow uploads them to the Worker on each
+run, so there is one place to manage them and a redeploy can never leave the
+Worker without them.
 
-```bash
-openssl rand -hex 32 | npx wrangler secret put SETUP_TOKEN
-openssl rand -base64 32 | npx wrangler secret put FIELD_KEY   # enables encrypted passport storage
-```
+Two are needed to deploy:
 
-Everything else is optional and switches a capability on when present — see
-`.dev.vars.example` for the full list and
+- `CLOUDFLARE_API_TOKEN` — an API token with **Workers Scripts: Edit**,
+  **D1: Edit**, **Workers KV Storage: Edit** and **Workers R2 Storage: Edit**
+  on this account.
+- `CLOUDFLARE_ACCOUNT_ID` — your account ID.
+
+One is needed to create the first login:
+
+- `SETUP_TOKEN` — any long random string; it unlocks `/setup` once.
+
+The rest are optional and each switches a capability on when present —
+`FIELD_KEY` (encrypted passport storage), the Telegram/WhatsApp/email ingest
+settings, `AI_PROVIDER`, `MAIL_PROVIDER`. The full list is in
+`scripts/collect-secrets.mjs` and `.dev.vars.example`; see
 [docs/integrations.md](docs/integrations.md) for how to wire each channel up.
 
 ### 2. Deploy
 
-Deployment runs from GitHub, not from a laptop. Add two repository secrets:
-
-- `CLOUDFLARE_API_TOKEN` — an API token with *Edit Cloudflare Workers*, *D1
-  edit* and *Workers KV Storage edit* on this account.
-- `CLOUDFLARE_ACCOUNT_ID` — your account ID.
-
-Then push to `main`. The workflow typechecks, tests, applies any pending D1
-migrations and deploys.
+Push to `main`, or run the **Deploy** workflow by hand from the Actions tab.
+It typechecks, tests, applies any pending D1 migrations, deploys the Worker,
+then uploads whichever secrets are configured.
 
 To deploy by hand while you are setting things up:
 
 ```bash
 npx wrangler deploy
+npx wrangler secret put SETUP_TOKEN
 ```
 
 ### 3. Create the first account
