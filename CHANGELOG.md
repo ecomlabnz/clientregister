@@ -7,6 +7,51 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.21.0 — 28 August 2026
+
+### Added
+- **Automations.** A rule is a trigger, a window and an action, and it reads
+  back as one sentence: *when a case deadline is approaching within 7 days,
+  create a task for Tai, for approval*. Anything harder to say than that is a
+  program, and a program does not belong in a form. Five triggers, all of them
+  questions the register can already answer from dates it already holds: a case
+  deadline approaching, a task past its due date, a quote about to lapse, a
+  client document expiring, a message sitting untriaged in the inbox. A rule
+  written this afternoon matches everything that already qualifies, because
+  nothing is stored to make the triggers work.
+- **An approval queue**, at Alerts → For approval. Everything a rule would like
+  to do, waiting for somebody to say yes, with what it would create or send
+  shown before the decision rather than after it.
+- **A task may be raised without asking; an email may not.** A task is internal
+  and the worst case is one somebody closes, so a rule can be written to create
+  one outright. Anything leaving the practice waits for a person and records
+  which person — and that is not a setting: the schema carries
+  `CHECK (action_kind != 'email' OR requires_approval = 1)`, so a rule that
+  skips approval on an email cannot be stored by any route, including a direct
+  write to the database.
+- **It proposes once.** Every proposal is unique on rule + record + the date
+  that caused it, enforced by the database. The nightly run cannot raise the
+  same thing twice, and something dismissed stays dismissed. A date that moves
+  is genuinely new, and is proposed again.
+- **A digest**: one message gathering everything a rule matched, rather than one
+  per record.
+- **The AI layer writes one thing here: the covering paragraph on a digest.**
+  The list under it is assembled by the register, the recipient comes from the
+  rule, and the sending waits for a person. It is written when the digest is
+  proposed rather than when it is approved, so what somebody reads is what goes
+  out, and the interface says which paragraph the model wrote. Switch the AI
+  off and every rule still fires, still proposes and still acts — the digest
+  arrives as the list.
+- **Skips are counted and explained.** A rule that matches and then cannot act —
+  a task with nobody to assign it to, an email with no address — says so on the
+  Automations page. A rule that quietly does nothing looks exactly like a rule
+  that is working.
+
+### Fixed
+- **A `var(--line)` that was never defined**, which silently dropped a border.
+  A test now checks every custom property used in the stylesheet against the
+  ones defined, because a misspelled one fails invisibly.
+
 ## 0.20.0 — 28 August 2026
 
 ### Added

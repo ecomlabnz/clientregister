@@ -129,6 +129,7 @@ function adminTabs(current: string): Raw {
     { id: 'users', label: 'Users', href: '/admin/users' },
     { id: 'settings', label: 'Practice settings', href: '/admin/settings' },
     { id: 'audit', label: 'Audit log', href: '/admin/audit' },
+    { id: 'automations', label: 'Automations', href: '/workflows/rules' },
     { id: 'integrations', label: 'Integrations', href: '/admin?tab=integrations' },
     { id: 'modules', label: 'Modules', href: '/admin?tab=modules' },
     { id: 'maintenance', label: 'Maintenance', href: '/admin?tab=maintenance' },

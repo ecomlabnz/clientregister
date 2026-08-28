@@ -22,6 +22,7 @@ import { html, raw } from '../../ui/html';
 import { badge, card, emptyState, pageHeader, table } from '../../ui/components';
 import { dateShort, relativeDays } from '../../ui/format';
 import { CASE_STATUS_LABELS, DEADLINE_CASE_STATUSES, OPEN_CASE_STATUSES } from '../../domain';
+import { pendingProposalCount } from '../../core/automations';
 
 export type AlertKind = 'case_deadline' | 'task' | 'document' | 'quote';
 export type AlertSeverity = 'overdue' | 'urgent' | 'soon';
@@ -209,7 +210,13 @@ export const alertsModule: AppModule = {
       const horizon = Math.min(365, Math.max(7, Number(c.req.query('days') ?? '90') || 90));
       const kindFilter = c.req.query('kind') ?? '';
 
-      const alerts = await collectAlerts(c.env, horizon);
+      const [alerts, awaiting] = await Promise.all([
+        collectAlerts(c.env, horizon),
+        // What the register would like to do about all this. Alerts are what is
+        // coming; the queue is what somebody has proposed doing, so the two
+        // belong on one bar rather than in two places nobody connects.
+        pendingProposalCount(c.env),
+      ]);
       const shown = kindFilter && kindFilter in KIND_LABELS
         ? alerts.filter((a) => a.kind === kindFilter)
         : alerts;
@@ -239,6 +246,7 @@ export const alertsModule: AppModule = {
           ${views.map((v) => html`
             <a class="${v.id === kindFilter || (v.id === '' && !kindFilter) ? 'tab current' : 'tab'}"
                href="${`/alerts?kind=${v.id}&days=${horizon}`}">${v.label} <span class="muted">${v.count}</span></a>`)}
+          <a class="tab" href="/workflows">For approval <span class="muted">${awaiting}</span></a>
         </nav>
         <form method="get" action="/alerts" class="filters" data-live-search>
           <input type="hidden" name="kind" value="${kindFilter}">
