@@ -270,8 +270,11 @@ export function isAiEnabled(env: Env): boolean {
  */
 export const AI_SETTINGS: SettingsGroup = {
   id: 'ai',
-  title: 'Assistant',
-  order: 60,
+  title: 'AI Assistant',
+  // First, ahead of Practice at 10. It is the setting most likely to be
+  // changed and the one whose effect is least obvious from the page it acts
+  // on, so it is worth finding without reading along a row of twelve.
+  order: 5,
   description: 'Which model the assistant uses. It suggests; a person always '
     + 'presses the button. The register works with all of this switched off.',
   settings: [

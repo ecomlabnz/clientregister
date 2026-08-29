@@ -7,6 +7,23 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.41.0 — 29 August 2026
+
+### Fixed
+- **Saving a brief clears it from the panel.** It wrote the brief to the file
+  and then left it sitting there, still offering to save the same words again,
+  with nothing on screen to say it had already been kept. A brief with a
+  `kept_at` is finished; the panel goes back to offering a fresh reading.
+- `ai_runs` itself is untouched by keeping a brief — it records what the model
+  was asked and what it answered, and that does not change because somebody
+  kept the answer.
+
+### Changed
+- The assistant settings group is **AI Assistant**, and sorts first. It is the
+  setting most likely to be changed and the one whose effect is least obvious
+  from the page it acts on, so it is worth finding without reading along a row
+  of twelve.
+
 ## 0.40.0 — 29 August 2026
 
 ### Fixed
