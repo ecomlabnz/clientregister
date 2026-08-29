@@ -611,8 +611,13 @@ textarea { resize: vertical; min-height: 70px; }
   grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap;
   padding-top: 14px; border-top: 1px solid var(--border); margin-top: 6px;
 }
-.row-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 16px; align-items: end; }
-.row-form > button { margin-bottom: 14px; }
+/* Fields start at the top so every label sits on one line. They were aligned
+   to the bottom, which meant a field carrying a hint under its input pushed
+   its own label up and the row came out staggered.
+   The button keeps the old bottom alignment, so where it shares a row with
+   inputs it still lines up with them rather than with the labels. */
+.row-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 16px; align-items: start; }
+.row-form > button { align-self: end; margin-bottom: 14px; }
 .entry-form { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .inline-form { display: inline-flex; gap: 6px; align-items: center; }
 .inline-form select { width: auto; padding: 4px 6px; font-size: 0.82rem; }
@@ -887,15 +892,36 @@ details[open] > summary { margin-bottom: 12px; }
 
 /* --- Tags and parties ---------------------------------------------------- */
 
-.tag-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 4px; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 5px 6px; align-items: center; margin-top: 4px; }
+/* A tag and its remove button travel together. Without this the × wraps onto
+   the next line on its own and appears to belong to the following tag. */
+.tag-chip { display: inline-flex; align-items: center; gap: 1px; }
+.tag-chip .badge { font-size: 0.68rem; padding: 1px 6px; }
 .tag-row .inline-form { display: inline-flex; }
 .btn-tag-remove {
   background: none; border: none; color: var(--muted); cursor: pointer;
   font-size: 0.95rem; line-height: 1; padding: 0 2px; width: auto;
 }
 .btn-tag-remove:hover { color: var(--red); }
-.tag-form { margin-top: 12px; }
+.tag-form { margin-top: 8px; }
 .tag-form input { margin-bottom: 6px; }
+/* Closed until wanted: the box is for an occasional action and was taking more
+   room than the tags it adds to. */
+/* Present for a screen reader, absent for everyone else. Used where a visible
+   label would only repeat the control beside it. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.tag-add { margin-top: 10px; }
+.tag-add > summary {
+  cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--accent);
+  list-style: none; display: inline-flex; align-items: center; gap: 4px;
+}
+.tag-add > summary::-webkit-details-marker { display: none; }
+.tag-add > summary::before { content: '+'; font-weight: 700; }
+.tag-add > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .party-list { list-style: none; margin: 0; padding: 0; }
 .party-list li {

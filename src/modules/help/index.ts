@@ -32,6 +32,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.39.1', date: '29 August 2026',
+    notes: [
+      '“Brief me on this matter” works again — it was failing on a database error.',
+      'Tags read as one chip each, in a line, with the add box folded away until wanted.',
+      'The status form no longer staggers its fields.',
+    ],
+  },
+  {
     version: '0.39.0', date: '29 August 2026',
     notes: [
       'The model the assistant uses is now chosen in the app, under '

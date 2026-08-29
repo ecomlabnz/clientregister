@@ -279,6 +279,15 @@ export const AI_SETTINGS: SettingsGroup = {
         + 'it checked by a person before anything is written. Move up if extraction from '
         + 'difficult scans starts costing you more in corrections than the model saves.',
     },
+    {
+      key: 'ai.workspace_id', type: 'string', default: '', maxLength: 80,
+      label: 'Anthropic workspace ID',
+      help: 'Only needed for an identity-linked key, which refuses a request that does '
+        + 'not say which workspace it acts in — the error reads “anthropic-workspace-id '
+        + 'is required”. Find it in the Anthropic console under the workspace, in the '
+        + 'address bar or its settings. Leave empty for an ordinary key: the header is '
+        + 'then not sent at all, which is what an ordinary key expects.',
+    },
   ],
 };
 
@@ -287,11 +296,22 @@ export async function currentModel(env: Env): Promise<string> {
   return settingValue(env, AI_SETTINGS.settings[0]!);
 }
 
+/**
+ * The workspace an identity-linked key acts in, or empty for an ordinary key.
+ *
+ * Empty means the header is not sent rather than sent blank: an ordinary key
+ * rejects the header outright, so a default of "" has to mean absent.
+ */
+export async function currentWorkspaceId(env: Env): Promise<string> {
+  return (await settingValue(env, AI_SETTINGS.settings[1]!)).trim();
+}
+
 export async function getProvider(env: Env): Promise<AiProvider | null> {
   const provider = (env.AI_PROVIDER ?? 'none').toLowerCase();
   if (provider === 'anthropic' && env.ANTHROPIC_API_KEY) {
     const { createAnthropicProvider } = await import('./anthropic');
-    return createAnthropicProvider(env, await currentModel(env));
+    const [model, workspaceId] = await Promise.all([currentModel(env), currentWorkspaceId(env)]);
+    return createAnthropicProvider(env, { model, workspaceId });
   }
   if (provider === 'workers-ai' && env.AI) {
     const { createWorkersAiProvider } = await import('./workers-ai');

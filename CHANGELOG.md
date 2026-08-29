@@ -7,6 +7,41 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.39.1 — 29 August 2026
+
+### Fixed
+- **"Brief me on this matter" failed with a database error.** It asked
+  `case_status_history` for a column named `changed_at`; the column is `at`,
+  and always has been. Nothing caught it because nothing in the suite ran a
+  query against a real schema — the tests read source as text, and the schema
+  lived in migrations nobody loaded. It failed only when somebody pressed the
+  button.
+- **A new check prepares every fixed query in the codebase against the schema
+  built from the migrations.** Preparing resolves table and column names
+  without executing anything, so an unknown name fails in the suite. It found a
+  second live bug immediately: the knowledge base CSV export asked for
+  `published_on` and `source_url`, neither of which exists — that download
+  would have failed for anyone who tried it.
+- **The audit log printed IP addresses over the detail beside them.** The cell
+  was `nowrap`, and an IPv6 address is one unbreakable token wider than its
+  column; in a fixed table that does not widen the column, it paints over the
+  next one.
+
+### Added
+- **An Anthropic workspace ID setting.** An identity-linked API key refuses any
+  request that does not say which workspace it acts in. Left empty the header
+  is not sent at all, which is what an ordinary key expects.
+
+### Changed
+- **Tags on a case are a single chip each**, tag and remove button together, so
+  the × can no longer wrap onto the next line and appear to belong to the tag
+  after it. Smaller type, and the add box is folded away until asked for — it
+  was taking more room than the tags it adds to.
+- **The status form's fields line up.** They were aligned to the bottom of the
+  row, so a field carrying a hint under its input pushed its own label up and
+  the row came out staggered. Fields start at the top now; a button sharing the
+  row still sits level with the inputs rather than with the labels.
+
 ## 0.39.0 — 29 August 2026
 
 ### Changed

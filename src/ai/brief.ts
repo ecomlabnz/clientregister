@@ -61,8 +61,12 @@ export async function caseFileText(env: Env, caseId: string): Promise<{ title: s
       `SELECT description, kind, status, net_cents, gst_cents, gross_cents, currency
          FROM fee_items WHERE case_id = ? ORDER BY created_at`, caseId),
     all<any>(env.DB,
-      `SELECT from_status, to_status, changed_at, note FROM case_status_history
-        WHERE case_id = ? ORDER BY changed_at DESC LIMIT 12`, caseId),
+      // The column is `at`; aliased rather than renamed, so the rest of this
+      // file keeps reading in words. Written as `changed_at` originally, which
+      // no test caught because nothing here runs against a real schema — the
+      // brief only fails when somebody asks for one.
+      `SELECT from_status, to_status, at AS changed_at, note FROM case_status_history
+        WHERE case_id = ? ORDER BY at DESC LIMIT 12`, caseId),
   ]);
 
   const lines: string[] = [
