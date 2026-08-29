@@ -117,11 +117,32 @@ export function createAnthropicProvider(
       : {}),
   });
 
+  /**
+   * Say what we sent, on the way out.
+   *
+   * A provider error naming a workspace is ambiguous on its own: it may be the
+   * one this register sent, or one the key itself is bound to. Reading the
+   * difference out of timestamps is guesswork, so the answer travels with the
+   * error. A workspace id is an identifier, not a credential — the key is never
+   * added here.
+   */
+  const withContext = async <T>(work: () => Promise<T>): Promise<T> => {
+    try {
+      return await work();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const sent = opts.workspaceId
+        ? `sent workspace ${opts.workspaceId}`
+        : 'sent no workspace header';
+      throw new Error(`${message} [model ${model}, ${sent}]`);
+    }
+  };
+
   return {
     name: 'anthropic',
     model,
     async triage(input): Promise<TriageResult> {
-      const response = await client.messages.parse({
+      const response = await withContext(() => client.messages.parse({
         model,
         max_tokens: 4000,
         system: TRIAGE_SYSTEM_PROMPT,
@@ -132,7 +153,7 @@ export function createAnthropicProvider(
             content: `Subject: ${input.subject ?? '(none)'}\n\nMessage:\n${input.body.slice(0, 20_000)}`,
           },
         ],
-      });
+      }));
 
       if (!response.parsed_output) throw new Error('model returned no structured output');
       return normaliseTriage(response.parsed_output as Partial<TriageResult>);
@@ -168,20 +189,20 @@ export function createAnthropicProvider(
       }
       if (content.length === 0) throw new Error('there was nothing to read');
 
-      const response = await client.messages.parse({
+      const response = await withContext(() => client.messages.parse({
         model,
         max_tokens: 4000,
         system: INTAKE_SYSTEM_PROMPT,
         output_config: { format: zodOutputFormat(intakeSchema(input.caseTypes)) },
         messages: [{ role: 'user', content }],
-      });
+      }));
 
       if (!response.parsed_output) throw new Error('model returned no structured output');
       return normaliseIntake(response.parsed_output as Partial<IntakeResult>);
     },
 
     async brief(input): Promise<BriefResult> {
-      const response = await client.messages.parse({
+      const response = await withContext(() => client.messages.parse({
         model,
         max_tokens: 4000,
         system: BRIEF_SYSTEM_PROMPT,
@@ -189,7 +210,7 @@ export function createAnthropicProvider(
         messages: [
           { role: 'user', content: `File: ${input.title}\n\n${input.file.slice(0, 60_000)}` },
         ],
-      });
+      }));
       if (!response.parsed_output) throw new Error('model returned no structured output');
       const parsed = response.parsed_output as BriefResult;
       return {
