@@ -162,6 +162,12 @@ export const PREFERENCE_GROUPS: PreferenceGroup[] = [
         key: 'pref.assign_to_me', type: 'boolean', default: 'true', label: 'Assign new tasks to me by default',
         help: 'A task always has an owner; this decides who is proposed.',
       },
+      {
+        key: 'pref.task_note_prompt', type: 'boolean', default: 'true',
+        label: 'Ask what was done when I complete a task',
+        help: 'A one-line box after you mark something done, which you can skip. '
+          + 'With this off, completing is one click and a note can still be added from the task.',
+      },
     ],
   },
   {

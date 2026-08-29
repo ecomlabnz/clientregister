@@ -167,6 +167,12 @@ export interface FieldOpts {
   maxlength?: number;
   disabled?: boolean;
   step?: string;
+  /**
+   * Put the cursor here on load. Use it only where the whole point of the page
+   * is this one box — a page that steals focus from somebody halfway through
+   * reading it is worse than one that does nothing.
+   */
+  autofocus?: boolean;
 }
 
 export function field(opts: FieldOpts): Raw {
@@ -177,6 +183,7 @@ export function field(opts: FieldOpts): Raw {
       ? html`<textarea id="${id}" name="${opts.name}" rows="${opts.rows ?? 4}"
                ${opts.required ? raw('required') : ''}
                ${opts.disabled ? raw('disabled') : ''}
+               ${opts.autofocus ? raw('autofocus') : ''}
                ${opts.maxlength ? raw(`maxlength="${opts.maxlength}"`) : ''}
                placeholder="${opts.placeholder ?? ''}">${value}</textarea>`
       : html`<input id="${id}" name="${opts.name}" type="${opts.type ?? 'text'}" value="${value}"
@@ -185,6 +192,7 @@ export function field(opts: FieldOpts): Raw {
                ${opts.step ? raw(`step="${opts.step}"`) : ''}
                ${opts.maxlength ? raw(`maxlength="${opts.maxlength}"`) : ''}
                ${opts.autocomplete ? raw(`autocomplete="${opts.autocomplete}"`) : ''}
+               ${opts.autofocus ? raw('autofocus') : ''}
                placeholder="${opts.placeholder ?? ''}">`;
   return html`
     <div class="field">
