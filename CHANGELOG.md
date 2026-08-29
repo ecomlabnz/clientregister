@@ -7,6 +7,27 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.43.0 — 29 August 2026
+
+### Added
+- **Two alerts that are not about a date.** Everything else on the page answers
+  *what is due*; these answer *what is wrong*, which is how matters are
+  actually lost — rarely to a missed deadline, usually to nobody looking.
+- **Gone quiet** — an open matter with no note, no status change and no task
+  activity for ten days. Any of the three counts as somebody working on it.
+  The threshold is a setting, read where the alerts are built rather than
+  passed in, because three pages call that function and a threshold meaning one
+  thing on the dashboard and another on the alerts page would be a bug nobody
+  could see.
+- **Does not add up** — a matter whose own record contradicts itself: a
+  decision dated before lodgement, a matter marked approved or declined with no
+  decision date, a lodged date in the future. The row says *which* facts
+  disagree, because a row somebody has to investigate before acting is a row
+  they learn to skip — and that costs the reliable rows their credibility too.
+- Both are ordinary queries. No model is consulted, and a test holds that true:
+  the argument for putting them beside the dates is that they are as checkable
+  as a date is.
+
 ## 0.42.0 — 29 August 2026
 
 ### Added
