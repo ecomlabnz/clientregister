@@ -102,3 +102,12 @@ describe('clamping works at every width', () => {
     expect(beforeMedia).toContain('.clamp-1 { -webkit-line-clamp: 1; }');
   });
 });
+
+describe('a grid column can actually shrink', () => {
+  it('uses minmax(0, …) on the narrow-screen rule too', () => {
+    // A grid track's default min-width is auto, so a plain `1fr` cannot shrink
+    // below its content: one wide child then pushes the column past the
+    // viewport. The desktop rule always had the guard; the mobile rule did not.
+    expect(css).toContain('@media (max-width: 900px) { .cols { grid-template-columns: minmax(0, 1fr); } }');
+  });
+});

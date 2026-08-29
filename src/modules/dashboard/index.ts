@@ -13,7 +13,7 @@ import { all, count } from '../../core/db';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { page } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
-import { badge, card, emptyState, pageHeader, statusTone, table } from '../../ui/components';
+import { badge, card, emptyState, pageHeader, sparkline, statusTone, table } from '../../ui/components';
 import { dateShort, isOverdue, money, relativeDays, truncate } from '../../ui/format';
 import {
   CASE_STATUS_LABELS, CLIENT_STATUS_LABELS, DEADLINE_CASE_STATUSES,
@@ -21,13 +21,14 @@ import {
 } from '../../domain';
 import { can } from '../../core/rbac';
 import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
-import { documentAlerts } from '../alerts';
+import { collectAlerts, documentAlerts, type Alert } from '../alerts';
+import { CHANNEL_LABELS } from '../../core/channels';
 
 export const dashboardModule: AppModule = {
   name: 'dashboard',
   title: 'Dashboard',
   basePaths: ['/', '/search'],
-  nav: [{ href: '/', label: 'Today', permission: 'register:read', order: 100 }],
+  nav: [{ href: '/', label: 'Dashboard', permission: 'register:read', order: 100 }],
 
   register(app) {
     const r = new Hono<AppContext>();
@@ -38,7 +39,8 @@ export const dashboardModule: AppModule = {
       const today = new Date().toISOString().slice(0, 10);
       const openPlaceholders = OPEN_CASE_STATUSES.map(() => '?').join(',');
 
-      const [deadlines, overdueTasks, newInquiries, pendingInbox, myCases, statusCounts, sentQuotes, unpaid, expiring] =
+      const [deadlines, overdueTasks, newInquiries, pendingInbox, myCases, statusCounts, sentQuotes, unpaid, expiring,
+             everything, approvals, conversations, invoicesLate, lodgedByMonth] =
         await Promise.all([
           all<any>(
             c.env.DB,
@@ -87,26 +89,115 @@ export const dashboardModule: AppModule = {
             `SELECT COALESCE(SUM(gross_cents), 0) AS total FROM fee_items WHERE status = 'invoiced'`,
           ),
           documentAlerts(c.env, 90),
+          // Everything with a date, merged and sorted, so the list at the top
+          // can be assembled by filtering rather than by asking again.
+          collectAlerts(c.env, 90),
+          // Waiting for a person: proposals, unanswered conversations, and
+          // invoices past their due date. None of these were reachable from
+          // this page, which is how a queue becomes a place nobody looks.
+          all<any>(
+            c.env.DB,
+            `SELECT a.id, a.automation_name, a.action_kind, a.subject_label, a.subject_href, a.created_at
+               FROM automation_actions a WHERE a.status = 'pending'
+              ORDER BY a.created_at LIMIT 8`,
+          ),
+          all<any>(
+            c.env.DB,
+            `SELECT t.id, t.channel, t.peer_label, t.peer_id, t.last_message_at,
+                    cl.full_name AS client_name,
+                    (SELECT COUNT(*) FROM ingest_messages m
+                      WHERE m.thread_id = t.id AND m.status = 'pending') AS waiting
+               FROM channel_threads t LEFT JOIN clients cl ON cl.id = t.client_id
+              WHERE t.status = 'open'
+              ORDER BY t.last_message_at DESC LIMIT 8`,
+          ),
+          all<any>(
+            c.env.DB,
+            `SELECT i.id, i.ref, i.due_on, i.gross_cents, i.paid_cents, i.currency,
+                    cl.full_name AS client_name
+               FROM invoices i LEFT JOIN clients cl ON cl.id = i.client_id
+              WHERE i.status IN ('issued','part_paid') AND i.due_on IS NOT NULL AND i.due_on < ?
+              ORDER BY i.due_on LIMIT 8`,
+            today,
+          ),
+          // Twelve months of lodgements, for the one trend worth a shape.
+          all<{ month: string; n: number }>(
+            c.env.DB,
+            `SELECT substr(lodged_at, 1, 7) AS month, COUNT(*) AS n FROM cases
+              WHERE lodged_at IS NOT NULL AND lodged_at >= ?
+              GROUP BY month ORDER BY month`,
+            new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10),
+          ),
         ]);
 
       const openTotal = statusCounts.reduce((s, row) => s + row.n, 0);
       const outstanding = unpaid[0]?.total ?? 0;
 
-      return page(c, { title: 'Today', active: '/' }, html`
+      // What bites today: everything dated that has arrived or gone past,
+      // whatever kind of thing it is. A morning is spent on this list, not on
+      // working out which of six panels holds the thing that is late.
+      const overdueInvoices = invoicesLate.map((i: any): Alert => ({
+        kind: 'quote', severity: 'overdue', date: i.due_on,
+        title: `Invoice ${i.ref} — ${i.client_name ?? 'no client'}`,
+        detail: `${money(i.gross_cents - i.paid_cents, i.currency)} owing`,
+        href: `/invoices/${i.id}`,
+      }));
+      const needsToday = [...everything, ...overdueInvoices]
+        .filter((a) => a.date <= today)
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      const weekAway = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+      // Two degrees rather than one: already late, and late this week.
+      const tone = (rows: Array<{ date: string }>): string => {
+        if (rows.some((x) => x.date < today)) return 'stat-urgent';
+        return rows.some((x) => x.date <= weekAway) ? 'stat-warn' : '';
+      };
+
+      const months = lodgedByMonth.map((m) => m.n);
+      const monthName = (key: string): string =>
+        new Date(`${key}-01T00:00:00Z`).toLocaleDateString('en-NZ', { month: 'short', timeZone: 'UTC' });
+
+      return page(c, { title: 'Dashboard', active: '/' }, html`
         ${pageHeader(`Good day, ${user.name.split(' ')[0]}`, 'What needs attention.')}
 
+        ${'' /* The figures carry their own urgency: red once something is late,
+                 amber when it bites this week, quiet otherwise. A count on its
+                 own says how many, which is the least useful half of the
+                 answer. */}
         <div class="fee-summary">
           <div class="stat"><span class="stat-label">Open cases</span><span class="stat-value">${openTotal}</span></div>
-          <div class="stat ${deadlines.some((d: any) => isOverdue(d.decision_due_at)) ? 'stat-warn' : ''}">
+          <div class="stat ${tone(deadlines.map((d: any) => ({ date: d.decision_due_at })))}">
             <span class="stat-label">Deadlines tracked</span><span class="stat-value">${deadlines.length}</span></div>
-          <div class="stat ${overdueTasks.length ? 'stat-warn' : ''}">
+          <div class="stat ${tone(overdueTasks.map((t: any) => ({ date: t.due_at })))}">
             <span class="stat-label">Tasks due</span><span class="stat-value">${overdueTasks.length}</span></div>
           <div class="stat ${pendingInbox ? 'stat-warn' : ''}">
             <span class="stat-label">Inbox</span><span class="stat-value">${pendingInbox}</span></div>
-          <div class="stat ${expiring.some((e) => e.severity !== 'soon') ? 'stat-warn' : ''}">
+          <div class="stat ${tone(expiring.map((e) => ({ date: e.date })))}">
             <span class="stat-label">Documents expiring</span><span class="stat-value">${expiring.length}</span></div>
-          <div class="stat"><span class="stat-label">Invoiced unpaid</span><span class="stat-value">${money(outstanding)}</span></div>
+          <div class="stat ${invoicesLate.length ? 'stat-urgent' : ''}">
+            <span class="stat-label">Invoiced unpaid</span><span class="stat-value">${money(outstanding)}</span>
+            ${invoicesLate.length
+              ? html`<span class="stat-label warn">${invoicesLate.length} overdue</span>` : ''}</div>
         </div>
+
+        ${'' /* One list, every source, sorted by date. A morning is spent on
+                 what has arrived or gone past — not on working out which of
+                 eight panels holds the thing that is late. */}
+        ${needsToday.length === 0
+          ? card('Needs you today', emptyState('Nothing overdue and nothing due today. '
+              + 'Everything ahead is on the panels below.'))
+          : card(`Needs you today — ${needsToday.length}`, table([
+              { label: 'Due', width: '16' },
+              { label: 'What', width: '50' },
+              { label: 'Detail', width: '34', hideOn: 'sm' },
+            ], needsToday.slice(0, 12).map((a) => html`
+              <tr class="${a.date < today ? 'row-urgent' : ''}">
+                <td class="small ${a.date < today ? 'warn' : ''}">${dateShort(a.date)}
+                  <div class="muted">${relativeDays(a.date)}</div></td>
+                <td><a class="clamp-2" href="${a.href}">${a.title}</a>
+                  <div class="row-meta show-sm"><span class="muted">${a.detail}</span></div></td>
+                <td class="small muted col-sm-hide clamp-2">${a.detail}</td>
+              </tr>`), { fixed: true }))}
 
         <div class="cols">
           <div class="col-main">
@@ -150,6 +241,42 @@ export const dashboardModule: AppModule = {
           </div>
 
           <div class="col-side">
+            ${'' /* Three things that wait on a person rather than on a date,
+                     and were reachable only from pages nobody opens first. */}
+            ${approvals.length > 0 ? card(`Waiting for you — ${approvals.length}`, html`
+              <ul class="list">${approvals.map((a: any) => html`
+                <li>
+                  <a href="/workflows">${a.action_kind === 'task' ? 'Task' :
+                     a.action_kind === 'email' ? 'Email' : 'Digest'}: ${truncate(a.subject_label, 40)}</a>
+                  <div class="muted small">${a.automation_name}</div>
+                </li>`)}</ul>
+              <p class="hint"><a href="/workflows">Approve or dismiss</a></p>`) : ''}
+
+            ${invoicesLate.length > 0 ? card(`Invoices overdue — ${invoicesLate.length}`, html`
+              <ul class="list">${invoicesLate.map((i: any) => html`
+                <li><a href="/invoices/${i.id}"><code>${i.ref}</code> ${i.client_name ?? ''}</a>
+                    <div class="muted small warn">
+                      ${money(i.gross_cents - i.paid_cents, i.currency)} · due ${dateShort(i.due_on)}
+                      · ${relativeDays(i.due_on)}</div></li>`)}</ul>`) : ''}
+
+            ${conversations.filter((t: any) => t.waiting > 0).length > 0
+              ? card('Conversations waiting', html`
+                <ul class="list">${conversations.filter((t: any) => t.waiting > 0).map((t: any) => html`
+                  <li><a href="/inbox/threads/${t.id}">${t.peer_label ?? t.peer_id}</a>
+                      <div class="muted small">
+                        ${CHANNEL_LABELS[t.channel as keyof typeof CHANNEL_LABELS] ?? t.channel}
+                        ${t.client_name ? ` · ${t.client_name}` : ''}
+                        · ${t.waiting} unanswered</div></li>`)}</ul>`)
+              : ''}
+
+            ${months.length >= 2 ? card('Matters lodged', html`
+              ${sparkline(months, { label: `Matters lodged per month over the last ${months.length} months` })}
+              <div class="sparkline-scale">
+                <span>${monthName(lodgedByMonth[0]!.month)}</span>
+                <span>${months.reduce((a, b) => a + b, 0)} in ${months.length} months</span>
+                <span>${monthName(lodgedByMonth[lodgedByMonth.length - 1]!.month)}</span>
+              </div>`) : ''}
+
             ${card('Documents expiring', expiring.length === 0
               ? emptyState('No passports, visas, police or medical certificates expiring in the next 90 days.')
               : html`

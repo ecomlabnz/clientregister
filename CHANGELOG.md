@@ -7,6 +7,41 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.29.0 — 29 August 2026
+
+### Changed
+- **"Today" is now "Dashboard."**
+- **It leads with one list: "Needs you today."** Everything dated that has
+  arrived or gone past — case deadlines, tasks, expiring documents, lapsing
+  quotes, overdue invoices — merged from every source and sorted by date, with
+  names and dates rather than counts. A morning is spent on that list, not on
+  working out which of eight panels holds the thing that is late.
+- **The figures carry their own urgency**: red once something is late, amber
+  when it bites this week, quiet otherwise. A count alone says how many, which
+  is the less useful half of the answer.
+
+### Added
+- **Waiting for you** — the automation approval queue, which until now was
+  reachable only from Alerts. A queue nobody opens first is a queue nobody
+  works.
+- **Invoices overdue**, by name and by how late, rather than folded into one
+  "invoiced unpaid" total.
+- **Conversations waiting** — Telegram and WhatsApp threads with an unanswered
+  message.
+- **Matters lodged**, as a twelve-month sparkline. The one place on the page
+  where a shape beats a figure, because it is a trend rather than a state.
+  Drawn with SVG presentation attributes rather than inline styles, which the
+  content policy forbids, and its y axis starts at zero — a chart that crops the
+  bottom makes an ordinary month look like a collapse.
+
+### Fixed
+- **Three pixels of horizontal scroll on every phone.** The narrow-screen rule
+  for the two-column layout used `1fr` where the desktop rule used
+  `minmax(0, 1fr)`. A grid track's default `min-width` is `auto`, so a plain
+  `1fr` cannot shrink below its content and one wide child pushes the column
+  past the viewport. The desktop rule always had the guard; the mobile rule did
+  not.
+
 ## 0.28.0 — 29 August 2026
 
 ### Changed
