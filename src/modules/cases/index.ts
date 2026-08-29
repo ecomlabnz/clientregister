@@ -502,6 +502,11 @@ export const casesModule: AppModule = {
         threadsFor(c.env, 'case', id),
       ]);
 
+      // The first person on a matter is the principal applicant far more often
+      // than not. Once the role is taken it cannot be given again, so the
+      // sensible default changes to the next most common one.
+      const hasPrincipal = parties.some((p: any) => p.role === 'principal_applicant');
+
       const nextStatuses = CASE_TRANSITIONS[kase.status] ?? [];
       const deadlineWarning = DEADLINE_CASE_STATUSES.includes(kase.status) && kase.decision_due_at;
 
@@ -580,7 +585,14 @@ export const casesModule: AppModule = {
                     ${csrfField(csrf)}
                     ${select({ label: 'Client', name: 'client_id', value: '', required: true,
                                options: clients, includeBlank: 'Choose an existing client' })}
-                    ${select({ label: 'Role on this case', name: 'role', value: 'secondary_applicant',
+                    ${'' /* The first person on a matter is the principal
+                             applicant far more often than not; after that the
+                             role is taken, so the sensible default is the next
+                             most common one. A default that is wrong on the
+                             first party is a mistake somebody makes once and
+                             then has to undo. */}
+                    ${select({ label: 'Role on this case', name: 'role',
+                               value: hasPrincipal ? 'secondary_applicant' : 'principal_applicant',
                                includeBlank: false, options: optionsFrom(PARTY_ROLES, PARTY_ROLE_LABELS) })}
                     ${field({ label: 'Note', name: 'notes', maxlength: 200,
                               placeholder: 'e.g. accredited employer, NZ citizen partner' })}
@@ -606,7 +618,8 @@ export const casesModule: AppModule = {
                     ${field({ label: 'Given names', name: 'given_names', maxlength: 120,
                               placeholder: 'As in the passport' })}
                     ${field({ label: 'Family name', name: 'family_name', required: true, maxlength: 120 })}
-                    ${select({ label: 'Role on this case', name: 'role', value: 'secondary_applicant',
+                    ${select({ label: 'Role on this case', name: 'role',
+                               value: hasPrincipal ? 'secondary_applicant' : 'principal_applicant',
                                includeBlank: false, options: optionsFrom(PARTY_ROLES, PARTY_ROLE_LABELS) })}
                     ${field({ label: 'Email', name: 'email', type: 'email', maxlength: 320 })}
                     <button class="btn btn-secondary" type="submit">Create and add</button>

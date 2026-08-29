@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.57.0', date: '29 August 2026',
+    notes: [
+      'A matter has one principal applicant. The database refuses a second, and the message '
+        + 'names who already holds the role rather than reporting a constraint.',
+      'The role now defaults to <strong>Principal applicant</strong> on the first party added '
+        + 'to a matter, and to Secondary applicant once the role is taken.',
+    ],
+  },
+  {
     version: '0.56.0', date: '29 August 2026',
     notes: [
       'A party who is not on file yet can be added from the matter itself \u2014 a name, a '

@@ -111,6 +111,24 @@ export async function addParty(
   );
   if (existing) return { ok: false, reason: 'That client is already a party to this case.' };
 
+  // A matter has one principal applicant. Everything about an application is
+  // measured from that person, and two makes the file ambiguous about the one
+  // thing it has to be certain about. The database refuses it either way — this
+  // says so in words, and names who already holds the role.
+  if (input.role === 'principal_applicant') {
+    const held = await one<{ full_name: string }>(
+      env.DB,
+      `SELECT cl.full_name FROM case_parties p JOIN clients cl ON cl.id = p.client_id
+        WHERE p.case_id = ? AND p.role = 'principal_applicant'`,
+      input.caseId,
+    );
+    if (held) {
+      return { ok: false,
+        reason: `${held.full_name} is already the principal applicant on this matter. `
+          + 'A matter has one — add this person in another role, or change theirs first.' };
+    }
+  }
+
   const id = newId('prt');
   await run(
     env.DB,
