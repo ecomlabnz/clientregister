@@ -38,9 +38,17 @@ export function composeFullName(
   return tidy(`${tidy(parts.givenNames)} ${tidy(parts.familyName)}`);
 }
 
-/** "Family, Given" — for alphabetical listings and file labels. */
+/**
+ * "FAMILY, Given" — for alphabetical listings, file labels and matter names.
+ *
+ * The family name is capitalised, as a passport prints it and as INZ writes it.
+ * That is not decoration: half this practice's clients have names whose order
+ * is not the English one, and "Thi Thu Thuy TRUONG" tells you which part is the
+ * family name where "Thi Thu Thuy Truong" leaves you guessing. Guessing wrong
+ * on a form is the sort of mistake that comes back as a request for evidence.
+ */
 export function formalName(parts: NameParts, fallback = ''): string {
-  const family = tidy(parts.familyName);
+  const family = tidy(parts.familyName).toUpperCase();
   const given = tidy(parts.givenNames);
   if (!family) return given || fallback;
   return given ? `${family}, ${given}` : family;

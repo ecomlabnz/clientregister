@@ -118,7 +118,7 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
   const [cases, tasks, quotes, documents] = await Promise.all([
     all<any>(
       env.DB,
-      `SELECT k.id, k.ref, k.title, k.status, k.decision_due_at, cl.full_name AS client_name
+      `SELECT k.id, k.ref, k.title, k.descriptor, k.status, k.decision_due_at, cl.full_name AS client_name
          FROM cases k JOIN clients cl ON cl.id = k.client_id
         WHERE k.decision_due_at IS NOT NULL AND k.decision_due_at <= ?
           AND k.status IN (${openPlaceholders})
@@ -150,8 +150,12 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
       kind: 'case_deadline' as const,
       severity: severityFor(k.decision_due_at, today),
       date: k.decision_due_at,
-      title: `${k.title} — ${k.client_name}`,
-      detail: `${k.ref} · ${CASE_STATUS_LABELS[k.status as keyof typeof CASE_STATUS_LABELS] ?? k.status}`
+      // The title names the matter by its type and client, so appending the
+      // client again said it twice. The client moves to the detail line, where
+      // it is still there for a title somebody wrote their own way.
+      title: k.title,
+      detail: `${k.descriptor ? `${k.descriptor} · ` : ''}${k.client_name} · ${k.ref} · `
+        + `${CASE_STATUS_LABELS[k.status as keyof typeof CASE_STATUS_LABELS] ?? k.status}`
         + (DEADLINE_CASE_STATUSES.includes(k.status) ? ' · response required' : ''),
       href: `/cases/${k.id}`,
     })),

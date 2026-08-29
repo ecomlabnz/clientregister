@@ -404,7 +404,7 @@ fee('aarav_student', 'Dependent child student visa', 'professional', 90000, 'exc
 split('aarav_student', [{ key: 'principal', label: 'Principal (me)', bp: 5000 }, { key: 'admin', label: 'Admin team', bp: 5000 }]);
 
 kase('harbour_accreditation', {
-  client: 'harbour', title: 'Employer accreditation renewal', case_type: 'ot_other', status: 'approved',
+  client: 'harbour', title: 'Employer accreditation renewal', case_type: 'emp_accreditation_renewal', status: 'approved',
   inz: 'INZ-2026-098771', lodged: day(-120), decided: at(-70), outcome: 'approved',
   summary: 'Standard accreditation renewal for up to five migrant workers. Granted.',
 });
@@ -414,7 +414,7 @@ fee('harbour_accreditation', 'Accreditation renewal', 'professional', 180000, 'e
 split('harbour_accreditation', [{ key: 'principal', label: 'Principal (me)', bp: 7000 }, { key: 'admin', label: 'Admin team', bp: 3000 }]);
 
 kase('orchards_jobcheck', {
-  client: 'orchards', title: 'Job check — 3 seasonal orchard roles', case_type: 'ot_other', status: 'lodged',
+  client: 'orchards', title: 'Job check — 3 seasonal orchard roles', case_type: 'emp_job_check', status: 'lodged',
   inz: 'INZ-2026-121004', lodged: day(-18), due: day(12),
   next_action: 'Await job check outcome', next_due: day(12),
   summary: 'Job check for three seasonal orchard roles, advertised as required.',

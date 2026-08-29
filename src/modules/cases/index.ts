@@ -45,7 +45,8 @@ import {
 import { feesSection } from '../fees';
 
 export interface CaseRow {
-  id: string; ref: string; client_id: string; title: string; case_type: string;
+  id: string; ref: string; client_id: string; title: string; descriptor: string | null;
+  case_type: string;
   status: CaseStatus; priority: string; assigned_to: string | null;
   inz_application_number: string | null; inz_client_number: string | null;
   lodged_at: string | null; decision_due_at: string | null; decided_at: string | null;
@@ -88,7 +89,13 @@ function caseForm(
         </div>
         ${field({ label: 'Matter title', name: 'title', value: values.title, required: true, maxlength: 200,
                   placeholder: 'e.g. AEWV. RUBEZHANSKII, Aleksei',
-                  hint: 'Filled in from the type and the client as you choose them. Change it freely.' })}
+                  hint: 'The name of the matter. Filled in from the type and the client as you '
+                    + 'choose them; change it freely.' })}
+        ${field({ label: 'What it is about', name: 'descriptor', value: values.descriptor, maxlength: 160,
+                  placeholder: 'e.g. Orchard worker, Kiwi Orchards',
+                  hint: 'The line under the title in every list. What distinguishes this matter '
+                    + 'from the next one of the same kind for the same person — the role and the '
+                    + 'employer, the ground of the request. Optional.' })}
         <div class="field">
           <label for="f_case_type">Case type<span class="req"> *</span></label>
           <select id="f_case_type" name="case_type" required class="js-case-type">
@@ -149,6 +156,7 @@ function readCaseForm(f: FormReader, types: Term[]) {
   return {
     client_id: f.text('client_id', { required: true, label: 'Client', max: 60 }),
     title: f.text('title', { required: true, label: 'Matter title', max: 200 }),
+    descriptor: f.optional('descriptor', { max: 160 }),
     case_type: submittedType,
     priority: f.enum('priority', PRIORITIES, { fallback: 'normal' })!,
     assigned_to: f.optional('assigned_to', { max: 60 }),
@@ -285,7 +293,11 @@ export const casesModule: AppModule = {
                 ${row.priority !== 'normal' ? badge(PRIORITY_LABELS[row.priority as keyof typeof PRIORITY_LABELS], row.priority === 'urgent' ? 'red' : 'amber') : ''}</td>
             <td>
               <a class="clamp-2" href="/cases/${row.id}">${row.title}</a>
-              <div class="muted small clamp-1">${labelFor(types, row.case_type)}</div>
+              ${/* The type used to sit here. With the title naming the matter
+                    by its type and client, repeating the type says nothing —
+                    what it is *about* does. Types with no descriptor yet keep
+                    the old line rather than losing one. */ ''}
+              <div class="muted small clamp-1">${row.descriptor || labelFor(types, row.case_type)}</div>
               <div class="row-meta show-sm">
                 <code>${row.ref}</code>
                 <a href="/clients/${row.client_id}">${row.client_name}</a>
@@ -360,11 +372,11 @@ export const casesModule: AppModule = {
         ?? expectedDecisionDate(v.lodged_at, policy.expectedMonths);
       await run(
         c.env.DB,
-        `INSERT INTO cases (id, ref, client_id, title, case_type, status, priority, assigned_to,
+        `INSERT INTO cases (id, ref, client_id, title, descriptor, case_type, status, priority, assigned_to,
             inz_application_number, inz_client_number, lodged_at, decision_due_at,
             next_action, next_action_due, summary, chase_inz, currency, created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NZD',?,?,?)`,
-        id, ref, v.client_id, v.title, v.case_type, status, v.priority, v.assigned_to || null,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NZD',?,?,?)`,
+        id, ref, v.client_id, v.title, v.descriptor, v.case_type, status, v.priority, v.assigned_to || null,
         v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue,
         v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), nowIso(), user.id,
       );
@@ -427,7 +439,8 @@ export const casesModule: AppModule = {
                        { href: `/clients/${kase.client_id}`, label: kase.client_name },
                        { label: kase.ref }])}
         ${pageHeader(kase.title,
-          `${kase.ref} · ${labelFor(types, kase.case_type)} · ${kase.client_name}`,
+          `${kase.descriptor ? `${kase.descriptor} · ` : ''}${kase.ref} · `
+            + `${labelFor(types, kase.case_type)} · ${kase.client_name}`,
           writable ? html`<a class="btn btn-secondary" href="/cases/${kase.id}/edit">Edit</a>
                           <a class="btn btn-secondary" href="/quotes/new?case_id=${kase.id}&client_id=${kase.client_id}">New quote</a>` : undefined)}
 
@@ -723,11 +736,11 @@ export const casesModule: AppModule = {
         ?? expectedDecisionDate(v.lodged_at, policy.expectedMonths);
       await run(
         c.env.DB,
-        `UPDATE cases SET client_id=?, title=?, case_type=?, priority=?, assigned_to=?,
+        `UPDATE cases SET client_id=?, title=?, descriptor=?, case_type=?, priority=?, assigned_to=?,
            inz_application_number=?, inz_client_number=?, lodged_at=?, decision_due_at=?,
            next_action=?, next_action_due=?, summary=?, chase_inz=?, updated_at=?
          WHERE id=?`,
-        v.client_id, v.title, v.case_type, v.priority, v.assigned_to || null,
+        v.client_id, v.title, v.descriptor, v.case_type, v.priority, v.assigned_to || null,
         v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue,
         v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), id,
       );

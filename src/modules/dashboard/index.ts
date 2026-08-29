@@ -13,7 +13,7 @@ import { all, count } from '../../core/db';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { page } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
-import { badge, card, emptyState, pageHeader, sparkline, statusTone, table } from '../../ui/components';
+import { badge, card, caseSubline, emptyState, pageHeader, sparkline, statusTone, table } from '../../ui/components';
 import { dateShort, isOverdue, money, relativeDays, truncate } from '../../ui/format';
 import {
   CASE_STATUS_LABELS, CLIENT_STATUS_LABELS, DEADLINE_CASE_STATUSES,
@@ -44,7 +44,7 @@ export const dashboardModule: AppModule = {
         await Promise.all([
           all<any>(
             c.env.DB,
-            `SELECT k.id, k.ref, k.title, k.status, k.decision_due_at, k.priority, cl.full_name AS client_name
+            `SELECT k.id, k.ref, k.title, k.descriptor, k.status, k.decision_due_at, k.priority, cl.full_name AS client_name
                FROM cases k JOIN clients cl ON cl.id = k.client_id
               WHERE k.decision_due_at IS NOT NULL AND k.status IN (${openPlaceholders})
               ORDER BY k.decision_due_at LIMIT 15`,
@@ -67,7 +67,7 @@ export const dashboardModule: AppModule = {
           count(c.env.DB, `SELECT COUNT(*) AS n FROM ingest_messages WHERE status = 'pending'`),
           all<any>(
             c.env.DB,
-            `SELECT k.id, k.ref, k.title, k.status, k.next_action, k.next_action_due, cl.full_name AS client_name
+            `SELECT k.id, k.ref, k.title, k.descriptor, k.status, k.next_action, k.next_action_due, cl.full_name AS client_name
                FROM cases k JOIN clients cl ON cl.id = k.client_id
               WHERE k.assigned_to = ? AND k.status IN (${openPlaceholders})
               ORDER BY COALESCE(k.next_action_due, '9999') LIMIT 15`,
@@ -208,7 +208,7 @@ export const dashboardModule: AppModule = {
                   <td class="small ${isOverdue(d.decision_due_at) ? 'warn' : ''}">
                     ${dateShort(d.decision_due_at)}<div class="muted">${relativeDays(d.decision_due_at)}</div></td>
                   <td><a href="/cases/${d.id}">${d.title}</a>
-                      <div class="muted small"><code>${d.ref}</code></div></td>
+                      ${caseSubline(d.descriptor, d.ref)}</td>
                   <td class="small">${d.client_name}</td>
                   <td>${badge(CASE_STATUS_LABELS[d.status as keyof typeof CASE_STATUS_LABELS] ?? d.status, statusTone(d.status))}
                       ${DEADLINE_CASE_STATUSES.includes(d.status) ? badge('response required', 'red') : ''}</td>
@@ -231,7 +231,7 @@ export const dashboardModule: AppModule = {
               ['Case', 'Client', 'Status', 'Next action'],
               myCases.map((k: any) => html`
                 <tr>
-                  <td><a href="/cases/${k.id}">${k.title}</a><div class="muted small"><code>${k.ref}</code></div></td>
+                  <td><a href="/cases/${k.id}">${k.title}</a>${caseSubline(k.descriptor, k.ref)}</td>
                   <td class="small">${k.client_name}</td>
                   <td>${badge(CASE_STATUS_LABELS[k.status as keyof typeof CASE_STATUS_LABELS] ?? k.status, statusTone(k.status))}</td>
                   <td class="small">${k.next_action ? html`${truncate(k.next_action, 50)}

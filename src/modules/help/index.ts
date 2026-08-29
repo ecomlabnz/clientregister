@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.36.0', date: '29 August 2026',
+    notes: [
+      'A matter now has a name and a separate line for what it is about. '
+        + '“AEWV. TAGATA, Sione” with “Orchard worker, Kiwi Orchards” underneath.',
+      'Surnames are capitalised in a matter name, as a passport prints them, so it is '
+        + 'clear which part is the family name.',
+      'Existing matters were split into the two boxes automatically.',
+    ],
+  },
+  {
     version: '0.35.0', date: '29 August 2026',
     notes: [
       'Marking a task done now asks what was done and how. The task is already complete by '
@@ -396,6 +406,29 @@ function sections(origin: string): Section[] {
       body: html`
         <p>A case is one matter for one client: an application, an appeal, a s.61 request. Open one
            from the client's page so it attaches to the right file.</p>
+        <h4>Naming a matter</h4>
+        <p>A matter has a <strong>name</strong> and a thing it is <strong>about</strong>, and they
+           are two boxes rather than one.</p>
+        <p>The name follows the practice's convention — the type, then the client with the surname
+           in capitals:</p>
+        <p class="prewrap"><code>AEWV. TAGATA, Sione</code><br>
+           <code>S.61. BUI, Dac Dat</code></p>
+        <p>Capitals on the surname are not decoration. Many clients have names whose order is not
+           the English one, and <em>TRUONG, Thi Thu Thuy</em> says which part is the family name
+           where <em>Truong, Thi Thu Thuy</em> leaves it to be guessed — and guessing wrong on a
+           form comes back as a request for evidence.</p>
+        <p>Pick the client and the type and the name is filled in for you, taking the short form
+           of the type from the dropdown. Type in the box and it stops proposing, for good.</p>
+        <p><strong>What it is about</strong> is the small line under the name in every list:
+           <em>Orchard worker, Kiwi Orchards</em>, <em>unlawful since March</em>. It is what tells
+           two matters of the same kind for the same person apart. Leave it empty when there is
+           nothing to distinguish — one student visa for one client is not ambiguous with
+           anything.</p>
+        <p>The short forms come from the type list, which an administrator edits under
+           <strong>Admin → Settings → Vocabulary</strong> with no deployment. Change
+           <code>RQ. Section 61 Request</code> to <code>RQ. S.61</code> and every matter named
+           from then on uses it. The part before the dot groups the list; it is dropped from the
+           name.</p>
         <p>The <strong>status</strong> is the heart of it. You move a case forward from its own
            page, adding a note explaining why — that note goes on the file. Statuses cannot jump:
            a case cannot go from <em>Lead</em> straight to <em>Approved</em> without passing

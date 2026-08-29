@@ -101,3 +101,45 @@ describe('renumbering the matters already on the register', () => {
     expect(sql).toContain("AND status IN ('open', 'in_progress', 'blocked')");
   });
 });
+
+describe('a matter has a name and a thing it is about', () => {
+  const cases = readFileSync('src/modules/cases/index.ts', 'utf8');
+  const components = readFileSync('src/ui/components.ts', 'utf8');
+  const migration = readFileSync('migrations/0026_case_descriptor.sql', 'utf8');
+
+  it('splits the two apart on the em dash that already separated them', () => {
+    // ' — ' is three *characters* but the em dash is three *bytes*, and
+    // SQLite's SUBSTR counts characters. Written as +5 first, which ate the
+    // first two letters of every descriptor; caught by rehearsing on a scratch
+    // copy before the migration went anywhere near a real database.
+    expect(migration).toContain("INSTR(title, ' — ') + 3");
+    expect(migration).not.toContain("INSTR(title, ' — ') + 5");
+  });
+
+  it('keeps the subordinate line to one line', () => {
+    // The reference shares the line rather than taking one of its own: a third
+    // line makes every row in every list taller, and row height on these
+    // tables has already had to be fixed once.
+    expect(components).toContain('export function caseSubline(');
+    const fn = components.slice(components.indexOf('export function caseSubline('),
+      components.indexOf('export function pageHeader('));
+    expect(fn).toContain("' · '");
+    expect(fn).toContain('clamp-1');
+  });
+
+  it('stops saying the same thing twice', () => {
+    // The title names the matter by its type and client. Repeating the type
+    // underneath, or the client after a dash, says nothing new.
+    expect(cases).toContain('row.descriptor || labelFor(types, row.case_type)');
+    const alerts = readFileSync('src/modules/alerts/index.ts', 'utf8');
+    expect(alerts).toContain('title: k.title,');
+    expect(alerts).not.toContain('title: `${k.title} — ${k.client_name}`');
+  });
+
+  it('lets a case be saved with no descriptor at all', () => {
+    // Plenty of matters need none: one student visa for one client is not
+    // ambiguous with anything.
+    expect(cases).toContain("descriptor: f.optional('descriptor', { max: 160 })");
+    expect(migration).not.toMatch(/descriptor[^;]*NOT NULL/);
+  });
+});

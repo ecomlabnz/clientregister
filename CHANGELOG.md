@@ -7,6 +7,48 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.36.0 — 29 August 2026
+
+### Added
+- **A matter has a name and a thing it is about, and they are now two fields.**
+  One field was doing both jobs — "AEWV — Orchard worker, Kiwi Orchards" is
+  both "which matter is this" and "what is it about" — and because it was one
+  field the answer to the first drifted with the second: sixteen cases, sixteen
+  different shapes.
+- The name follows the practice's convention (`AEWV. TAGATA, Sione`), proposed
+  from the type and the client and editable freely. **What it is about** is the
+  small line under it in every list.
+- The reference shares that line rather than taking one of its own. A third
+  line would make every row in every list taller, and row height on these
+  tables has already had to be fixed once.
+
+### Changed
+- **Surnames are capitalised in a matter name**, as a passport prints them and
+  as INZ writes them. Many of this practice's clients have names whose order is
+  not the English one: `TRUONG, Thi Thu Thuy` says which part is the family
+  name where `Truong, Thi Thu Thuy` leaves it to be guessed, and guessing wrong
+  on a form comes back as a request for evidence.
+- The cases list showed the case type under the title. With the title naming
+  the matter by its type, that said nothing; it shows what the matter is about
+  instead, falling back to the type where there is no descriptor yet.
+- An alert titled `${title} — ${client}` said the client twice once the title
+  carried it. The client moved to the detail line, where it is still there for
+  a title somebody wrote their own way.
+
+### Fixed
+- Two demo cases were typed `OT. Other` when `EMP. Job Check` and
+  `EMP. Accreditation Renewal` existed — the type drifting because the title
+  carried the meaning and nobody looked at the dropdown. Corrected in the seed.
+
+### Notes on the migration
+- Existing titles are split on the em dash they already used; a title without
+  one keeps the whole title and gets no descriptor, which is right — there was
+  no detail to move.
+- Written first as `INSTR(title, ' — ') + 5`, on the assumption that the em
+  dash's three bytes were three positions. SQLite's `SUBSTR` counts characters,
+  so that ate the first two letters of every descriptor. Caught by rehearsing
+  on a scratch copy, which is the entire reason for rehearsing.
+
 ## 0.35.1 — 29 August 2026
 
 ### Fixed
