@@ -129,3 +129,6 @@ line in the registry — see [docs/architecture.md](docs/architecture.md).
 - [docs/security.md](docs/security.md) — the controls, and what they do not cover.
 - [docs/integrations.md](docs/integrations.md) — email, Telegram, WhatsApp, AI, outbound mail.
 - [docs/operations.md](docs/operations.md) — deployment, secrets, migrations, backup, recovery.
+- [docs/marketing.md](docs/marketing.md) — what the register does, for someone who has not seen it.
+- [docs/intake-prompt.md](docs/intake-prompt.md) — a prompt for reading the practice's own folders
+  into the register, and for finding out what the register cannot yet hold.
