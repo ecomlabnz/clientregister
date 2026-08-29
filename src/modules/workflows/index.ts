@@ -22,7 +22,7 @@ import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { adminTabs } from '../admin';
-import { alertTabs, collectAlerts } from '../alerts';
+import { alertCounters, alertTabs, collectAlerts } from '../alerts';
 import { auditFrom } from '../../core/audit';
 import { all, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
@@ -157,6 +157,7 @@ export const workflowsModule: AppModule = {
       return page(c, { title: 'Workflows', active: '/alerts' }, html`
         ${pageHeader('For approval',
           'What the register would do about the dates it is watching. Nothing here has happened yet.')}
+        ${alertCounters(alerts)}
         ${alertTabs({ alerts, awaiting: pending?.n ?? 0, horizon, current: 'approval' })}
         ${queueTabs(view, pending?.n ?? 0)}
 

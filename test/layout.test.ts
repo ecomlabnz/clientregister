@@ -88,3 +88,31 @@ describe('form layout', () => {
     expect(ownTracks, 'panels must take their columns from the shared rules').toEqual([]);
   });
 });
+
+describe('pages in one family look like one family', () => {
+  const modules = ['src/modules/alerts/index.ts', 'src/modules/workflows/index.ts'];
+
+  it('never shows the alerts bar without the figures above it', () => {
+    // "For approval" is a tab of Alerts, so it wears the Alerts furniture. It
+    // wore the bar but not the three figures, and a counter strip that
+    // disappears on a click reads as something having broken rather than as
+    // something having moved.
+    for (const file of modules) {
+      const text = readFileSync(file, 'utf8');
+      if (!text.includes('alertTabs({')) continue;
+      expect(text, `${file} renders the alerts bar without alertCounters`)
+        .toContain('alertCounters(');
+    }
+  });
+
+  it('builds both from the same list, so they cannot disagree', () => {
+    // Counted from what the page actually holds rather than from a second
+    // query that might not agree with it.
+    for (const file of modules) {
+      const text = readFileSync(file, 'utf8');
+      if (!text.includes('alertTabs({')) continue;
+      expect(text).toMatch(/alertCounters\(alerts\)/);
+      expect(text).toMatch(/alertTabs\(\{ alerts,/);
+    }
+  });
+});

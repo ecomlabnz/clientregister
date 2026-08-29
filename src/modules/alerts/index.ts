@@ -200,6 +200,26 @@ export const ALERT_SETTINGS: SettingsGroup = {
 };
 
 /**
+ * The three figures over the alerts bar.
+ *
+ * Shared with the approvals queue for the same reason the bar is: a page in the
+ * alerts family that drops them looks like a different page, and the figures
+ * vanishing on a click reads as something having gone wrong rather than as
+ * having moved. They count the whole window, not the tab being shown, so they
+ * mean the same thing wherever you are standing.
+ */
+export function alertCounters(alerts: Alert[]): Raw {
+  const counts = countBySeverity(alerts);
+  return html`<div class="fee-summary">
+    <div class="stat ${counts.overdue ? 'stat-warn' : ''}">
+      <span class="stat-label">Overdue</span><span class="stat-value">${counts.overdue}</span></div>
+    <div class="stat ${counts.urgent ? 'stat-warn' : ''}">
+      <span class="stat-label">Within ${URGENT_DAYS} days</span><span class="stat-value">${counts.urgent}</span></div>
+    <div class="stat"><span class="stat-label">Later</span><span class="stat-value">${counts.soon}</span></div>
+  </div>`;
+}
+
+/**
  * The one bar of tabs the alerts family uses.
  *
  * Shared with the approvals queue rather than copied, because a tab that leads
@@ -255,20 +275,9 @@ export const alertsModule: AppModule = {
       const shown = kindFilter && kindFilter in KIND_LABELS
         ? alerts.filter((a) => a.kind === kindFilter)
         : alerts;
-      const counts = countBySeverity(alerts);
-
-
       return page(c, { title: 'Alerts', active: '/alerts' }, html`
         ${pageHeader('Alerts', `Everything with a date attached, across the whole register, for the next ${horizon} days.`)}
-
-        <div class="fee-summary">
-          <div class="stat ${counts.overdue ? 'stat-warn' : ''}">
-            <span class="stat-label">Overdue</span><span class="stat-value">${counts.overdue}</span></div>
-          <div class="stat ${counts.urgent ? 'stat-warn' : ''}">
-            <span class="stat-label">Within ${URGENT_DAYS} days</span><span class="stat-value">${counts.urgent}</span></div>
-          <div class="stat"><span class="stat-label">Later</span><span class="stat-value">${counts.soon}</span></div>
-        </div>
-
+        ${alertCounters(alerts)}
         ${alertTabs({ alerts, awaiting, horizon, current: kindFilter })}
         <form method="get" action="/alerts" class="filters" data-live-search>
           <input type="hidden" name="kind" value="${kindFilter}">
