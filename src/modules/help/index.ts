@@ -32,6 +32,23 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.48.0', date: '29 August 2026',
+    notes: [
+      'Police certificate and medical expiry dates are now worked out rather than typed. '
+        + 'A police certificate is good for 6 months from issue, or 24 once it has gone in '
+        + 'with an application; a medical is 3 months, or 36. Record the issue date and the '
+        + 'register does the arithmetic \u2014 including at the end of a month, where 31 March '
+        + 'plus six months is 30 September and not 1 October.',
+      'Each certificate has a \u201csubmitted with an application on\u201d date. Fill it in '
+        + 'and the expiry moves by itself, and the file records that it did.',
+      'A certificate inside the warning window now counts as pressing rather than upcoming. '
+        + 'The window is 30 days by default and is set under Settings \u2192 Alerts \u2014 '
+        + 'longer than for a deadline, because you cannot replace a medical on the day.',
+      'A chest x-ray keeps a hand-entered expiry: no rule has been stated for one, and '
+        + 'inventing one would be worse than leaving it alone.',
+    ],
+  },
+  {
     version: '0.47.0', date: '29 August 2026',
     notes: [
       'A task can be opened. Click its title in the list and you get the whole thing \u2014 '
