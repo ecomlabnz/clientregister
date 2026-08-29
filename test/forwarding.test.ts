@@ -18,7 +18,7 @@ const inbox = readFileSync('src/modules/inbox/index.ts', 'utf8');
 const entry = (over: Partial<ThreadEntry> = {}): ThreadEntry => ({
   id: 'm1', kind: 'message', direction: 'in', at: '2026-08-20T04:00:00.000Z',
   body: 'The employer has signed the job check.', who: 'A Client',
-  status: null, note: null, href: null, attachments: null, ...over,
+  status: null, note: null, href: null, attachments: null, bodyHtml: null, ...over,
 });
 
 describe('the quoted original', () => {

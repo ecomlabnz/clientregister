@@ -25,6 +25,7 @@ import { can } from '../../core/rbac';
 import { incomingCounts, incomingTabs } from '../inquiries';
 import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
 import { FormReader } from '../../core/validate';
+import { sanitiseHtml } from '../../core/sanitise';
 import {
   CHANNEL_LABELS, type ThreadEntry, type ThreadRow,
   forwardQuote, linkThread, postReply, threadFor, threadHistory,
@@ -33,7 +34,7 @@ import {
 interface IngestRow {
   id: string; channel: string; external_id: string | null; received_at: string;
   sender: string | null; sender_display: string | null; subject: string | null;
-  body_text: string | null; attachments_json: string | null; trusted: number;
+  body_text: string | null; body_html: string | null; attachments_json: string | null; trusted: number;
   status: string; processed_at: string | null; inquiry_id: string | null;
   error: string | null; meta_json: string | null;
   /** Set when the sender could be identified, which is what makes a reply possible. */
@@ -387,7 +388,13 @@ export const inboxModule: AppModule = {
                       <div class="msg-meta">${entry.who} · ${dateTime(entry.at)}
                         ${entry.direction === 'out' && entry.status && entry.status !== 'sent'
                           ? badge(entry.status, entry.status === 'failed' ? 'red' : 'amber') : ''}</div>
-                      <div class="msg-body">${entry.body}</div>
+                      ${'' /* Formatted where the sender formatted it, through
+                               the same allow-list rebuild as the message page.
+                               A conversation of stripped text loses exactly the
+                               structure that made a letter readable. */}
+                      ${entry.bodyHtml
+                        ? html`<div class="msg-body message-html">${sanitiseHtml(entry.bodyHtml).html}</div>`
+                        : html`<div class="msg-body">${entry.body}</div>`}
                       ${entry.note ? html`<div class="small muted">${entry.note}</div>` : ''}
                       ${'' /* Per message, because that is what you forward — not
                                the whole exchange. Behind mail:send whatever the
@@ -544,6 +551,9 @@ export const inboxModule: AppModule = {
             id: m.id, kind: 'message', direction: 'in', at: m.received_at,
             body: m.body_text ?? '', who: m.sender_display ?? m.sender ?? 'them',
             status: null, note: null, href: null, attachments: names,
+            // A forward quotes the plain text: it is going into a message box a
+            // person will edit, and markup in there is not editable prose.
+            bodyHtml: null,
           },
         };
       }
@@ -569,6 +579,7 @@ export const inboxModule: AppModule = {
         entry: {
           id: r_.id, kind: 'reply', direction: 'out', at: r_.created_at, body: r_.body,
           who: r_.author, status: null, note: null, href: null, attachments: r_.attachments ?? null,
+          bodyHtml: null,
         },
       };
     };
@@ -782,6 +793,8 @@ ${quote}</textarea>
       // of — becoming an inquiry, so the two actions are independent.
       const filed = await all<{ id: string; ref: string }>(
         c.env.DB, 'SELECT id, ref FROM kb_articles WHERE ingest_message_id = ? ORDER BY created_at', id);
+      const plain = c.req.query('plain') === '1';
+      const formatted = msg.body_html ? sanitiseHtml(msg.body_html) : null;
 
       return page(c, { title: 'Inbox message', active: '/inquiries' }, html`
         ${breadcrumbs([{ href: '/inbox', label: 'Inbox' }, { label: msg.channel }])}
@@ -795,7 +808,27 @@ ${quote}</textarea>
 
         <div class="cols">
           <div class="col-main">
-            ${card('Message', html`<div class="prewrap message-body">${msg.body_text || '(empty)'}</div>`)}
+            ${'' /* Shown as it was written when the sender wrote it that way,
+                     because an INZ letter or a schedule of dates is half
+                     structure and stripping it leaves a wall of lines. The
+                     markup is rebuilt from an allow-list rather than cleaned,
+                     and the policy on every page of this application runs no
+                     script, applies no inline style and loads no remote image —
+                     so a tracking pixel cannot report that it was read. The
+                     plain text is always one click away, and is what search and
+                     the AI actually read. */}
+            ${card('Message', formatted && !plain
+              ? html`
+                  <div class="message-html">${formatted.html}</div>
+                  <p class="small muted">
+                    ${formatted.hadImages
+                      ? html`Images in this message are not shown. `
+                      : ''}Shown as it was sent. <a href="?plain=1">Show the plain text</a></p>`
+              : html`
+                  <div class="prewrap message-body">${msg.body_text || '(empty)'}</div>
+                  ${msg.body_html
+                    ? html`<p class="small muted"><a href="?">Show it as it was sent</a></p>`
+                    : ''}`)}
 
             ${attachments.length > 0 ? card('Attachments', html`
               <ul class="list">${attachments.map((a) => html`

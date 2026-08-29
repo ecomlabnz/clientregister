@@ -162,6 +162,7 @@ export async function pollInbox(env: Env): Promise<PollResult | null> {
         senderDisplay: parsed.fromName ?? sender,
         subject: parsed.subject,
         bodyText: parsed.text,
+        bodyHtml: parsed.html,
         attachments: parsed.attachments,
         trusted: allowed.length > 0 && isAllowed(allowed, sender),
         toAddresses: parsed.toAddresses,

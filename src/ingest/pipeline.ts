@@ -31,6 +31,8 @@ export interface CapturedMessage {
   senderDisplay?: string | null;
   subject?: string | null;
   bodyText?: string | null;
+  /** The formatted part of an email, rendered only through `sanitiseHtml`. */
+  bodyHtml?: string | null;
   attachments?: Array<{ filename: string; contentType: string; size: number }>;
   trusted: boolean;
   /** Everyone the message was addressed to, so a reply can reach them all. */
@@ -79,12 +81,13 @@ export async function captureMessage(env: Env, msg: CapturedMessage): Promise<Ca
   await run(
     env.DB,
     `INSERT INTO ingest_messages (id, channel, external_id, dedupe_key, received_at, sender, sender_display,
-        subject, body_text, attachments_json, trusted, status, meta_json, created_at,
+        subject, body_text, body_html, attachments_json, trusted, status, meta_json, created_at,
         to_addrs, cc_addrs)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,?)`,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,?)`,
     id, msg.channel, msg.externalId ?? null, key, msg.receivedAt ?? nowIso(),
     msg.sender ?? null, msg.senderDisplay ?? null, msg.subject ?? null,
     (msg.bodyText ?? '').slice(0, 60_000),
+    msg.bodyHtml ? msg.bodyHtml.slice(0, 400_000) : null,
     msg.attachments && msg.attachments.length ? JSON.stringify(msg.attachments) : null,
     msg.trusted ? 1 : 0,
     msg.meta ? JSON.stringify(msg.meta) : null,

@@ -1,0 +1,24 @@
+-- 0039_a_letter_as_it_was_sent.sql
+--
+-- Until now an inbound email was flattened to text the moment it arrived: the
+-- HTML part was read, stripped, and thrown away. That is cheap and it is safe,
+-- and for triage — is this work, who is it from — it is enough.
+--
+-- It is not enough for reading. An INZ letter, a schedule of documents, a table
+-- of dates: strip the markup out and what is left is a wall of lines with the
+-- structure that made it legible removed. The practice reads these, not only
+-- files them.
+--
+-- So the formatted part is kept alongside the text. Both, not one: the text is
+-- what search, triage and the AI read, because it is smaller and has no shape
+-- to be confused by, and the HTML is only ever rendered — through
+-- `src/core/sanitise.ts`, which rebuilds it from an allow-list rather than
+-- cleaning it, and under a content security policy that runs no script, applies
+-- no inline style and loads no remote image. One fact, two forms, and the form
+-- that is displayed is never the form that is read by anything else.
+--
+-- Only new mail has it. Messages already captured keep the text they were
+-- reduced to, and are shown as they always were; the original is gone and
+-- nothing here pretends otherwise.
+
+ALTER TABLE ingest_messages ADD COLUMN body_html TEXT;

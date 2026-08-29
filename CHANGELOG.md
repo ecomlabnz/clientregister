@@ -7,6 +7,44 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.64.0 — 30 August 2026
+
+### Added
+- **An email is shown the way it was written.** Until now the formatted part was
+  read, stripped and thrown away the moment a message arrived. That is cheap and
+  safe, and for triage — is this work, who is it from — it was enough. It is not
+  enough for reading: an INZ letter or a schedule of dates is half structure,
+  and stripping it leaves a wall of lines.
+- The plain text is **always one click away**, and stays the version that search,
+  triage and the AI read — smaller, and with no shape for anything to be
+  confused by. One fact, two forms, and the form that is displayed is never the
+  form anything else reads.
+
+### Security
+- The formatted body is **rebuilt, not cleaned**. `src/core/sanitise.ts` reads
+  the markup token by token and emits only what is on an allow-list: a tag if
+  its name is listed, an attribute if it is listed for that tag and its value
+  passes the check for it. Anything unrecognised — a tag, a comment, a stray
+  `<` — becomes escaped text. There is no path by which a construct nobody
+  thought of is emitted verbatim, which is how every regex-based sanitiser
+  eventually fails.
+- `style`, `class` and `id` never survive, so a sender cannot restyle the page
+  or borrow the register's own classes. Layout and type stay the application's.
+- A link is kept only if it is plainly http, https, mailto or tel, checked after
+  entities and control characters are removed — `java&#115;cript:` and
+  `java<tab>script:` are both read as `javascript:` by a browser. One that fails
+  loses its anchor entirely rather than becoming blue text that does nothing.
+  What survives opens away from the register and tells the far end nothing about
+  where it was clicked from.
+- **Images are dropped and the reader is told.** A remote image in a client's
+  email is a tracking pixel as often as it is a logo. The content security
+  policy already blocked it loading; this means the page does not show a row of
+  broken frames either, and nothing reports that a letter was read.
+- The policy is the second layer and not the first: `default-src 'none'` with
+  `script-src 'self'` and `style-src 'self'` means an inline script never runs,
+  an inline style never applies and a frame never loads, even if something got
+  past the rebuild.
+
 ## 0.63.0 — 30 August 2026
 
 ### Added

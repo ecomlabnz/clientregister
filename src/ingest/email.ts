@@ -14,6 +14,10 @@ import { allowList, captureMessage, isAllowed } from './pipeline';
 import { audit } from '../core/audit';
 
 const MAX_BODY_CHARS = 60_000;
+// Larger than the text, because markup is most of an HTML email's weight and a
+// letter cut off two thirds of the way down is not a letter. Still a ceiling:
+// a mailing with a megabyte of table markup is not worth a megabyte of D1.
+const MAX_HTML_CHARS = 400_000;
 
 export interface ParsedInboundEmail {
   fromAddress: string | null;
@@ -30,6 +34,14 @@ export interface ParsedInboundEmail {
   ccAddresses: string[];
   subject: string | null;
   text: string;
+  /**
+   * The formatted part, kept as it arrived.
+   *
+   * Never read by anything but the renderer, and never rendered except through
+   * `sanitiseHtml`. The text above stays the version that search, triage and
+   * the AI see: smaller, and with no shape for anything to be confused by.
+   */
+  html: string | null;
   attachments: Array<{ filename: string; contentType: string; size: number }>;
   messageId: string | null;
   date: string | null;
@@ -58,6 +70,7 @@ export async function parseInboundEmail(raw: ArrayBuffer): Promise<ParsedInbound
     ccAddresses: addresses(email.cc),
     subject: email.subject ?? null,
     text: text.slice(0, MAX_BODY_CHARS),
+    html: email.html ? email.html.slice(0, MAX_HTML_CHARS) : null,
     attachments: (email.attachments ?? []).map((a) => ({
       filename: a.filename ?? 'attachment',
       contentType: a.mimeType ?? 'application/octet-stream',
@@ -111,6 +124,7 @@ export async function handleInboundEmail(
       senderDisplay: parsed.fromName ?? sender,
       subject: parsed.subject,
       bodyText: parsed.text,
+      bodyHtml: parsed.html,
       attachments: parsed.attachments,
       trusted,
       toAddresses: parsed.toAddresses,

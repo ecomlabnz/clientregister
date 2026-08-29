@@ -32,6 +32,20 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.64.0', date: '30 August 2026',
+    notes: [
+      'Emails are now shown the way they were sent \u2014 paragraphs, lists, tables and links '
+        + 'kept \u2014 instead of being flattened to plain text. The plain text is one click away '
+        + 'and is still what search reads.',
+      'Nothing a sender writes can affect the page: the formatting is rebuilt from a fixed list '
+        + 'of what is allowed, and scripts, styles and frames never reach it.',
+      'Images in an email are not shown. A picture in a message is a tracking pixel as often as '
+        + 'it is a logo, and this way nothing reports back that a letter was read.',
+      'Only mail arriving from now on has this. Messages already captured keep the text they '
+        + 'were reduced to.',
+    ],
+  },
+  {
     version: '0.63.0', date: '30 August 2026',
     notes: [
       'Any message in a conversation can be forwarded. The original is quoted with who it was '
