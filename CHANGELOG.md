@@ -7,6 +7,43 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.45.0 — 29 August 2026
+
+### Added
+Three more alerts that are not about a date. Same pattern as the first two: the
+model noticed them reading a file, and what it noticed is now a query, so it
+runs on every matter every time rather than on the one somebody thought to ask
+about. AI as the scout, rules as the guard.
+
+- **Not acknowledged** — a matter with a lodged status and no INZ application
+  number on the file. INZ acknowledges a lodgement by issuing that number;
+  after the grace period its absence means the acknowledgement never arrived,
+  or it arrived and nobody wrote it down. You find out which by looking, and
+  until then the matter cannot be quoted, chased or checked online. The grace
+  period is a setting (**Settings → Alerts**), default 14 days.
+- **No room to act** — a task due on the same day as the deadline it serves.
+  That is not a plan, it is the deadline written twice: no room for the client
+  to be unreachable, for a document to be missing, or for the day to go wrong.
+  The register cannot know how long the work takes; it can see that nothing was
+  allowed for it. It stops once the day has passed, where the deadline row says
+  the same thing louder.
+- **Status not recorded** — an open matter for someone with no current visa on
+  their record. Every question a matter turns on starts from the visa they hold
+  now. It clears by recording the answer, and "none, offshore" is an answer.
+  Organisations are never asked: a row that can never be cleared teaches people
+  to ignore the list.
+
+### Changed
+- The five checks that are not about a date now live in one exported place,
+  `CHECKS_NOT_ABOUT_A_DATE`, rather than inline in `collectAlerts`.
+
+### Verifying
+- `test/alertsql.test.ts` runs all five against a database built from the
+  migrations, with a row that should fire and a row that should not for each —
+  a whitespace-only visa type, an organisation, a fresh lodgement inside the
+  grace period, a task with a week in hand, a task already done. Each check was
+  watched failing before it was kept.
+
 ## 0.44.0 — 29 August 2026
 
 ### Added

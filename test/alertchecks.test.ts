@@ -5,16 +5,44 @@ import { KIND_LABELS_FOR_TEST } from '../src/modules/alerts';
 const alerts = readFileSync('src/modules/alerts/index.ts', 'utf8');
 
 /**
- * Two things a date cannot tell you.
+ * The things a date cannot tell you.
  *
  * Every other alert answers "what is due". These answer "what is wrong", which
  * is how matters actually go astray: not by a missed deadline, but by a file
- * nobody has touched, or one whose own record contradicts itself.
+ * nobody has touched, one whose own record contradicts itself, a lodgement
+ * never acknowledged, a task with no room in front of it, or a person whose
+ * immigration status the register never learned.
+ *
+ * These are the guards on how the checks are wired. Whether each one fires on
+ * the right record is proved in `test/alertsql.test.ts`, against a database
+ * built from the migrations.
  */
 describe('alerts that are not about a date', () => {
-  it('names both kinds', () => {
+  it('names every kind', () => {
     expect(KIND_LABELS_FOR_TEST.quiet).toBe('Gone quiet');
     expect(KIND_LABELS_FOR_TEST.contradiction).toBe('Does not add up');
+    expect(KIND_LABELS_FOR_TEST.unacknowledged).toBe('Not acknowledged');
+    expect(KIND_LABELS_FOR_TEST.no_slack).toBe('No room to act');
+    expect(KIND_LABELS_FOR_TEST.status_unknown).toBe('Status not recorded');
+  });
+
+  it('reads the acknowledgement grace period once, where the alerts are built', () => {
+    // Same reasoning as the quiet threshold: three pages call collectAlerts.
+    expect(alerts).toContain("key: 'alerts.ack_days'");
+    expect(alerts).toContain("d.key === 'alerts.ack_days'");
+    expect(alerts).not.toMatch(/collectAlerts\([^)]*ackDays/);
+  });
+
+  it('never asks an organisation for a visa it cannot hold', () => {
+    // A row that can never be cleared teaches people to ignore the list.
+    expect(alerts).toContain("cl.kind = 'individual'");
+  });
+
+  it('sends the missing-status row to the person, not the matter', () => {
+    // The visa is recorded on the client. A row that exists to be cleared has
+    // to land where clearing it happens.
+    const block = alerts.slice(alerts.indexOf("kind: 'status_unknown' as const"));
+    expect(block.slice(0, 900)).toContain('`/clients/${k.client_id}`');
   });
 
   it('stays deterministic — no model is consulted', () => {

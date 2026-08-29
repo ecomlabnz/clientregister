@@ -32,6 +32,22 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.45.0', date: '29 August 2026',
+    notes: [
+      '\u201cNot acknowledged\u201d \u2014 a matter lodged with INZ where no application '
+        + 'number has been recorded. Either the acknowledgement never arrived or nobody wrote '
+        + 'the number down, and you find out which by looking. How long to wait first is set '
+        + 'under Settings \u2192 Alerts.',
+      '\u201cNo room to act\u201d \u2014 a task due on the same day as the deadline it '
+        + 'serves. That is the deadline written twice, with no time in it for the client to be '
+        + 'unreachable or a document to be missing.',
+      '\u201cStatus not recorded\u201d \u2014 an open matter for someone with no current '
+        + 'visa on their record. It clears by recording one, and \u201cnone, offshore\u201d '
+        + 'is an answer. Organisations are never asked.',
+      'Like the other two, these are ordinary checks over the register. No model is consulted.',
+    ],
+  },
+  {
     version: '0.44.0', date: '29 August 2026',
     notes: [
       'Column headings in Cases and Clients now sort. Click one to sort by it, click it '
