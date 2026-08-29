@@ -29,7 +29,7 @@ import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABE
 import { isAiEnabled } from '../../ai/provider';
 import { nzbnConfigured } from '../../integrations/nzbn';
 import { mailConfigured, mailSetupGaps } from '../../mail/provider';
-import { flushQueue } from '../../mail/queue';
+import { flushQueue, queueEmail } from '../../mail/queue';
 import { registeredModules } from '../../registry';
 import { PRACTICE_SETTINGS } from '../../core/practice';
 import { can } from '../../core/rbac';
@@ -185,6 +185,13 @@ export const adminModule: AppModule = {
              <a href="/help#connecting">Help → Connecting Telegram, WhatsApp and email</a>.
              Keys are set as GitHub repository secrets and reach the Worker on the next deploy —
              they are never stored in this database.</p>
+          ${mailConfigured(env) ? html`
+            <form method="post" action="/admin/mail/test" class="inline-form mb">
+              ${csrfField(c.get('session')!.csrf)}
+              <button class="btn btn-secondary" type="submit">Send a test message to myself</button>
+            </form>
+            <p class="hint">Goes only to your own address — a test that could be aimed anywhere
+               would be a way to send mail as the practice to anyone.</p>` : ''}
           ${table(['Capability', 'Status', 'Detail'], [
           statusRow('Encrypted PII fields', Boolean(env.FIELD_KEY),
             'FIELD_KEY — enables storing passport numbers under AES-256-GCM.'),
@@ -276,6 +283,57 @@ export const adminModule: AppModule = {
 
       await auditFrom(c, { action: 'admin.demo_data_removed' });
       return redirectWith(c, '/admin', 'Demonstration data removed. Real records are untouched.');
+    });
+
+    /**
+     * Send one message to the person pressing the button.
+     *
+     * Deliberately not to an address they type: a test that can be aimed
+     * anywhere is a way to send mail from the practice's domain to anyone,
+     * which is what the outbound queue's audit trail exists to prevent. Sending
+     * to yourself answers the only question a test asks — does it arrive, and
+     * where — and answering it needs nobody else's inbox.
+     */
+    r.post('/mail/test', requirePermission('admin:settings'), async (c) => {
+      const user = c.get('user')!;
+      if (!mailConfigured(c.env)) {
+        return redirectWith(c, '/admin?tab=integrations',
+          `Outbound email is not configured yet. Still needed: ${mailSetupGaps(c.env).join(', ')}.`, 'err');
+      }
+
+      const stamp = new Date().toISOString();
+      await queueEmail(c.env, {
+        to: user.email,
+        subject: `Test message from ${c.env.APP_NAME ?? 'the register'}`,
+        text: [
+          `This is a test message from ${c.env.APP_NAME ?? 'the client register'}.`,
+          '',
+          `Sent by: ${user.name} <${user.email}>`,
+          `Provider: ${(c.env.MAIL_PROVIDER ?? 'none').toLowerCase()}`,
+          `From: ${c.env.MAIL_FROM ?? '(not set)'}`,
+          `At: ${stamp}`,
+          '',
+          'If this arrived in your inbox rather than your spam folder, outbound email is',
+          'working. If it went to spam, that is normal for a domain that has only just',
+          'started sending, and settles as a few more messages go out.',
+          '',
+          'Nothing was sent to anybody else. A test only ever goes to the person who',
+          'pressed the button.',
+        ].join('\n'),
+        createdBy: user.id,
+      });
+
+      const result = await flushQueue(c.env, 5);
+      await auditFrom(c, { action: 'admin.mail_test', meta: { to: user.email, ...result } });
+
+      return redirectWith(c, '/admin?tab=integrations',
+        result.sent > 0
+          ? `Test message sent to ${user.email}. If it is not in your inbox, look in spam — `
+            + 'a domain that has just started sending often lands there for the first few.'
+          : result.failed > 0
+            ? 'The provider refused it. Admin → Maintenance shows the queue and the reason.'
+            : 'Queued, but nothing was sent — check that MAIL_PROVIDER and its key are set.',
+        result.sent > 0 ? 'ok' : 'err');
     });
 
     r.post('/mail/flush', requirePermission('admin:settings'), async (c) => {

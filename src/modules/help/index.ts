@@ -32,6 +32,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.31.0', date: '29 August 2026',
+    notes: [
+      'A “send a test message to myself” button, under Admin → Integrations.',
+      'The manual gained the sections it was missing: decisions and chasing INZ, '
+        + 'certificates, and export — and proper setup steps for Resend.',
+    ],
+  },
+  {
     version: '0.30.0', date: '29 August 2026',
     notes: [
       'Replies can be directed to a mailbox other than the sending address — '
@@ -296,7 +304,7 @@ function sections(origin: string): Section[] {
       id: 'getting-around',
       title: 'Getting around',
       body: html`
-        <p>The bar across the top is the whole application. <strong>Today</strong> is the daily
+        <p>The bar across the top is the whole application. <strong>Dashboard</strong> is the daily
            starting point; <strong>Alerts</strong> is everything with a date attached;
            <strong>Inbox</strong> holds messages captured from email, Telegram and WhatsApp that
            nobody has dealt with yet.</p>
@@ -584,7 +592,7 @@ function sections(origin: string): Section[] {
            Tasks page for anything standalone. A task raised from a case stays attached to it and
            shows on that case.</p>
         <p>Everything about a task can be changed afterwards: title, detail, due date, priority,
-           who owns it, and whether it stays attached. Overdue tasks appear on Today and on
+           who owns it, and whether it stays attached. Overdue tasks appear on the Dashboard and on
            Alerts.</p>
         <p><strong>Every task belongs to someone.</strong> It defaults to you and can be handed
            over, but it cannot be left with nobody: an unassigned task sits in the list looking
@@ -673,6 +681,78 @@ function sections(origin: string): Section[] {
         <h4>When it runs</h4>
         <p>Every night, and whenever you press <strong>Run the rules now</strong>. Running it twice
            costs nothing.</p>`,
+    },
+    {
+      id: 'decisions',
+      title: 'Expected decisions, and chasing INZ',
+      body: html`
+        <p>When a matter is lodged, the register fills in an expected decision date — a month after
+           lodgement by default — unless you have given one. It is a starting point, not a rule:
+           INZ publishes processing times per visa type, and the adviser on the matter knows better
+           than a default does, so the date stays editable on the matter itself.</p>
+        <h4>When that date passes</h4>
+        <p>A task is raised to follow it up, assigned to whoever owns the matter. Then another a
+           month later, and another the month after — three chases on the default schedule.</p>
+        <p>All of it is adjustable under <strong>Admin → Settings → Decisions and chasing INZ</strong>:
+           how long a decision is expected to take, whether to chase at all, on what schedule, and
+           at what priority. The schedule counts <em>from the expected decision date</em>, so
+           <code>0, 1, 2</code> means on the day it was expected and then monthly twice more.
+           Anchoring it there rather than on lodgement means changing how long a decision takes
+           moves the chases with it, instead of chasing before the decision is even due.</p>
+        <h4>A matter that should not be chased</h4>
+        <p>Untick <strong>Chase INZ when this decision is overdue</strong> on the matter. Chases
+           already raised are withdrawn. Use it for a file under a formal complaint, or where the
+           client has asked for silence.</p>
+        <p>The chases are rebuilt from the matter's dates every night, so moving the expected
+           decision moves them, a decision arriving withdraws what is left, and a chase you have
+           already done is left alone.</p>`,
+    },
+    {
+      id: 'certificates',
+      title: 'Police certificates, medicals and x-rays',
+      body: html`
+        <p>Each one is a record with its own dates, kept on the client's page under
+           <strong>Certificates</strong> — not a set of boxes that the next one overwrites.</p>
+        <p>That distinction is the point. A matter lodged in March relied on the certificate held in
+           March, and if the client produces a fresh one in September the March fact would otherwise
+           be gone. "Which certificate did we lodge with?" is a question a practice has to be able
+           to answer, sometimes years later.</p>
+        <p>A client may also hold police certificates from several countries at once — you need one
+           from everywhere they have lived twelve months or more — and a single set of boxes could
+           never represent that. The most recent of each kind is marked <strong>current</strong>;
+           the rest are marked superseded and stay on the file.</p>
+        <p>A medical is either a <strong>General Medical</strong> (INZ 1007) or a
+           <strong>Limited Medical</strong> (INZ 1201), and which one was done decides what INZ will
+           accept it for.</p>
+        <p>The alerts page watches the current one of each kind. Where several police certificates
+           are current, it watches the one expiring soonest, because that is the one that bites
+           first.</p>`,
+    },
+    {
+      id: 'export',
+      title: 'Taking your data out',
+      body: html`
+        <p><strong>Admin → Export.</strong> Fifteen sets of records, each one link and one file:
+           clients, matters, parties, certificates, fees, quotes and their lines, invoices and their
+           lines, payments, tasks, notes, inquiries, the knowledge base and the audit log.</p>
+        <p>They are CSV — comma separated, quoted to the standard, and written as UTF-8 with a
+           byte-order mark so Excel reads macrons correctly rather than mangling every Māori name.
+           They open in Excel, Numbers, Google Sheets or anything that reads a text file.</p>
+        <p>Your records are yours. A system that makes them hard to leave with is holding them,
+           whatever its intentions, so there is no queue, no email and no "we will prepare your
+           export".</p>
+        <h4>Two things worth knowing</h4>
+        <p><strong>Passport numbers are in none of them.</strong> They are the one field the register
+           encrypts, and writing them in the clear into a file that lands in a downloads folder
+           would undo that in a single click. The client export says only whether a passport is
+           held; the number is revealed one at a time on the client's page, and every reveal is
+           recorded.</p>
+        <p><strong>Every download is recorded</strong> in the audit log — what was taken, by whom,
+           and when. An export is a copy of the practice's files leaving the building, and that is
+           worth a line.</p>
+        <p class="hint">Reading data back in is a separate job and is not built. An import has to
+           decide what to do about records that already exist, and getting that wrong is worse than
+           not having it.</p>`,
     },
     {
       id: 'alerts',
@@ -911,9 +991,39 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
         </ol>
         <p class="hint">Gmail allows roughly 500 messages a day on a personal account and 2,000 on
            Workspace — far above what a practice sends by hand, but not a bulk mailing tool. If you
-           ever need to send from <code>@yourdomain</code> rather than Gmail, the register also
-           speaks to Resend: set <code>MAIL_PROVIDER</code> to <code>resend</code> and supply
-           <code>RESEND_API_KEY</code> instead.</p>
+           ever need to send from <code>@yourdomain</code> rather than Gmail, use Resend instead —
+           below.</p>
+
+        <h4>4b · Email out — Resend, to send as the practice</h4>
+        <p>Resend sends from your own domain rather than a mailbox. Use it when clients should see
+           mail from the firm's address rather than from a personal Gmail.</p>
+        <ol>
+          <li>At <a href="https://resend.com" rel="noopener">resend.com</a>, add your domain under
+              <strong>Domains</strong> and create the DNS records it gives you. If the domain is on
+              Cloudflare this is a few minutes; verification is usually quick.</li>
+          <li>Under <strong>API Keys</strong>, create one with <strong>Sending access</strong> — not
+              Full access. The register only sends, and a key that can also delete domains is a key
+              that can do real damage if it leaks. Scope it to the domain you just verified. It is
+              shown once.</li>
+          <li>Add three GitHub repository secrets:
+              <code>MAIL_PROVIDER</code> = <code>resend</code>, <code>RESEND_API_KEY</code> = the
+              key, and <code>MAIL_FROM</code> = the sending address, written as
+              <code>Your Name &lt;you@yourdomain&gt;</code>.</li>
+          <li>Deploy. Secrets only reach the register on the next deploy.</li>
+          <li>Go to <strong>Admin → Integrations</strong> and press
+              <strong>Send a test message to myself</strong>. It goes only to your own address.</li>
+        </ol>
+        <p><strong>If the test lands in spam, that is normal for a domain that has only just started
+           sending</strong>, and it settles as a few more messages go out. Better to find that on
+           your own inbox than on a client's.</p>
+        <h4>When replies should go somewhere else</h4>
+        <p>The address mail is sent <em>from</em> and the mailbox a reply lands in are two different
+           questions. Sending is authorised by DNS — a provider will only put a From address on a
+           domain verified with it — while receiving needs a mailbox that domain may not have.</p>
+        <p>If your sending domain has no mailbox behind it, set <strong>Replies should go to</strong>
+           under <strong>Settings → Practice</strong> to the address you actually read. Every
+           outbound message then carries it. Leave it empty when the sending address is itself a
+           working mailbox, which is the ordinary case.</p>
 
         <h4>5 · Document storage — turning on R2</h4>
         <p><strong>R2</strong> is Cloudflare's file storage. The register keeps its records in a
@@ -952,7 +1062,7 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
            is offered until a person decides.</p>
         <p>In practice: whoever opens the office works the inbox each morning, converts genuine
            enquiries into inquiries, files circulars into the knowledge base, and ignores the rest.
-           The <strong>Today</strong> screen shows how many are waiting.</p>`,
+           The <strong>Dashboard</strong> shows how many are waiting.</p>`,
     },
     {
       id: 'conversations',
