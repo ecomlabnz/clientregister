@@ -132,3 +132,15 @@ describe('a provider error says what was sent', () => {
     expect(calls.length).toBe(3);
   });
 });
+
+describe('the brief does not invent terminology', () => {
+  it('forbids expanding an abbreviation the file did not expand', () => {
+    // Asked for a brief on a case at PPI stage, the model wrote "PPI
+    // (Particulars of Inference)". It is Potentially Prejudicial Information.
+    // The file never expanded it; the model guessed, and a plausible guess
+    // reads as fact to somebody skimming — in a practice where these are terms
+    // of art with fixed meanings.
+    expect(provider).toContain("Never expand an abbreviation the file does not");
+    expect(provider).toMatch(/PPI, RFI, AEWV, SMC/);
+  });
+});

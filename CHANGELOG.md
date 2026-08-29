@@ -7,6 +7,17 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.39.4 — 29 August 2026
+
+### Fixed
+- **The brief no longer expands abbreviations it was not given.** Asked about a
+  case at PPI stage it wrote "PPI (Particulars of Inference)"; it is
+  Potentially Prejudicial Information. The file never expanded it — the model
+  guessed, and a plausible guess reads as fact to somebody skimming. PPI, RFI,
+  AEWV, SMC and s.61 are terms of art with fixed meanings, and the adviser
+  being briefed already knows them. It writes the abbreviation as it appears
+  now, or asks under "questions".
+
 ## 0.39.3 — 29 August 2026
 
 ### Changed
