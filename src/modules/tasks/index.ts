@@ -151,6 +151,9 @@ export const tasksModule: AppModule = {
                 <td><strong class="clamp-2">${t.title}</strong>
                     ${t.priority !== 'normal' ? badge(PRIORITY_LABELS[t.priority as keyof typeof PRIORITY_LABELS], t.priority === 'urgent' ? 'red' : 'amber') : ''}
                     ${t.details ? html`<div class="muted small prewrap clamp-2">${t.details}</div>` : ''}
+                    ${t.completion_note
+                      ? html`<div class="small prewrap clamp-2"><strong>Done:</strong> ${t.completion_note}</div>`
+                      : ''}
                     <div class="row-meta show-sm">
                       ${links[i] ? html`<a href="${links[i]!.href}">${links[i]!.label}</a>` : ''}
                       ${badge(TASK_STATUS_LABELS[t.status as keyof typeof TASK_STATUS_LABELS] ?? t.status, statusTone(t.status))}
@@ -261,6 +264,12 @@ export const tasksModule: AppModule = {
             ${select({ label: 'Assigned to', name: 'assigned_to', value: task.assigned_to,
                        required: true, options: users, includeBlank: false,
                        hint: 'A task always belongs to someone. Hand it over rather than clearing it.' })}
+            <div class="settings-cell-wide">
+              ${field({ label: 'What was done', name: 'completion_note', type: 'textarea', rows: 3,
+                        maxlength: 2000, value: task.completion_note,
+                        hint: 'Filled in when you mark it done, and editable here afterwards. '
+                          + 'Changing it adds a line to the file rather than replacing the old one.' })}
+            </div>
           </div>
           <div class="form-section">
             <h3>Attached to</h3>
@@ -293,6 +302,7 @@ export const tasksModule: AppModule = {
       const dueAt = f.date('due_at');
       const priority = f.enum('priority', PRIORITIES, { fallback: 'normal' })!;
       const status = f.enum('status', TASK_STATUSES, { fallback: 'open' })!;
+      const completionNote = f.optional('completion_note', { max: 2000 });
       const assignedTo = f.text('assigned_to', { required: true, label: 'Assignee', max: 60 });
       const detach = f.bool('detach') === 1;
       const back = safeReturn(String(form.get('return_to') ?? ''), `/tasks/${id}/edit`);
@@ -304,9 +314,10 @@ export const tasksModule: AppModule = {
       await run(
         c.env.DB,
         `UPDATE tasks SET title = ?, details = ?, due_at = ?, priority = ?, status = ?,
-           assigned_to = ?, entity_type = ?, entity_id = ?, completed_at = ?, updated_at = ?
+           completion_note = ?, assigned_to = ?, entity_type = ?, entity_id = ?,
+           completed_at = ?, updated_at = ?
          WHERE id = ?`,
-        title, details, dueAt, priority, status, assignedTo,
+        title, details, dueAt, priority, status, completionNote, assignedTo,
         detach ? null : existing.entity_type, detach ? null : existing.entity_id,
         status === 'done' ? (existing.completed_at ?? nowIso()) : null,
         nowIso(), id,
@@ -326,6 +337,18 @@ export const tasksModule: AppModule = {
             body: `Task updated: ${changes.join(', ')}.`, createdBy: user.id,
           });
         }
+      }
+
+      // The note gets its own line rather than joining the list of changes
+      // above, because it is the substance and the rest is bookkeeping. It is
+      // appended: the file records what was said at the time, so a second
+      // thought is a second line and never a rewrite of the first.
+      if (!detach && existing.entity_type && existing.entity_id
+          && completionNote && completionNote !== existing.completion_note) {
+        await addEntry(c.env, {
+          entityType: existing.entity_type, entityId: existing.entity_id, kind: 'note',
+          body: `${title} — ${completionNote}`, createdBy: user.id,
+        });
       }
 
       await auditFrom(c, { action: 'task.updated', entityType: 'task', entityId: id,
@@ -357,7 +380,89 @@ export const tasksModule: AppModule = {
         });
       }
       await auditFrom(c, { action: 'task.status_changed', entityType: 'task', entityId: id, meta: { status } });
+
+      // Completing it is one press and has already happened by this point. The
+      // note is asked for afterwards rather than demanded first, so nothing is
+      // held up by somebody who has nothing to say — and it is a page rather
+      // than a dialog because a dialog needs scripting to exist at all, and
+      // because a box that blocks you every time becomes a box you dismiss
+      // without reading, which produces notes that say "done".
+      if (status === 'done' && !task.completion_note) {
+        const prefs = await preferencesFor(c.env, user.id);
+        if (asPrefBoolean(prefs['pref.task_note_prompt'], true)) {
+          return c.redirect(`/tasks/${id}/note?return_to=${encodeURIComponent(back)}`);
+        }
+      }
       return redirectWith(c, back, `Task marked ${TASK_STATUS_LABELS[status].toLowerCase()}.`);
+    });
+
+    // --- What was done ------------------------------------------------------
+    //
+    // A history of "done, done, done" answers nothing six months later, when
+    // the question is what was actually said to INZ or which of three options
+    // the client took. The note is never required: some tasks genuinely need
+    // none, and forcing one produces notes that say "done".
+    r.get('/:id/note', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const back = safeReturn(c.req.query('return_to'));
+      const task = await one<any>(c.env.DB, 'SELECT * FROM tasks WHERE id = ?', id);
+      if (!task) return c.notFound();
+      const link = await entityLabel(c.env, task.entity_type, task.entity_id);
+      const csrf = c.get('session')!.csrf;
+
+      return page(c, { title: 'What was done', active: '/tasks' }, html`
+        ${breadcrumbs([{ href: '/tasks', label: 'Tasks' }, { label: 'What was done' }])}
+        ${pageHeader('What was done?',
+          `${task.title}${link ? ` · ${link.label}` : ''}`)}
+        ${card('A line for the file', html`
+          <form method="post" action="${`/tasks/${id}/note`}" class="settings-form">
+            ${csrfField(csrf)}
+            <input type="hidden" name="return_to" value="${back}">
+            ${/* The whole page is this one box, so it takes the whole width
+                  rather than a third of it. */ ''}
+            <div class="settings-cell-wide">
+              ${field({ label: 'What was done, and how', name: 'note', type: 'textarea', rows: 3,
+                        maxlength: 2000, autofocus: true, value: task.completion_note ?? '',
+                        hint: link
+                          ? `Saved on the task and added to the file for ${link.label}.`
+                          : 'Saved on the task.' })}
+            </div>
+            <div class="settings-cell-wide form-actions">
+              <button class="btn btn-primary" type="submit">Save it</button>
+              <a class="btn btn-secondary" href="${back}">Nothing to add</a>
+            </div>
+          </form>`)}
+        <p class="hint">This box can be turned off under your account preferences, and a note can
+           always be added later by editing the task.</p>`);
+    });
+
+    r.post('/:id/note', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const user = c.get('user')!;
+      const form = await c.req.formData();
+      const f = new FormReader(form);
+      const note = f.optional('note', { max: 2000 });
+      const back = safeReturn(String(form.get('return_to') ?? ''));
+
+      const task = await one<any>(c.env.DB, 'SELECT * FROM tasks WHERE id = ?', id);
+      if (!task) return c.notFound();
+      if (!note) return redirectWith(c, back, 'Task marked done.');
+
+      await run(c.env.DB, 'UPDATE tasks SET completion_note = ?, updated_at = ? WHERE id = ?',
+        note, nowIso(), id);
+
+      // Appended, never written over the entry the completion already made.
+      // The timeline records what was said at the time, so a second thought is
+      // a second line rather than a rewrite of the first.
+      if (task.entity_type && task.entity_id) {
+        await addEntry(c.env, {
+          entityType: task.entity_type, entityId: task.entity_id, kind: 'note',
+          body: `${task.title} — ${note}`, createdBy: user.id,
+        });
+      }
+      await auditFrom(c, { action: 'task.note_recorded', entityType: 'task', entityId: id,
+        meta: { replaced: Boolean(task.completion_note) } });
+      return redirectWith(c, back, 'Noted.');
     });
 
     app.route('/tasks', r);

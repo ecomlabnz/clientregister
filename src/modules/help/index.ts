@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.35.0', date: '29 August 2026',
+    notes: [
+      'Marking a task done now asks what was done and how. The task is already complete by '
+        + 'then, the box is skippable, and the note goes onto the file of whatever the task '
+        + 'was attached to.',
+      'The prompt can be turned off under your account preferences.',
+    ],
+  },
+  {
     version: '0.34.0', date: '29 August 2026',
     notes: [
       'Inquiries, the Inbox and Conversations share one menu entry, Incoming, as three tabs. '
@@ -650,7 +659,20 @@ function sections(origin: string): Section[] {
            over, but it cannot be left with nobody: an unassigned task sits in the list looking
            accounted for and is exactly the sort of thing that gets missed. What a task is
            <em>about</em> stays optional — a client, a case, a knowledge base article, or nothing
-           at all.</p>`,
+           at all.</p>
+        <h4>What was done</h4>
+        <p>When you mark a task done, the register asks for a line about what was done and how.
+           The task is already complete by then — the box does not hold anything up, and
+           <strong>Nothing to add</strong> closes it in one press.</p>
+        <p>It is worth filling in. A history of "done, done, done" answers nothing six months
+           later, when the question is what was actually said to INZ, or which of three options
+           the client took. The note is saved on the task and added to the file of whatever the
+           task was attached to, so somebody reading the case finds it without going looking.</p>
+        <p>A note is never overwritten. Change it later — by editing the task — and the new
+           wording is added to the file as another line, leaving the first where it was. If you
+           would rather not be asked at all, turn off <em>Ask what was done when I complete a
+           task</em> under your account preferences; you can still add the note by editing the
+           task.</p>`,
     },
     {
       id: 'knowledge',

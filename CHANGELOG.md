@@ -7,6 +7,35 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.35.0 — 29 August 2026
+
+### Added
+- **Marking a task done asks what was done, and how.** A history of "done,
+  done, done" answers nothing six months later, when the question is what was
+  actually said to INZ or which of three options the client took.
+- **It never holds anything up.** The task is written, and the audit entry
+  made, before the box appears; somebody who closes the tab has still marked it
+  done. *Nothing to add* closes it in one press.
+- **It is a page, not a dialog.** A dialog needs scripting to exist at all, and
+  this register works with scripting off — and a box that blocks you every time
+  becomes a box you dismiss without reading, which produces notes that say
+  "done".
+- **Never required.** Some tasks genuinely need no note ("ring them back"), and
+  forcing one produces exactly the notes this exists to stop. The column is
+  nullable and the empty form is a valid answer.
+- The note is saved on the task and added to the timeline of whatever the task
+  was attached to, where somebody reading the case will find it. It is
+  appended, never written over the completion entry: the file records what was
+  said at the time, so a later change is another line rather than a rewrite of
+  the first.
+- A new preference, *Ask what was done when I complete a task*, turns the
+  prompt off for anyone who finds it in the way. The note can still be added by
+  editing the task.
+
+### Changed
+- `field()` accepts `autofocus`, used only where the whole point of the page is
+  the one box.
+
 ## 0.34.0 — 29 August 2026
 
 ### Changed
