@@ -26,7 +26,7 @@ import { badge, card, csrfField, field, optionsFrom, pageHeader, select, table }
 import { dateShort, dateTime, timeShort, truncate } from '../../ui/format';
 import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../core/rbac';
 import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABELS, SPLIT_BASES } from '../../core/fees';
-import { isAiEnabled } from '../../ai/provider';
+import { currentModel, isAiEnabled } from '../../ai/provider';
 import { nzbnConfigured } from '../../integrations/nzbn';
 import { mailConfigured, mailSetupGaps } from '../../mail/provider';
 import { flushQueue, queueEmail } from '../../mail/queue';
@@ -160,12 +160,13 @@ export const adminModule: AppModule = {
     r.get('/', requirePermission('admin:settings'), async (c) => {
       const env = c.env;
       const tab = c.req.query('tab') ?? 'overview';
-      const [users, pendingIngest, queuedMail, demoCount] = await Promise.all([
+      const [users, pendingIngest, queuedMail, demoCount, aiModel] = await Promise.all([
         count(env.DB, 'SELECT COUNT(*) AS n FROM users'),
         count(env.DB, `SELECT COUNT(*) AS n FROM ingest_messages WHERE status = 'pending'`),
         count(env.DB, `SELECT COUNT(*) AS n FROM outbound_emails WHERE status = 'queued'`),
         count(env.DB, `SELECT (SELECT COUNT(*) FROM clients WHERE id LIKE 'demo\\_%' ESCAPE '\\')
                             + (SELECT COUNT(*) FROM cases WHERE id LIKE 'demo\\_%' ESCAPE '\\') AS n`),
+        currentModel(env),
       ]);
 
       return page(c, { title: 'Administration', active: '/admin' }, html`
@@ -208,8 +209,9 @@ export const adminModule: AppModule = {
             'NZBN_API_KEY — free key from portal.api.business.govt.nz. Lets you create a company client from the register.'),
           statusRow('AI layer', isAiEnabled(env),
             isAiEnabled(env)
-              ? `AI_PROVIDER=${env.AI_PROVIDER} · model ${env.AI_MODEL || 'claude-haiku-4-5'}`
-                + ' — suggestions only, never applied automatically.'
+              ? `AI_PROVIDER=${env.AI_PROVIDER} · model ${aiModel}`
+                + ' — chosen under Settings → Assistant. Suggestions only, never applied'
+                + ' automatically.'
               : `AI_PROVIDER=${env.AI_PROVIDER ?? 'none'}. Set it to “anthropic” with an`
                 + ' ANTHROPIC_API_KEY to switch the assistant on. The register works without it.'),
           statusRow('Outbound email', mailConfigured(env),

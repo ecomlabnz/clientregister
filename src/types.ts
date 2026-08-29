@@ -54,7 +54,6 @@ export interface Env {
   GMAIL_REFRESH_TOKEN?: string;
 
   AI_PROVIDER?: string;
-  AI_MODEL?: string;
   ANTHROPIC_API_KEY?: string;
 }
 

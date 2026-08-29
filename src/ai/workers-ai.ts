@@ -12,10 +12,16 @@ import {
   type AiProvider, type BriefResult, type IntakeResult, type TriageResult,
 } from './provider';
 
+/**
+ * Workers AI names models in its own namespace, so the setting that chooses an
+ * Anthropic model has nothing to say here. This provider takes its own default
+ * and nothing overrides it: picking a Workers AI model would be a different
+ * choice with a different list, and there is no point offering half of it.
+ */
 const DEFAULT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
 
 export function createWorkersAiProvider(env: Env): AiProvider {
-  const model = env.AI_MODEL || DEFAULT_MODEL;
+  const model = DEFAULT_MODEL;
 
   return {
     name: 'workers-ai',

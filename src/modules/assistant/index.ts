@@ -30,7 +30,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import { badge, card, csrfField, emptyState, field, pageHeader, statusTone } from '../../ui/components';
 import { dateTime } from '../../ui/format';
-import { isAiEnabled } from '../../ai/provider';
+import { AI_SETTINGS, isAiEnabled } from '../../ai/provider';
 import { runTriage, latestTriage } from '../../ai/triage';
 import { caseTypes, labelFor } from '../../core/vocabulary';
 import { newId } from '../../core/ids';
@@ -54,6 +54,7 @@ export const assistantModule: AppModule = {
   title: 'Assistant',
   basePaths: ['/assistant'],
   nav: [{ href: '/assistant', label: 'Assistant', permission: 'ai:run', order: 15 }],
+  settings: [AI_SETTINGS],
 
   register(app) {
     const r = new Hono<AppContext>();

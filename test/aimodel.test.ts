@@ -2,16 +2,36 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const anthropic = readFileSync('src/ai/anthropic.ts', 'utf8');
-const workflow = readFileSync('.github/workflows/deploy.yml', 'utf8');
+const provider = readFileSync('src/ai/provider.ts', 'utf8');
+const collect = readFileSync('scripts/collect-secrets.mjs', 'utf8');
 
 describe('the model the practice runs on', () => {
-  it('is the cheap one, and is overridable without a code change', () => {
+  it('is the cheap one by default', () => {
     // Everything asked of it is extraction and summarisation against a schema,
     // checked by a person before anything is written. Paying five times more
     // for that would be paying for reasoning this workload does not use.
     expect(anthropic).toContain("const DEFAULT_MODEL = 'claude-haiku-4-5';");
-    expect(anthropic).toContain('env.AI_MODEL || DEFAULT_MODEL');
-    expect(workflow).toContain('AI_MODEL: ${{ secrets.AI_MODEL }}');
+    expect(provider).toContain("key: 'ai.model', type: 'enum', default: 'claude-haiku-4-5'");
+  });
+
+  it('is chosen in the app, in exactly one place', () => {
+    // A choice about cost and quality that the practice makes for itself, like
+    // a case type or a fee rate — not something to wait on a deploy for. And
+    // one owner: a secret saying one thing while a setting says another is the
+    // kind of disagreement nobody finds until it matters.
+    expect(anthropic).toContain('chosenModel || DEFAULT_MODEL');
+    expect(provider).toContain('createAnthropicProvider(env, await currentModel(env))');
+    expect(collect).not.toMatch(/^\s*'AI_MODEL',/m);
+  });
+
+  it('prices every option, because the choice is about cost', () => {
+    const group = provider.slice(provider.indexOf('export const AI_SETTINGS'),
+      provider.indexOf('export async function currentModel'));
+    const options = [...group.matchAll(/label: 'Claude [^']+'/g)].map((m) => m[0]);
+    expect(options.length).toBe(3);
+    for (const label of options) {
+      expect(label, `${label} does not say what it costs`).toMatch(/per million tokens/);
+    }
   });
 
   it('writes model ids without a date suffix', () => {
