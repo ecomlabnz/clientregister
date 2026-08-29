@@ -7,6 +7,26 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.61.0 — 29 August 2026
+
+### Fixed
+- **A forwarded message is no longer treated as a conversation.** A conversation
+  is keyed on the counterpart, because that is both who it is with and where a
+  reply goes. A forwarded Telegram message has no counterpart: it arrives in the
+  practice's own chat with the bot and is *about* somebody who is not in that
+  chat. Keyed on the chat id, every forward joined one thread named after
+  whoever forwarded it — three unrelated people showing as a single conversation
+  — and a reply typed there would have gone back to the forwarder rather than to
+  the person it concerned.
+- A forward is now an inbox message and, when it is work, an inquiry. It is not
+  a conversation, and the database refuses to give it one — on insert and on a
+  later attach, because the capture writes the row and the thread in two
+  statements.
+- Migration 0037 unpicks what was already built on the old rule: forwards come
+  back out of their threads, and a thread left holding nothing goes with them. A
+  thread is kept if somebody really did write in that chat, or if the practice
+  replied through it — something was said to somebody, and that stands.
+
 ## 0.60.0 — 29 August 2026
 
 ### Added

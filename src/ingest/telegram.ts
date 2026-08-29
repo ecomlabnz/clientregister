@@ -106,8 +106,17 @@ export async function handleTelegramWebhook(c: Context<AppContext>): Promise<Res
     receivedAt: new Date((msg.date ?? Math.floor(Date.now() / 1000)) * 1000).toISOString(),
     // The chat, not the sender: a reply goes back to where the message came
     // from, which in a group is the group.
-    peerId: msg.chat?.id !== undefined ? String(msg.chat.id) : null,
-    peerLabel: msg.chat?.title ?? displayName(msg.from),
+    //
+    // A forward has no counterpart at all, and this is the whole of it. What
+    // arrives is a message *about* somebody, relayed through the practice's own
+    // chat with the bot — there is nobody at the other end of it to answer. Key
+    // it on the chat id and every forward, whoever it was originally from,
+    // lands in one conversation named after whoever forwarded it, which is
+    // exactly what happened: three unrelated people in a thread called "TZ".
+    // So a forward becomes an inbox message and an inquiry, and no
+    // conversation. The database refuses to give it one (migration 0037).
+    peerId: forwardedFrom ? null : (msg.chat?.id !== undefined ? String(msg.chat.id) : null),
+    peerLabel: forwardedFrom ? null : (msg.chat?.title ?? displayName(msg.from)),
     meta: { from_id: fromId, chat_id: msg.chat?.id, username: msg.from?.username, forwarded: Boolean(msg.forward_origin) },
   });
 
