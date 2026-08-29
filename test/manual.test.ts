@@ -32,7 +32,10 @@ describe('the manual keeps up with the application', () => {
   it('documents each way of sending mail out', () => {
     expect(help).toContain('Resend');
     expect(help).toContain('Replies should go to');
-    expect(help).toContain('Send a test message to myself');
+    // Checked by what the feature does rather than by the label on its button,
+    // which may reasonably be reworded — as it was, one version after this test
+    // first pinned the old wording and duly failed the build.
+    expect(help).toMatch(/Admin → Integrations[\s\S]{0,300}test message/);
   });
 
   it('names a module for every registered feature that has a page', () => {
