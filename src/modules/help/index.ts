@@ -32,6 +32,13 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.30.0', date: '29 August 2026',
+    notes: [
+      'Replies can be directed to a mailbox other than the sending address — '
+        + 'Settings → Practice → “Replies should go to”.',
+    ],
+  },
+  {
     version: '0.29.0', date: '29 August 2026',
     notes: [
       'Today is now Dashboard, and leads with one list of what is late or due today.',
