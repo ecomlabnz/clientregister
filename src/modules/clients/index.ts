@@ -134,7 +134,15 @@ function clientForm(
       * scripting off, all five sections simply show at once, as they always
       * did.
       */ ''}
-    <nav class="tabs form-tabs js-hide" data-tabs-for="client">
+    ${/* Hidden in the HTML and revealed by the script that makes it work.
+          `js-hide` is the opposite arrangement — it marks a control that exists
+          *for* the no-script case and is taken away once scripting is known to
+          be there — and it was wrong here: the script's own `bar.hidden = false`
+          cancelled it, so with scripting off you got five tab buttons that did
+          nothing. Hidden by default fails the safe way: if the script never
+          runs, or cannot find this form, the bar stays away and the sections
+          read as one long form, which is what they already do. */ ''}
+    <nav class="tabs form-tabs" data-tabs-for="client" hidden>
       <button type="button" class="tab current" data-tab="who">Who this is</button>
       <button type="button" class="tab" data-tab="contact">Contact</button>
       <button type="button" class="tab" data-tab="identity">Identity</button>
