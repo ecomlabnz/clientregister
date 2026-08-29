@@ -60,3 +60,44 @@ describe('the suggestion never overwrites what somebody typed', () => {
     expect(js).toContain("title.addEventListener('input', function () { delete title.dataset.suggested; });");
   });
 });
+
+describe('renumbering the matters already on the register', () => {
+  const sql = readFileSync('migrations/0022_case_refs_by_year.sql', 'utf8');
+
+  it('renames in two passes, because the column is unique', () => {
+    // Moving one row straight to its new value collides with a row that has
+    // not moved yet.
+    expect(sql).toContain("UPDATE cases SET ref = 'PENDING-' || id;");
+    const pending = sql.indexOf("'PENDING-'");
+    const final = sql.indexOf('SELECT t.new_ref FROM case_renumber_tmp t WHERE t.case_id = cases.id');
+    expect(final).toBeGreaterThan(pending);
+  });
+
+  it('numbers within the calendar year the matter was opened', () => {
+    expect(sql).toContain("strftime('%Y', c2.created_at) = strftime('%Y', k.created_at)");
+    expect(sql).toContain("'CASE-' || substr(strftime('%Y', k.created_at), 3, 2)");
+  });
+
+  it('leaves the counters agreeing with what was handed out', () => {
+    // Otherwise the next matter opened takes a number one of these already has.
+    expect(sql).toContain("DELETE FROM counters WHERE name LIKE 'case:%'");
+    expect(sql).toContain("SELECT 'case:' || strftime('%Y', created_at), COUNT(*)");
+  });
+
+  it('leaves no bridge behind', () => {
+    // A mapping table plus a search that reads it is a compatibility layer the
+    // application carries forever. The scratch table is dropped.
+    expect(sql).toContain('DROP TABLE case_renumber_tmp;');
+    expect(sql).not.toContain('case_ref_history');
+  });
+
+  it('does not rewrite the audit log or existing notes', () => {
+    // Append-only records of what was said at the time.
+    expect(sql).not.toMatch(/UPDATE\s+audit_log/i);
+    expect(sql).not.toMatch(/UPDATE\s+entries/i);
+  });
+
+  it('corrects open task titles but not finished ones', () => {
+    expect(sql).toContain("AND status IN ('open', 'in_progress', 'blocked')");
+  });
+});

@@ -193,7 +193,8 @@ export const casesModule: AppModule = {
       if (q) {
         params.push(`%${q}%`);
         const ph = p();
-        where.push(`(k.title LIKE ${ph} OR k.ref LIKE ${ph} OR cl.full_name LIKE ${ph} OR k.inz_application_number LIKE ${ph})`);
+        where.push(`(k.title LIKE ${ph} OR k.ref LIKE ${ph} OR cl.full_name LIKE ${ph}`
+          + ` OR k.inz_application_number LIKE ${ph} OR k.inz_client_number LIKE ${ph})`);
       }
       if (status && (CASE_STATUSES as readonly string[]).includes(status)) {
         params.push(status);
