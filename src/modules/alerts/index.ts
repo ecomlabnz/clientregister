@@ -77,8 +77,12 @@ export async function documentAlerts(env: Env, horizonDays = 90): Promise<Alert[
 
   const rows = await all<{ id: string; ref: string; full_name: string; document: string; expires: string }>(
     env.DB,
-    `SELECT id, ref, full_name, 'Passport' AS document, passport_expiry AS expires FROM clients
-       WHERE passport_expiry IS NOT NULL AND passport_expiry <= ?1 AND status != 'archived'
+    `SELECT c.id, c.ref, c.full_name,
+            'Passport' || CASE WHEN p.country IS NULL THEN '' ELSE ' (' || p.country || ')' END AS document,
+            p.expires_on AS expires
+       FROM client_passports p JOIN clients c ON c.id = p.client_id
+      WHERE p.status = 'held' AND p.expires_on IS NOT NULL AND p.expires_on <= ?1
+        AND c.status != 'archived'
      UNION ALL
      SELECT id, ref, full_name, 'Current visa', current_visa_expiry FROM clients
        WHERE current_visa_expiry IS NOT NULL AND current_visa_expiry <= ?1 AND status != 'archived'

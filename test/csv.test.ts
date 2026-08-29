@@ -65,6 +65,8 @@ describe('what the export deliberately excludes', () => {
     // that lands in a downloads folder would undo that in a single click.
     for (const set of DATASETS) {
       expect(set.sql, set.key).not.toMatch(/passport_sealed\s*(,|$)/m);
+      // The same field, now that a client may hold several of them.
+      expect(set.sql, set.key).not.toMatch(/number_sealed\s*(,|$)/m);
     }
     const clients = DATASETS.find((d) => d.key === 'clients')!;
     expect(clients.sql).toContain("CASE WHEN passport_sealed IS NULL THEN 'no' ELSE 'yes' END");

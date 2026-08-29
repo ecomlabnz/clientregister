@@ -75,6 +75,19 @@ export const DATASETS: Dataset[] = [
            ORDER BY k.ref, p.role`,
   },
   {
+    key: 'passports', label: 'Passports',
+    description: 'Every passport on file, including second and third ones and those replaced. '
+      + 'Numbers are excluded; the column says only whether one is held.',
+    sql: `SELECT cl.ref AS client_ref, cl.full_name AS client, p.country, p.issued_on,
+                 p.expires_on, p.status,
+                 CASE WHEN p.is_primary = 1 THEN 'yes' ELSE 'no' END AS is_primary,
+                 CASE WHEN p.number_sealed IS NULL THEN 'no' ELSE 'yes' END AS number_on_file,
+                 p.notes, p.created_at
+            FROM client_passports p
+            JOIN clients cl ON cl.id = p.client_id
+           ORDER BY cl.ref, p.is_primary DESC, p.expires_on`,
+  },
+  {
     key: 'certificates', label: 'Certificates',
     description: 'Police certificates, medicals and x-rays, including superseded ones.',
     sql: `SELECT cl.ref AS client_ref, cl.full_name AS client, c.kind, c.subtype, c.country,

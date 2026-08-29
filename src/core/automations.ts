@@ -200,8 +200,12 @@ export async function eventsFor(env: Env, trigger: TriggerKey, withinDays: numbe
     const horizon = shiftDays(now, withinDays);
     const rows = await all<any>(
       env.DB,
-      `SELECT id, ref, full_name, email, assigned_to, 'Passport' AS document, passport_expiry AS expires FROM clients
-         WHERE passport_expiry IS NOT NULL AND passport_expiry <= ?1 AND status != 'archived'
+      `SELECT c.id, c.ref, c.full_name, c.email, c.assigned_to,
+              'Passport' || CASE WHEN p.country IS NULL THEN '' ELSE ' (' || p.country || ')' END AS document,
+              p.expires_on AS expires
+         FROM client_passports p JOIN clients c ON c.id = p.client_id
+        WHERE p.status = 'held' AND p.expires_on IS NOT NULL AND p.expires_on <= ?1
+          AND c.status != 'archived'
        UNION ALL
        SELECT id, ref, full_name, email, assigned_to, 'Current visa', current_visa_expiry FROM clients
          WHERE current_visa_expiry IS NOT NULL AND current_visa_expiry <= ?1 AND status != 'archived'
