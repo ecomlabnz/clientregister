@@ -21,6 +21,12 @@ export function createResendProvider(apiKey: string): MailProvider {
           subject: message.subject,
           text: message.text,
           ...(message.html ? { html: message.html } : {}),
+          ...(message.attachments?.length
+            ? { attachments: message.attachments.map((a) => ({
+                filename: a.filename,
+                content: base64(a.bytes),
+              })) }
+            : {}),
         }),
       });
 
@@ -31,4 +37,12 @@ export function createResendProvider(apiKey: string): MailProvider {
       return { id: body.id ?? null };
     },
   };
+}
+
+
+/** Resend takes attachment content as base64. */
+function base64(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
 }

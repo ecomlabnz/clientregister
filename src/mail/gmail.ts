@@ -136,28 +136,51 @@ export function buildMimeMessage(message: OutboundMessage, from: string): string
     'MIME-Version: 1.0',
   ];
 
-  if (message.html) {
-    const boundary = `b_${crypto.randomUUID().replace(/-/g, '')}`;
-    lines.push(`Content-Type: multipart/alternative; boundary="${boundary}"`, '');
+  const boundary = () => `b_${crypto.randomUUID().replace(/-/g, '')}`;
+
+  /** The message itself: plain, or plain and formatted together. */
+  const bodyPart = (): string[] => {
+    if (!message.html) {
+      return ['Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: 8bit',
+              '', message.text];
+    }
+    const alt = boundary();
+    return [
+      `Content-Type: multipart/alternative; boundary="${alt}"`, '',
+      `--${alt}`, 'Content-Type: text/plain; charset="UTF-8"',
+      'Content-Transfer-Encoding: 8bit', '', message.text, '',
+      `--${alt}`, 'Content-Type: text/html; charset="UTF-8"',
+      'Content-Transfer-Encoding: 8bit', '', message.html, '',
+      `--${alt}--`, '',
+    ];
+  };
+
+  const files = message.attachments ?? [];
+  if (files.length === 0) {
+    lines.push(...bodyPart());
+    return lines.join('\r\n');
+  }
+
+  // multipart/mixed wrapping the body, which may itself be multipart. A reader
+  // that cannot show the formatted version still gets the plain one, and still
+  // gets the files.
+  const mixed = boundary();
+  lines.push(`Content-Type: multipart/mixed; boundary="${mixed}"`, '');
+  lines.push(`--${mixed}`, ...bodyPart(), '');
+  for (const file of files) {
     lines.push(
-      `--${boundary}`,
-      'Content-Type: text/plain; charset="UTF-8"',
-      'Content-Transfer-Encoding: 8bit',
+      `--${mixed}`,
+      `Content-Type: ${headerValue(file.contentType)}; name="${headerValue(file.filename)}"`,
+      `Content-Disposition: attachment; filename="${headerValue(file.filename)}"`,
+      'Content-Transfer-Encoding: base64',
       '',
-      message.text,
-      '',
-      `--${boundary}`,
-      'Content-Type: text/html; charset="UTF-8"',
-      'Content-Transfer-Encoding: 8bit',
-      '',
-      message.html,
-      '',
-      `--${boundary}--`,
+      // Wrapped at 76 characters: a base64 body on one enormous line is legal
+      // and some mail servers reject it anyway.
+      ...(base64(file.bytes).match(/.{1,76}/g) ?? []),
       '',
     );
-  } else {
-    lines.push('Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: 8bit', '', message.text);
   }
+  lines.push(`--${mixed}--`, '');
 
   return lines.join('\r\n');
 }

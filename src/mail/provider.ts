@@ -37,7 +37,24 @@ export interface OutboundMessage {
    * reads. Left empty, replies go to From, which is the ordinary case.
    */
   replyTo?: string | null;
+  /**
+   * Files to send with it, already loaded.
+   *
+   * Resolved from documents at the moment of sending rather than carried
+   * through the queue as bytes: the document is the owner of those bytes, and a
+   * second copy in a queue row would be a second answer to what was sent.
+   */
+  attachments?: Array<{ filename: string; contentType: string; bytes: Uint8Array }>;
 }
+
+/**
+ * What a message may carry in total.
+ *
+ * Gmail refuses a raw message over about 35 MB and base64 inflates by a third,
+ * so the honest ceiling is lower than the number people remember. Stopping here
+ * with a clear message beats a provider error that names a byte count.
+ */
+export const MAX_ATTACHMENT_TOTAL_BYTES = 20 * 1024 * 1024;
 
 export interface MailProvider {
   readonly name: string;

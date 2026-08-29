@@ -2,15 +2,18 @@
 
 import type { Env } from '../types';
 import { newId } from '../core/ids';
-import { all, getSetting, nowIso, run } from '../core/db';
+import { all, getSetting, nowIso, one, run } from '../core/db';
 import { audit } from '../core/audit';
-import { getMailProvider, looksLikeEmail, type OutboundMessage } from './provider';
+import {
+  MAX_ATTACHMENT_TOTAL_BYTES, getMailProvider, looksLikeEmail, type OutboundMessage,
+} from './provider';
 
 export interface QueuedEmail {
   id: string;
   to_addr: string;
   cc_addr: string | null;
   bcc_addr: string | null;
+  attachment_ids: string | null;
   subject: string;
   body_text: string;
   body_html: string | null;
@@ -27,7 +30,11 @@ export interface QueuedEmail {
 
 export async function queueEmail(
   env: Env,
-  message: OutboundMessage & { entityType?: string | null; entityId?: string | null; createdBy?: string | null },
+  message: OutboundMessage & {
+    entityType?: string | null; entityId?: string | null; createdBy?: string | null;
+    /** Documents to send with it. Resolved to bytes at send time, never here. */
+    documentIds?: string[];
+  },
 ): Promise<string> {
   if (!looksLikeEmail(message.to)) throw new Error('invalid recipient address');
 
@@ -42,14 +49,51 @@ export async function queueEmail(
   await run(
     env.DB,
     `INSERT INTO outbound_emails (id, to_addr, cc_addr, bcc_addr, subject, body_text, body_html,
-        reply_to, status, entity_type, entity_id, created_at, created_by)
-     VALUES (?,?,?,?,?,?,?,?, 'queued', ?,?,?,?)`,
+        reply_to, status, entity_type, entity_id, created_at, created_by, attachment_ids)
+     VALUES (?,?,?,?,?,?,?,?, 'queued', ?,?,?,?,?)`,
     id, message.to.trim(), message.cc ?? null, message.bcc ?? null,
     message.subject, message.text, message.html ?? null,
     replyTo,
     message.entityType ?? null, message.entityId ?? null, nowIso(), message.createdBy ?? null,
+    // Ids, not bytes. The queue records what was to be sent; the document owns
+    // the bytes, and a copy here would be a second answer to what went out.
+    message.documentIds?.length ? message.documentIds.join(',') : null,
   );
   return id;
+}
+
+/**
+ * Load the documents a queued message is meant to carry.
+ *
+ * At the moment of sending rather than at the moment of queuing, so a message
+ * that sat in the queue for a day sends the document as it is now — which is
+ * the same document, because a document is never edited in place here. What it
+ * really buys is that nothing is duplicated.
+ *
+ * A document that has gone missing is skipped rather than failing the send: a
+ * reply that reaches the client without its attachment is recoverable, and one
+ * that never leaves is not. What was skipped is returned so the caller can say.
+ */
+export async function loadAttachments(
+  env: Env, ids: string[],
+): Promise<{ files: NonNullable<OutboundMessage['attachments']>; missing: string[] }> {
+  const files: NonNullable<OutboundMessage['attachments']> = [];
+  const missing: string[] = [];
+  if (!env.DOCS || ids.length === 0) return { files, missing: ids };
+
+  let total = 0;
+  for (const id of ids) {
+    const doc = await one<{ r2_key: string; filename: string; content_type: string }>(
+      env.DB, 'SELECT r2_key, filename, content_type FROM documents WHERE id = ?', id);
+    if (!doc) { missing.push(id); continue; }
+    const object = await env.DOCS.get(doc.r2_key);
+    if (!object) { missing.push(doc.filename); continue; }
+    const bytes = new Uint8Array(await object.arrayBuffer());
+    total += bytes.byteLength;
+    if (total > MAX_ATTACHMENT_TOTAL_BYTES) { missing.push(doc.filename); continue; }
+    files.push({ filename: doc.filename, contentType: doc.content_type, bytes });
+  }
+  return { files, missing };
 }
 
 /**
@@ -77,6 +121,9 @@ export async function flushQueue(env: Env, limit = 20): Promise<{ sent: number; 
         {
           to: item.to_addr, cc: item.cc_addr, bcc: item.bcc_addr, subject: item.subject,
           text: item.body_text, html: item.body_html,
+          attachments: item.attachment_ids
+            ? (await loadAttachments(env, item.attachment_ids.split(','))).files
+            : undefined,
           // Stored on the message rather than read from settings at send time,
           // so what was queued is what goes out even if the setting changes in
           // between.

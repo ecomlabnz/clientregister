@@ -21,7 +21,7 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith } from '../../ui/layout';
 import { html } from '../../ui/html';
 import { card, csrfField, pageHeader, table } from '../../ui/components';
-import { dateTime } from '../../ui/format';
+import { dateShort, dateTime } from '../../ui/format';
 import { addEntry } from '../../core/timeline';
 import { safeReturn } from '../tasks';
 
@@ -40,6 +40,7 @@ const SAFE_INLINE_TYPES = new Set([
 interface DocumentRow {
   id: string; entity_type: string; entity_id: string; r2_key: string; filename: string;
   content_type: string; size_bytes: number; sha256: string | null; description: string | null;
+  sent_count?: number; last_sent_at?: string | null;
   uploaded_at: string; uploaded_by: string | null; uploader_name?: string | null;
 }
 
@@ -94,7 +95,16 @@ export async function storeDocument(
 export async function listDocuments(env: any, entityType: string, entityId: string): Promise<DocumentRow[]> {
   return all<DocumentRow>(
     env.DB,
-    `SELECT d.*, u.name AS uploader_name FROM documents d
+    // How many times this document has been sent, and when it last was. The
+    // practice sends drafts back and forth, so "which version did they get" is
+    // a question about the document rather than about the email — and this is
+    // the end of it a person is usually looking from.
+    `SELECT d.*, u.name AS uploader_name,
+            (SELECT COUNT(*) FROM reply_attachments a WHERE a.document_id = d.id) AS sent_count,
+            (SELECT MAX(r.created_at) FROM reply_attachments a
+               JOIN channel_replies r ON r.id = a.reply_id
+              WHERE a.document_id = d.id) AS last_sent_at
+       FROM documents d
        LEFT JOIN users u ON u.id = d.uploaded_by
       WHERE d.entity_type = ? AND d.entity_id = ? ORDER BY d.uploaded_at DESC`,
     entityType, entityId,
@@ -130,16 +140,28 @@ export const documentsModule: AppModule = {
 
       const recent = await all<DocumentRow>(
         c.env.DB,
-        `SELECT d.*, u.name AS uploader_name FROM documents d
+        // Whether this document has ever gone to anybody, and when it last
+        // did. The practice sends drafts back and forth, so "which version did
+        // they get" is a question about the document — and this is the end of
+        // it a person usually looks from.
+        `SELECT d.*, u.name AS uploader_name,
+                (SELECT COUNT(*) FROM reply_attachments a WHERE a.document_id = d.id) AS sent_count,
+                (SELECT MAX(r.created_at) FROM reply_attachments a
+                   JOIN channel_replies r ON r.id = a.reply_id
+                  WHERE a.document_id = d.id) AS last_sent_at
+           FROM documents d
            LEFT JOIN users u ON u.id = d.uploaded_by ORDER BY d.uploaded_at DESC LIMIT 100`,
       );
       return page(c, { title: 'Documents' }, html`
         ${pageHeader('Documents', 'Recently uploaded files.')}
-        ${table(['Uploaded', 'File', 'Attached to', 'Size', 'By'], recent.map((d) => html`
+        ${table(['Uploaded', 'File', 'Attached to', 'Sent', 'Size', 'By'], recent.map((d) => html`
           <tr>
             <td class="small">${dateTime(d.uploaded_at)}</td>
             <td><a href="/documents/${d.id}">${d.filename}</a></td>
             <td class="small"><a href="/${d.entity_type}s/${d.entity_id}">${d.entity_type}</a></td>
+            <td class="small">${(d.sent_count ?? 0) > 0
+              ? html`${d.sent_count}×<div class="muted">${dateShort(d.last_sent_at)}</div>`
+              : html`<span class="muted">—</span>`}</td>
             <td class="small">${Math.ceil(d.size_bytes / 1024)} KB</td>
             <td class="small">${d.uploader_name ?? '—'}</td>
           </tr>`))}`);
