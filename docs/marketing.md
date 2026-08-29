@@ -184,8 +184,11 @@ and questions edited from inside the register.
 - **A strict content security policy.** No inline script, no inline style, no
   CDN, nothing loaded from a third party. There is no analytics tag and no
   tracker.
-- **Documents are stored in Oceania**, deliberately — the bucket was created with
-  that placement and cannot silently drift.
+- **The data stays in this part of the world.** The database's primary replica is
+  in Melbourne, and documents are stored in Oceania — the bucket was created with
+  that placement deliberately and cannot silently drift. Australia rather than
+  New Zealand, which is worth saying plainly; it is not the same thing, and it is
+  a long way from "data centres worldwide".
 - **The AI is off until you turn it on, and can be turned off again.** When it is
   on, the text of the matter you asked about goes to the model provider named in
   the settings, and nothing else does; when it is off, nothing leaves at all and
