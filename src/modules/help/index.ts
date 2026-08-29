@@ -1284,9 +1284,16 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
               <strong>Gmail API</strong>, and press <strong>Enable</strong>.</li>
           <li>Open <strong>APIs &amp; Services → OAuth consent screen</strong>. Choose
               <strong>External</strong>, fill in the app name and your email where asked, and save.
-              On the <strong>Audience</strong> page, add your own Gmail address under
-              <strong>Test users</strong> — you do not need to publish or be verified, because you
-              are the only user.</li>
+              On the <strong>Audience</strong> page, add the Gmail address under
+              <strong>Test users</strong>.
+              <p class="hint">Then press <strong>Publish app</strong> on that same page, so the
+                 publishing status reads <strong>In production</strong> rather than
+                 <strong>Testing</strong>. This matters more than it looks:
+                 <strong>a refresh token issued while the app is in Testing expires after seven
+                 days</strong>, and outbound mail would simply stop a week after you set it up,
+                 with nothing obviously wrong. Publishing does not mean submitting for
+                 verification — you will still see Google's “unverified app” warning when you
+                 authorise, which is expected and is the next step.</p></li>
           <li>Open <strong>APIs &amp; Services → Credentials → Create credentials → OAuth client
               ID</strong>. Choose <strong>Web application</strong>. Under
               <strong>Authorised redirect URIs</strong> add exactly:
@@ -1303,13 +1310,18 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
               <strong>Advanced → Go to (your app)</strong>.</li>
           <li>Back in the Playground, press <strong>Exchange authorization code for tokens</strong>.
               Copy the <strong>Refresh token</strong> — the long one starting <code>1//</code>.
-              It does not expire unless you revoke it.</li>
+              With the app published (step 3) it does not expire unless you revoke it or change
+              the account's password. If mail stops about a week after setup, the app was left in
+              Testing: publish it and take a fresh token.</li>
           <li>Save four repository secrets:
               <ul>
                 <li><code>MAIL_PROVIDER</code> = <code>gmail</code></li>
                 <li><code>MAIL_FROM</code> = how you want to appear, e.g.
                     <code>Tai &lt;you@gmail.com&gt;</code> — the address must be the account you
-                    just authorised</li>
+                    just authorised. Gmail will not let you send as anything else, so this is the
+                    address every client sees. If it is not the address you want them to answer,
+                    set <strong>Settings → Practice → “Replies should go to”</strong> as well and
+                    their replies will land wherever you say.</li>
                 <li><code>GMAIL_CLIENT_ID</code> and <code>GMAIL_CLIENT_SECRET</code> from step 4</li>
                 <li><code>GMAIL_REFRESH_TOKEN</code> from step 7</li>
               </ul>
