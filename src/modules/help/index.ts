@@ -32,6 +32,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.60.0', date: '29 August 2026',
+    notes: [
+      'An inquiry can now be deleted, from the list or from its own page \u2014 for the wrong '
+        + 'numbers and forwarded noise that were only ever cluttering it.',
+      'Only while it is still only an inquiry. One that has become a matter, been quoted, or '
+        + 'carries a task, a document or a file note is refused, and says why.',
+      'A note is never deleted with it, and the audit log records what the inquiry was. The '
+        + 'message it came from is marked ignored, so the same thing is not dismissed twice.',
+    ],
+  },
+  {
     version: '0.59.0', date: '29 August 2026',
     notes: [
       'Converting an inquiry now asks for the same fields as the client form: record type, '

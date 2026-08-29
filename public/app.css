@@ -671,6 +671,10 @@ textarea { resize: vertical; min-height: 70px; }
 .inline-row + .prewrap, .inline-row + p { margin-top: 10px; }
 
 .inline-form { display: inline-flex; gap: 6px; align-items: center; }
+/* The last cell of a row, holding what you can do to it. Right-aligned so the
+   controls line up down the table rather than wandering with the text beside
+   them, and never wrapped: a button broken across two lines reads as two. */
+.row-actions { text-align: right; white-space: nowrap; }
 .inline-form select { width: auto; padding: 4px 6px; font-size: 0.82rem; }
 
 .filters {
