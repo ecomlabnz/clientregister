@@ -32,6 +32,12 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.32.0', date: '29 August 2026',
+    notes: [
+      'The test message can go to any address, so you can see how it lands at a client\'s provider.',
+    ],
+  },
+  {
     version: '0.31.0', date: '29 August 2026',
     notes: [
       'A “send a test message to myself” button, under Admin → Integrations.',
@@ -1010,8 +1016,10 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
               key, and <code>MAIL_FROM</code> = the sending address, written as
               <code>Your Name &lt;you@yourdomain&gt;</code>.</li>
           <li>Deploy. Secrets only reach the register on the next deploy.</li>
-          <li>Go to <strong>Admin → Integrations</strong> and press
-              <strong>Send a test message to myself</strong>. It goes only to your own address.</li>
+          <li>Go to <strong>Admin → Integrations</strong> and send a test message. Your own
+              address is filled in, but try one at whatever your clients use — Gmail and Outlook
+              judge a new sending domain more harshly than most, and a message they file in spam
+              is worth knowing about before a quote goes to a client.</li>
         </ol>
         <p><strong>If the test lands in spam, that is normal for a domain that has only just started
            sending</strong>, and it settles as a few more messages go out. Better to find that on
