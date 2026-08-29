@@ -7,6 +7,16 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.39.3 — 29 August 2026
+
+### Changed
+- **A provider error now says what the request carried** — the model, and the
+  workspace sent or that none was sent. An error naming a workspace is
+  ambiguous on its own: it may be the one this register sent, or one the key
+  itself is bound to, and telling those apart by comparing timestamps against a
+  settings row is guesswork. The answer travels with the error instead. The key
+  is never included; a workspace ID is an identifier, not a credential.
+
 ## 0.39.2 — 29 August 2026
 
 ### Added

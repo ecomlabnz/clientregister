@@ -111,3 +111,24 @@ describe('a workspace ID is checked on the way in', () => {
     expect(group).toContain('wrkspc_01JwQvzr7rXLA5AGx3HKfFUJ');
   });
 });
+
+describe('a provider error says what was sent', () => {
+  it('names the model and the workspace, and never the key', () => {
+    // An error naming a workspace is ambiguous alone: it may be the one this
+    // register sent, or one the key itself is bound to. Reading the difference
+    // out of timestamps is guesswork, so the answer travels with the error.
+    expect(anthropic).toContain('const withContext = async');
+    expect(anthropic).toContain('sent workspace ${opts.workspaceId}');
+    expect(anthropic).toContain("'sent no workspace header'");
+    const wrapper = anthropic.slice(anthropic.indexOf('const withContext'),
+      anthropic.indexOf('return {', anthropic.indexOf('const withContext')));
+    expect(wrapper).not.toMatch(/ANTHROPIC_API_KEY|apiKey/);
+  });
+
+  it('wraps every call, not just the one that was failing', () => {
+    const wrapped = anthropic.match(/withContext\(\(\) => client\.messages\.parse\(\{/g) ?? [];
+    const calls = anthropic.match(/client\.messages\.parse\(\{/g) ?? [];
+    expect(wrapped.length).toBe(calls.length);
+    expect(calls.length).toBe(3);
+  });
+});
