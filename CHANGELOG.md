@@ -7,6 +7,18 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.52.0 — 29 August 2026
+
+### Added
+- **A reply, where the message is read.** Capture has always set `thread_id`
+  whenever the sender could be identified — that is what makes a reply possible —
+  but the message page showed only the three decisions about what the message
+  should *become*: create an inquiry, file it, ignore it. Answering the person
+  who sent it meant leaving the page and finding the conversation by their name.
+- It appears only when there is a conversation to reply in, and it sits below the
+  three decisions rather than among them, because it answers a different
+  question. A message's Details panel also links to the conversation now.
+
 ## 0.51.1 — 29 August 2026
 
 ### Fixed

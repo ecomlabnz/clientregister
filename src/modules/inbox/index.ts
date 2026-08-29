@@ -35,6 +35,8 @@ interface IngestRow {
   body_text: string | null; attachments_json: string | null; trusted: number;
   status: string; processed_at: string | null; inquiry_id: string | null;
   error: string | null; meta_json: string | null;
+  /** Set when the sender could be identified, which is what makes a reply possible. */
+  thread_id: string | null;
 }
 
 export const CHANNEL_SETTINGS: SettingsGroup = {
@@ -430,6 +432,15 @@ export const inboxModule: AppModule = {
                     ${csrfField(csrf)}
                     <button class="btn btn-secondary btn-block" type="submit">Ignore</button>
                   </form>`}
+              ${'' /* Replying is not one of the three decisions above — those are
+                       about what the message becomes. This is about answering
+                       the person, which is often the first thing you want to do
+                       and previously meant finding the conversation by hand. */}
+              ${msg.thread_id
+                ? html`<a class="btn btn-secondary btn-block mt" href="/inbox/threads/${msg.thread_id}">
+                         Reply to ${msg.sender_display ?? msg.sender ?? 'them'}
+                       </a>`
+                : ''}
               ${filed.length ? html`<p class="hint">Filed as
                   ${filed.map((a) => html`<a href="/knowledge/${a.id}">${a.ref}</a>`)}.</p>` : ''}`)}
 
@@ -439,6 +450,10 @@ export const inboxModule: AppModule = {
                 <dt>Channel</dt><dd>${msg.channel}</dd>
                 <dt>Sender</dt><dd class="small">${msg.sender ?? '—'}</dd>
                 <dt>Trusted</dt><dd>${msg.trusted ? 'Yes (allow-listed)' : 'No'}</dd>
+                ${msg.thread_id
+                  ? html`<dt>Conversation</dt>
+                         <dd class="small"><a href="/inbox/threads/${msg.thread_id}">Both halves of it</a></dd>`
+                  : ''}
                 <dt>External ID</dt><dd class="small">${msg.external_id ?? '—'}</dd>
                 <dt>Processed</dt><dd>${dateTime(msg.processed_at)}</dd>
               </dl>
