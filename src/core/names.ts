@@ -35,7 +35,30 @@ export function composeFullName(
   organisationName?: string | null,
 ): string {
   if (kind === 'organisation') return tidy(organisationName);
-  return tidy(`${tidy(parts.givenNames)} ${tidy(parts.familyName)}`);
+  return tidy(`${tidy(parts.givenNames)} ${familyNameFor(parts.familyName)}`);
+}
+
+/**
+ * A family name as this practice records it: in capitals, whatever was typed.
+ *
+ * Not a display choice — it is how the name is stored, so it is the same on the
+ * client, on the matter, in the export and in a search, and nobody has to
+ * remember. A passport prints the surname in capitals and INZ writes it that
+ * way, and many of this practice's clients have names whose order is not the
+ * English one: "Dac Dat BUI" says which part is the family name where "Dac Dat
+ * Bui" leaves it to be guessed.
+ *
+ * It is deliberately lossy. The capitalisation somebody typed is not kept, so a
+ * client who writes their name "de Vries" is stored "DE VRIES". That is the
+ * convention asked for, and it is the one a form or a visa label will use.
+ *
+ * Done here rather than in SQL on purpose. SQLite's UPPER() is ASCII-only, so
+ * it turns "Nguyễn" into "NGUYễN" — half the letters changed and half not,
+ * which for this practice's caseload is worse than leaving it alone.
+ * JavaScript's toUpperCase is Unicode-aware and gets it right.
+ */
+export function familyNameFor(value: string | null | undefined): string {
+  return tidy(value).toUpperCase();
 }
 
 /**

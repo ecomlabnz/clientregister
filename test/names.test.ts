@@ -1,21 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { composeFullName, formalName, splitFullName } from '../src/core/names';
+import { composeFullName, familyNameFor, formalName, splitFullName } from '../src/core/names';
 
 describe('composeFullName', () => {
   it('joins a person’s given and family names in reading order', () => {
+    // The family name comes out in capitals: it is stored that way, so a
+    // composed full name that did not would disagree with the column it was
+    // built from.
     expect(composeFullName('individual', { givenNames: 'Ana Maria', familyName: 'Silva' }))
-      .toBe('Ana Maria Silva');
+      .toBe('Ana Maria SILVA');
   });
 
   it('tolerates a missing half rather than leaving stray spaces', () => {
-    expect(composeFullName('individual', { givenNames: '', familyName: 'Silva' })).toBe('Silva');
+    expect(composeFullName('individual', { givenNames: '', familyName: 'Silva' })).toBe('SILVA');
     expect(composeFullName('individual', { givenNames: 'Ana', familyName: null })).toBe('Ana');
     expect(composeFullName('individual', {})).toBe('');
   });
 
   it('collapses untidy whitespace from pasted values', () => {
     expect(composeFullName('individual', { givenNames: '  Ana   Maria ', familyName: ' Silva  ' }))
-      .toBe('Ana Maria Silva');
+      .toBe('Ana Maria SILVA');
   });
 
   it('uses the registered name for an organisation, ignoring person fields', () => {
@@ -62,5 +65,32 @@ describe('splitFullName', () => {
   it('handles empty input without throwing', () => {
     expect(splitFullName('')).toEqual({ givenNames: '', familyName: '' });
     expect(splitFullName(null)).toEqual({ givenNames: '', familyName: '' });
+  });
+});
+
+describe('familyNameFor', () => {
+  it('capitalises whatever was typed', () => {
+    expect(familyNameFor('bui')).toBe('BUI');
+    expect(familyNameFor('de Vries')).toBe('DE VRIES');
+    expect(familyNameFor('  Silva  ')).toBe('SILVA');
+    expect(familyNameFor(null)).toBe('');
+    expect(familyNameFor(undefined)).toBe('');
+  });
+
+  it('handles names SQLite would mangle', () => {
+    // SQLite's UPPER() is ASCII-only: it returns 'NGUYễN' and 'MüLLER',
+    // changing half the letters and leaving half. That is why this is done in
+    // the application and not in a migration.
+    expect(familyNameFor('Nguyễn')).toBe('NGUYỄN');
+    expect(familyNameFor('müller')).toBe('MÜLLER');
+    expect(familyNameFor("ma'afu")).toBe("MA'AFU");
+  });
+
+  it('is what composeFullName uses, so the two never disagree', () => {
+    expect(composeFullName('individual', { givenNames: 'Dac Dat', familyName: 'Bui' }))
+      .toBe('Dac Dat BUI');
+    // An organisation has a registered name, not a surname to capitalise.
+    expect(composeFullName('organisation', {}, 'Kiwi Orchards Limited'))
+      .toBe('Kiwi Orchards Limited');
   });
 });

@@ -7,6 +7,32 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.36.1 — 29 August 2026
+
+### Changed
+- **A client's family name is stored in capitals**, whatever was typed. Not a
+  display choice: the client record, the matter named from it, the CSV export
+  and any search all agree without each of them having to remember. A passport
+  prints the surname that way and INZ writes it that way, and many of this
+  practice's clients have names whose order is not the English one — "Dac Dat
+  BUI" says which part is the family name where "Dac Dat Bui" leaves it to be
+  guessed.
+- Deliberately lossy: a client who writes "de Vries" is stored "DE VRIES".
+- The demo seed stores names the same way, so seeded data does not look
+  different from data somebody typed.
+
+### Notes
+- This is done in the application, not in a migration, because **SQLite's
+  `UPPER()` is ASCII-only**: it turns "Nguyễn" into "NGUYễN" and "müller" into
+  "MüLLER", changing half the letters and leaving half. For this practice's
+  caseload that is worse than doing nothing. JavaScript's `toUpperCase` is
+  Unicode-aware and gets it right, so existing records are normalised by a
+  one-off pass through the application rather than by shipped SQL.
+- The rehearsal that found this nearly reported a false pass: the first harness
+  split the migration file on `;` and skipped every statement, because each
+  chunk began with its comment block. Running the file with `executescript`
+  showed the real result.
+
 ## 0.36.0 — 29 August 2026
 
 ### Added
