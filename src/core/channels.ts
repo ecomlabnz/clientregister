@@ -303,6 +303,13 @@ export interface ThreadEntry {
   href: string | null;
   /** What was sent with it, named, so a forward can say so. */
   attachments: string | null;
+  /**
+   * The formatted original, where the sender wrote one.
+   *
+   * Carried as it arrived and rendered only through `sanitiseHtml`. `body`
+   * stays the plain text, which is what a forward quotes and what search reads.
+   */
+  bodyHtml: string | null;
 }
 
 /**
@@ -362,7 +369,7 @@ export async function threadHistory(env: Env, threadId: string): Promise<ThreadE
       // conversation whose shape disagrees with the decision. It is still in
       // the inbox under "Ignored", and the audit log still records that it
       // arrived; only this reading of the exchange leaves it out.
-      `SELECT id, received_at, body_text, sender_display, sender, status
+      `SELECT id, received_at, body_text, body_html, sender_display, sender, status
          FROM ingest_messages
         WHERE thread_id = ? AND status != 'ignored' ORDER BY received_at LIMIT 200`,
       threadId,
@@ -387,7 +394,7 @@ export async function threadHistory(env: Env, threadId: string): Promise<ThreadE
       id: m.id, kind: 'message' as const,
       direction: 'in' as const, at: m.received_at, body: m.body_text ?? '',
       who: m.sender_display ?? m.sender ?? 'them', status: m.status, note: null,
-      href: `/inbox/${m.id}`, attachments: null,
+      href: `/inbox/${m.id}`, attachments: null, bodyHtml: m.body_html ?? null,
     })),
     ...outbound.map((r: any) => ({
       id: r.id, kind: 'reply' as const,
@@ -396,6 +403,9 @@ export async function threadHistory(env: Env, threadId: string): Promise<ThreadE
       note: [r.attachments ? `Attached: ${r.attachments}` : null, r.error ?? null]
         .filter(Boolean).join(' · ') || null,
       href: null, attachments: r.attachments ?? null,
+      // What the practice sent is composed here, in the register's own
+      // formatting rules, so there is no foreign markup to render.
+      bodyHtml: null,
     })),
   ];
   return entries.sort((a, b) => a.at.localeCompare(b.at));

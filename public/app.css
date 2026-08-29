@@ -410,6 +410,41 @@ body.bare {
   background: var(--surface-2); padding: 14px; border-radius: var(--radius);
   max-height: 460px; overflow: auto; font-size: 0.92rem;
 }
+/* An email shown the way it was written.
+   The sender's structure survives — paragraphs, lists, tables, links — but the
+   type, colour and spacing are this application's. `style`, `class` and `id`
+   never reach the page (src/core/sanitise.ts drops them), so nothing here can
+   be overridden by a sender, and there is nothing to override it with.
+   A wide table from a mail client scrolls inside this box rather than pushing
+   the page sideways. */
+.message-html {
+  background: var(--surface-2); padding: 14px; border-radius: var(--radius);
+  max-height: 620px; overflow: auto; font-size: 0.92rem; line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.message-html p { margin: 0 0 0.8em; }
+.message-html > :last-child { margin-bottom: 0; }
+.message-html h1, .message-html h2, .message-html h3,
+.message-html h4, .message-html h5, .message-html h6 {
+  font-size: 1rem; margin: 1.1em 0 0.4em; line-height: 1.3;
+}
+.message-html ul, .message-html ol { margin: 0 0 0.8em; padding-left: 1.4em; }
+.message-html li { margin-bottom: 0.25em; }
+.message-html blockquote {
+  margin: 0 0 0.8em; padding-left: 12px; border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+.message-html table { border-collapse: collapse; margin: 0 0 0.8em; max-width: 100%; }
+.message-html td, .message-html th {
+  border: 1px solid var(--border); padding: 4px 8px; text-align: left; vertical-align: top;
+}
+.message-html pre { white-space: pre-wrap; margin: 0 0 0.8em; }
+.message-html hr { border: 0; border-top: 1px solid var(--border); margin: 1em 0; }
+.message-html a { word-break: break-word; }
+/* Inside a conversation the message already sits in its own bubble, so the
+   second background and padding would be a box inside a box. */
+.msg-body.message-html { background: none; padding: 0; max-height: 420px; }
+
 .key-block {
   background: var(--surface-2); padding: 12px; border-radius: var(--radius);
   word-break: break-all; font-family: var(--mono); font-size: 0.9rem;
