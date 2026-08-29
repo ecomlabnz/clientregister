@@ -70,10 +70,18 @@ const SEVERITY_TONES: Record<AlertSeverity, 'red' | 'amber' | 'neutral'> = {
 
 const URGENT_DAYS = 14;
 
-function severityFor(date: string, today: string): AlertSeverity {
+/**
+ * How loud a row should be.
+ *
+ * `urgentDays` is how far ahead counts as pressing. It defaults to the
+ * register-wide fourteen, and is raised for the things you cannot do on the
+ * day — a medical needs an appointment, an overseas police certificate can take
+ * months — because a warning that arrives too late to act on is not a warning.
+ */
+function severityFor(date: string, today: string, urgentDays = URGENT_DAYS): AlertSeverity {
   if (date < today) return 'overdue';
   const days = Math.round((Date.parse(date) - Date.parse(today)) / 86_400_000);
-  return days <= URGENT_DAYS ? 'urgent' : 'soon';
+  return days <= urgentDays ? 'urgent' : 'soon';
 }
 
 /** Today and the horizon, as plain YYYY-MM-DD so they compare with stored dates. */
@@ -130,6 +138,14 @@ function window(horizonDays: number): { today: string; horizon: string } {
  */
 export async function documentAlerts(env: Env, horizonDays = 90): Promise<Alert[]> {
   const { today, horizon } = window(horizonDays);
+  // A certificate is not like a deadline. You cannot do it on the day: a
+  // replacement medical needs an appointment, and a police certificate from
+  // overseas can take longer than the notice period itself. So certificates get
+  // their own, longer, "this is pressing now" window.
+  const noticeDays = Number(
+    await settingValue(env,
+      ALERT_SETTINGS.settings.find((d) => d.key === 'alerts.certificate_notice_days')!),
+  ) || 30;
 
   const rows = await all<{ id: string; ref: string; full_name: string; document: string; expires: string }>(
     env.DB,
@@ -158,7 +174,7 @@ export async function documentAlerts(env: Env, horizonDays = 90): Promise<Alert[
 
   return rows.map((row) => ({
     kind: 'document' as const,
-    severity: severityFor(row.expires, today),
+    severity: severityFor(row.expires, today, noticeDays),
     date: row.expires,
     title: `${row.document} — ${row.full_name}`,
     detail: row.ref,
@@ -466,6 +482,13 @@ export const ALERT_SETTINGS: SettingsGroup = {
     { key: 'alerts.urgent_days', type: 'integer', label: 'Treat as urgent within (days)',
       default: '14', min: 1, max: 90,
       help: 'Anything due inside this window is counted as pressing rather than upcoming.' },
+    { key: 'alerts.certificate_notice_days', type: 'integer',
+      label: 'Warn about an expiring certificate (days ahead)',
+      default: '30', min: 7, max: 180,
+      help: 'A police certificate, medical or x-ray inside this window counts as pressing '
+        + 'rather than upcoming. Replacing one takes weeks — a police certificate from '
+        + 'overseas can take longer than that — so the warning has to come while there is '
+        + 'still time to act on it.' },
     { key: 'alerts.ack_days', type: 'integer', label: 'Expect an INZ acknowledgement within (days)',
       default: '14', min: 1, max: 180,
       help: 'A lodged matter with no INZ application number recorded after this long is '

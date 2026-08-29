@@ -43,7 +43,9 @@ import { asPrefInteger, preferencesFor } from '../../core/preferences';
 import { caseTypes, englishTests, labelFor, termOptions } from '../../core/vocabulary';
 import {
   CERTIFICATE_KINDS, CERTIFICATE_LABELS, MEDICAL_TYPES, type CertificateKind,
-  addCertificate, certificatesFor, currentOf, medicalTypeLabel, refreshClientCache, removeCertificate,
+  CERTIFICATE_VALIDITY,
+  addCertificate, certificatesFor, currentOf, expiryIsDerived, medicalTypeLabel,
+  refreshClientCache, removeCertificate, setCertificateSubmitted, validityRule,
 } from '../../core/certificates';
 import {
   PASSPORT_STATUSES, type PassportStatus,
@@ -1033,7 +1035,28 @@ export const clientsModule: AppModule = {
                                     ${cert.expires_on ? html` · expires ${dateShort(cert.expires_on)}` : ''}
                                     ${cert.reference ? html` · ${cert.reference}` : ''}
                                   </div>
+                                  ${/* Why it expires when it does. The date is worked out by the
+                                        database from the issue date and this; saying so on the page
+                                        is the difference between a date you trust and one you
+                                        re-check against the certificate every time. */ ''}
+                                  ${expiryIsDerived(kind) ? html`
+                                    <div class="small muted">
+                                      ${cert.submitted_on
+                                        ? html`Submitted with an application ${dateShort(cert.submitted_on)} —
+                                               ${CERTIFICATE_VALIDITY[kind]!.submitted} months from issue.`
+                                        : html`Not submitted with an application —
+                                               ${CERTIFICATE_VALIDITY[kind]!.held} months from issue.`}
+                                    </div>` : ''}
                                   ${cert.notes ? html`<div class="small muted">${cert.notes}</div>` : ''}
+                                  ${writable && expiryIsDerived(kind) ? html`
+                                    <form method="post" class="inline-form mt-sm"
+                                          action="/clients/${client.id}/certificates/${cert.id}/submitted">
+                                      ${csrfField(csrf)}
+                                      <label class="small muted" for="sub-${cert.id}">Submitted with an application on</label>
+                                      <input type="date" id="sub-${cert.id}" name="submitted_on"
+                                             value="${cert.submitted_on ?? ''}">
+                                      <button class="btn btn-small btn-secondary" type="submit">Save</button>
+                                    </form>` : ''}
                                 </div>
                                 <div>
                                   ${cert.expires_on ? expiryCell(cert.expires_on) : ''}
@@ -1057,14 +1080,24 @@ export const clientsModule: AppModule = {
                                   hint: 'Police certificates only — one per country lived in for 12 months or more.' })}
                         ${select({ label: 'Medical type', name: 'subtype', includeBlank: 'Not a medical',
                                    options: MEDICAL_TYPES })}
-                        ${field({ label: 'Issued', name: 'issued_on', type: 'date' })}
-                        ${field({ label: 'Expires', name: 'expires_on', type: 'date' })}
+                        ${field({ label: 'Issued', name: 'issued_on', type: 'date',
+                                  hint: 'Required for a police certificate or a medical.' })}
+                        ${field({ label: 'Submitted with an application on', name: 'submitted_on', type: 'date',
+                                  hint: 'Leave empty if it has not gone in yet. It can be added later.' })}
+                        ${field({ label: 'Expires', name: 'expires_on', type: 'date',
+                                  hint: 'X-rays only. A police certificate and a medical are worked '
+                                    + 'out from the issue date.' })}
                         ${field({ label: 'Reference', name: 'reference', maxlength: 80 })}
                         ${field({ label: 'Note', name: 'notes', maxlength: 300 })}
                         <button class="btn btn-primary" type="submit">Record it</button>
                       </form>
                       <p class="hint">A new one does not replace the old. The most recent of each
                          kind is marked current and is what the alerts page watches.</p>
+                      <p class="hint">INZ works the expiry out rather than reading the one printed on
+                         the certificate: a police certificate is
+                         ${validityRule('police')} A medical is ${validityRule('medical')}
+                         So those two are worked out here too, from the issue date — which means
+                         recording that one went in with an application moves its expiry by itself.</p>
                     </details>` : ''}
                 </div>
               </section>`}
@@ -1197,12 +1230,27 @@ export const clientsModule: AppModule = {
       if (!kind) return redirectWith(c, `/clients/${id}`, 'Choose what kind of certificate.', 'err');
 
       const issuedOn = f.date('issued_on');
+      const submittedOn = f.date('submitted_on');
       const expiresOn = f.date('expires_on');
-      if (!issuedOn && !expiresOn) {
+      const derived = expiryIsDerived(kind as CertificateKind);
+
+      // For a police certificate or a medical the issue date is the whole
+      // record: the expiry follows from it, so without one there is nothing to
+      // work out and nothing to watch.
+      if (derived && !issuedOn) {
+        return redirectWith(c, `/clients/${id}#certificates`,
+          `A ${CERTIFICATE_LABELS[kind as CertificateKind].toLowerCase()} needs its issue date — `
+          + 'the expiry is worked out from it.', 'err');
+      }
+      if (!derived && !issuedOn && !expiresOn) {
         return redirectWith(c, `/clients/${id}#certificates`,
           'Give at least one date — otherwise there is nothing to watch.', 'err');
       }
-      if (issuedOn && expiresOn && expiresOn < issuedOn) {
+      if (submittedOn && issuedOn && submittedOn < issuedOn) {
+        return redirectWith(c, `/clients/${id}#certificates`,
+          'A certificate cannot have been submitted before it was issued.', 'err');
+      }
+      if (!derived && issuedOn && expiresOn && expiresOn < issuedOn) {
         return redirectWith(c, `/clients/${id}#certificates`,
           'A certificate cannot expire before it was issued.', 'err');
       }
@@ -1215,19 +1263,59 @@ export const clientsModule: AppModule = {
         subtype: kind === 'medical' ? f.optional('subtype', { max: 40 }) : null,
         country: kind === 'police' ? f.optional('country', { max: 100 }) : null,
         reference: f.optional('reference', { max: 80 }),
-        issuedOn, expiresOn,
+        issuedOn, submittedOn, expiresOn,
         notes: f.optional('notes', { max: 300 }),
         userId: c.get('user')!.id,
       });
       await addEntry(c.env, {
         entityType: 'client', entityId: id, kind: 'system',
         body: `${CERTIFICATE_LABELS[kind as CertificateKind]} recorded`
-          + `${expiresOn ? `, expiring ${expiresOn}` : ''}.`,
+          + `${issuedOn ? `, issued ${dateShort(issuedOn)}` : ''}`
+          + `${!derived && expiresOn ? `, expiring ${dateShort(expiresOn)}` : ''}.`,
         createdBy: c.get('user')!.id,
       });
       await auditFrom(c, { action: 'client.certificate_added', entityType: 'client', entityId: id,
         meta: { kind, expiresOn } });
       return redirectWith(c, `/clients/${id}#certificates`, 'Certificate recorded.');
+    });
+
+    // Whether a certificate went in with an application is usually known after
+    // it was recorded, not at the time — so it is its own small form rather
+    // than a field you would have to delete and re-enter the certificate to
+    // change. It is the only thing about a certificate that can be changed,
+    // because it is the only thing that is not a fact about the paper itself.
+    r.post('/:id/certificates/:certId/submitted', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const certId = c.req.param('certId')!;
+      const f = new FormReader(await c.req.formData());
+      const submittedOn = f.date('submitted_on');
+
+      const cert = await one<{ kind: string; issued_on: string | null }>(
+        c.env.DB, 'SELECT kind, issued_on FROM client_certificates WHERE id = ? AND client_id = ?',
+        certId, id);
+      if (!cert) return c.notFound();
+      if (submittedOn && cert.issued_on && submittedOn < cert.issued_on) {
+        return redirectWith(c, `/clients/${id}#certificates`,
+          'A certificate cannot have been submitted before it was issued.', 'err');
+      }
+
+      await setCertificateSubmitted(c.env, id, certId, submittedOn);
+      const after = await one<{ expires_on: string | null }>(
+        c.env.DB, 'SELECT expires_on FROM client_certificates WHERE id = ?', certId);
+      await addEntry(c.env, {
+        entityType: 'client', entityId: id, kind: 'system',
+        body: submittedOn
+          ? `${CERTIFICATE_LABELS[cert.kind as CertificateKind]} recorded as submitted with an `
+            + `application on ${dateShort(submittedOn)}`
+            + `${after?.expires_on ? `; now good until ${dateShort(after.expires_on)}` : ''}.`
+          : `${CERTIFICATE_LABELS[cert.kind as CertificateKind]} no longer recorded as submitted`
+            + `${after?.expires_on ? `; now good until ${dateShort(after.expires_on)}` : ''}.`,
+        createdBy: c.get('user')!.id,
+      });
+      await auditFrom(c, { action: 'client.certificate_submitted', entityType: 'client', entityId: id,
+        meta: { certId, submittedOn } });
+      return redirectWith(c, `/clients/${id}#certificates`,
+        submittedOn ? 'Noted — the expiry has moved with it.' : 'Cleared.');
     });
 
     r.post('/:id/certificates/:certId/remove', requirePermission('register:write'), async (c) => {

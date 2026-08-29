@@ -7,6 +7,48 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.48.0 — 29 August 2026
+
+### Added
+- **Certificate expiry is a rule, not a typing exercise.** INZ does not read the
+  expiry printed on a police certificate; it applies its own arithmetic, and the
+  arithmetic branches: 6 months from issue, 24 once the certificate has gone in
+  with an application. A medical is 3 and 36. So for those two kinds the expiry
+  stops being something a person enters and becomes something the database works
+  out from the issue date. One fact, one owner — and the fact is the issue date.
+- **`submitted_on`** on each certificate: the day it went in with an
+  application. Recording it moves the expiry by itself, and the file gets a line
+  saying so. It is the only thing about a certificate that can be edited,
+  because it is the only thing that is not a fact about the paper itself.
+- A **certificate notice window**, `alerts.certificate_notice_days`, default 30.
+  A certificate expiring inside it counts as pressing rather than upcoming —
+  longer than the 14 days used for a deadline, because a replacement medical
+  needs an appointment and an overseas police certificate can take longer than
+  the notice period itself.
+
+### Changed
+- The "Expires" box on the certificate form is now for x-rays only, and the
+  issue date is required for a police certificate or a medical. A form that no
+  longer owns a column must not write it.
+- The migration brings existing certificates under the rule where they have an
+  issue date. Where a typed expiry disagreed, the rule wins: it is the one INZ
+  applies, and a date that disagrees with INZ is not a record worth keeping.
+  Rows with no issue date are untouched — there is nothing to compute from.
+- A chest x-ray keeps its hand-entered expiry. No rule has been stated for one.
+
+### Verifying
+- `migrations/0029_certificate_validity.sql` puts the rule in a view,
+  `certificate_validity`, and two triggers ask the view. One place to read the
+  rule, one place to change it.
+- The month-end correction is a `MIN()`: SQLite's `date(d, '+6 months')` turns
+  31 March into 1 October, and rolling *forward* is the dangerous direction — it
+  would have the register call a certificate live on a day it is not.
+- `test/certvalidity.test.ts` runs the real triggers against a database built
+  from the migrations: both kinds, both branches, month ends, recursive triggers
+  on, and an expiry written straight into the column (the trigger overwrites
+  it). Each was watched failing — the clamp removed, the months swapped, the
+  update trigger narrowed — before it was kept.
+
 ## 0.47.0 — 29 August 2026
 
 ### Added

@@ -46,10 +46,42 @@ export interface CertificateRow {
   country: string | null;
   reference: string | null;
   issued_on: string | null;
+  /** The day it went in with an application, which is what extends it. */
+  submitted_on: string | null;
+  /** Worked out by the database for a police certificate or a medical. */
   expires_on: string | null;
   notes: string | null;
   created_at: string;
   created_by: string | null;
+}
+
+/**
+ * How long INZ treats a certificate as good for.
+ *
+ * Here for the wording on the page only. The dates themselves are worked out in
+ * the database — see `migrations/0029_certificate_validity.sql` — because an
+ * expiry typed by hand is wrong sooner or later, and wrong quietly. Two copies
+ * of the arithmetic would be the same problem one level up, so this describes
+ * the rule and never applies it.
+ */
+export const CERTIFICATE_VALIDITY: Record<CertificateKind, { held: number; submitted: number } | null> = {
+  police: { held: 6, submitted: 24 },
+  medical: { held: 3, submitted: 36 },
+  // No rule stated for an x-ray, so its expiry stays hand-entered.
+  chest_xray: null,
+};
+
+/** Why a certificate expires when it does, in words, for the page. */
+export function validityRule(kind: CertificateKind): string | null {
+  const rule = CERTIFICATE_VALIDITY[kind];
+  if (!rule) return null;
+  return `${rule.held} months from issue — ${rule.submitted} months once it has gone in `
+    + 'with an application.';
+}
+
+/** Whether this kind's expiry is worked out rather than entered. */
+export function expiryIsDerived(kind: CertificateKind): boolean {
+  return CERTIFICATE_VALIDITY[kind] !== null;
 }
 
 export async function certificatesFor(env: Env, clientId: string): Promise<CertificateRow[]> {
@@ -90,21 +122,44 @@ export async function addCertificate(
   env: Env,
   input: {
     clientId: string; kind: CertificateKind; subtype: string | null; country: string | null;
-    reference: string | null; issuedOn: string | null; expiresOn: string | null;
-    notes: string | null; userId: string | null;
+    reference: string | null; issuedOn: string | null; submittedOn: string | null;
+    expiresOn: string | null; notes: string | null; userId: string | null;
   },
 ): Promise<string> {
   const id = newId('crt');
+  // `expires_on` is passed for an x-ray and left null for the other two: the
+  // database fills those from the issue date. Writing a guess here would give
+  // the column a second owner, and the trigger would overwrite it anyway.
   await run(
     env.DB,
     `INSERT INTO client_certificates (id, client_id, kind, subtype, country, reference,
-        issued_on, expires_on, notes, created_at, created_by)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        issued_on, submitted_on, expires_on, notes, created_at, created_by)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     id, input.clientId, input.kind, input.subtype, input.country, input.reference,
-    input.issuedOn, input.expiresOn, input.notes, nowIso(), input.userId,
+    input.issuedOn, input.submittedOn,
+    expiryIsDerived(input.kind) ? null : input.expiresOn,
+    input.notes, nowIso(), input.userId,
   );
   await refreshClientCache(env, input.clientId);
   return id;
+}
+
+/**
+ * Record — or clear — the day a certificate went in with an application.
+ *
+ * That is the whole edit: the expiry follows from it, and the database applies
+ * the rule. Nothing here works out a date.
+ */
+export async function setCertificateSubmitted(
+  env: Env, clientId: string, id: string, submittedOn: string | null,
+): Promise<boolean> {
+  const res = await run(
+    env.DB,
+    `UPDATE client_certificates SET submitted_on = ? WHERE id = ? AND client_id = ?`,
+    submittedOn, id, clientId,
+  );
+  await refreshClientCache(env, clientId);
+  return (res.meta?.changes ?? 0) > 0;
 }
 
 export async function removeCertificate(env: Env, clientId: string, id: string): Promise<boolean> {
