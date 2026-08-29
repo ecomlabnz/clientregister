@@ -32,6 +32,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.52.0', date: '29 August 2026',
+    notes: [
+      'A message in the Inbox now offers a reply to whoever sent it, where you are reading it. '
+        + 'Answering somebody is a different question from deciding what their message becomes, '
+        + 'and it used to mean leaving the message and finding the conversation by hand.',
+    ],
+  },
+  {
     version: '0.51.1', date: '29 August 2026',
     notes: [
       'Gmail credentials are trimmed before use. Pasted with a trailing newline, a client ID '

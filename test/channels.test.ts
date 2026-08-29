@@ -52,3 +52,36 @@ describe('joining a thread does not change who is trusted', () => {
     expect(capture).not.toContain('trusted');
   });
 });
+
+/**
+ * A message you can answer.
+ *
+ * Capture sets `thread_id` whenever the sender could be identified, which is
+ * what makes a reply possible — but the message page showed the three decisions
+ * about what the message should *become* and nothing about answering the person
+ * who sent it. Finding the conversation meant leaving the message and hunting
+ * for it by the sender's name.
+ */
+describe('replying from the message', () => {
+  const inbox = readFileSync('src/modules/inbox/index.ts', 'utf8');
+
+  it('offers the reply where the message is read', () => {
+    expect(inbox).toContain('Reply to ${msg.sender_display ?? msg.sender ?? \'them\'}');
+    expect(inbox).toContain('href="/inbox/threads/${msg.thread_id}"');
+  });
+
+  it('offers it only when there is a conversation to reply in', () => {
+    // Without a peer there is no thread, and a dead button is worse than none.
+    const actions = inbox.slice(inbox.indexOf("card('Actions'"), inbox.indexOf("card('Details'"));
+    expect(actions).toContain('${msg.thread_id');
+  });
+
+  it('keeps it out of the three decisions about what the message becomes', () => {
+    // Create an inquiry, file it, ignore it — those decide what the message is.
+    // Answering the person is a different question and must not look like a
+    // fourth option in that set.
+    const actions = inbox.slice(inbox.indexOf("card('Actions'"), inbox.indexOf("card('Details'"));
+    expect(actions.indexOf('Create an inquiry from this'))
+      .toBeLessThan(actions.indexOf('Reply to $'));
+  });
+});
