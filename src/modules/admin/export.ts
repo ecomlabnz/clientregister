@@ -189,8 +189,8 @@ export const DATASETS: Dataset[] = [
   {
     key: 'knowledge', label: 'Knowledge base',
     description: 'Articles with their publication and effective dates.',
-    sql: `SELECT ref, title, kind, status, published_on, effective_at, review_at, expires_at,
-                 source_url, body, created_at, updated_at
+    sql: `SELECT ref, title, kind, status, published_at, effective_at, review_at, expires_at,
+                 source, source_ref, summary, body, created_at, updated_at
             FROM kb_articles ORDER BY ref`,
   },
   {

@@ -650,27 +650,38 @@ export const casesModule: AppModule = {
 
           <div class="col-side">
             ${card('Tags', html`
+              ${/* Each tag and its remove button are one chip, so the × can
+                    never wrap onto the next line away from the tag it removes —
+                    which is what made a row of three tags read as four. */ ''}
               ${caseTags.length === 0
                 ? html`<p class="muted small">No tags yet.</p>`
-                : html`<p class="tag-row">${caseTags.map((tag) => html`
-                    ${badge(tag.name, tag.colour)}
-                    ${writable ? html`
-                      <form method="post" action="/cases/${kase.id}/tags/${tag.id}/remove" class="inline-form">
-                        ${csrfField(csrf)}
-                        <button class="btn-tag-remove" type="submit" title="Remove ${tag.name}">×</button>
-                      </form>` : ''}`)}</p>`}
+                : html`<div class="tag-row">${caseTags.map((tag) => html`
+                    <span class="tag-chip">
+                      ${badge(tag.name, tag.colour)}
+                      ${writable ? html`
+                        <form method="post" action="/cases/${kase.id}/tags/${tag.id}/remove" class="inline-form">
+                          ${csrfField(csrf)}
+                          <button class="btn-tag-remove" type="submit" title="Remove ${tag.name}">×</button>
+                        </form>` : ''}
+                    </span>`)}</div>`}
+              ${/* Folded away by default. The box is for the once-in-a-while
+                    occasion of adding a tag, and it was taking more room than
+                    the tags themselves. `details` needs no script. */ ''}
               ${writable ? html`
-                <form method="post" action="/cases/${kase.id}/tags" class="tag-form">
-                  ${csrfField(csrf)}
-                  <label for="f_tag">Add a tag</label>
-                  <input id="f_tag" name="tag" list="tag-options" maxlength="40" required
-                         placeholder="Type a new tag or pick one" autocomplete="off">
-                  <datalist id="tag-options">
-                    ${allTags.map((tag) => html`<option value="${tag.name}"></option>`)}
-                  </datalist>
-                  <button class="btn btn-secondary btn-small" type="submit">Add</button>
-                  <p class="hint">Anything you type that does not exist yet is created.</p>
-                </form>` : ''}`)}
+                <details class="tag-add">
+                  <summary>Add a tag</summary>
+                  <form method="post" action="/cases/${kase.id}/tags" class="tag-form">
+                    ${csrfField(csrf)}
+                    <label class="sr-only" for="f_tag">Tag</label>
+                    <input id="f_tag" name="tag" list="tag-options" maxlength="40" required
+                           placeholder="Type a new tag or pick one" autocomplete="off">
+                    <datalist id="tag-options">
+                      ${allTags.map((tag) => html`<option value="${tag.name}"></option>`)}
+                    </datalist>
+                    <button class="btn btn-secondary btn-small" type="submit">Add</button>
+                    <p class="hint">Anything you type that does not exist yet is created.</p>
+                  </form>
+                </details>` : ''}`)}
 
             ${card('Key details', html`
               <dl class="kv">

@@ -19,9 +19,18 @@ describe('the model the practice runs on', () => {
     // a case type or a fee rate — not something to wait on a deploy for. And
     // one owner: a secret saying one thing while a setting says another is the
     // kind of disagreement nobody finds until it matters.
-    expect(anthropic).toContain('chosenModel || DEFAULT_MODEL');
-    expect(provider).toContain('createAnthropicProvider(env, await currentModel(env))');
+    expect(anthropic).toContain('opts.model || DEFAULT_MODEL');
+    expect(provider).toContain('createAnthropicProvider(env, { model, workspaceId })');
     expect(collect).not.toMatch(/^\s*'AI_MODEL',/m);
+  });
+
+  it('sends the workspace header only when there is a workspace', () => {
+    // An identity-linked key refuses a request that does not name its
+    // workspace; an ordinary key refuses the header. Empty has to mean absent,
+    // not sent blank.
+    expect(anthropic).toContain("'anthropic-workspace-id': opts.workspaceId");
+    expect(anthropic).toContain('opts.workspaceId\n      ? { defaultHeaders');
+    expect(provider).toContain("key: 'ai.workspace_id'");
   });
 
   it('prices every option, because the choice is about cost', () => {

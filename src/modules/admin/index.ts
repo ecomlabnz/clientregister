@@ -804,7 +804,11 @@ export const adminModule: AppModule = {
             <td class="small col-sm-hide">${row.entity_type
               ? html`${row.entity_type}<div class="muted clamp-1">${truncate(row.entity_id, 20)}</div>`
               : '—'}</td>
-            <td class="small muted col-sm-hide nowrap">${row.ip ?? '—'}</td>
+            ${/* Not nowrap: an IPv6 address is one unbreakable token wider than
+                   the column, and in a fixed table it does not widen the column —
+                   it paints over the cell beside it, which is how the detail
+                   text came to have an address written through it. */ ''}
+            <td class="small muted col-sm-hide break-any">${row.ip ?? '—'}</td>
             <td class="small muted"><span class="clamp-2 break-any">${truncate(row.meta_json, 160)}</span></td>
           </tr>`;
         }), { sticky: true, fixed: true, empty: 'Nothing recorded in this window.' })}

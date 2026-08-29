@@ -102,9 +102,20 @@ const BriefSchema = z.object({
  */
 const DEFAULT_MODEL = 'claude-haiku-4-5';
 
-export function createAnthropicProvider(env: Env, chosenModel?: string): AiProvider {
-  const model = chosenModel || DEFAULT_MODEL;
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+export function createAnthropicProvider(
+  env: Env,
+  opts: { model?: string; workspaceId?: string } = {},
+): AiProvider {
+  const model = opts.model || DEFAULT_MODEL;
+  // An identity-linked key refuses any request that does not say which
+  // workspace it acts in. An ordinary key refuses the header. So it is sent
+  // only when there is one, rather than sent empty.
+  const client = new Anthropic({
+    apiKey: env.ANTHROPIC_API_KEY,
+    ...(opts.workspaceId
+      ? { defaultHeaders: { 'anthropic-workspace-id': opts.workspaceId } }
+      : {}),
+  });
 
   return {
     name: 'anthropic',
