@@ -15,6 +15,9 @@ the same page opens as fast on a phone between appointments as on a desk. It has
 an AI assistant that reads files and drafts briefs, and it works completely with
 that assistant switched off.
 
+**Everything described below is built and running.** Nothing on this page is a
+roadmap item, and the one thing that is still to come says so plainly at the end.
+
 ---
 
 ## What it is for
@@ -181,6 +184,13 @@ and questions edited from inside the register.
 - **A strict content security policy.** No inline script, no inline style, no
   CDN, nothing loaded from a third party. There is no analytics tag and no
   tracker.
+- **Documents are stored in Oceania**, deliberately — the bucket was created with
+  that placement and cannot silently drift.
+- **The AI is off until you turn it on, and can be turned off again.** When it is
+  on, the text of the matter you asked about goes to the model provider named in
+  the settings, and nothing else does; when it is off, nothing leaves at all and
+  every other part of the register works unchanged. Which model, and what it
+  costs per million tokens, are shown where you choose it.
 - **Rate limiting** on sign-in, and sessions that end immediately when an
   account is suspended.
 - **An audit log** recording every sign-in and failed attempt, every record
@@ -218,6 +228,10 @@ That is the piece practice software has generally left out. Filing what you were
 sent is not the same as being able to find the decision that answers the point,
 and an adviser who has to leave the register to do the reading loses the thread
 of the matter they were reading for.
+
+It is also, on a survey of every product sold into this market in New Zealand and
+Australia, a thing none of them does. The category is uniformly practice
+management with the law left outside it.
 
 ---
 
