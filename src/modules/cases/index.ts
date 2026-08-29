@@ -9,8 +9,9 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
-import { all, nextYearlyRef, nowIso, one, run } from '../../core/db';
+import { all, nextRef, nextYearlyRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
+import { composeFullName, familyNameFor, formalName, plainAscii } from '../../core/names';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
@@ -586,8 +587,28 @@ export const casesModule: AppModule = {
                     <button class="btn btn-primary" type="submit">Add party</button>
                   </form>
                   <p class="hint">Everyone on a matter is a client in their own right — a partner, a
-                     child, an employer — so each has their own documents and expiry dates.
-                     <a href="/clients/new">Create a client</a> first if they are not on file.</p>
+                     child, an employer — so each has their own documents and expiry dates.</p>
+
+                  ${'' /* Somebody who is not on file yet is the ordinary case
+                           for a party, not the exception: a partner, a child, an
+                           employer. Sending the adviser away to the client form
+                           and back loses the matter they were working on, and
+                           the record they create there is the same record this
+                           makes — a client, with a reference of its own. */}
+                  <p class="subhead mt">Not on file yet?</p>
+                  <form method="post" action="/cases/${kase.id}/parties/new" class="row-form">
+                    ${csrfField(csrf)}
+                    ${field({ label: 'Given names', name: 'given_names', maxlength: 120,
+                              placeholder: 'As in the passport' })}
+                    ${field({ label: 'Family name', name: 'family_name', required: true, maxlength: 120 })}
+                    ${select({ label: 'Role on this case', name: 'role', value: 'secondary_applicant',
+                               includeBlank: false, options: optionsFrom(PARTY_ROLES, PARTY_ROLE_LABELS) })}
+                    ${field({ label: 'Email', name: 'email', type: 'email', maxlength: 320 })}
+                    <button class="btn btn-secondary" type="submit">Create and add</button>
+                  </form>
+                  <p class="hint">Creates a client record and puts them on this matter in one step.
+                     Everything else about them — passport, nationality, dates — is filled in on
+                     their own page afterwards, which is where it belongs.</p>
                 </details>` : ''}`)}
 
             ${fees}
@@ -947,6 +968,66 @@ export const casesModule: AppModule = {
     });
 
     // --- Parties ------------------------------------------------------------
+    /**
+     * Create a client and put them on this matter, in one step.
+     *
+     * A party who is not on file yet is the ordinary case, not the exception —
+     * a partner, a child, an employer. Sending somebody to the client form and
+     * back loses the matter they were working on, and produces exactly the
+     * record this produces.
+     *
+     * Deliberately only four fields. The rest of what the register holds about
+     * a person belongs on that person's own page, and a long form here would
+     * be a second client form to keep in step with the first.
+     */
+    r.post('/:id/parties/new', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const user = c.get('user')!;
+      const kase = await one<{ id: string; ref: string }>(c.env.DB, 'SELECT id, ref FROM cases WHERE id = ?', id);
+      if (!kase) return c.notFound();
+
+      const f = new FormReader(await c.req.formData());
+      const givenNames = f.optional('given_names', { max: 120 });
+      const familyName = f.text('family_name', { required: true, label: 'Family name', max: 120 });
+      const roleRaw = f.text('role', { required: true, label: 'Role', max: 40 });
+      const email = f.email('email');
+      if (!f.valid || !isPartyRole(roleRaw)) {
+        return redirectWith(c, `/cases/${id}`, 'A family name and a role are needed.', 'err');
+      }
+
+      // Through the same helpers the client form uses, so a person created here
+      // is written exactly as one created there — family name in capitals, in
+      // plain English letters, however it was typed.
+      const family = familyNameFor(familyName);
+      const given = plainAscii(givenNames ?? '');
+      const clientId = newId('cli');
+      const ref = await nextRef(c.env.DB, 'client', 'CL');
+      const stamp = nowIso();
+      await run(
+        c.env.DB,
+        `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name, email,
+            status, assigned_to, created_at, updated_at, created_by)
+         VALUES (?,?, 'individual', ?,?,?,?, 'active', ?,?,?,?)`,
+        clientId, ref, composeFullName('individual', { givenNames: given, familyName: family }),
+        given || null, family, email ?? null, user.id, stamp, stamp, user.id,
+      );
+
+      const result = await addParty(c.env, {
+        caseId: id, clientId, role: roleRaw, notes: null, createdBy: user.id });
+      if (!result.ok) return redirectWith(c, `/cases/${id}`, result.reason, 'err');
+
+      await addEntry(c.env, {
+        entityType: 'case', entityId: id, kind: 'system',
+        body: `${formalName({ givenNames: given, familyName: family })} added as `
+          + `${PARTY_ROLE_LABELS[roleRaw]}, and created as client ${ref}.`,
+        createdBy: user.id,
+      });
+      await auditFrom(c, { action: 'client.created', entityType: 'client', entityId: clientId,
+        meta: { ref, from: 'case_party', caseRef: kase.ref } });
+      return redirectWith(c, `/cases/${id}`,
+        `${ref} created and added. Their own page is where the rest of their details go.`);
+    });
+
     r.post('/:id/parties', requirePermission('register:write'), async (c) => {
       const id = c.req.param('id')!;
       const user = c.get('user')!;

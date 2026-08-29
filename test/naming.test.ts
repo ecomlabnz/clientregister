@@ -178,3 +178,59 @@ describe('the short form of a case type', () => {
     expect(appjs).toContain("if (specific === 'General' || specific === 'Other') specific = group;");
   });
 });
+
+/**
+ * Adding somebody who is not on file yet.
+ *
+ * A party who does not exist as a client is the ordinary case, not the
+ * exception — a partner, a child, an employer. Sending an adviser to the client
+ * form and back loses the matter they were working on, and produces exactly the
+ * record this produces.
+ */
+describe('creating a party from the matter', () => {
+  const cases = readFileSync('src/modules/cases/index.ts', 'utf8');
+
+  it('writes the name through the same helpers as the client form', () => {
+    // Otherwise there are two answers to "how is a family name stored", and
+    // one of them is whatever somebody typed.
+    const route = cases.slice(cases.indexOf("r.post('/:id/parties/new'"),
+                              cases.indexOf("r.post('/:id/parties',"));
+    expect(route).toContain('familyNameFor(familyName)');
+    expect(route).toContain('plainAscii(givenNames');
+    expect(route).toContain("composeFullName('individual'");
+  });
+
+  it('gives them a reference of their own', () => {
+    // A party is a client in their own right, with their own documents and
+    // expiry dates. A record without a reference is not one.
+    const route = cases.slice(cases.indexOf("r.post('/:id/parties/new'"),
+                              cases.indexOf("r.post('/:id/parties',"));
+    expect(route).toContain("nextRef(c.env.DB, 'client', 'CL')");
+  });
+
+  it('asks for four things and no more', () => {
+    // The rest of what the register holds about a person belongs on that
+    // person's page. A longer form here would be a second client form to keep
+    // in step with the first.
+    const form = cases.slice(cases.indexOf('Not on file yet?'), cases.indexOf('Creates a client record'));
+    const fields = [...form.matchAll(/name: '(\w+)'/g)].map((m) => m[1]!);
+    expect(fields).toEqual(['given_names', 'family_name', 'role', 'email']);
+  });
+
+  it('records it on the file and in the audit log', () => {
+    const route = cases.slice(cases.indexOf("r.post('/:id/parties/new'"),
+                              cases.indexOf("r.post('/:id/parties',"));
+    expect(route).toContain('addEntry');
+    expect(route).toContain("action: 'client.created'");
+    expect(route).toContain("from: 'case_party'");
+  });
+
+  it('leaves the adviser on the matter they were working on', () => {
+    // The whole point. A redirect anywhere else and this is the old journey
+    // with extra steps.
+    const route = cases.slice(cases.indexOf("r.post('/:id/parties/new'"),
+                              cases.indexOf("r.post('/:id/parties',"));
+    expect(route).toContain('return redirectWith(c, `/cases/${id}`');
+    expect(route).not.toContain('/clients/new');
+  });
+});
