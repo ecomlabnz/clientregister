@@ -347,6 +347,35 @@ function readClientForm(f: FormReader) {
   };
 }
 
+/**
+ * What each sortable heading in the client list orders by.
+ *
+ * A key arrives in the address bar, so it is looked up here and never
+ * interpolated: an unknown key finds nothing and the list falls back to its
+ * default order. Anything reaching ORDER BY from a query string would be an
+ * injection with a URL for a payload.
+ *
+ * Each entry is a list, because one heading can need more than one expression
+ * to break its own ties — and each gets the direction applied, or only the
+ * last would be reversed.
+ */
+export const CLIENT_SORTS: Record<string, string[]> = {
+  ref: ['c.ref'],
+  // A register that writes surnames in capitals sorts by them too: "TRUONG,
+  // Thi Thu Thuy" belongs under T for Truong, not under T for Thi. An
+  // organisation has no family name, so it sorts under its registered one.
+  //
+  // COLLATE NOCASE because SQLite compares text by byte otherwise, which puts
+  // TRUONG before Tagata — capitals sort ahead of lower case. The column is
+  // written in capitals, so this only matters for a row that arrived some
+  // other way, and it is exactly that row a person would go looking for.
+  name: ["COALESCE(NULLIF(c.family_name, ''), c.full_name) COLLATE NOCASE", 'c.full_name COLLATE NOCASE'],
+  contact: ["COALESCE(c.email, c.phone, '') COLLATE NOCASE"],
+  status: ['c.status'],
+  cases: ['open_cases'],
+  updated: ['c.updated_at'],
+};
+
 export const clientsModule: AppModule = {
   name: 'clients',
   title: 'Clients',
@@ -364,6 +393,7 @@ export const clientsModule: AppModule = {
       const pageNum = Math.max(1, Number(c.req.query('page') ?? '1') || 1);
 
       const prefs = await preferencesFor(c.env, c.get('user')!.id);
+
       const PAGE_SIZE = asPrefInteger(prefs['pref.page_size'], DEFAULT_PAGE_SIZE);
       const offset = (pageNum - 1) * PAGE_SIZE;
 
@@ -390,11 +420,22 @@ export const clientsModule: AppModule = {
       }
       const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
+      const asked = c.req.query('sort') ?? '';
+      const sortCols = CLIENT_SORTS[asked];
+      const sortKey = sortCols ? asked : '';
+      const sortDir = c.req.query('dir') === 'desc' ? 'desc' : 'asc';
+      const dirSql = sortDir === 'desc' ? 'DESC' : 'ASC';
+      // The ref tie-breaker keeps paging stable: two rows with the same status
+      // must not swap places between page one and page two.
+      const orderSql = sortCols
+        ? `${sortCols.map((e) => `${e} ${dirSql}`).join(', ')}, c.ref ASC`
+        : 'c.updated_at DESC';
+
       const rows = await all<ClientRow & { open_cases: number }>(
         c.env.DB,
         `SELECT c.*, (SELECT COUNT(*) FROM cases k WHERE k.client_id = c.id AND k.closed_at IS NULL) AS open_cases
            FROM clients c ${whereSql}
-          ORDER BY c.updated_at DESC LIMIT ?${params.length + 1} OFFSET ?${params.length + 2}`,
+          ORDER BY ${orderSql} LIMIT ?${params.length + 1} OFFSET ?${params.length + 2}`,
         ...params, PAGE_SIZE + 1, offset,
       );
       const hasMore = rows.length > PAGE_SIZE;
@@ -440,12 +481,12 @@ export const clientsModule: AppModule = {
         </form>
         <div data-live-results>
         ${table([
-          { label: 'Reference', width: '14', hideOn: 'sm' },
-          { label: 'Name', width: '30' },
-          { label: 'Contact', width: '24' },
-          { label: 'Status', width: '14', hideOn: 'sm' },
-          { label: 'Open cases', width: '10', hideOn: 'sm' },
-          { label: 'Updated', width: '12', hideOn: 'sm' },
+          { label: 'Reference', width: '14', hideOn: 'sm', sort: 'ref' },
+          { label: 'Name', width: '30', sort: 'name' },
+          { label: 'Contact', width: '24', sort: 'contact' },
+          { label: 'Status', width: '14', hideOn: 'sm', sort: 'status' },
+          { label: 'Open cases', width: '10', hideOn: 'sm', sort: 'cases' },
+          { label: 'Updated', width: '12', hideOn: 'sm', sort: 'updated' },
         ], shown.map((row) => html`
           <tr>
             <td class="col-sm-hide"><a href="/clients/${row.id}"><code>${row.ref}</code></a></td>
@@ -464,10 +505,15 @@ export const clientsModule: AppModule = {
             <td class="col-sm-hide">${badge(CLIENT_STATUS_LABELS[row.status], statusTone(row.status))}</td>
             <td class="col-sm-hide">${row.open_cases || '—'}</td>
             <td class="small col-sm-hide">${dateShort(row.updated_at)}</td>
-          </tr>`), { sticky: true, fixed: true, empty: 'No clients match that.' })}
+          </tr>`), { sticky: true, fixed: true, empty: 'No clients match that.',
+            // Sorting resets to page one: the second page of one order holds
+            // different rows from the second page of another.
+            sort: { key: sortKey, dir: sortDir,
+                    href: (key, dir) => `/clients?${new URLSearchParams({
+                      view, q, status, sort: key, dir, page: '1' }).toString()}` } })}
         <div class="pager">
-          ${pageNum > 1 ? html`<a class="btn btn-secondary" href="/clients?view=${view}&q=${q}&status=${status}&page=${pageNum - 1}">Previous</a>` : ''}
-          ${hasMore ? html`<a class="btn btn-secondary" href="/clients?view=${view}&q=${q}&status=${status}&page=${pageNum + 1}">Next</a>` : ''}
+          ${pageNum > 1 ? html`<a class="btn btn-secondary" href="${`/clients?${new URLSearchParams({ view, q, status, sort: sortKey, dir: sortDir, page: String(pageNum - 1) }).toString()}`}">Previous</a>` : ''}
+          ${hasMore ? html`<a class="btn btn-secondary" href="${`/clients?${new URLSearchParams({ view, q, status, sort: sortKey, dir: sortDir, page: String(pageNum + 1) }).toString()}`}">Next</a>` : ''}
         </div>
         </div>`);
     });

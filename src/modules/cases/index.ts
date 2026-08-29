@@ -61,6 +61,43 @@ export interface CaseRow {
 
 const DEFAULT_PAGE_SIZE = 25;
 
+/**
+ * What a column heading may sort by.
+ *
+ * A key arrives in the address bar, so it is looked up here rather than used.
+ * Anything reaching ORDER BY from a query string would be an injection, and an
+ * allow-list is the only version of this that cannot become one.
+ *
+ * Each entry is the SQL for ascending; descending flips it. The tie-breaker on
+ * `ref` keeps paging stable — two rows with the same status must not swap
+ * places between page one and page two.
+ */
+/**
+ * What each sortable heading orders by. A key arrives in the address bar, so it
+ * is looked up here and never interpolated: an unknown key finds nothing and
+ * the list falls back to its default order.
+ *
+ * Each entry is a list, because one heading can need more than one expression
+ * to break its own ties — and each gets the direction applied, or only the last
+ * would be reversed.
+ */
+export const CASE_SORTS: Record<string, string[]> = {
+  ref: ['k.ref'],
+  title: ['k.title COLLATE NOCASE'],
+  // By family name, as the client list sorts, so the same person is in the
+  // same place in both. COLLATE NOCASE for the reason given there.
+  client: ["COALESCE(NULLIF(cl.family_name, ''), cl.full_name) COLLATE NOCASE", 'cl.full_name COLLATE NOCASE'],
+  status: ['k.status'],
+  due: ["COALESCE(k.decision_due_at, k.next_action_due, '9999')"],
+  owner: ["COALESCE(u.name, '') COLLATE NOCASE"],
+};
+
+/** The order used when nobody has asked for one: most pressing first. */
+const CASE_DEFAULT_ORDER =
+  `CASE k.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
+   COALESCE(k.decision_due_at, k.next_action_due, '9999') ASC,
+   k.updated_at DESC`;
+
 function caseForm(
   c: any,
   values: Partial<CaseRow>,
@@ -226,6 +263,17 @@ export const casesModule: AppModule = {
       const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
       params.push(PAGE_SIZE + 1, (pageNum - 1) * PAGE_SIZE);
 
+      const asked = c.req.query('sort') ?? '';
+      const sortCols = CASE_SORTS[asked];
+      const sortKey = sortCols ? asked : '';
+      const sortDir = c.req.query('dir') === 'desc' ? 'desc' : 'asc';
+      const dirSql = sortDir === 'desc' ? 'DESC' : 'ASC';
+      // The ref tie-breaker keeps paging stable: two rows sharing a status must
+      // not swap places between page one and page two.
+      const orderSql = sortCols
+        ? `${sortCols.map((e) => `${e} ${dirSql}`).join(', ')}, k.ref ASC`
+        : CASE_DEFAULT_ORDER;
+
       const rows = await all<CaseRow & { client_name: string; client_ref: string; assignee_name: string | null }>(
         c.env.DB,
         `SELECT k.*, cl.full_name AS client_name, cl.ref AS client_ref, u.name AS assignee_name
@@ -233,9 +281,7 @@ export const casesModule: AppModule = {
            JOIN clients cl ON cl.id = k.client_id
            LEFT JOIN users u ON u.id = k.assigned_to
            ${whereSql}
-          ORDER BY CASE k.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
-                   COALESCE(k.decision_due_at, k.next_action_due, '9999') ASC,
-                   k.updated_at DESC
+          ORDER BY ${orderSql}
           LIMIT ?${params.length - 1} OFFSET ?${params.length}`,
         ...params,
       );
@@ -247,7 +293,7 @@ export const casesModule: AppModule = {
       ]);
 
       const qs = (over: Record<string, string | number>) =>
-        new URLSearchParams({ q, status, assigned, scope, tag: tagFilter, page: String(pageNum), ...Object.fromEntries(Object.entries(over).map(([k2, v]) => [k2, String(v)])) }).toString();
+        new URLSearchParams({ q, status, assigned, scope, tag: tagFilter, sort: sortKey, dir: sortDir, page: String(pageNum), ...Object.fromEntries(Object.entries(over).map(([k2, v]) => [k2, String(v)])) }).toString();
 
       return page(c, { title: 'Cases', active: '/cases' }, html`
         ${pageHeader('Cases', 'Every matter the practice is running.',
@@ -281,12 +327,12 @@ export const casesModule: AppModule = {
           * layouts, so there is one list to maintain, not two.
           */ ''}
         ${table([
-          { label: 'Reference', width: '16', hideOn: 'sm' },
-          { label: 'Matter', width: '30' },
-          { label: 'Client', width: '18', hideOn: 'sm' },
-          { label: 'Status', width: '18', hideOn: 'sm' },
-          { label: 'Key date', width: '18' },
-          { label: 'Owner', width: '12', hideOn: 'sm' },
+          { label: 'Reference', width: '16', hideOn: 'sm', sort: 'ref' },
+          { label: 'Matter', width: '30', sort: 'title' },
+          { label: 'Client', width: '18', hideOn: 'sm', sort: 'client' },
+          { label: 'Status', width: '18', hideOn: 'sm', sort: 'status' },
+          { label: 'Key date', width: '18', sort: 'due' },
+          { label: 'Owner', width: '12', hideOn: 'sm', sort: 'owner' },
         ], shown.map((row) => {
           const overdue = isOverdue(row.decision_due_at) && isOpenStatus(row.status);
           return html`
@@ -322,7 +368,12 @@ export const casesModule: AppModule = {
                   : '—'}</td>
             <td class="small col-sm-hide">${row.assignee_name ?? '—'}</td>
           </tr>`;
-        }), { sticky: true, fixed: true, empty: 'No cases match that.' })}
+        }), { sticky: true, fixed: true, empty: 'No cases match that.',
+              // Sorting resets to page one: the second page of one order holds
+              // different rows from the second page of another, so keeping the
+              // number would land somewhere arbitrary.
+              sort: { key: sortKey, dir: sortDir,
+                      href: (key, dir) => `/cases?${qs({ sort: key, dir, page: 1 })}` } })}
         <div class="pager">
           ${pageNum > 1 ? html`<a class="btn btn-secondary" href="/cases?${raw(qs({ page: pageNum - 1 }))}">Previous</a>` : ''}
           ${hasMore ? html`<a class="btn btn-secondary" href="/cases?${raw(qs({ page: pageNum + 1 }))}">Next</a>` : ''}

@@ -106,6 +106,13 @@ export function emptyState(message: string, actionHtml?: Raw): Raw {
 
 export interface Column {
   label: string;
+  /**
+   * Makes the heading a sort control. The value is a key the page understands,
+   * never SQL — the page maps it through an allow-list, because a sort key
+   * arrives in the address bar and anything reaching ORDER BY from there would
+   * be an injection.
+   */
+  sort?: string;
   /** Share of the table width. With `fixed`, this is what stops one column
    *  taking the space three others needed. */
   width?: string;
@@ -113,6 +120,13 @@ export interface Column {
    *  same class, because a pre-rendered row cannot be told its own index. */
   hideOn?: 'sm';
   align?: 'right';
+}
+
+export interface SortState {
+  key: string;
+  dir: 'asc' | 'desc';
+  /** The address this table is at, with a different sort applied. */
+  href: (key: string, dir: 'asc' | 'desc') => string;
 }
 
 export interface TableOpts {
@@ -135,6 +149,14 @@ export interface TableOpts {
   fixed?: boolean;
   /** Shown instead of the table when there are no rows. */
   empty?: string;
+  /**
+   * How the table is sorted now, and how to ask for it differently.
+   *
+   * Headings become ordinary links. Sorting a list is navigation — a different
+   * view of the same thing, with an address you can keep — so it needs no
+   * script and survives a reload.
+   */
+  sort?: SortState;
 }
 
 export function table(columns: Array<string | Column>, rows: Raw[], opts: TableOpts = {}): Raw {
@@ -151,10 +173,23 @@ export function table(columns: Array<string | Column>, rows: Raw[], opts: TableO
         ${sized
           ? html`<colgroup>${cols.map((c) => html`<col ${c.width ? raw(`class="w-${c.width}"`) : ''}>`)}</colgroup>`
           : ''}
-        <thead><tr>${cols.map((c) => html`<th class="${[
-          c.hideOn === 'sm' ? 'col-sm-hide' : '',
-          c.align === 'right' ? 'num' : '',
-        ].filter(Boolean).join(' ')}">${c.label}</th>`)}</tr></thead>
+        <thead><tr>${cols.map((c) => {
+          const cls = [
+            c.hideOn === 'sm' ? 'col-sm-hide' : '',
+            c.align === 'right' ? 'num' : '',
+          ].filter(Boolean).join(' ');
+          if (!c.sort || !opts.sort) return html`<th class="${cls}">${c.label}</th>`;
+          const current = opts.sort.key === c.sort;
+          // Clicking the column you are already sorted by reverses it; clicking
+          // another starts it ascending, which is what a person means by
+          // "sort by name".
+          const next = current && opts.sort.dir === 'asc' ? 'desc' : 'asc';
+          return html`<th class="${cls}" ${current ? raw(`aria-sort="${opts.sort.dir === 'asc' ? 'ascending' : 'descending'}"`) : ''}>
+            <a class="${current ? 'th-sort th-sort-on' : 'th-sort'}"
+               href="${opts.sort.href(c.sort, next)}">${c.label}<span class="th-arrow" aria-hidden="true">${
+                 current ? (opts.sort.dir === 'asc' ? '▲' : '▼') : '↕'}</span></a>
+          </th>`;
+        })}</tr></thead>
         <tbody>${join(rows)}</tbody>
       </table>
     </div>`;
