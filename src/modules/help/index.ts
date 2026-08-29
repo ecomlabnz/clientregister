@@ -32,6 +32,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.34.0', date: '29 August 2026',
+    notes: [
+      'Inquiries, the Inbox and Conversations share one menu entry, Incoming, as three tabs. '
+        + 'They are still separate records — only the menu is shared.',
+      'The number beside each of those tabs is what is waiting on it, not how many rows exist.',
+    ],
+  },
+  {
     version: '0.33.0', date: '29 August 2026',
     notes: [
       'A client may hold more than one passport. The one on their form is the primary; '
@@ -39,7 +47,8 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
         + 'is watched for expiry.',
       'Forms now size themselves to the space they are in rather than to the window, '
         + 'so a narrow window no longer squeezes them into unreadable columns.',
-      '“For approval” keeps the Alerts tab bar instead of replacing it, so there is a way back.',
+      '“For approval” keeps the Alerts tab bar and its figures instead of replacing them, '
+        + 'so there is a way back.',
     ],
   },
   {
@@ -325,8 +334,8 @@ function sections(origin: string): Section[] {
       body: html`
         <p>The bar across the top is the whole application. <strong>Dashboard</strong> is the daily
            starting point; <strong>Alerts</strong> is everything with a date attached;
-           <strong>Inbox</strong> holds messages captured from email, Telegram and WhatsApp that
-           nobody has dealt with yet.</p>
+           <strong>Incoming</strong> is everything that arrived from outside — inquiries, the raw
+           inbox, and the channel conversations, as three tabs of one page.</p>
         <p>Press <kbd>/</kbd> anywhere to jump to the search box on the page. Your name at the top
            right opens your account; <strong>Sign out</strong> sits beside it.</p>
         <p>You will only see the parts your role allows. If a colleague can see something you
@@ -507,14 +516,21 @@ function sections(origin: string): Section[] {
     },
     {
       id: 'inquiries',
-      title: 'Inquiries and the inbox',
+      title: 'Incoming: inquiries, inbox and conversations',
       body: html`
-        <p>An <strong>inquiry</strong> is work that arrives before there is a client. Record one by
-           hand for a phone call, or let it arrive through a channel.</p>
+        <p><strong>Incoming</strong> is one menu entry with three tabs, because what you actually
+           want to know is "what came in" rather than which of three screens to look at. The number
+           beside each tab is what is waiting on it.</p>
+        <p>An <strong>inquiry</strong> is work that arrives before there is a client: a reference, a
+           status and an owner. Record one by hand for a phone call, or let it arrive through a
+           channel.</p>
         <p>The <strong>Inbox</strong> holds messages captured from email, Telegram and WhatsApp
            exactly as they arrived. Messages from senders on the allow-list become inquiries
            automatically; anything else waits there marked <em>unverified</em> until a person
            decides, which is what stops a stranger who finds the address creating records.</p>
+        <p>They stay separate records on purpose. A message is not a piece of work: a thread of
+           twenty messages is still one inquiry, and an inquiry taken over the phone has no message
+           behind it at all. Only the menu is shared.</p>
         <p>From an inquiry, <strong>Create client and case</strong> does both in one step and links
            them, carrying the original message across as the case summary. If the contact details
            match someone already on file, the page says so rather than making a duplicate.</p>`,
@@ -1106,7 +1122,7 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
       id: 'conversations',
       title: 'Conversations',
       body: html`
-        <p>Under <strong>Inbox → Conversations</strong> each channel is a two-way thread: what
+        <p>Under <strong>Incoming → Conversations</strong> each channel is a two-way thread: what
            somebody sent, and what the practice sent back, in one place and on the file.</p>
         <p>A thread is one counterpart on one channel — a Telegram chat, a WhatsApp number. It
            starts by itself the first time they write. Link it to a client and the conversation is

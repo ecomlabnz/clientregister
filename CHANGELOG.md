@@ -7,6 +7,30 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.34.0 — 29 August 2026
+
+### Changed
+- **Inquiries, the Inbox and Conversations share one menu entry, *Incoming*,
+  as three tabs.** Nobody thinks "I will go to the Inbox" — they think "what
+  came in", and three separate entries made you choose a screen before you knew
+  what had arrived.
+- **They stay separate records.** The inbox holds raw messages from a channel:
+  untrusted outside text that nothing acts on by itself. An inquiry is a work
+  item with a reference, a status and an owner. A thread of twenty messages is
+  still one inquiry, and an inquiry taken over the phone has no message behind
+  it at all. Merging the data would lose that; only the menu is shared.
+- The number beside each tab is what is *waiting* on it — open inquiries,
+  untriaged messages, open threads — not how many rows exist. A count is only
+  useful if it means "this much is asking for you".
+- The inbox's own status views (Waiting, Processed, Ignored, Failed, All) are a
+  row of buttons now rather than a second bar of tabs, for the same reason the
+  approvals queue's are: two tab bars on one page make the lower one look like
+  navigation away rather than a filter of what is already there.
+- The Inbox and Conversations tabs are absent for a role that cannot triage,
+  not disabled — a tab that refuses to open is worse than one never offered.
+  Checked by demoting an account to `readonly`: the bar shows Inquiries alone
+  and `/inbox` answers 403.
+
 ## 0.33.0 — 29 August 2026
 
 ### Added
