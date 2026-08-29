@@ -26,10 +26,22 @@ describe('composeFullName', () => {
 
 describe('formalName', () => {
   it('reads family first for listings', () => {
-    expect(formalName({ givenNames: 'Ana Maria', familyName: 'Silva' })).toBe('Silva, Ana Maria');
-    expect(formalName({ familyName: 'Silva' })).toBe('Silva');
+    expect(formalName({ givenNames: 'Ana Maria', familyName: 'Silva' })).toBe('SILVA, Ana Maria');
+    expect(formalName({ familyName: 'Silva' })).toBe('SILVA');
     expect(formalName({ givenNames: 'Ana' })).toBe('Ana');
     expect(formalName({}, 'Unnamed')).toBe('Unnamed');
+  });
+
+  it('capitalises the family name, as a passport does', () => {
+    // Half this practice's clients have names whose order is not the English
+    // one. "TRUONG, Thi Thu Thuy" says which part is the family name;
+    // "Truong, Thi Thu Thuy" leaves it to be guessed, and guessing wrong on a
+    // form comes back as a request for evidence.
+    expect(formalName({ givenNames: 'Thi Thu Thuy', familyName: 'Truong' }))
+      .toBe('TRUONG, Thi Thu Thuy');
+    // Only the family name. Given names keep the capitalisation they were
+    // entered with, because that is how the person writes them.
+    expect(formalName({ givenNames: 'Dac Dat', familyName: 'bui' })).toBe('BUI, Dac Dat');
   });
 });
 

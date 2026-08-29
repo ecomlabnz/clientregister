@@ -73,6 +73,22 @@ export function sparkline(values: number[], opts: { label: string } = { label: '
     </svg>`;
 }
 
+/**
+ * The line under a case title in a list.
+ *
+ * A matter has a name — "AEWV. TAGATA, Sione" — and a thing it is about —
+ * "Orchard worker, Kiwi Orchards". The name goes in the link; this is the rest.
+ *
+ * The reference joins the same line rather than taking one of its own. A third
+ * line would make every row in every list taller for a value nobody reads twice,
+ * and row height on these tables has already had to be fixed once.
+ */
+export function caseSubline(descriptor: string | null | undefined, ref?: string | null): Raw {
+  if (!descriptor && !ref) return raw('');
+  return html`<div class="muted small clamp-1">${descriptor ?? ''}${
+    descriptor && ref ? ' · ' : ''}${ref ? html`<code>${ref}</code>` : ''}</div>`;
+}
+
 export function pageHeader(title: string, subtitle?: string | null, actions?: Raw): Raw {
   return html`
     <div class="page-head">
