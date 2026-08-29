@@ -7,6 +7,23 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.51.1 — 29 August 2026
+
+### Fixed
+- **Gmail credentials are trimmed before use.** They arrive by copy and paste,
+  and a client ID with a trailing newline is a different string — to which Google
+  answers *"The OAuth client was not found"*, which reads like the client was
+  deleted rather than like a stray keystroke. Whitespace is never meaningful in
+  any of these values.
+- A whitespace-only value now counts as absent rather than present, so the
+  integrations page says what is missing instead of the request failing later.
+- **A credential of the wrong shape is named as such, before the request.** A
+  client ID that does not end `.apps.googleusercontent.com` is not a Google
+  client ID; a refresh token that does not start `1//` is probably an access
+  token or an authorisation code saved in its place. Google's own answer to
+  either names neither the field nor the problem. The message never repeats the
+  value back — it goes into a flash message and the audit log.
+
 ## 0.51.0 — 29 August 2026
 
 ### Added
