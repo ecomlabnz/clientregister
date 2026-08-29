@@ -101,7 +101,7 @@ sv_exchange | SV. Exchange
 sv_other | SV. Other
 
 wv_aewv | WV. AEWV
-wv_partner | WV. Partner
+wv_partner | WV. Partner WV
 wv_dep_child | WV. Dep Child
 wv_post_study | WV. Post-Study
 wv_specific_purpose | WV. Specific Purpose
@@ -119,7 +119,7 @@ rv_green_list_wtr | RV. Green List - WtR
 rv_smc | RV. SMC
 rv_rfw_talent | RV. RfW - Talent
 rv_rfw_religious_worker | RV. RfW - Religious Worker
-rv_partnership | RV. Partnership
+rv_partnership | RV. Partner RV
 rv_parent | RV. Parent
 rv_dep_child | RV. Dep Child
 rv_refugee_family_support | RV. Refugee Family Support
@@ -131,9 +131,9 @@ rv_pacific_access_category | RV. Pacific Access Category
 rv_settlement_refugee_protected_person | RV. Settlement (Refugee / Protected Person)
 rv_other | RV. Other
 
-rq_section_61_request | RQ. Section 61 Request
+rq_section_61_request | RQ. S.61
 rq_ministerial_intervention | RQ. Ministerial Intervention
-rq_reconsideration_temporary_visa_decline | RQ. Reconsideration - Temporary Visa Decline
+rq_reconsideration_temporary_visa_decline | RQ. Recon
 rq_privacy_act_request | RQ. Privacy Act Request
 rq_status_of_person_request | RQ. Status of Person Request
 rq_immigration_act_request_s_378 | RQ. Immigration Act Request (s 378)
@@ -156,7 +156,7 @@ cz_citizenship_grant | CZ. Citizenship - Grant
 cz_citizenship_confirmation | CZ. Citizenship - Confirmation
 
 emp_employer_accreditation | EMP. Employer Accreditation
-emp_job_check | EMP. Job Check
+emp_job_check | EMP. JC
 emp_accreditation_renewal | EMP. Accreditation Renewal
 
 ot_advice_only | OT. Advice Only
@@ -220,10 +220,33 @@ export async function vocabulary(env: Env, def: VocabularyDef): Promise<Term[]> 
  * visas; the grouping prefix is dropped here, since a title reading
  * "WV. AEWV. SURNAME" says the same thing twice.
  */
+/**
+ * The short form of a case type, as it appears at the front of a matter name.
+ *
+ * A label reads "GROUP. Specific" — "WV. AEWV", "RQ. Section 61 Request". The
+ * specific half is the name, and the group is only there to sort the dropdown,
+ * so it is dropped: "AEWV", not "WV. AEWV".
+ *
+ * Except where the specific half is a filler. "SV. General" and "RV. Other"
+ * strip to "General" and "Other", which name nothing — for those the group is
+ * the whole meaning, so it is what survives: "SV", "RV". Fillers are named here
+ * rather than guessed at, because a label like "WV. Specific Purpose" is a real
+ * type and must not be mistaken for one.
+ */
+const FILLER_TYPE_WORDS = ['general', 'other'];
+
+export function caseTypeShort(typeLabel: string): string {
+  const label = typeLabel.trim();
+  const dot = label.indexOf('. ');
+  if (dot === -1) return label;
+  const group = label.slice(0, dot).trim();
+  const specific = label.slice(dot + 2).trim();
+  if (!specific) return group;
+  return FILLER_TYPE_WORDS.includes(specific.toLowerCase()) ? group : specific;
+}
+
 export function suggestCaseTitle(typeLabel: string, clientFormalName: string): string {
-  const specific = typeLabel.includes('. ')
-    ? typeLabel.slice(typeLabel.indexOf('. ') + 2).trim()
-    : typeLabel.trim();
+  const specific = caseTypeShort(typeLabel);
   if (!specific) return clientFormalName;
   if (!clientFormalName) return specific;
   return `${specific}. ${clientFormalName}`;

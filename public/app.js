@@ -448,11 +448,16 @@
       var type = typeSelect.options[typeSelect.selectedIndex];
       if (!client || !type || !client.value || !type.value) return '';
       var formal = client.getAttribute('data-formal') || '';
-      // The type's label already reads "WV. AEWV"; the grouping prefix is
-      // dropped so the title does not say the same thing twice.
+      // The type's label reads "WV. AEWV"; the grouping prefix is dropped so
+      // the title does not say the same thing twice. Except where what is left
+      // is a filler — "SV. General" would strip to "General", which names
+      // nothing — and there the group is the whole meaning. Kept in step with
+      // caseTypeShort in core/vocabulary.ts, which does this on the server.
       var label = (type.textContent || '').trim();
       var dot = label.indexOf('. ');
+      var group = dot === -1 ? '' : label.slice(0, dot).trim();
       var specific = dot === -1 ? label : label.slice(dot + 2).trim();
+      if (specific === 'General' || specific === 'Other') specific = group;
       if (!specific) return formal;
       return formal ? specific + '. ' + formal : specific;
     };
