@@ -272,7 +272,13 @@ p:last-child { margin-bottom: 0; }
    width of a large monitor — past about 1400px the eye loses its place coming
    back to the start of the next line. The public page keeps its own, narrower
    measure, because that one is read rather than worked in. */
-.main { max-width: 1400px; margin: 0 auto; padding: 20px 18px 60px; }
+/* The boxes a form can find itself inside are the ones that measure width.
+   An element is never sized by its own container query, so `container-type`
+   goes on the holder — the page, a column of a two-column page, a card body,
+   a band of a form — and the form reads its width from whichever of those is
+   nearest. This is what makes a form in a 430px side column lay itself out as
+   a 430px form instead of asking the window. */
+.main { max-width: 1400px; margin: 0 auto; padding: 20px 18px 60px; container-type: inline-size; }
 .footer {
   max-width: 1400px; margin: 0 auto; padding: 0 20px 30px;
   display: flex; justify-content: space-between; color: var(--muted); font-size: 0.8rem;
@@ -307,9 +313,10 @@ body.bare {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface-2);
 }
-.card-body { padding: 14px; }
+.card-body { padding: 14px; container-type: inline-size; }
 
 .cols { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.cols > * { container-type: inline-size; min-width: 0; }
 /* minmax(0, 1fr), not 1fr: a grid track's default min-width is auto, so a plain
    1fr cannot shrink below its content and a single wide child pushes the column
    past the viewport. The desktop rule above already guards against this; the
@@ -501,33 +508,70 @@ textarea { resize: vertical; min-height: 70px; }
 
 .checkbox-field input { width: auto; margin-top: 3px; }
 
+/* Form layout.
+ *
+ * Every form box sizes itself off the *container it sits in*, not off the
+ * window. That distinction is not academic: these grids used viewport media
+ * queries, and a form in the narrow column of a two-column page was told
+ * "the window is 1400px wide, use three columns" while its own box was 300.
+ *
+ * Column counts are written out (repeat(2, ...), repeat(3, ...)) rather than
+ * left to `auto-fit`, because `grid-column: 1 / -1` does not work inside a
+ * `repeat(auto-fit, ...)` track list: the spec resolves the auto-repetition to
+ * a single track when an item is placed against the end line, so the section
+ * marked "take the whole form" came out one column wide — the widest section on
+ * the client form was rendering as the narrowest. Explicit tracks make `1 / -1`
+ * mean what it says.
+ *
+ * The breakpoints are chosen from the field, not the device: a labelled box
+ * with a line of hint under it wants about 300px, and the holder that does the
+ * measuring is usually a card or the page, so its width includes padding the
+ * fields never get. Hence 660 and 1060 rather than a round 640 and 1040. Below
+ * the first there is room for one column, below the second for two, and never
+ * more than three — a form of fifteen boxes in five columns is harder to read
+ * than one in three, whatever the window allows.
+ */
 .form-grid {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 18px; box-shadow: var(--shadow);
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 26px;
 }
-.form-section { padding-bottom: 6px; }
-/* A section that needs the whole form rather than one of its columns. */
+.form-grid, .form-section, .settings-form,
+.js-tabbed [data-panel], .js-tabbed [data-kind] {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 26px;
+}
+@container (min-width: 660px) {
+  .form-grid, .form-section, .settings-form,
+  .js-tabbed [data-panel], .js-tabbed [data-kind] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (min-width: 1060px) {
+  .form-grid, .form-section, .settings-form,
+  .js-tabbed [data-panel], .js-tabbed [data-kind] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* A section is a band across the whole form with its own heading, and its own
+   container so the fields inside it measure themselves against the band rather
+   than against the page. */
+.form-section {
+  grid-column: 1 / -1;
+  padding-bottom: 6px;
+  container-type: inline-size;
+}
+.form-section > h3, .form-grid > h3, .settings-form > h3 { grid-column: 1 / -1; }
+/* Kept as a name for sections that were marked wide by hand. Every section is
+   full width now; this says so rather than doing anything. */
 .form-section-wide { grid-column: 1 / -1; }
 
-/* Settings: fields flow across the grid rather than stacking in its first
-   column. A heading, a description or a long text box takes the whole width.
-   `display: grid` is set here rather than relied on from .form-grid — this
-   class was written assuming that company, and stacked silently into one
-   column the first time it was used on its own. */
-.settings-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 0 26px;
-}
+/* A field grid written directly inside a band is the same grid, not a grid
+   inside a grid: its children join the band's columns rather than being packed
+   into one of them. Without this the client form's Immigration band was a
+   1326px box holding a 312px grid cut into three 87px columns — every label
+   wrapping, the hint under "Score" running to six lines. */
+.form-section > .settings-form { display: contents; }
+
+/* A heading inside a band, a description, or a long text box: the whole row. */
 .settings-head { grid-column: 1 / -1; }
 .settings-cell-wide { grid-column: 1 / -1; }
 .settings-cell-wide textarea { min-height: 92px; }
-@media (min-width: 1000px) {
-  /* Never more than three across: a form of fifteen boxes in five columns is
-     harder to read than one in three, whatever the window allows. */
-  .settings-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
 
 /* Composing a message. The body is padded into columns of figures, which only
    line up in a monospace face. */
@@ -634,12 +678,22 @@ details[open] > summary { margin-bottom: 12px; }
   cursor: pointer; color: var(--muted);
 }
 .form-tabs .tab.current { background: var(--surface); color: var(--accent); border-color: var(--border); border-bottom-color: var(--surface); }
-/* A tabbed form shows one panel, which then gets the whole width to lay out in. */
+/* A tabbed form shows one panel, which then gets the whole width to lay out in.
+   These carry `display: grid` and `align-content` only: the column count comes
+   from the shared field-grid rules above, so a panel and a plain section are
+   laid out by one set of breakpoints rather than two that disagree. This block
+   used its own `auto-fit, minmax(280px)` and, being the more specific selector,
+   quietly overrode them — a 1326px panel came out four columns wide with every
+   label wrapping. */
 .js-tabbed [data-panel]:not([hidden]) { grid-column: 1 / -1; }
-.js-tabbed [data-panel] { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 26px; align-content: start; }
+.js-tabbed [data-panel] { container-type: inline-size; }
+.js-tabbed [data-panel], .js-tabbed [data-kind] { display: grid; gap: 0 26px; }
+.js-tabbed [data-panel] { align-content: start; }
 .js-tabbed [data-panel] > h3 { grid-column: 1 / -1; }
 .js-tabbed [data-panel] > p, .js-tabbed [data-panel] > [data-kind] { grid-column: 1 / -1; }
-.js-tabbed [data-kind] { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 26px; }
+/* A band of the record-type halves is a container in its own right, like a
+   section, so the boxes inside it measure against the band. */
+.js-tabbed [data-kind] { container-type: inline-size; }
 
 /* The manual reads as prose rather than as a form. */
 .manual h4 { margin: 18px 0 6px; font-size: 0.95rem; }
