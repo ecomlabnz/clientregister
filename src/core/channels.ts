@@ -317,3 +317,63 @@ export async function openThreadCount(env: Env): Promise<number> {
   );
   return row?.n ?? 0;
 }
+
+
+/**
+ * The conversations attached to a client or a matter, with their last word.
+ *
+ * Correspondence used to live only in the Incoming section: a message reached a
+ * client's file as a one-line stub when somebody turned it into an inquiry, and
+ * otherwise not at all. That made "what did we actually tell them" a question
+ * you answered by remembering which conversation it was in.
+ *
+ * Read rather than copied. The message stays in one place and the file shows
+ * it — copying the body onto a timeline would give it a second owner, and the
+ * two would disagree the first time one was edited.
+ */
+export interface ThreadSummary {
+  id: string;
+  channel: ThreadChannel;
+  peer_id: string;
+  peer_label: string | null;
+  last_message_at: string | null;
+  /** The most recent thing said, whichever side said it. */
+  last_body: string | null;
+  last_direction: 'in' | 'out' | null;
+  waiting: number;
+}
+
+export async function threadsFor(
+  env: Env, entity: 'client' | 'case', entityId: string,
+): Promise<ThreadSummary[]> {
+  const column = entity === 'client' ? 'client_id' : 'case_id';
+  return all<ThreadSummary>(
+    env.DB,
+    `SELECT t.id, t.channel, t.peer_id, t.peer_label, t.last_message_at,
+            (SELECT COUNT(*) FROM ingest_messages m
+              WHERE m.thread_id = t.id AND m.status = 'pending') AS waiting,
+            (SELECT body_text FROM ingest_messages m
+              WHERE m.thread_id = t.id AND m.status != 'ignored'
+              ORDER BY m.received_at DESC LIMIT 1) AS last_in,
+            (SELECT r.body FROM channel_replies r
+              WHERE r.thread_id = t.id ORDER BY r.created_at DESC LIMIT 1) AS last_out,
+            (SELECT MAX(m.received_at) FROM ingest_messages m
+              WHERE m.thread_id = t.id AND m.status != 'ignored') AS last_in_at,
+            (SELECT MAX(r.created_at) FROM channel_replies r WHERE r.thread_id = t.id) AS last_out_at
+       FROM channel_threads t
+      WHERE t.${column} = ?
+      ORDER BY t.last_message_at DESC LIMIT 50`,
+    entityId,
+  ).then((rows) => rows.map((row: any) => {
+    // Whichever side spoke last. Comparing the two timestamps rather than
+    // trusting last_message_at, which is only bumped on a reply.
+    const outLater = (row.last_out_at ?? '') > (row.last_in_at ?? '');
+    return {
+      id: row.id, channel: row.channel, peer_id: row.peer_id, peer_label: row.peer_label,
+      last_message_at: row.last_out_at && outLater ? row.last_out_at : row.last_in_at,
+      last_body: outLater ? row.last_out : row.last_in,
+      last_direction: (row.last_in_at || row.last_out_at) ? (outLater ? 'out' : 'in') : null,
+      waiting: row.waiting ?? 0,
+    } as ThreadSummary;
+  }));
+}

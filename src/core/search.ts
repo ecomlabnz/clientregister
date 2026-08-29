@@ -18,7 +18,8 @@ import type { Env } from '../types';
 import { all } from './db';
 
 export type ResultKind =
-  | 'client' | 'case' | 'quote' | 'invoice' | 'inquiry' | 'task' | 'article' | 'note' | 'document';
+  | 'client' | 'case' | 'quote' | 'invoice' | 'inquiry' | 'task' | 'article' | 'note' | 'document'
+  | 'message';
 
 export interface SearchHit {
   kind: ResultKind;
@@ -41,12 +42,13 @@ export const KIND_LABELS: Record<ResultKind, string> = {
   task: 'Tasks',
   article: 'Knowledge base',
   note: 'File notes',
+  message: 'Correspondence',
   document: 'Documents',
 };
 
 /** The order the groups are shown in — most often wanted first. */
 export const KIND_ORDER: ResultKind[] = [
-  'client', 'case', 'task', 'quote', 'invoice', 'inquiry', 'note', 'document', 'article',
+  'client', 'case', 'task', 'quote', 'invoice', 'inquiry', 'note', 'message', 'document', 'article',
 ];
 
 /**
@@ -180,6 +182,51 @@ export async function searchEverything(
         : `/${r.entity_type}s/${r.entity_id}`,
       title: r.body,
       detail: [r.kind, r.occurred_at?.slice(0, 10)].filter(Boolean).join(' · '),
+      weight: 4,
+    }))),
+
+    // Correspondence, both halves of it.
+    //
+    // A file note records what somebody decided to write down. This is what was
+    // actually said, in the words it was said in — and until now it was the one
+    // body of text in the register that could not be searched at all, which
+    // made "what did we tell them about the police certificate" a question you
+    // answered by scrolling.
+    //
+    // Ignored messages are left out, for the same reason they leave the
+    // conversation: somebody decided they were not correspondence.
+    all<any>(env.DB,
+      `SELECT m.id, m.subject, m.body_text, m.received_at, m.sender_display, m.sender,
+              m.thread_id, t.peer_label, t.peer_id
+         FROM ingest_messages m LEFT JOIN channel_threads t ON t.id = m.thread_id
+        WHERE m.status != 'ignored'
+          AND (m.subject LIKE ?1 ESCAPE '\\' OR m.body_text LIKE ?1 ESCAPE '\\')
+        ORDER BY m.received_at DESC LIMIT ?2`,
+      like, limit,
+    ).then((rows) => rows.map((r) => ({
+      kind: 'message' as const, id: r.id,
+      href: r.thread_id ? `/inbox/threads/${r.thread_id}` : `/inbox/${r.id}`,
+      title: r.subject || r.body_text || '(no subject)',
+      detail: ['from ' + (r.sender_display ?? r.sender ?? 'unknown'),
+               r.received_at?.slice(0, 10)].filter(Boolean).join(' · '),
+      weight: 4,
+    }))),
+
+    all<any>(env.DB,
+      `SELECT r.id, r.body, r.created_at, r.thread_id, u.name AS author,
+              t.peer_label, t.peer_id
+         FROM channel_replies r
+         JOIN users u ON u.id = r.created_by
+         LEFT JOIN channel_threads t ON t.id = r.thread_id
+        WHERE r.body LIKE ?1 ESCAPE '\\'
+        ORDER BY r.created_at DESC LIMIT ?2`,
+      like, limit,
+    ).then((rows) => rows.map((r) => ({
+      kind: 'message' as const, id: r.id,
+      href: `/inbox/threads/${r.thread_id}`,
+      title: r.body,
+      detail: [`${r.author} → ${r.peer_label ?? r.peer_id ?? 'them'}`,
+               r.created_at?.slice(0, 10)].filter(Boolean).join(' · '),
       weight: 4,
     }))),
 

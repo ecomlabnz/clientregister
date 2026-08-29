@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.55.0', date: '29 August 2026',
+    notes: [
+      'Correspondence is searchable. The global search box now looks inside messages and '
+        + 'replies as well as file notes \u2014 what was actually said, in the words it was '
+        + 'said in, which was the one body of text in the register you could not search.',
+      'A client\u2019s page and a matter\u2019s page now show the conversations linked to '
+        + 'them, with the last thing said and whether anything is waiting.',
+    ],
+  },
+  {
     version: '0.54.0', date: '29 August 2026',
     notes: [
       'A matter is always assigned to somebody. \u201cUnassigned\u201d is gone from the form, '
