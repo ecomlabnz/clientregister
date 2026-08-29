@@ -594,8 +594,13 @@ export const casesModule: AppModule = {
                            employer. Sending the adviser away to the client form
                            and back loses the matter they were working on, and
                            the record they create there is the same record this
-                           makes — a client, with a reference of its own. */}
-                  <p class="subhead mt">Not on file yet?</p>
+                           makes — a client, with a reference of its own.
+
+                           The rule between the two is not decoration. Run
+                           together, the second form reads as more of the first,
+                           which is how somebody fills in half of each. */}
+                  <div class="or-rule">or</div>
+                  <h4>Somebody not on file yet</h4>
                   <form method="post" action="/cases/${kase.id}/parties/new" class="row-form">
                     ${csrfField(csrf)}
                     ${field({ label: 'Given names', name: 'given_names', maxlength: 120,
