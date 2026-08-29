@@ -7,6 +7,31 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.57.0 — 29 August 2026
+
+### Added
+- **A matter has one principal applicant.** Everything about an application is
+  measured from that person — whose visa it is, whose character and health is
+  assessed, who the decision is about — and everyone else on the file is there
+  in relation to them. Two principals is not an unusual matter; it is a data
+  entry mistake that makes the file ambiguous about the one thing it has to be
+  certain about.
+- A **partial unique index** on `case_parties`, not a check in the route: three
+  routes add a party — the party form, the create-and-add form, and the intake
+  extraction — and a rule enforced in three places is a rule enforced in none.
+  It also holds against an *edit*, so nobody can promote their way past it.
+- The refusal **names who already holds the role** and suggests what to do,
+  rather than reporting a failed constraint.
+
+### Changed
+- **The role defaults to Principal applicant on the first party**, and to
+  Secondary applicant once the role is taken. It defaulted to Secondary always,
+  which was wrong on the very first party added to every matter — a mistake
+  somebody makes once and then has to undo.
+- The migration demotes the later of any duplicate principals rather than
+  deleting it, and writes why on the record. The first keeps the role: it is the
+  one the file was built around.
+
 ## 0.56.1 — 29 August 2026
 
 ### Fixed
