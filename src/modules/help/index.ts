@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.51.0', date: '29 August 2026',
+    notes: [
+      '\u201cCheck for mail now\u201d under Settings \u2192 Maintenance runs the mailbox poll '
+        + 'on demand and reports what it looked at, not only what it took \u2014 so a mailbox '
+        + 'that is connected but quiet can be told apart from one that is not connected at all.',
+      'When Google refuses the authorisation, the message carries its own words rather than a '
+        + 'generic failure.',
+    ],
+  },
+  {
     version: '0.50.0', date: '29 August 2026',
     notes: [
       'The register can read a mailbox for you. Forward your working mail into a dedicated '
