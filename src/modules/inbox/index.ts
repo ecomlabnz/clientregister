@@ -16,7 +16,7 @@ import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
-import { badge, card, csrfField, emptyState, pageHeader, statusTone, table } from '../../ui/components';
+import { actionButton, badge, card, csrfField, emptyState, pageHeader, statusTone, table } from '../../ui/components';
 import { dateTime, truncate } from '../../ui/format';
 import { processMessage } from '../../ingest/pipeline';
 import { isAiEnabled } from '../../ai/provider';
@@ -37,6 +37,46 @@ interface IngestRow {
   error: string | null; meta_json: string | null;
   /** Set when the sender could be identified, which is what makes a reply possible. */
   thread_id: string | null;
+}
+
+/**
+ * A subject line that reads as an answer.
+ *
+ * Only ever one "Re:", however many times a conversation goes round — mail
+ * clients that stack them produce subjects nobody can read, and the register
+ * should not be one of them.
+ */
+export function replySubject(subject: string): string {
+  const trimmed = subject.trim();
+  const stripped = trimmed.replace(/^((re|fwd|fw)\s*(\[\d+\])?\s*:\s*)+/i, '');
+  return `Re: ${stripped}`.slice(0, 200);
+}
+
+/**
+ * The address out of `Name <address@example>`, lower-cased.
+ *
+ * `MAIL_FROM` is written for a human to read, and comparing it to a header
+ * address means taking the part that is actually an address.
+ */
+export function addressPart(value: string | undefined | null): string {
+  const raw = (value ?? '').trim();
+  const angled = raw.match(/<([^>]+)>/);
+  return (angled ? angled[1]! : raw).trim().toLowerCase();
+}
+
+/**
+ * Which of these are not addresses, for telling somebody before it is sent.
+ *
+ * Deliberately loose. A strict RFC 5322 check rejects addresses that work, and
+ * the register is not the last line of validation — the provider is. This
+ * catches the typo, not the exotic.
+ */
+export function badAddresses(list: string | null | undefined): string[] {
+  return (list ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .filter((entry) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry));
 }
 
 export const CHANNEL_SETTINGS: SettingsGroup = {
@@ -162,23 +202,27 @@ export const inboxModule: AppModule = {
         </form>
 
         <div data-live-results>
+        ${'' /* Subject first, then who it is from, then when — the order every
+                 mail client uses, and the order the eye wants: what is this,
+                 who sent it, how old is it. The date led before, which put the
+                 least useful column where the eye lands. */}
         ${table([
-          { label: 'Received', width: '16' },
+          { label: 'Subject', width: '40' },
           { label: 'From', width: '20', hideOn: 'sm' },
-          { label: 'Subject', width: '38' },
-          { label: 'Trust', width: '13', hideOn: 'sm' },
+          { label: 'Received', width: '16' },
+          { label: 'Trust', width: '11', hideOn: 'sm' },
           { label: 'Status', width: '13' },
         ], rows.map((row) => html`
           <tr>
-            <td class="small">${dateTime(row.received_at)}
-              <div class="muted">${row.channel}</div></td>
-            <td class="small col-sm-hide">${row.sender_display ?? row.sender ?? '—'}</td>
             <td><a class="clamp-2" href="/inbox/${row.id}">${
               truncate(row.subject ?? row.body_text, 90) || '(no subject)'}</a>
               <div class="row-meta show-sm">
                 <span class="muted">${row.sender_display ?? row.sender ?? '—'}</span>
                 ${row.trusted ? badge('allow-listed', 'green') : badge('unverified', 'amber')}
               </div></td>
+            <td class="small col-sm-hide">${row.sender_display ?? row.sender ?? '—'}</td>
+            <td class="small">${dateTime(row.received_at)}
+              <div class="muted">${row.channel}</div></td>
             <td class="col-sm-hide">${row.trusted ? badge('allow-listed', 'green') : badge('unverified', 'amber')}</td>
             <td>${badge(row.status, statusTone(row.status === 'processed' ? 'approved' : row.status))}
                 ${row.inquiry_id ? html`<div class="small"><a href="/inquiries/${row.inquiry_id}">inquiry</a></div>` : ''}</td>
@@ -251,11 +295,50 @@ export const inboxModule: AppModule = {
       );
       if (!thread) return c.notFound();
 
-      const [history, clients] = await Promise.all([
+      const [history, clients, matters, addressBook, lastIn] = await Promise.all([
         threadHistory(c.env, id),
         all<{ id: string; full_name: string }>(
           c.env.DB, `SELECT id, full_name FROM clients WHERE status != 'archived' ORDER BY full_name LIMIT 500`),
+        // Every open matter, so a conversation can be filed against the thing
+        // it is actually about rather than only against the person.
+        all<{ id: string; ref: string; title: string; client_name: string }>(
+          c.env.DB,
+          `SELECT k.id, k.ref, k.title, cl.full_name AS client_name
+             FROM cases k JOIN clients cl ON cl.id = k.client_id
+            WHERE k.closed_at IS NULL ORDER BY k.ref DESC LIMIT 500`),
+        // The address book: everyone in the register who has an email address.
+        // Not a separate list to maintain — a list nobody maintains is worse
+        // than none, and these addresses are already kept current.
+        all<{ full_name: string; email: string }>(
+          c.env.DB,
+          `SELECT full_name, email FROM clients
+            WHERE email IS NOT NULL AND TRIM(email) <> '' AND status != 'archived'
+            ORDER BY full_name LIMIT 500`),
+        // Who the last message in was addressed to, which is what "reply to
+        // all" means. Null on anything captured before the register started
+        // keeping them, and the form then simply offers nobody to add.
+        one<{ subject: string | null; to_addrs: string | null; cc_addrs: string | null }>(
+          c.env.DB,
+          `SELECT subject, to_addrs, cc_addrs FROM ingest_messages
+            WHERE thread_id = ? ORDER BY received_at DESC LIMIT 1`, id),
       ]);
+
+      // Everyone on the last message except ourselves and the person we are
+      // already writing to — the mailbox it was forwarded through is on that
+      // list too, and copying a reply back into our own inbox is a loop.
+      const ours = new Set([
+        thread.peer_id.toLowerCase(),
+        // The address the practice sends from. The most direct answer to "is
+        // this us", and the one that holds even before the other two are set.
+        addressPart(c.env.MAIL_FROM),
+        (c.env.GMAIL_INBOX_ADDRESS ?? '').toLowerCase(),
+        ...(c.env.INGEST_EMAIL_ALLOWED_SENDERS ?? '').split(',').map((a) => a.trim().toLowerCase()),
+      ].filter(Boolean));
+      const others = [...new Set([
+        ...(lastIn?.to_addrs ?? '').split(','),
+        ...(lastIn?.cc_addrs ?? '').split(','),
+      ].map((a) => a.trim().toLowerCase()).filter(Boolean))]
+        .filter((a) => !ours.has(a));
 
       const canReply = thread.channel === 'email'
         ? can(c.get('user'), 'mail:send')
@@ -288,14 +371,53 @@ export const inboxModule: AppModule = {
               <form method="post" action="${`/inbox/threads/${thread.id}/reply`}" class="entry-form">
                 ${csrfField(session.csrf)}
                 ${thread.channel === 'email' ? html`
+                  ${'' /* One list of everyone in the register who has an address.
+                           A browser offers it as you type without any script, and
+                           it is not a second address list to keep up to date —
+                           these are the ones already kept current. */}
+                  <datalist id="known-addresses">
+                    ${addressBook.map((p) => html`<option value="${p.email}">${p.full_name}</option>`)}
+                  </datalist>
+                  <div class="field">
+                    <label for="f_to">To</label>
+                    <input id="f_to" name="to" list="known-addresses" maxlength="500"
+                           value="${thread.peer_id}">
+                    <p class="hint">Separate several with commas.</p>
+                  </div>
+                  <div class="cols-2">
+                    <div class="field">
+                      <label for="f_cc">Cc</label>
+                      <input id="f_cc" name="cc" list="known-addresses" maxlength="500"
+                             value="${others.join(', ')}">
+                      ${others.length
+                        ? html`<p class="hint">Everyone else on their last message. Clear it to
+                                 answer only ${thread.peer_id}.</p>`
+                        : ''}
+                    </div>
+                    <div class="field">
+                      <label for="f_bcc">Bcc</label>
+                      <input id="f_bcc" name="bcc" list="known-addresses" maxlength="500" value="">
+                      <p class="hint">Copied without the others being told. Recorded here either way.</p>
+                    </div>
+                  </div>
                   <div class="field">
                     <label for="f_subject">Subject</label>
-                    <input id="f_subject" name="subject" maxlength="200" value="">
+                    <input id="f_subject" name="subject" maxlength="200"
+                           value="${lastIn?.subject ? replySubject(lastIn.subject) : ''}">
                   </div>` : ''}
                 <div class="field">
                   <label for="f_body">Message</label>
-                  <textarea id="f_body" name="body" rows="5" required maxlength="4000"></textarea>
+                  <textarea id="f_body" name="body" rows="8" required maxlength="4000"></textarea>
                 </div>
+                ${thread.channel === 'email' ? html`
+                  <div class="field checkbox-field">
+                    <label><input type="checkbox" name="format" value="html" checked> Send it formatted</label>
+                    <p class="hint">Blank lines start paragraphs. <code>**bold**</code>,
+                       <code>*italic*</code>, <code># heading</code>, and lines starting
+                       <code>-</code> or <code>1.</code> become lists. Links are made from
+                       addresses you paste. The plain text is sent as well, so a client whose
+                       mail reader will not show formatting still gets a readable letter.</p>
+                  </div>` : ''}
                 <button class="btn btn-primary" type="submit">Send</button>
                 <p class="hint">Sent as the practice, and recorded here with your name against it.
                    ${thread.channel === 'whatsapp'
@@ -316,10 +438,20 @@ export const inboxModule: AppModule = {
                       ${cl.id === thread.client_id ? raw('selected') : ''}>${cl.full_name}</option>`)}
                   </select>
                 </div>
+                <div class="field">
+                  <label for="f_case">Matter</label>
+                  <select id="f_case" name="case_id">
+                    <option value="">Not linked</option>
+                    ${matters.map((k) => html`<option value="${k.id}"
+                      ${k.id === thread.case_id ? raw('selected') : ''}>${k.ref} — ${k.title} (${k.client_name})</option>`)}
+                  </select>
+                </div>
                 <button class="btn btn-secondary" type="submit">Save</button>
-                <p class="hint">Linking a conversation puts it on that client's file. It changes
-                   nothing about who is trusted — that is the channel's allow-list, and it is a
-                   secret rather than a setting.</p>
+                <p class="hint">A conversation is usually about a person <em>and</em> a matter, and
+                   most correspondence is about one particular matter. Linking it to both puts it
+                   on both files.</p>
+                <p class="hint">Neither changes who is trusted — that is the channel's allow-list,
+                   and it is a secret rather than a setting.</p>
               </form>`)}
           </div>
         </div>`);
@@ -331,7 +463,17 @@ export const inboxModule: AppModule = {
       const f = new FormReader(await c.req.formData());
       const body = f.text('body', { required: true, label: 'Message', max: 4000 });
       const subject = f.optional('subject', { max: 200 });
+      const to = f.optional('to', { max: 500 });
+      const cc = f.optional('cc', { max: 500 });
+      const bcc = f.optional('bcc', { max: 500 });
+      const asHtml = f.text('format', { max: 10 }) === 'html';
       if (!f.valid) return redirectWith(c, `/inbox/threads/${id}`, Object.values(f.errors)[0]!, 'err');
+
+      const bad = [to, cc, bcc].flatMap((list) => badAddresses(list));
+      if (bad.length) {
+        return redirectWith(c, `/inbox/threads/${id}`,
+          `That is not an email address: ${bad.join(', ')}.`, 'err');
+      }
 
       const thread = await one<{ channel: string }>(
         c.env.DB, `SELECT channel FROM channel_threads WHERE id = ?`, id);
@@ -339,7 +481,10 @@ export const inboxModule: AppModule = {
         return redirectWith(c, `/inbox/threads/${id}`, 'Your role cannot send email.', 'err');
       }
 
-      const result = await postReply(c.env, { threadId: id, body, userId: user.id, subject: subject ?? undefined });
+      const result = await postReply(c.env, {
+        threadId: id, body, userId: user.id, subject: subject ?? undefined,
+        to, cc, bcc, asHtml,
+      });
       await auditFrom(c, { action: 'channel.reply_posted', entityType: 'channel_thread', entityId: id,
         meta: { ok: result.ok } });
       return redirectWith(c, `/inbox/threads/${id}`, result.message, result.ok ? 'ok' : 'err');
@@ -349,11 +494,12 @@ export const inboxModule: AppModule = {
       const id = c.req.param('id')!;
       const f = new FormReader(await c.req.formData());
       const clientId = f.optional('client_id', { max: 80 });
-      await linkThread(c.env, id, clientId, null);
+      const caseId = f.optional('case_id', { max: 80 });
+      await linkThread(c.env, id, clientId, caseId);
       await auditFrom(c, { action: 'channel.thread_linked', entityType: 'channel_thread', entityId: id,
-        meta: { clientId } });
+        meta: { clientId, caseId } });
       return redirectWith(c, `/inbox/threads/${id}`,
-        clientId ? 'Linked to that client.' : 'Link removed.', 'ok');
+        clientId || caseId ? 'Linked.' : 'Link removed.', 'ok');
     });
 
     r.get('/:id', requirePermission('ingest:triage'), async (c) => {
@@ -432,6 +578,15 @@ export const inboxModule: AppModule = {
                     ${csrfField(csrf)}
                     <button class="btn btn-secondary btn-block" type="submit">Ignore</button>
                   </form>`}
+              ${'' /* data-confirm rather than an inline onsubmit: the content
+                       security policy allows no inline script, so an onsubmit
+                       would simply not run and the confirmation would be
+                       silently absent on a destructive button. */}
+              ${msg.inquiry_id ? '' : html`<div class="mt">${actionButton(
+                `/inbox/${msg.id}/delete`, csrf, 'Delete it',
+                { className: 'btn btn-danger btn-block',
+                  confirm: 'Delete this message? The audit log keeps the record that it arrived, '
+                    + 'but the message itself goes.' })}</div>`}
               ${'' /* Replying is not one of the three decisions above — those are
                        about what the message becomes. This is about answering
                        the person, which is often the first thing you want to do
@@ -475,6 +630,45 @@ export const inboxModule: AppModule = {
       await run(c.env.DB, `UPDATE ingest_messages SET status = 'ignored', processed_at = ? WHERE id = ?`, nowIso(), id);
       await auditFrom(c, { action: 'inbox.ignored', entityType: 'ingest_message', entityId: id });
       return redirectWith(c, '/inbox', 'Message ignored.');
+    });
+
+    /**
+     * Delete a captured message.
+     *
+     * Ignoring says "this was not correspondence"; deleting says "this should
+     * not be here at all" — a misdirected message, something with content the
+     * practice has no business holding. Both are real, and the second cannot be
+     * done by the first.
+     *
+     * What goes is the captured copy. The audit log keeps the record that a
+     * message arrived, from whom, and that somebody deleted it — that log is
+     * append-only and this does not touch it. So the fact is preserved and the
+     * content is not, which is the distinction that makes deletion safe to
+     * offer at all.
+     *
+     * A message already made into an inquiry cannot be deleted: the inquiry
+     * refers to it, and deleting it would leave a record pointing at nothing.
+     */
+    r.post('/:id/delete', requirePermission('ingest:triage'), async (c) => {
+      const id = c.req.param('id')!;
+      const msg = await one<{ sender: string | null; subject: string | null; channel: string;
+                             inquiry_id: string | null }>(
+        c.env.DB, 'SELECT sender, subject, channel, inquiry_id FROM ingest_messages WHERE id = ?', id);
+      if (!msg) return c.notFound();
+      if (msg.inquiry_id) {
+        return redirectWith(c, `/inbox/${id}`,
+          'This became an inquiry, so it cannot be deleted — the inquiry refers to it. '
+          + 'Close the inquiry instead.', 'err');
+      }
+
+      // Audited before the row goes, so the record of what was deleted is
+      // written from the row itself rather than from memory of it.
+      await auditFrom(c, {
+        action: 'inbox.deleted', entityType: 'ingest_message', entityId: id,
+        meta: { sender: msg.sender, subject: msg.subject, channel: msg.channel },
+      });
+      await run(c.env.DB, 'DELETE FROM ingest_messages WHERE id = ?', id);
+      return redirectWith(c, '/inbox', 'Deleted. The audit log keeps the record that it arrived.');
     });
 
     r.post('/:id/triage', requirePermission('ai:run'), async (c) => {

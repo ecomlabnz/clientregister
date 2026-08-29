@@ -16,6 +16,7 @@ export function createResendProvider(apiKey: string): MailProvider {
           from,
           to: [message.to],
           ...(message.cc ? { cc: [message.cc] } : {}),
+          ...(message.bcc ? { bcc: [message.bcc] } : {}),
           ...(message.replyTo ? { reply_to: [message.replyTo] } : {}),
           subject: message.subject,
           text: message.text,

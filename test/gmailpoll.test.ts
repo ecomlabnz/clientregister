@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { decodeRawMessage, inboxCredentials, inboxSetupGaps } from '../src/ingest/gmail';
-import { MAIL_POLL_CRON } from '../src/index';
+import {
+  MAIL_POLL_CRON, decodeRawMessage, inboxCredentials, inboxSetupGaps,
+} from '../src/ingest/gmail';
 import { credentialShapeProblem } from '../src/mail/gmail';
 import type { Env } from '../src/types';
 
@@ -207,5 +208,17 @@ describe('naming what is wrong with a credential', () => {
       clientId: 'sensitive-looking-value', clientSecret: 's', refreshToken: '1//r',
     })!;
     expect(problem).not.toContain('sensitive-looking-value');
+  });
+});
+
+describe('the Worker module exports only handlers', () => {
+  it('keeps constants out of src/index.ts', () => {
+    // The runtime rejects an export from the Worker's module that is not a
+    // handler, and refuses to start — which is the good version of that
+    // mistake, but only if somebody runs it. A dry-run build does not.
+    const index = readFileSync('src/index.ts', 'utf8');
+    const exports = [...index.matchAll(/^export\s+(?:const|function|class|let|var)\s+(\w+)/gm)]
+      .map((m) => m[1]!);
+    expect(exports, `not a handler: ${exports.join(', ')}`).toEqual([]);
   });
 });

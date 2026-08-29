@@ -32,6 +32,22 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.53.0', date: '29 August 2026',
+    notes: [
+      'A reply you have full control over: To, Cc and Bcc, all with the register\u2019s own '
+        + 'people offered as you type. Cc comes pre-filled with everyone else who was on their '
+        + 'last message \u2014 reply to all, without having to remember who all was.',
+      'Replies can be sent formatted. Blank lines start paragraphs, **bold**, *italic*, '
+        + '# headings and - or 1. lists. The plain text goes as well, so a client whose mail '
+        + 'reader will not show formatting still gets a readable letter.',
+      'A conversation can be linked to a matter as well as a client. Most correspondence is '
+        + 'about one particular matter.',
+      'A message can be deleted, not only ignored \u2014 and an ignored message no longer '
+        + 'appears in the conversation. The audit log keeps the record that it arrived either way.',
+      'The inbox now leads with the subject, then who it is from, then when.',
+    ],
+  },
+  {
     version: '0.52.0', date: '29 August 2026',
     notes: [
       'A message in the Inbox now offers a reply to whoever sent it, where you are reading it. '

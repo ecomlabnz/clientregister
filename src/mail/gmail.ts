@@ -129,6 +129,8 @@ export function buildMimeMessage(message: OutboundMessage, from: string): string
     `From: ${headerValue(from)}`,
     `To: ${headerValue(message.to)}`,
     ...(message.cc ? [`Cc: ${headerValue(message.cc)}`] : []),
+    // Gmail reads this, delivers to it, and strips it from what recipients see.
+    ...(message.bcc ? [`Bcc: ${headerValue(message.bcc)}`] : []),
     ...(message.replyTo ? [`Reply-To: ${headerValue(message.replyTo)}`] : []),
     `Subject: ${encodeHeaderText(message.subject)}`,
     'MIME-Version: 1.0',

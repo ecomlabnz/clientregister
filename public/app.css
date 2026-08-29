@@ -491,6 +491,12 @@ input:focus, select:focus, textarea:focus {
 }
 textarea { resize: vertical; min-height: 70px; }
 .hint { font-size: 0.78rem; color: var(--muted); margin: 4px 0 0; line-height: 1.45; }
+/* Two fields that belong side by side inside a form that is otherwise one
+   column — Cc and Bcc, which are read as a pair. Falls to one column on a
+   narrow screen, where side by side would make both unusable. */
+.cols-2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 20px; }
+@container (min-width: 520px) { .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 .checkbox-field label { display: flex; gap: 8px; align-items: flex-start; font-weight: 500; }
 
 /* A passage the register is quoting back rather than asserting: a proposed

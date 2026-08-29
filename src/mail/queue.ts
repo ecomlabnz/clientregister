@@ -10,6 +10,7 @@ export interface QueuedEmail {
   id: string;
   to_addr: string;
   cc_addr: string | null;
+  bcc_addr: string | null;
   subject: string;
   body_text: string;
   body_html: string | null;
@@ -40,10 +41,11 @@ export async function queueEmail(
   const id = newId('out');
   await run(
     env.DB,
-    `INSERT INTO outbound_emails (id, to_addr, cc_addr, subject, body_text, body_html, reply_to,
-        status, entity_type, entity_id, created_at, created_by)
-     VALUES (?,?,?,?,?,?,?, 'queued', ?,?,?,?)`,
-    id, message.to.trim(), message.cc ?? null, message.subject, message.text, message.html ?? null,
+    `INSERT INTO outbound_emails (id, to_addr, cc_addr, bcc_addr, subject, body_text, body_html,
+        reply_to, status, entity_type, entity_id, created_at, created_by)
+     VALUES (?,?,?,?,?,?,?,?, 'queued', ?,?,?,?)`,
+    id, message.to.trim(), message.cc ?? null, message.bcc ?? null,
+    message.subject, message.text, message.html ?? null,
     replyTo,
     message.entityType ?? null, message.entityId ?? null, nowIso(), message.createdBy ?? null,
   );
@@ -73,7 +75,7 @@ export async function flushQueue(env: Env, limit = 20): Promise<{ sent: number; 
     try {
       const result = await provider.send(
         {
-          to: item.to_addr, cc: item.cc_addr, subject: item.subject,
+          to: item.to_addr, cc: item.cc_addr, bcc: item.bcc_addr, subject: item.subject,
           text: item.body_text, html: item.body_html,
           // Stored on the message rather than read from settings at send time,
           // so what was queued is what goes out even if the setting changes in

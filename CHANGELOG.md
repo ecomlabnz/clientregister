@@ -7,6 +7,56 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.53.0 — 29 August 2026
+
+### Added
+- **A reply you have full control over.** A reply went to one address — whoever
+  the conversation was with — as plain text, with nobody else on it.
+  Correspondence does not work that way: a message arrives addressed to three
+  people and the answer has to reach the same three.
+- **To, Cc and Bcc**, each offering the register's own people as you type. Not a
+  second address list to maintain — a list nobody maintains is worse than none,
+  and these addresses are already kept current.
+- **Cc is pre-filled with everyone else on their last message**, minus ourselves:
+  the sending address, the polled mailbox and the trusted-sender list are all
+  excluded, or every reply would copy itself back into the register. Reply-to-all
+  without having to remember who "all" was.
+- This needed the recipients to be captured in the first place. `to_addrs` and
+  `cc_addrs` on `ingest_messages`, parsed from the message. Older rows keep NULL
+  and the form offers nobody to add, which is honest.
+- **Formatted replies.** The stored body stays the plain text somebody typed and
+  the formatting is derived from it, so the record reads as what was written.
+  `sent_html` records what was made of it.
+- **Bcc through the whole mail layer** — both transports, and recorded on the
+  message. A blind copy that leaves no trace is one nobody can answer a question
+  about later. Blind is a property of the message, not of the file.
+- **A conversation links to a matter as well as a client.** The column has been
+  on `channel_threads` since it was created; nothing ever set it.
+- **A message can be deleted.** Ignoring says "this was not correspondence";
+  deleting says "this should not be here at all". The audit entry is written from
+  the row before the row goes, and that log is append-only — so the fact that a
+  message arrived survives its content being removed, which is what makes
+  deletion safe to offer. One that became an inquiry cannot be deleted.
+
+### Changed
+- **Ignored messages no longer appear in the conversation.** Ignoring one is a
+  decision that it was not correspondence, and a thread that keeps showing it
+  disagrees with the decision. It stays in the inbox under *Ignored*.
+- **The inbox leads with the subject**, then who it is from, then when. The date
+  led before, which put the least useful column where the eye lands first.
+- One `Re:`, however many times a conversation goes round.
+
+### Fixed
+- **`export const MAIL_POLL_CRON` from `src/index.ts` stopped the Worker
+  starting.** The runtime rejects an export from the Worker's module that is not
+  a handler. Production tolerated it; the local runtime refused outright, and a
+  dry-run build never exercises either. Moved to `src/ingest/gmail.ts`, where it
+  belongs anyway, with a test that fails on any non-handler export from
+  `src/index.ts`.
+- The delete confirmation uses `data-confirm` rather than an inline `onsubmit`,
+  which the content security policy would have blocked — leaving a destructive
+  button with no confirmation at all.
+
 ## 0.52.0 — 29 August 2026
 
 ### Added

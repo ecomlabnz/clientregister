@@ -32,6 +32,17 @@ import { allowList, captureMessage, isAllowed } from './pipeline';
 import { parseInboundEmail } from './email';
 import { audit } from '../core/audit';
 
+/**
+ * How often the mailbox is read. Must match the entry in `wrangler.jsonc`, and
+ * a test holds the two together — if they drift, every firing runs the nightly
+ * housekeeping and the mailbox is never read.
+ *
+ * Here rather than in `src/index.ts` because that file is the Worker's module,
+ * and the runtime rejects an export from it that is not a handler. It refuses
+ * to start at all, which is the good version of that mistake.
+ */
+export const MAIL_POLL_CRON = '*/5 * * * *';
+
 const LIST_ENDPOINT = 'https://gmail.googleapis.com/gmail/v1/users/me/messages';
 const TOKEN_CACHE_KEY = 'mail:gmail:inbox_access_token';
 const SEEN_PREFIX = 'ingest:gmail:';
@@ -153,6 +164,8 @@ export async function pollInbox(env: Env): Promise<PollResult | null> {
         bodyText: parsed.text,
         attachments: parsed.attachments,
         trusted: allowed.length > 0 && isAllowed(allowed, sender),
+        toAddresses: parsed.toAddresses,
+        ccAddresses: parsed.ccAddresses,
         receivedAt: parsed.date ? new Date(parsed.date).toISOString() : new Date().toISOString(),
         // The sender is the counterpart, so the message joins their
         // conversation and a reply has somewhere to go.
