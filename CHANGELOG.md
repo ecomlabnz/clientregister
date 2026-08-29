@@ -7,6 +7,63 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.49.0 — 29 August 2026
+
+### Added
+- **Nationality is a country, not a sentence.** It was a text box, so "Vietnam",
+  "Viet Nam", "VN" and "Vietnamese" were four different nationalities and none
+  of them could be counted, filtered or trusted. It is now an ISO 3166-1 alpha-2
+  code chosen from the full list of 249, and two triggers on `clients` refuse
+  anything else — a guarantee in the route that happens to write the row lasts
+  until somebody adds a second route.
+- Codes rather than names because countries rename themselves: Swaziland became
+  Eswatini, Turkey became Turkiye, Macedonia became North Macedonia. A register
+  holding codes changes one label. A register holding names needs a migration
+  and an argument about what the old records meant.
+- **Current visa is a choice**, from `vocab.visa_types` — modelled on the
+  practice's own visa taxonomy, with the same VV/SV/WV/RV prefixes as the case
+  types so the two lists read as one family. It is vocabulary, so an
+  administrator edits it without a deployment; unlike nationality, the database
+  does not police it.
+- The list includes **"None — offshore"**, **"None — unlawful"** and **"None —
+  visa expired, onshore"**. A client with no immigration status recorded raises
+  an alert, and an alert that cannot be cleared honestly is one people learn to
+  ignore.
+
+### Changed
+- **"Works for" and "Role there" are one group.** Left to flow with everything
+  else they landed in different rows with an unrelated field between them, which
+  is how a form turns into a dump of boxes. New `.field-group` — a fieldset that
+  takes a row of its own and lays its own fields out inside it.
+- The clients export now carries both `nationality` (the country's name, for a
+  person) and `nationality_code` (for the next system).
+- A nationality read out of a document or a model's answer goes through
+  `countryCodeFor`, which takes codes, names, common variants ("UK", "USA",
+  "Holland", "Burma") and the demonyms this caseload arrives under. Anything it
+  cannot place resolves to nothing and the person picks from the list — a
+  confident guess at somebody's nationality is worse than an empty box.
+
+### Migrations
+- `0030_countries.sql` creates the `countries` table, generated from
+  `src/core/countries.ts`, and brings existing nationalities across. Names are
+  the runtime's own CLDR names with a short list of corrections where CLDR
+  writes something an adviser would not look under — "Hong Kong SAR China" is
+  "Hong Kong" on a form, and the two Congos are named rather than distinguished
+  by their capital cities.
+- `0031_visa_types.sql` maps recorded visa text onto keys.
+- **Neither discards anything.** What does not map is written into the client's
+  file notes with a line asking somebody to set it, and the column is cleared.
+  A record beats a tidy column.
+
+### Verifying
+- `test/countries.test.ts` builds the database from the migrations and checks
+  the table matches the array exactly — two sources of truth for one list is how
+  a dropdown ends up offering a country the database then refuses. It also
+  attacks the column directly: `'Vietnam'`, `'vn'` and `'ZZ'` are all refused,
+  on insert and on update.
+- Both migrations were rehearsed on a scratch database against the values
+  actually held, including the ones that do not map.
+
 ## 0.48.0 — 29 August 2026
 
 ### Added

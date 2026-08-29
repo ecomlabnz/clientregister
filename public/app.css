@@ -613,6 +613,28 @@ textarea { resize: vertical; min-height: 70px; }
   position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
 }
+/* Two or three boxes that are one fact.
+   "Works for" and "Role there" flowed as separate fields, so they landed in
+   different rows with something unrelated between them — which is how a form
+   turns into a dump of boxes. A group takes a row of its own and lays its own
+   fields out inside it. */
+.field-group {
+  grid-column: 1 / -1;
+  display: grid; gap: 0 26px; grid-template-columns: minmax(0, 1fr);
+  border: 0; border-top: 1px solid var(--border);
+  margin: 6px 0 0; padding: 12px 0 0;
+  min-inline-size: 0;               /* fieldsets refuse to shrink without this */
+}
+.field-group > legend {
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 0 8px 0 0; margin: 0;
+}
+@container (min-width: 660px) {
+  .field-group { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .field-group > legend { grid-column: 1 / -1; }
+}
+
 .form-actions {
   grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap;
   padding-top: 14px; border-top: 1px solid var(--border); margin-top: 6px;

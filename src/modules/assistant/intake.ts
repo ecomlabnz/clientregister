@@ -27,6 +27,7 @@ import { FormReader } from '../../core/validate';
 import { composeFullName, familyNameFor, plainAscii } from '../../core/names';
 import { addEntry } from '../../core/timeline';
 import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
+import { countryCodeFor, countryOptions } from '../../core/countries';
 import { CASE_STATUSES, CASE_STATUS_LABELS, PARTY_ROLES, PARTY_ROLE_LABELS,
          type PartyRole } from '../../domain';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
@@ -65,8 +66,14 @@ function personFields(prefix: string, person: IntakePerson, roleFixed: PartyRole
       value: person.family_name ?? '', maxlength: 120 })}</div>
     <div class="settings-cell">${field({ label: 'Known as', name: `${prefix}preferred_name`,
       value: person.preferred_name ?? '', maxlength: 80 })}</div>
-    <div class="settings-cell">${field({ label: 'Nationality', name: `${prefix}nationality`,
-      value: person.nationality ?? '', maxlength: 80 })}</div>
+    ${'' /* The model returns whatever the document said — "Vietnamese", "Viet
+             Nam", "SRV". `countryCodeFor` turns the ones it can into a code and
+             the rest into nothing, and the person confirming the extraction
+             picks from the list. A wrong nationality confidently pre-filled is
+             worse than an empty box. */}
+    <div class="settings-cell">${select({ label: 'Nationality', name: `${prefix}nationality`,
+      value: countryCodeFor(person.nationality) ?? '', options: countryOptions(),
+      includeBlank: 'Not recorded' })}</div>
     <div class="settings-cell">${field({ label: 'Email', name: `${prefix}email`, type: 'email',
       value: person.email ?? '', maxlength: 320 })}</div>
     <div class="settings-cell">${field({ label: 'Phone', name: `${prefix}phone`,
@@ -395,7 +402,7 @@ async function createPerson(
     f.optional(`${prefix}preferred_name`, { max: 80 }),
     f.email(`${prefix}email`),
     f.optional(`${prefix}phone`, { max: 40 }),
-    f.optional(`${prefix}nationality`, { max: 80 }),
+    countryCodeFor(f.optional(`${prefix}nationality`, { max: 80 })),
     f.date(`${prefix}date_of_birth`),
     c.get('user')!.id, stamp, stamp, c.get('user')!.id,
   );

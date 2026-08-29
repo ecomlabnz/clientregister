@@ -32,6 +32,22 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.49.0', date: '29 August 2026',
+    notes: [
+      'Nationality is now chosen from the full list of countries rather than typed. It is '
+        + 'held as an ISO 3166-1 code, so it can be counted and filtered, and the database '
+        + 'refuses anything that is not a country.',
+      'Current visa is now chosen from a list too \u2014 modelled on the practice\u2019s own '
+        + 'visa taxonomy, with the same VV/SV/WV/RV prefixes as the case types. '
+        + '\u201cNone \u2014 offshore\u201d and \u201cNone \u2014 unlawful\u201d are on it, '
+        + 'because they are answers. Edit the list under Settings \u2192 Lists and dropdowns.',
+      'Anything already recorded that did not match a country or a visa was moved into the '
+        + 'client\u2019s file notes rather than discarded, with a line asking you to set it.',
+      '\u201cWorks for\u201d and \u201cRole there\u201d now sit together under Employment '
+        + 'instead of drifting into different rows.',
+    ],
+  },
+  {
     version: '0.48.0', date: '29 August 2026',
     notes: [
       'Police certificate and medical expiry dates are now worked out rather than typed. '

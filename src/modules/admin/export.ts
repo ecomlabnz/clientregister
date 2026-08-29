@@ -43,14 +43,20 @@ export const DATASETS: Dataset[] = [
     key: 'clients', label: 'Clients',
     description: 'Everyone on the register, with contact details, nationality, visa and English. '
       + 'Passport numbers are excluded; the column says only whether one is held.',
-    sql: `SELECT ref, kind, full_name, given_names, family_name, preferred_name, nzbn,
-                 company_number, email, phone, whatsapp, telegram_username, nationality,
-                 date_of_birth,
-                 CASE WHEN passport_sealed IS NULL THEN 'no' ELSE 'yes' END AS passport_on_file,
-                 passport_country, passport_expiry, current_visa_type, current_visa_expiry,
-                 english_test_type, english_test_score, english_test_date,
-                 address, status, created_at, updated_at
-            FROM clients ORDER BY ref`,
+    // Nationality goes out as the country's name as well as its code: an
+    // export is read by a person, and a spreadsheet column of "VN" answers
+    // nothing. The code goes too, because an export is also read by the next
+    // system, and that one wants the code.
+    sql: `SELECT c.ref, c.kind, c.full_name, c.given_names, c.family_name, c.preferred_name, c.nzbn,
+                 c.company_number, c.email, c.phone, c.whatsapp, c.telegram_username,
+                 c.nationality AS nationality_code, co.name AS nationality,
+                 c.date_of_birth,
+                 CASE WHEN c.passport_sealed IS NULL THEN 'no' ELSE 'yes' END AS passport_on_file,
+                 c.passport_country, c.passport_expiry, c.current_visa_type, c.current_visa_expiry,
+                 c.english_test_type, c.english_test_score, c.english_test_date,
+                 c.address, c.status, c.created_at, c.updated_at
+            FROM clients c LEFT JOIN countries co ON co.code = c.nationality
+           ORDER BY c.ref`,
   },
   {
     key: 'cases', label: 'Matters',

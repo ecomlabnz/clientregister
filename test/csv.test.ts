@@ -69,7 +69,9 @@ describe('what the export deliberately excludes', () => {
       expect(set.sql, set.key).not.toMatch(/number_sealed\s*(,|$)/m);
     }
     const clients = DATASETS.find((d) => d.key === 'clients')!;
-    expect(clients.sql).toContain("CASE WHEN passport_sealed IS NULL THEN 'no' ELSE 'yes' END");
+    // Table-qualified since the clients export joins `countries` for the
+    // nationality name; the guard is about the column, not the prefix.
+    expect(clients.sql).toMatch(/CASE WHEN (\w+\.)?passport_sealed IS NULL THEN 'no' ELSE 'yes' END/);
   });
 
   it('names its columns rather than selecting everything', () => {
