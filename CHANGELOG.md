@@ -7,6 +7,28 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.50.1 — 29 August 2026
+
+### Changed
+- **The secrets section of `docs/operations.md` is now the whole process**, not a
+  table with a footnote. Every name the pipeline knows, what it unlocks, what
+  breaks without it, how to set one, how to check it arrived, how to add a new
+  name, and which two cannot be rotated casually.
+- It leads with the two rules that actually caught people today, because neither
+  is visible from anywhere: **a value set in GitHub does nothing until a deploy
+  runs**, and **a name has to be in both `collect-secrets.mjs` and the workflow's
+  `env:` block** or it is silently dropped.
+- The one place the names are ever visible is the deploy's *Upload secrets to the
+  Worker* step, which prints one line per name and a count. Documented, because
+  it is the only way to confirm a change arrived.
+
+### Verifying
+- `test/secrets.test.ts` now holds three things together: every name the
+  collector knows is passed by the workflow, described in `docs/operations.md`,
+  and declared on `Env` in `src/types.ts`. A secret that arrives at the Worker
+  and is unreachable from the code, or that nobody wrote down, now fails the
+  build.
+
 ## 0.50.0 — 29 August 2026
 
 ### Added
