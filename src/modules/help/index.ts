@@ -32,6 +32,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.61.0', date: '29 August 2026',
+    notes: [
+      'A message you forward into the bot no longer joins a conversation. It was landing in '
+        + 'one thread named after you, whoever it was originally from, and a reply typed there '
+        + 'would have come back to you rather than gone to them.',
+      'A forward is now an inbox message and an inquiry, and nothing else. Existing '
+        + 'conversations have been unpicked: a thread is kept only where somebody really wrote '
+        + 'in that chat, or where the practice replied through it.',
+    ],
+  },
+  {
     version: '0.60.0', date: '29 August 2026',
     notes: [
       'An inquiry can now be deleted, from the list or from its own page \u2014 for the wrong '
