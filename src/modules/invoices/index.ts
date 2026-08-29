@@ -243,7 +243,7 @@ export const invoicesModule: AppModule = {
                       <td class="num">${money(line.net_cents, invoice.currency)}</td>
                       ${editable ? html`<td>${actionButton(
                         `/invoices/${invoice.id}/items/${line.id}/remove`, csrf, 'Remove',
-                        { className: 'btn btn-danger btn-sm', confirm: 'Remove this line?' })}</td>` : ''}
+                        { className: 'btn btn-danger btn-small', confirm: 'Remove this line?' })}</td>` : ''}
                     </tr>`), { fixed: true })}
 
               <dl class="kv mt">

@@ -872,7 +872,7 @@ export const clientsModule: AppModule = {
                                 <div>
                                   ${cert.expires_on ? expiryCell(cert.expires_on) : ''}
                                   ${writable ? actionButton(`/clients/${client.id}/certificates/${cert.id}/remove`, csrf,
-                                      'Remove', { className: 'btn btn-danger btn-sm',
+                                      'Remove', { className: 'btn btn-danger btn-small',
                                                   confirm: 'Remove this certificate? Its history goes with it.' }) : ''}
                                 </div>
                               </li>`)}

@@ -22,6 +22,7 @@ import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { adminTabs } from '../admin';
+import { alertTabs, collectAlerts } from '../alerts';
 import { auditFrom } from '../../core/audit';
 import { all, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
@@ -60,13 +61,18 @@ interface ActionRow {
  */
 function queueTabs(current: string, pending: number): Raw {
   const tabs = [
-    { id: 'pending', label: 'For approval', href: '/workflows', count: pending },
+    { id: 'pending', label: 'Waiting', href: '/workflows', count: pending },
     { id: 'done', label: 'Carried out', href: '/workflows?view=done', count: null as number | null },
     { id: 'dismissed', label: 'Dismissed', href: '/workflows?view=dismissed', count: null },
   ];
-  return html`<nav class="tabs">${tabs.map((t) => html`
-    <a class="${t.id === current ? 'tab current' : 'tab'}" href="${t.href}">${t.label}${
-      t.count === null ? '' : html` <span class="muted">${t.count}</span>`}</a>`)}</nav>`;
+  // Buttons, not a second row of tabs. Two tab bars on one page make the lower
+  // one look like navigation away from the page rather than a filter of what is
+  // already on it — which is part of why "For approval" felt like a trapdoor.
+  // The bar above navigates; this row filters.
+  return html`<div class="filters">${tabs.map((t) => html`
+    <a class="${t.id === current ? 'btn btn-primary btn-small' : 'btn btn-secondary btn-small'}"
+       href="${t.href}">${t.label}${
+      t.count === null ? '' : html` (${t.count})`}</a>`)}</div>`;
 }
 
 /** A rule read back as a sentence, which is how anybody checks it is right. */
@@ -131,7 +137,11 @@ export const workflowsModule: AppModule = {
         ? (c.req.query('view') as string) : 'pending';
       const canEdit = user.role === 'owner' || user.role === 'admin';
 
-      const [items, pending] = await Promise.all([
+      // The alerts the bar counts, so this page wears the same bar the Alerts
+      // page does and "For approval" reads as a tab of it rather than a
+      // different room with no door back.
+      const horizon = Math.min(365, Math.max(7, Number(c.req.query('days') ?? '90') || 90));
+      const [items, pending, alerts] = await Promise.all([
         all<ActionRow>(
           c.env.DB,
           `SELECT a.*, u.name AS decided_by_name
@@ -141,11 +151,13 @@ export const workflowsModule: AppModule = {
           view,
         ),
         one<{ n: number }>(c.env.DB, `SELECT COUNT(*) AS n FROM automation_actions WHERE status = 'pending'`),
+        collectAlerts(c.env, horizon),
       ]);
 
       return page(c, { title: 'Workflows', active: '/alerts' }, html`
         ${pageHeader('For approval',
           'What the register would do about the dates it is watching. Nothing here has happened yet.')}
+        ${alertTabs({ alerts, awaiting: pending?.n ?? 0, horizon, current: 'approval' })}
         ${queueTabs(view, pending?.n ?? 0)}
 
         ${items.length === 0
@@ -178,11 +190,11 @@ export const workflowsModule: AppModule = {
                   ${row.status === 'pending' ? html`
                     <form method="post" action="${`/workflows/${row.id}/approve`}" class="inline-form">
                       ${csrfField(c.get('session')!.csrf)}
-                      <button class="btn btn-primary btn-sm" type="submit">Approve</button>
+                      <button class="btn btn-primary btn-small" type="submit">Approve</button>
                     </form>
                     <form method="post" action="${`/workflows/${row.id}/dismiss`}" class="inline-form">
                       ${csrfField(c.get('session')!.csrf)}
-                      <button class="btn btn-secondary btn-sm" type="submit">Dismiss</button>
+                      <button class="btn btn-secondary btn-small" type="submit">Dismiss</button>
                     </form>` : html`
                     ${badge(row.status, STATUS_TONES[row.status] ?? 'neutral')}
                     <div class="small muted">${row.result ?? ''}</div>
@@ -266,16 +278,16 @@ export const workflowsModule: AppModule = {
                         <div class="small muted">${ruleSentence(rule)}</div>
                       </div>
                       <div class="admin-links">
-                        <a class="btn btn-secondary btn-sm" href="${`/admin/automations?edit=${rule.id}`}">Edit</a>
+                        <a class="btn btn-secondary btn-small" href="${`/admin/automations?edit=${rule.id}`}">Edit</a>
                         <form method="post" action="${`/admin/automations/${rule.id}/toggle`}" class="inline-form">
                           ${csrfField(session.csrf)}
-                          <button class="btn btn-secondary btn-sm" type="submit">
+                          <button class="btn btn-secondary btn-small" type="submit">
                             ${rule.enabled ? 'Turn off' : 'Turn on'}</button>
                         </form>
                         <form method="post" action="${`/admin/automations/${rule.id}/delete`}" class="inline-form"
                               data-confirm="Delete this rule? Proposals it has already made stay where they are.">
                           ${csrfField(session.csrf)}
-                          <button class="btn btn-danger btn-sm" type="submit">Delete</button>
+                          <button class="btn btn-danger btn-small" type="submit">Delete</button>
                         </form>
                       </div>
                     </li>`)}
