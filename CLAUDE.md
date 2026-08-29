@@ -67,6 +67,12 @@ rule but facts about the data:
 
 ## Verifying
 
+**Never pipe a test or typecheck run into `head` or `tail` inside an `&&`
+chain.** A pipeline's exit status is that of its *last* command, so `npx vitest
+run | tail -3` reports success however badly the tests failed, and the chain
+carries on to commit and push. Use `set -o pipefail`, or run the command and
+read its output separately. This has already put one red build on main.
+
 Prove behaviour rather than assuming it. Database guarantees are checked by
 attacking the database directly, not through the application. Browser behaviour
 — sticky headers, hidden sections, tab interactions — is checked in Chromium
