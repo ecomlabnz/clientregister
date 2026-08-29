@@ -32,6 +32,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.46.0', date: '29 August 2026',
+    notes: [
+      'The <strong>Admin</strong> section is now called <strong>Settings</strong>. Nothing '
+        + 'moved \u2014 it is the same tabs at the same addresses \u2014 and most of the help '
+        + 'already called it that.',
+      'The navigation now tightens as the window narrows instead of wrapping into a ragged '
+        + 'second row, and takes a full-width line of its own once it can no longer share one '
+        + 'with the search box.',
+    ],
+  },
+  {
     version: '0.45.0', date: '29 August 2026',
     notes: [
       '\u201cNot acknowledged\u201d \u2014 a matter lodged with INZ where no application '
@@ -98,7 +109,7 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
     version: '0.39.0', date: '29 August 2026',
     notes: [
       'The model the assistant uses is now chosen in the app, under '
-        + 'Admin \u2192 Settings \u2192 Assistant, with the price per million tokens beside '
+        + 'Settings \u2192 AI Assistant, with the price per million tokens beside '
         + 'each option. No deploy.',
     ],
   },
@@ -538,7 +549,7 @@ function sections(origin: string): Section[] {
            nothing to distinguish — one student visa for one client is not ambiguous with
            anything.</p>
         <p>The short forms come from the type list, which an administrator edits under
-           <strong>Admin → Settings → Vocabulary</strong> with no deployment. Change
+           <strong>Settings → Vocabulary</strong> with no deployment. Change
            <code>RQ. Section 61 Request</code> to <code>RQ. S.61</code> and every matter named
            from then on uses it. The part before the dot groups the list; it is dropped from the
            name.</p>
@@ -723,14 +734,14 @@ function sections(origin: string): Section[] {
               <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a></li>
         </ul>
         <p>Add them under <strong>Settings → Secrets and variables → Actions</strong> in the
-           repository, then push or re-run the deploy. <strong>Admin → Integrations</strong> then
+           repository, then push or re-run the deploy. <strong>Settings → Integrations</strong> then
            shows the AI layer as on, and names the model it is using.</p>
         <p>It runs on <strong>Claude Haiku 4.5</strong> — deliberately the cheap model, at about a
            fifth of the price of the largest one. Everything asked of it here is reading a document
            into form fields, triaging a message, or summarising a file the practice already holds,
            and all of it is checked by a person before anything is written. Paying five times more
            would be paying for reasoning this work does not use.</p>
-        <p>To change it, go to <strong>Admin → Settings → Assistant</strong> and pick another:
+        <p>To change it, go to <strong>Settings → AI Assistant</strong> and pick another:
            Sonnet 5 is the next step up, Opus 5 above it, and each carries its price per million
            tokens so the choice is made with the figures in front of you. It takes effect on the
            next request — no deploy.</p>
@@ -1377,7 +1388,7 @@ wv_partner | WV. Partner</pre>
       id: 'admin',
       title: 'Administration',
       body: html`
-        <p>Owners and administrators get an <strong>Admin</strong> section, in four tabs:
+        <p>Owners and administrators get a <strong>Settings</strong> section, in four tabs:
            <strong>Overview</strong> for the day's numbers and the links to users, settings and the
            audit log; <strong>Integrations</strong> for what is connected and what is still missing;
            <strong>Modules</strong> for what this installation is made of; and

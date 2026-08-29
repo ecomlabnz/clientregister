@@ -252,9 +252,14 @@ p:last-child { margin-bottom: 0; }
 }
 .brand { font-weight: 640; color: var(--text); letter-spacing: -0.02em; font-size: 0.95rem; }
 .brand:hover { text-decoration: none; }
-.topnav { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
+/* The navigation tightens as the window narrows instead of jumping a row.
+   Twelve sections need about 970px at full spacing, so the padding and the gap
+   shrink with the viewport — enough to keep the whole set on one line down to
+   around a thousand pixels, which is where a laptop half-screen sits. */
+.topnav { display: flex; gap: clamp(2px, 0.35vw, 4px); flex-wrap: wrap; flex: 1; }
 .nav-link {
-  padding: 4px 9px; border-radius: 5px; color: var(--muted); font-size: 0.86rem; font-weight: 500;
+  padding: 4px clamp(6px, 0.7vw, 9px); border-radius: 5px;
+  color: var(--muted); font-size: 0.86rem; font-weight: 500;
 }
 .nav-link:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
 .nav-link.current { background: var(--blue-bg); color: var(--accent); }
@@ -1173,6 +1178,17 @@ body.site { background: var(--bg); }
    inside their own box; every control is big enough to hit with a thumb; and
    the navigation stays complete rather than being hidden behind a menu that
    would need JavaScript to open. */
+
+/* Below the width where the navigation can share a line with the wordmark and
+   the search box, it takes a line of its own rather than wrapping raggedly
+   around them. A full-width row fits the whole set again; two even rows beat
+   one row and a stub. */
+@media (max-width: 1520px) {
+  .topbar { row-gap: 6px; }
+  .brand { order: 1; }
+  .topbar-right { order: 2; }
+  .topnav { order: 3; width: 100%; flex: none; }
+}
 
 @media (max-width: 720px) {
   .topbar { padding: 8px 12px; gap: 10px; row-gap: 8px; }

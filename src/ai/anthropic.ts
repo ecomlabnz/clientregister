@@ -94,7 +94,7 @@ const BriefSchema = z.object({
  * a 200K context rather than 1M (the longest thing sent is a case file, capped
  * at 60,000 characters below), and a 100-page ceiling on a single PDF.
  *
- * Which model actually runs is chosen in the app, under Admin → Settings →
+ * Which model actually runs is chosen in the app, under Settings → AI
  * Assistant; this is only the answer when nobody has chosen. Nothing else has
  * to change to move between them: no request here sends `effort` or `thinking`,
  * which are the parameters that differ between the tiers, and a test keeps that

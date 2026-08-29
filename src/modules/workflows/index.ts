@@ -124,7 +124,7 @@ export const workflowsModule: AppModule = {
 
     // Two routers, because these are two different jobs in two different parts
     // of the application. The queue is daily work and sits with Alerts; the
-    // rules are configuration and sit with the rest of Administration, under
+    // rules are configuration and sit with the rest of Settings, under
     // the Admin tab bar, so following that tab does not strand anybody in a
     // section they cannot get out of.
     const rules = new Hono<AppContext>();
@@ -208,7 +208,7 @@ export const workflowsModule: AppModule = {
            Anything that leaves the practice waits here for a person, whatever the rule says —
            that is enforced where the rules are stored, not only where they are written.${
              canEdit ? html` The rules themselves are under
-               <a href="/admin/automations">Admin → Automations</a>.` : ''}</p>`);
+               <a href="/admin/automations">Settings → Automations</a>.` : ''}</p>`);
     });
 
     r.post('/:id/approve', requirePermission('register:write'), async (c) => {
