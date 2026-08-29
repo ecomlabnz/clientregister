@@ -79,7 +79,27 @@ const BriefSchema = z.object({
   risks: z.array(z.string()),
 });
 
-const DEFAULT_MODEL = 'claude-opus-5';
+/**
+ * The model this practice runs on.
+ *
+ * Haiku 4.5, not because it is the best model but because it is the right one
+ * for this work at a fifth of the price — $1/$5 per million tokens against
+ * $5/$25 for Opus 5. Everything asked of it here is extraction and
+ * summarisation against a schema, from documents the practice already holds:
+ * reading a decision letter into form fields, triaging a message, summarising a
+ * file. None of it is reasoning the cheapest current model cannot do, and all of
+ * it is checked by a person before anything is written.
+ *
+ * Two things follow from the choice, and both are fine for this workload:
+ * a 200K context rather than 1M (the longest thing sent is a case file, capped
+ * at 60,000 characters below), and a 100-page ceiling on a single PDF.
+ *
+ * Set the AI_MODEL secret to override it — `claude-sonnet-5` is the next step
+ * up at $2/$10, `claude-opus-5` above that. Nothing else has to change: no
+ * request here sends `effort` or `thinking`, which are the parameters that
+ * differ between the tiers.
+ */
+const DEFAULT_MODEL = 'claude-haiku-4-5';
 
 export function createAnthropicProvider(env: Env): AiProvider {
   const model = env.AI_MODEL || DEFAULT_MODEL;
