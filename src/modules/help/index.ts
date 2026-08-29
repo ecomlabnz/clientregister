@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.43.0', date: '29 August 2026',
+    notes: [
+      'Two new alerts that are not about a date: “Gone quiet” lists open matters nothing '
+        + 'has happened on for ten days, and “Does not add up” lists matters whose own '
+        + 'recorded dates contradict each other.',
+      'How long counts as quiet is set under Settings \u2192 Alerts.',
+    ],
+  },
+  {
     version: '0.42.0', date: '29 August 2026',
     notes: [
       'A brief can be edited before it is saved. Edit it and the note records that you '
@@ -512,6 +521,20 @@ function sections(origin: string): Section[] {
            through lodgement, which stops a file quietly skipping a step.</p>
         <p>Set the <strong>response or decision due</strong> date whenever there is one, especially
            for an RFI or PPI. That is the date the Alerts page watches.</p>
+        <h4>Two alerts that are not about a date</h4>
+        <p>Everything else on the Alerts page answers <em>what is due</em>. These two answer
+           <em>what is wrong</em>, which is how matters are actually lost — rarely to a missed
+           deadline, usually to nobody looking.</p>
+        <p><strong>Gone quiet</strong> lists open matters with no note, no status change and no
+           task activity for ten days. Nothing is due on them; that is the point. Change the ten
+           days under <strong>Settings → Alerts</strong>.</p>
+        <p><strong>Does not add up</strong> lists matters whose own record contradicts itself — a
+           decision dated before lodgement, a matter marked approved or declined with no decision
+           date, a lodged date in the future. The row says which facts disagree, so you can judge
+           it without opening the file.</p>
+        <p>Both are ordinary database questions, not the assistant's opinion. Every row on the
+           Alerts page is meant to be trustworthy at a glance; a row you had to investigate before
+           acting would teach you to skim past the rest.</p>
         <p>The <strong>timeline</strong> on each case is the file note: calls, meetings, emails,
            what was advised. Anything the system does — a status change, a fee added, a task
            completed — is written there automatically, so the history reads in one place.</p>
