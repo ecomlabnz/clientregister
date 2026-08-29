@@ -19,6 +19,7 @@ import type { Env } from '../types';
 import { all, nowIso, one, run } from './db';
 import { newId } from './ids';
 import { audit } from './audit';
+import { renderEmailHtml } from './richtext';
 import { queueEmail } from '../mail/queue';
 
 export type ThreadChannel = 'telegram' | 'whatsapp' | 'email';
@@ -101,9 +102,28 @@ export interface ReplyRow {
  * the transport was working, and a failed send is a row saying so rather than
  * a message that never existed.
  */
+export interface ReplyInput {
+  threadId: string;
+  body: string;
+  userId: string;
+  subject?: string;
+  /**
+   * Where it goes, when that is not simply the person the conversation is with.
+   *
+   * A conversation has one counterpart; a piece of correspondence may have
+   * five. Left empty these fall back to the thread's peer, which is the
+   * ordinary case and the one that should need no thought.
+   */
+  to?: string | null;
+  cc?: string | null;
+  bcc?: string | null;
+  /** Send the formatted version as well as the plain text. */
+  asHtml?: boolean;
+}
+
 export async function postReply(
   env: Env,
-  input: { threadId: string; body: string; userId: string; subject?: string },
+  input: ReplyInput,
 ): Promise<{ ok: boolean; message: string }> {
   const thread = await one<ThreadRow>(env.DB, `SELECT * FROM channel_threads WHERE id = ?`, input.threadId);
   if (!thread) return { ok: false, message: 'That conversation no longer exists.' };
@@ -111,16 +131,28 @@ export async function postReply(
   const body = input.body.trim().slice(0, 4000);
   if (!body) return { ok: false, message: 'Write something first.' };
 
+  // Only email has recipients other than the counterpart. A chat id is the
+  // conversation, so anything typed into these fields on Telegram or WhatsApp
+  // would be silently ignored rather than honoured — better to not carry it.
+  const email = thread.channel === 'email';
+  const to = (email && input.to?.trim()) || thread.peer_id;
+  const cc = email ? (input.cc?.trim() || null) : null;
+  const bcc = email ? (input.bcc?.trim() || null) : null;
+  const asHtml = email && input.asHtml === true;
+
   const id = newId('rep');
   await run(
     env.DB,
-    `INSERT INTO channel_replies (id, thread_id, channel, body, status, created_at, created_by)
-     VALUES (?,?,?,?, 'queued', ?, ?)`,
+    `INSERT INTO channel_replies (id, thread_id, channel, body, status, created_at, created_by,
+        to_addr, cc_addr, bcc_addr, sent_html)
+     VALUES (?,?,?,?, 'queued', ?,?,?,?,?,?)`,
     id, thread.id, thread.channel, body, nowIso(), input.userId,
+    to, cc, bcc, asHtml ? 1 : 0,
   );
   await run(env.DB, `UPDATE channel_threads SET last_message_at = ? WHERE id = ?`, nowIso(), thread.id);
 
-  const sent = await deliver(env, thread, body, input.subject ?? null, input.userId);
+  const sent = await deliver(env, thread, body, input.subject ?? null, input.userId,
+    { to, cc, bcc, asHtml });
 
   await run(
     env.DB,
@@ -132,7 +164,8 @@ export async function postReply(
   await audit(env, {
     action: 'channel.reply', entityType: 'channel_thread', entityId: thread.id,
     actorId: input.userId,
-    meta: { channel: thread.channel, ok: sent.ok, queued: sent.queued, chars: body.length },
+    meta: { channel: thread.channel, ok: sent.ok, queued: sent.queued, chars: body.length,
+            to, cc, bcc, html: asHtml },
   });
 
   if (sent.ok) return { ok: true, message: 'Sent.' };
@@ -145,6 +178,7 @@ type Delivery = { ok: boolean; queued: boolean; providerId?: string | null; erro
 /** Hand the reply to whichever transport this channel uses. */
 async function deliver(
   env: Env, thread: ThreadRow, body: string, subject: string | null, userId: string,
+  email: { to: string; cc: string | null; bcc: string | null; asHtml: boolean },
 ): Promise<Delivery> {
   if (thread.channel === 'telegram') {
     if (!env.TELEGRAM_BOT_TOKEN) {
@@ -164,9 +198,14 @@ async function deliver(
   // subject to the same provider, the same retries and the same record.
   try {
     await queueEmail(env, {
-      to: thread.peer_id,
+      to: email.to,
+      cc: email.cc,
+      bcc: email.bcc,
       subject: subject || `Message from your adviser`,
       text: body,
+      // The plain text goes either way. A formatted message carries both, so a
+      // client that will not render HTML still gets a readable letter.
+      html: email.asHtml ? renderEmailHtml(body) : null,
       entityType: 'channel_thread', entityId: thread.id, createdBy: userId,
     });
     const { flushQueue } = await import('../mail/queue');
@@ -238,8 +277,15 @@ export async function threadHistory(env: Env, threadId: string): Promise<ThreadE
   const [inbound, outbound] = await Promise.all([
     all<any>(
       env.DB,
+      // Ignored messages are left out. Ignoring one is a decision that it was
+      // not correspondence — a notification, a circular, something sent to the
+      // wrong address — and a conversation that keeps showing it is a
+      // conversation whose shape disagrees with the decision. It is still in
+      // the inbox under "Ignored", and the audit log still records that it
+      // arrived; only this reading of the exchange leaves it out.
       `SELECT id, received_at, body_text, sender_display, sender, status
-         FROM ingest_messages WHERE thread_id = ? ORDER BY received_at LIMIT 200`,
+         FROM ingest_messages
+        WHERE thread_id = ? AND status != 'ignored' ORDER BY received_at LIMIT 200`,
       threadId,
     ),
     all<any>(

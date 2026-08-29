@@ -33,6 +33,9 @@ export interface CapturedMessage {
   bodyText?: string | null;
   attachments?: Array<{ filename: string; contentType: string; size: number }>;
   trusted: boolean;
+  /** Everyone the message was addressed to, so a reply can reach them all. */
+  toAddresses?: string[];
+  ccAddresses?: string[];
   receivedAt?: string;
   meta?: Record<string, unknown>;
   /**
@@ -76,8 +79,9 @@ export async function captureMessage(env: Env, msg: CapturedMessage): Promise<Ca
   await run(
     env.DB,
     `INSERT INTO ingest_messages (id, channel, external_id, dedupe_key, received_at, sender, sender_display,
-        subject, body_text, attachments_json, trusted, status, meta_json, created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)`,
+        subject, body_text, attachments_json, trusted, status, meta_json, created_at,
+        to_addrs, cc_addrs)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,?)`,
     id, msg.channel, msg.externalId ?? null, key, msg.receivedAt ?? nowIso(),
     msg.sender ?? null, msg.senderDisplay ?? null, msg.subject ?? null,
     (msg.bodyText ?? '').slice(0, 60_000),
@@ -85,6 +89,8 @@ export async function captureMessage(env: Env, msg: CapturedMessage): Promise<Ca
     msg.trusted ? 1 : 0,
     msg.meta ? JSON.stringify(msg.meta) : null,
     nowIso(),
+    msg.toAddresses?.length ? msg.toAddresses.join(', ') : null,
+    msg.ccAddresses?.length ? msg.ccAddresses.join(', ') : null,
   );
 
   // A message from somebody identifiable joins their conversation, so the

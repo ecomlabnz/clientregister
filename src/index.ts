@@ -11,7 +11,7 @@
 import type { Env } from './types';
 import { createApp } from './app';
 import { handleInboundEmail } from './ingest/email';
-import { pollInbox } from './ingest/gmail';
+import { MAIL_POLL_CRON, pollInbox } from './ingest/gmail';
 import { flushQueue } from './mail/queue';
 import { nowIso, run } from './core/db';
 import { audit } from './core/audit';
@@ -42,9 +42,6 @@ export default {
     ctx.waitUntil(event.cron === MAIL_POLL_CRON ? pollMail(env) : housekeeping(env));
   },
 } satisfies ExportedHandler<Env>;
-
-/** Must match the entry in wrangler.jsonc; a test holds the two together. */
-export const MAIL_POLL_CRON = '*/5 * * * *';
 
 async function pollMail(env: Env): Promise<void> {
   try {

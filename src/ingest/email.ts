@@ -18,6 +18,16 @@ const MAX_BODY_CHARS = 60_000;
 export interface ParsedInboundEmail {
   fromAddress: string | null;
   fromName: string | null;
+  /**
+   * Everyone else the message was addressed to.
+   *
+   * Kept because "reply to all" cannot exist without it — the register would
+   * have no idea who "all" was. A forwarded message carries the original
+   * headers, so these are the people the client actually wrote to, not the
+   * mailbox it passed through on the way here.
+   */
+  toAddresses: string[];
+  ccAddresses: string[];
   subject: string | null;
   text: string;
   attachments: Array<{ filename: string; contentType: string; size: number }>;
@@ -34,9 +44,18 @@ export async function parseInboundEmail(raw: ArrayBuffer): Promise<ParsedInbound
     (email.html ? stripHtml(email.html) : '') ||
     '(no text content)';
 
+  const addresses = (list: unknown): string[] =>
+    (Array.isArray(list) ? list : [])
+      .map((entry) => (entry as { address?: string }).address ?? '')
+      .map((address) => address.trim().toLowerCase())
+      .filter(Boolean)
+      .slice(0, 25);
+
   return {
     fromAddress: from?.address ? from.address.toLowerCase() : null,
     fromName: from?.name || null,
+    toAddresses: addresses(email.to),
+    ccAddresses: addresses(email.cc),
     subject: email.subject ?? null,
     text: text.slice(0, MAX_BODY_CHARS),
     attachments: (email.attachments ?? []).map((a) => ({
@@ -94,6 +113,8 @@ export async function handleInboundEmail(
       bodyText: parsed.text,
       attachments: parsed.attachments,
       trusted,
+      toAddresses: parsed.toAddresses,
+      ccAddresses: parsed.ccAddresses,
       receivedAt: parsed.date ? new Date(parsed.date).toISOString() : new Date().toISOString(),
       meta: { to: message.to, size: raw.byteLength },
     });

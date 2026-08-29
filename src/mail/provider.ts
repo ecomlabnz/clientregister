@@ -17,6 +17,14 @@ import type { Env } from '../types';
 export interface OutboundMessage {
   to: string;
   cc?: string | null;
+  /**
+   * Copied, without the other recipients being told.
+   *
+   * Recorded like every other recipient — a blind copy that leaves no trace is
+   * one nobody can answer a question about later. Blind is a property of the
+   * message, not of the file.
+   */
+  bcc?: string | null;
   subject: string;
   text: string;
   html?: string | null;
