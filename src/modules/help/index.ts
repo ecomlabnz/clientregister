@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.62.0', date: '30 August 2026',
+    notes: [
+      'A note on a task now shows when it was written and by whom. Notes already on file '
+        + 'have been dated from the record of when each was made.',
+      'Finishing a task is a single \u201cDone\u201d button rather than a choice in a dropdown '
+        + 'sitting next to \u201cCancelled\u201d.',
+      'Editing a task without touching the note leaves the note\u2019s date where it was.',
+    ],
+  },
+  {
     version: '0.61.0', date: '29 August 2026',
     notes: [
       'A message you forward into the bot no longer joins a conversation. It was landing in '

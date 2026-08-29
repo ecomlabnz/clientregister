@@ -16,7 +16,7 @@ import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
-import { badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, statusTone, table } from '../../ui/components';
+import { actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, statusTone, table } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays } from '../../ui/format';
 import { PRIORITIES, PRIORITY_LABELS, TASK_STATUS_LABELS, TASK_STATUSES } from '../../domain';
 import { isAssignable, userOptions } from '../../core/lookups';
@@ -152,7 +152,8 @@ export const tasksModule: AppModule = {
                     ${t.priority !== 'normal' ? badge(PRIORITY_LABELS[t.priority as keyof typeof PRIORITY_LABELS], t.priority === 'urgent' ? 'red' : 'amber') : ''}
                     ${t.details ? html`<div class="muted small prewrap clamp-2">${t.details}</div>` : ''}
                     ${t.completion_note
-                      ? html`<div class="small prewrap clamp-2"><strong>Done:</strong> ${t.completion_note}</div>`
+                      ? html`<div class="small prewrap clamp-2"><strong>Done${
+                          t.completion_note_at ? html` ${dateShort(t.completion_note_at)}` : ''}:</strong> ${t.completion_note}</div>`
                       : ''}
                     <div class="row-meta show-sm">
                       ${links[i] ? html`<a href="${links[i]!.href}">${links[i]!.label}</a>` : ''}
@@ -244,13 +245,19 @@ export const tasksModule: AppModule = {
       const task = await one<any>(c.env.DB, 'SELECT * FROM tasks WHERE id = ?', id);
       if (!task) return c.notFound();
 
-      const [link, creator, assignee] = await Promise.all([
+      const [link, creator, assignee, noteAuthor] = await Promise.all([
         entityLabel(c.env, task.entity_type, task.entity_id),
         task.created_by
           ? one<{ name: string }>(c.env.DB, 'SELECT name FROM users WHERE id = ?', task.created_by)
           : Promise.resolve(null),
         task.assigned_to
           ? one<{ name: string }>(c.env.DB, 'SELECT name FROM users WHERE id = ?', task.assigned_to)
+          : Promise.resolve(null),
+        // Null for a note written before the stamp existed, where the audit log
+        // had no actor to backfill from. Shown without an author rather than
+        // with a guessed one.
+        task.completion_note_by
+          ? one<{ name: string }>(c.env.DB, 'SELECT name FROM users WHERE id = ?', task.completion_note_by)
           : Promise.resolve(null),
       ]);
       const csrf = c.get('session')!.csrf;
@@ -294,12 +301,28 @@ export const tasksModule: AppModule = {
             </dl>`)}
         </div>
 
+        ${'' /* A note is a statement about a moment. "Called to find out, no
+                 update, will need to follow up in a week" is close to worthless
+                 without the day it was written, because six months later
+                 nobody can tell whether the call was yesterday or in March. */}
         ${task.completion_note
-          ? card('What was done', html`<div class="prewrap">${task.completion_note}</div>`)
+          ? card('What was done', html`
+              <div class="prewrap">${task.completion_note}</div>
+              <p class="small muted note-stamp">Written ${dateTime(task.completion_note_at)}${
+                noteAuthor ? html` by ${noteAuthor.name}` : ''}</p>`)
           : ''}
 
         ${writable ? card('Change it', html`
           <div class="inline-row">
+            ${'' /* Finishing a task is the thing people came here to do, and it
+                     was four presses behind a dropdown that also offers
+                     "Cancelled" right beside "Done". One button, said plainly.
+                     The dropdown stays for everything else. */}
+            ${open
+              ? actionButton(`/tasks/${task.id}/status`, csrf, 'Done', {
+                  className: 'btn btn-primary',
+                  fields: { status: 'done', return_to: here } })
+              : ''}
             <form method="post" action="/tasks/${task.id}/status" class="inline-form">
               ${csrfField(csrf)}
               <input type="hidden" name="return_to" value="${here}">
@@ -394,13 +417,25 @@ export const tasksModule: AppModule = {
         return redirectWith(c, `/tasks/${id}/edit`, 'Choose an active person to own this task.', 'err');
       }
 
+      // The note's stamp moves only when the note itself does. Re-saving this
+      // form without touching the box would otherwise redate a call made in
+      // March to today, which is worse than no date at all.
+      const noteChanged = (completionNote ?? '') !== (existing.completion_note ?? '');
+      const noteAt = completionNote
+        ? (noteChanged ? nowIso() : existing.completion_note_at ?? nowIso())
+        : null;
+      const noteBy = completionNote
+        ? (noteChanged ? user.id : existing.completion_note_by ?? user.id)
+        : null;
+
       await run(
         c.env.DB,
         `UPDATE tasks SET title = ?, details = ?, due_at = ?, priority = ?, status = ?,
-           completion_note = ?, assigned_to = ?, entity_type = ?, entity_id = ?,
+           completion_note = ?, completion_note_at = ?, completion_note_by = ?,
+           assigned_to = ?, entity_type = ?, entity_id = ?,
            completed_at = ?, updated_at = ?
          WHERE id = ?`,
-        title, details, dueAt, priority, status, completionNote, assignedTo,
+        title, details, dueAt, priority, status, completionNote, noteAt, noteBy, assignedTo,
         detach ? null : existing.entity_type, detach ? null : existing.entity_id,
         status === 'done' ? (existing.completed_at ?? nowIso()) : null,
         nowIso(), id,
@@ -531,8 +566,12 @@ export const tasksModule: AppModule = {
       if (!task) return c.notFound();
       if (!note) return redirectWith(c, back, 'Task marked done.');
 
-      await run(c.env.DB, 'UPDATE tasks SET completion_note = ?, updated_at = ? WHERE id = ?',
-        note, nowIso(), id);
+      await run(
+        c.env.DB,
+        `UPDATE tasks SET completion_note = ?, completion_note_at = ?, completion_note_by = ?,
+                          updated_at = ? WHERE id = ?`,
+        note, nowIso(), user.id, nowIso(), id,
+      );
 
       // Appended, never written over the entry the completion already made.
       // The timeline records what was said at the time, so a second thought is
