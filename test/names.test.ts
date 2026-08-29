@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { composeFullName, familyNameFor, formalName, splitFullName } from '../src/core/names';
+import { composeFullName, familyNameFor, formalName, plainAscii, splitFullName } from '../src/core/names';
 
 describe('composeFullName', () => {
   it('joins a person’s given and family names in reading order', () => {
@@ -77,12 +77,13 @@ describe('familyNameFor', () => {
     expect(familyNameFor(undefined)).toBe('');
   });
 
-  it('handles names SQLite would mangle', () => {
-    // SQLite's UPPER() is ASCII-only: it returns 'NGUYễN' and 'MüLLER',
-    // changing half the letters and leaving half. That is why this is done in
-    // the application and not in a migration.
-    expect(familyNameFor('Nguyễn')).toBe('NGUYỄN');
-    expect(familyNameFor('müller')).toBe('MÜLLER');
+  it('handles names SQL could not', () => {
+    // Two things SQL cannot do to a name. It has no way to strip diacritics at
+    // all, and its UPPER() is ASCII-only — 'Nguyễn' comes back 'NGUYễN',
+    // changing half the letters and leaving half. Both are why this lives in
+    // the application rather than in a migration.
+    expect(familyNameFor('Nguyễn')).toBe('NGUYEN');
+    expect(familyNameFor('müller')).toBe('MULLER');
     expect(familyNameFor("ma'afu")).toBe("MA'AFU");
   });
 
@@ -92,5 +93,46 @@ describe('familyNameFor', () => {
     // An organisation has a registered name, not a surname to capitalise.
     expect(composeFullName('organisation', {}, 'Kiwi Orchards Limited'))
       .toBe('Kiwi Orchards Limited');
+  });
+});
+
+describe('plainAscii', () => {
+  it('writes a name in plain English letters', () => {
+    expect(plainAscii('Rāwiri')).toBe('Rawiri');
+    expect(plainAscii('José')).toBe('Jose');
+    expect(plainAscii('Müller')).toBe('Muller');
+    expect(plainAscii('Nguyễn')).toBe('Nguyen');
+  });
+
+  it('handles the letters that do not decompose', () => {
+    // The Vietnamese đ is the one that matters most for this caseload: without
+    // an explicit map "Đặng" comes out "Đang" — half converted, which is worse
+    // than either end of the choice.
+    expect(plainAscii('Đặng')).toBe('Dang');
+    expect(plainAscii('Ørsted')).toBe('Orsted');
+    expect(plainAscii('Łukasz')).toBe('Lukasz');
+    expect(plainAscii('Straße')).toBe('Strasse');
+  });
+
+  it('leaves a plain name alone', () => {
+    expect(plainAscii('Tagata')).toBe('Tagata');
+    expect(plainAscii("O'Brien")).toBe("O'Brien");
+    expect(plainAscii('')).toBe('');
+    expect(plainAscii(null)).toBe('');
+  });
+
+  it('is applied to both halves of a name', () => {
+    expect(familyNameFor('Rāwiri')).toBe('RAWIRI');
+    expect(composeFullName('individual', { givenNames: 'Hiné', familyName: 'Rāwiri' }))
+      .toBe('Hine RAWIRI');
+    expect(formalName({ givenNames: 'Thi Thu Thuy', familyName: 'Trương' }))
+      .toBe('TRUONG, Thi Thu Thuy');
+  });
+
+  it('leaves a registered company name as the register holds it', () => {
+    // An organisation's name is copied from the Companies Office, not restyled
+    // by this practice.
+    expect(composeFullName('organisation', {}, 'Kiwi Ōrchards Limited'))
+      .toBe('Kiwi Ōrchards Limited');
   });
 });

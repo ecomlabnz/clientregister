@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.37.0', date: '29 August 2026',
+    notes: [
+      'A search box at the top of every page, covering the whole register \u2014 clients, '
+        + 'matters, tasks, quotes, invoices, inquiries, file notes, documents and the '
+        + 'knowledge base.',
+      'Names are recorded in plain English letters: RAWIRI, NGUYEN, DANG.',
+    ],
+  },
+  {
     version: '0.36.1', date: '29 August 2026',
     notes: [
       'A client\u2019s family name is now stored in capitals however it is typed \u2014 '
@@ -407,6 +416,22 @@ function sections(origin: string): Section[] {
            Clients page searches it by name or number and fills the details in from the register
            itself — the authority on how a company is actually registered, which a letterhead
            is not.</p>`,
+    },
+    {
+      id: 'search',
+      title: 'Finding things',
+      body: html`
+        <p>The box at the top right searches the whole register from any page:
+           clients, matters, tasks, quotes, invoices, inquiries, file notes, uploaded documents
+           and the knowledge base. Results are grouped by what they are.</p>
+        <p>It searches more than names. A reference typed in full — <code>CASE-26-014</code>,
+           <code>CL-0021</code>, <code>Q-0002</code> — is marked as an exact match and put first.
+           An INZ application or client number finds the matter. A phrase you remember from a file
+           note finds the note, which is often the thing you were actually after.</p>
+        <p>Results appear as you type. Two letters is the minimum: one letter matches most of the
+           register and answers nothing.</p>
+        <p>Names are held in plain English letters — <em>RAWIRI</em>, <em>NGUYEN</em>,
+           <em>DANG</em> — so there is never a mark you have to reproduce to find somebody.</p>`,
     },
     {
       id: 'cases',

@@ -262,6 +262,24 @@ p:last-child { margin-bottom: 0; }
 .signout { display: flex; }
 .whoami { display: flex; align-items: center; gap: 8px; color: var(--text); }
 .whoami:hover { text-decoration: none; }
+/* The register-wide search box.
+   Sized to be usable rather than prominent: it sits between the menu and the
+   account link, shrinks before either of them does, and is dropped on a phone
+   where the menu already needs the whole width — Search has its own page and
+   the menu reaches it. */
+.topsearch { display: flex; }
+.topsearch input {
+  width: clamp(140px, 18vw, 260px);
+  padding: 5px 10px; font-size: 0.85rem;
+  background: var(--surface-2);
+}
+.topsearch input:focus { background: var(--surface); }
+@media (max-width: 1100px) { .topsearch input { width: 150px; } }
+/* Kept on a phone rather than dropped. The account name is already hidden at
+   this width, which is the room it uses; a register you cannot search from a
+   phone is the wrong half to economise on. */
+@media (max-width: 720px) { .topsearch input { width: 100%; min-width: 0; } .topsearch { flex: 1; } }
+
 .whoami-name { font-size: 0.9rem; }
 .avatar {
   width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--accent-text);
