@@ -32,6 +32,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.56.0', date: '29 August 2026',
+    notes: [
+      'A party who is not on file yet can be added from the matter itself \u2014 a name, a '
+        + 'role, and they are created as a client and put on the matter in one step. You no '
+        + 'longer have to leave the matter, create the client, and find your way back.',
+    ],
+  },
+  {
     version: '0.55.0', date: '29 August 2026',
     notes: [
       'Correspondence is searchable. The global search box now looks inside messages and '

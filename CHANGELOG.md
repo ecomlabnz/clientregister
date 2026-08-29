@@ -7,6 +7,24 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.56.0 — 29 August 2026
+
+### Added
+- **A party can be created from the matter.** Adding somebody who is not yet a
+  client meant leaving the matter, filling in the client form, and finding your
+  way back — for a partner, a child or an employer, which is the *ordinary* case
+  for a party rather than the exception.
+- Four fields: given names, family name, role, email. Deliberately no more. The
+  rest of what the register holds about a person belongs on that person's own
+  page, and a longer form here would be a second client form to keep in step
+  with the first.
+- The name goes through the same helpers the client form uses, so somebody
+  created here is written exactly as somebody created there — family name in
+  capitals, in plain English letters, however it was typed. They get a reference
+  of their own, because a party is a client in their own right.
+- It lands you back on the matter you were working on. Anywhere else and it is
+  the old journey with extra steps.
+
 ## 0.55.0 — 29 August 2026
 
 ### Added
