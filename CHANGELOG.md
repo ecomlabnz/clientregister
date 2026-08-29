@@ -7,6 +7,28 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.62.0 — 30 August 2026
+
+### Added
+- **A note carries the day it was written**, and who wrote it. "Called to find
+  out, no update, will need to follow up in a week" is close to worthless
+  undated: six months on nobody can tell whether the call was yesterday or in
+  March. `completed_at` never answered it either — a note can be written before
+  the task is finished, changed afterwards, or left on a task still open.
+- **Finishing a task is one button.** "Done" sat inside a dropdown next to
+  "Cancelled", which is one slip away from the opposite of what was meant. The
+  dropdown stays for everything else.
+
+### Changed
+- The stamp moves only when the note itself moves. Re-saving the edit form
+  without touching the box no longer redates a call made in March to today,
+  which would be worse than no date at all.
+- Existing notes take their date and author **from the audit log**, which
+  already recorded each one as it was written. Where the log has nothing, the
+  task's own timestamps stand in and no author is invented.
+- The database refuses a note with no time on it, so a route that forgets fails
+  loudly rather than quietly producing another undated note.
+
 ## 0.61.0 — 29 August 2026
 
 ### Fixed
