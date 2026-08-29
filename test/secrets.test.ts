@@ -28,4 +28,22 @@ describe('the deploy hands over every secret the collector expects', () => {
     expect(missing, `not passed by .github/workflows/deploy.yml:\n  ${missing.join('\n  ')}`)
       .toEqual([]);
   });
+
+  it('describes each of them in the operations notes', () => {
+    // A secret nobody wrote down is one somebody sets wrongly at two in the
+    // morning. The table in docs/operations.md is where an administrator finds
+    // out what a name is for and what breaks without it.
+    const notes = readFileSync('docs/operations.md', 'utf8');
+    const undocumented = names.filter((name) => !notes.includes(`\`${name}\``));
+    expect(undocumented, `not described in docs/operations.md:\n  ${undocumented.join('\n  ')}`)
+      .toEqual([]);
+  });
+
+  it('declares each of them on Env, so the code can actually read one', () => {
+    // Uploaded to the Worker and absent from Env is a secret that arrives and
+    // is unreachable.
+    const types = readFileSync('src/types.ts', 'utf8');
+    const undeclared = names.filter((name) => !new RegExp(`\\b${name}\\??:`).test(types));
+    expect(undeclared, `not on Env in src/types.ts:\n  ${undeclared.join('\n  ')}`).toEqual([]);
+  });
 });

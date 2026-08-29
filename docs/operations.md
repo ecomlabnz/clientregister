@@ -38,30 +38,64 @@ npx wrangler deploy
 
 ## Secrets
 
-| Secret | Required | What it unlocks |
+### The two rules that catch people
+
+**1. Setting a secret does nothing until a deploy runs.** Values live in GitHub
+and reach the Worker only when the *Deploy* workflow uploads them. Save a secret,
+walk away, and the register carries on with the old value — no error, no warning,
+nothing in the log. Every change ends with **Actions → Deploy → Run workflow**.
+
+**2. A name has to be in two places.** `scripts/collect-secrets.mjs` lists what
+may be uploaded, and the `env:` block of the *Collect configured secrets* step in
+`.github/workflows/deploy.yml` is what puts the values where that script can see
+them. A name in one but not the other is a secret an administrator can set, watch
+deploy successfully, and never have take effect. That happened to the three Gmail
+credentials; `test/secrets.test.ts` now fails the build if any name on the list is
+missing from the workflow.
+
+### What each one is for
+
+| Secret | Needed for | Notes |
 |---|---|---|
-| `SETUP_TOKEN` | to create the first account | `/setup` |
-| `FIELD_KEY` | recommended | encrypted passport numbers (32 bytes, base64) |
-| `INGEST_EMAIL_ALLOWED_SENDERS` | for email ingest | trusted inbound senders |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_ALLOWED_USER_IDS` | for Telegram | Telegram ingest |
-| `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ALLOWED_SENDERS` | for WhatsApp | WhatsApp ingest |
-| `AI_PROVIDER`, `ANTHROPIC_API_KEY`, `AI_MODEL` | for AI triage | the AI layer |
-| `MAIL_PROVIDER`, `MAIL_FROM`, `RESEND_API_KEY` | for outbound mail | draining the mail queue |
+| `SETUP_TOKEN` | creating the first account | Only `/setup` uses it. Remove it afterwards. |
+| `FIELD_KEY` | sealed passport numbers | 32 random bytes, base64. **Cannot be rotated casually** — see below. |
+| `INGEST_EMAIL_ALLOWED_SENDERS` | inbound mail | Comma-separated. Mail from these addresses becomes an inquiry; everything else waits in Incoming. Unset means nothing is ever trusted. |
+| `TELEGRAM_BOT_TOKEN` · `TELEGRAM_WEBHOOK_SECRET` · `TELEGRAM_ALLOWED_USER_IDS` | Telegram ingest | |
+| `WHATSAPP_APP_SECRET` · `WHATSAPP_VERIFY_TOKEN` · `WHATSAPP_ALLOWED_SENDERS` | WhatsApp ingest | |
+| `NZBN_API_KEY` · `NZBN_USE_SANDBOX` | company lookup | Free key from `portal.api.business.govt.nz`. |
+| `AI_PROVIDER` · `ANTHROPIC_API_KEY` | the assistant | `AI_PROVIDER=anthropic`. Which model runs is a *setting*, not a secret — Settings → AI Assistant. |
+| `MAIL_PROVIDER` | outbound mail | `gmail` or `resend`. This one switch decides which transport is used; the other transport's secrets are simply ignored. |
+| `MAIL_FROM` | outbound mail | `Name <address>`. On Gmail it **must** be the authorised mailbox — Gmail refuses to send as anything else. |
+| `RESEND_API_KEY` | outbound via Resend | Sending access only, scoped to the verified domain. |
+| `GMAIL_CLIENT_ID` · `GMAIL_CLIENT_SECRET` · `GMAIL_REFRESH_TOKEN` | outbound via Gmail | Scope `gmail.send`. The message lands in that account's own Sent folder. |
+| `GMAIL_INBOX_REFRESH_TOKEN` | reading a mailbox | Scope `gmail.readonly`. **Never the sending account's token** — it is what names the mailbox. |
+| `GMAIL_INBOX_CLIENT_ID` · `GMAIL_INBOX_CLIENT_SECRET` | reading a mailbox | Fall back to the sending pair only when both accounts are in the same Google project. A refresh token is bound to the client that issued it, so a token from a different project needs its own pair. |
+| `GMAIL_INBOX_ADDRESS` | display only | Lets the integrations page name the mailbox being read. Authorises nothing. |
 
-**Set them as GitHub repository secrets**, under Settings → Secrets and
-variables → Actions. On every deploy, `scripts/collect-secrets.mjs` gathers the
-ones that are actually set and `wrangler secret bulk` uploads them to the
-Worker. Names not on that script's list are ignored, and secrets already on the
-Worker that are not in the upload are left alone.
+### Setting or changing one
 
-Managing them this way rather than through the Cloudflare dashboard means the
-Worker's configuration is reproducible: a fresh deploy into a new account gets
-the same secrets without anyone remembering to re-enter them. To add a new
-secret name, add it to the list in `scripts/collect-secrets.mjs` and to the
-`env:` block of the *Collect configured secrets* step in
-`.github/workflows/deploy.yml`.
+1. **GitHub → repo → Settings → Secrets and variables → Actions.**
+2. **New repository secret**, or the pencil icon to change an existing one.
+3. **Actions → Deploy → Run workflow** on `main`. Nothing happens until this
+   finishes.
+4. **Verify.** Open the run's *Upload secrets to the Worker* step. It prints one
+   line per name and a count — that is the only place the names are visible, and
+   the count going up is the proof the change arrived. Values are never printed.
+5. **Confirm the effect** in the application, under **Settings → Integrations**,
+   which says what is configured and what is still missing.
 
-By hand, if you prefer:
+### Adding a new secret name
+
+Three edits, all required:
+
+- `scripts/collect-secrets.mjs` — add the name to `SECRET_NAMES`.
+- `.github/workflows/deploy.yml` — add `NAME: ${{ secrets.NAME }}` to the `env:`
+  block of *Collect configured secrets*.
+- `src/types.ts` — add it to `Env` so the code can read it.
+
+`test/secrets.test.ts` holds the first two together.
+
+### By hand, if you must
 
 ```bash
 npx wrangler secret put NAME     # set
@@ -69,13 +103,25 @@ npx wrangler secret list         # see what is set (never the values)
 npx wrangler secret delete NAME  # remove
 ```
 
-Note that a secret set only in the Cloudflare dashboard is invisible to this
-repository, so nobody reviewing the code can tell it exists. Prefer the
-pipeline.
+A secret set only in the Cloudflare dashboard is invisible to this repository, so
+nobody reading the code can tell it exists, and a redeploy into a fresh account
+will not reproduce it. Prefer the pipeline.
+
+### Rotating
+
+Most secrets rotate by replacing the value and deploying. Two do not:
 
 **`FIELD_KEY` cannot be rotated casually.** Passport numbers sealed under the old
-key cannot be read with a new one. To rotate, decrypt and re-encrypt every
-sealed value in one migration before swapping the secret.
+key cannot be read with a new one. To rotate: decrypt and re-encrypt every sealed
+value in one migration, then swap the key.
+
+**A Gmail refresh token dies if its OAuth app is left in *Testing*.** Google
+issues seven-day tokens to unpublished apps, so mail stops a week after setup
+with nothing visibly wrong. A Workspace address avoids this entirely — its
+consent screen is *Internal*, which has no expiry, no verification and no
+warning. A personal Gmail account must be **published** (*In production*) before
+the token is taken. Revoking access in the Google account, or changing that
+account's password, also invalidates the token.
 
 ## Migrations
 
