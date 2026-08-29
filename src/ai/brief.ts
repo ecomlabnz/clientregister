@@ -18,7 +18,8 @@ import { newId } from '../core/ids';
 import { sha256Hex } from '../core/crypto';
 import { dateShort } from '../ui/format';
 import { getProvider, type BriefResult } from './provider';
-import { labelFor, caseTypes } from '../core/vocabulary';
+import { labelFor, caseTypes, visaTypes } from '../core/vocabulary';
+import { countryName } from '../core/countries';
 import { CASE_STATUS_LABELS, PRIORITY_LABELS, TASK_STATUS_LABELS } from '../domain';
 import { money } from '../ui/format';
 
@@ -54,7 +55,7 @@ export async function caseFileText(env: Env, caseId: string): Promise<{ title: s
   );
   if (!kase) return null;
 
-  const types = await caseTypes(env);
+  const [types, visas] = await Promise.all([caseTypes(env), visaTypes(env)]);
   const [parties, entries, tasks, fees, history] = await Promise.all([
     all<any>(env.DB,
       `SELECT p.role, c.full_name, c.kind FROM case_parties p
@@ -87,10 +88,12 @@ export async function caseFileText(env: Env, caseId: string): Promise<{ title: s
     `Status: ${CASE_STATUS_LABELS[kase.status as keyof typeof CASE_STATUS_LABELS] ?? kase.status}`,
     `Priority: ${PRIORITY_LABELS[kase.priority as keyof typeof PRIORITY_LABELS] ?? kase.priority}`,
     `Owner: ${kase.assignee_name ?? 'unassigned'}`,
-    `Client: ${kase.client_name}${kase.nationality ? ` (${kase.nationality})` : ''}`,
+    // The country's name, not its code: the model is being asked to reason
+    // about a person, and "VN" is a fact about our database.
+    `Client: ${kase.client_name}${kase.nationality ? ` (${countryName(kase.nationality)})` : ''}`,
   ];
   if (kase.current_visa_type) {
-    lines.push(`Client's current visa: ${kase.current_visa_type}${
+    lines.push(`Client's current visa: ${labelFor(visas, kase.current_visa_type)}${
       kase.current_visa_expiry ? `, expires ${dateShort(kase.current_visa_expiry)}` : ''}`);
   }
   if (kase.inz_application_number) lines.push(`INZ application: ${kase.inz_application_number}`);

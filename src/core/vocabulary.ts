@@ -186,7 +186,63 @@ exempt_work | Exempt — prior skilled work in English
 other | Other evidence`,
 };
 
-export const VOCABULARIES: VocabularyDef[] = [CASE_TYPE_VOCAB, ENGLISH_TEST_VOCAB];
+/**
+ * What a client holds *now* — not what the practice is applying for.
+ *
+ * A shorter list than the case types, and a different one: it has to cover
+ * every state a person can actually be in when they walk in, which includes
+ * several that are not visas at all. "None — offshore" and "None — unlawful"
+ * are answers, and the register needs them to be sayable; a client with no
+ * immigration status recorded raises an alert, and an alert that cannot be
+ * cleared honestly is an alert people learn to ignore.
+ *
+ * The prefixes match the case types on purpose, so the two lists read as one
+ * family and an adviser scanning a client page recognises the shape.
+ */
+export const VISA_TYPE_VOCAB: VocabularyDef = {
+  key: 'vocab.visa_types',
+  label: 'Visa a client currently holds',
+  help: 'One per line, written as “key | Label”. Offered on a client record as '
+    + '“Current visa”. Blank lines and lines starting with # are ignored.',
+  defaults: `vv_visitor | VV. Visitor
+vv_partner | VV. Partner
+vv_guardian | VV. Guardian of Student
+vv_medical | VV. Medical Treatment
+
+sv_student | SV. Student
+sv_partner | SV. Partner of Student
+sv_dep_child | SV. Dep Child
+
+wv_aewv | WV. AEWV
+wv_partner | WV. Partner
+wv_dep_child | WV. Dep Child
+wv_post_study | WV. Post-Study
+wv_specific_purpose | WV. Specific Purpose
+wv_working_holiday | WV. Working Holiday
+wv_seasonal | WV. Seasonal (RSE)
+wv_religious_worker | WV. Religious Worker
+wv_talent_accredited | WV. Talent Accredited Employer (legacy)
+wv_lt_skill_shortage | WV. Long Term Skill Shortage (legacy)
+wv_other | WV. Other
+
+rv_resident | RV. Resident
+rv_permanent | RV. Permanent Resident
+
+other_interim | Interim visa
+other_limited | Limited visa
+other_transit | Transit visa
+other_nzeta | NZeTA / visa waiver
+other_citizen_nz | New Zealand citizen
+other_citizen_au | Australian citizen or permanent resident
+
+none_offshore | None — offshore
+none_unlawful | None — unlawful in New Zealand
+none_expired | None — visa expired, onshore
+
+unknown | Not established yet`,
+};
+
+export const VOCABULARIES: VocabularyDef[] = [CASE_TYPE_VOCAB, VISA_TYPE_VOCAB, ENGLISH_TEST_VOCAB];
 
 export const VOCABULARY_SETTINGS: SettingsGroup = {
   id: 'vocabulary',
@@ -258,4 +314,8 @@ export async function caseTypes(env: Env): Promise<Term[]> {
 
 export async function englishTests(env: Env): Promise<Term[]> {
   return vocabulary(env, ENGLISH_TEST_VOCAB);
+}
+
+export async function visaTypes(env: Env): Promise<Term[]> {
+  return vocabulary(env, VISA_TYPE_VOCAB);
 }

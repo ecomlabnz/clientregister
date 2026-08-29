@@ -40,7 +40,8 @@ import { addEntry, listEntries } from '../../core/timeline';
 import { casesForClient, relatedClients } from '../../core/parties';
 import { can } from '../../core/rbac';
 import { asPrefInteger, preferencesFor } from '../../core/preferences';
-import { caseTypes, englishTests, labelFor, termOptions } from '../../core/vocabulary';
+import { caseTypes, englishTests, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
+import { countryCodeFor, countryName, countryOptions } from '../../core/countries';
 import {
   CERTIFICATE_KINDS, CERTIFICATE_LABELS, MEDICAL_TYPES, type CertificateKind,
   CERTIFICATE_VALIDITY,
@@ -106,6 +107,7 @@ function clientForm(
   users: Array<{ value: string; label: string }>,
   organisations: Array<{ value: string; label: string }>,
   englishTestOptions: Array<{ value: string; label: string }>,
+  visaTypeOptions: Array<{ value: string; label: string }>,
   errors?: Record<string, string>,
 ): Raw {
   const csrf = c.get('session').csrf;
@@ -170,14 +172,24 @@ function clientForm(
           ${field({ label: 'Family name', name: 'family_name', value: familyName, required: true, maxlength: 120 })}
           ${field({ label: 'Preferred name', name: 'preferred_name', value: values.preferred_name, maxlength: 120,
                     hint: 'What to call them in conversation, if different.' })}
-          ${field({ label: 'Nationality', name: 'nationality', value: values.nationality, maxlength: 100 })}
+          ${select({ label: 'Nationality', name: 'nationality', value: values.nationality ?? '',
+                     options: countryOptions(), includeBlank: 'Not recorded',
+                     hint: 'Held as an ISO 3166-1 country code, so it can be counted and filtered.' })}
           ${field({ label: 'Date of birth', name: 'date_of_birth', type: 'date', value: dateInputValue(values.date_of_birth) })}
-          ${select({ label: 'Works for', name: 'organisation_id', value: values.organisation_id ?? '',
-                     options: organisations, includeBlank: 'Not linked to an organisation',
-                     hint: 'Links this person to a company client. One of them can then be named as '
-                       + 'its primary contact.' })}
-          ${field({ label: 'Role there', name: 'organisation_role', value: values.organisation_role,
-                    maxlength: 100, placeholder: 'e.g. Director, HR Manager' })}
+
+          ${'' /* These two are one fact in two boxes: which company, and what
+                   they do there. Left to flow with everything else they landed
+                   in different rows with a field between them, which is how a
+                   form turns into a dump of boxes. */}
+          <fieldset class="field-group">
+            <legend>Employment</legend>
+            ${select({ label: 'Works for', name: 'organisation_id', value: values.organisation_id ?? '',
+                       options: organisations, includeBlank: 'Not linked to an organisation',
+                       hint: 'Links this person to a company client. One of them can then be named as '
+                         + 'its primary contact.' })}
+            ${field({ label: 'Role there', name: 'organisation_role', value: values.organisation_role,
+                      maxlength: 100, placeholder: 'e.g. Director, HR Manager' })}
+          </fieldset>
         </div>
 
         <div data-kind="organisation" ${kind === 'organisation' ? '' : raw('hidden')}>
@@ -250,7 +262,11 @@ function clientForm(
 
         <div class="settings-form">
           <p class="settings-head subhead">Immigration</p>
-          <div class="settings-cell">${field({ label: 'Current visa type', name: 'current_visa_type', value: values.current_visa_type, maxlength: 120 })}</div>
+          <div class="settings-cell">${select({ label: 'Current visa', name: 'current_visa_type',
+            value: values.current_visa_type ?? '', options: visaTypeOptions,
+            includeBlank: 'Not recorded',
+            hint: 'What they hold now, not what is being applied for. “None — offshore” is an '
+              + 'answer, and so is “None — unlawful”.' })}</div>
           <div class="settings-cell">${field({ label: 'Current visa expiry', name: 'current_visa_expiry', type: 'date', value: dateInputValue(values.current_visa_expiry) })}</div>
 
           <p class="settings-head subhead">Character and health</p>
@@ -330,7 +346,10 @@ function readClientForm(f: FormReader) {
     whatsapp: f.optional('whatsapp', { max: 60 }),
     telegram_username: f.optional('telegram_username', { max: 60 }),
     telegram_user_id: f.optional('telegram_user_id', { max: 40, pattern: /^\d+$/, patternMessage: 'Telegram user ID must be numeric.' }),
-    nationality: f.optional('nationality', { max: 100 }),
+    // The form is a dropdown, so this is already a code. Passed through the
+    // resolver anyway: a request built by hand carrying "Vietnam" then lands as
+    // VN rather than as a 500 from the trigger that guards the column.
+    nationality: countryCodeFor(f.optional('nationality', { max: 100 })),
     date_of_birth: f.date('date_of_birth'),
     passport_country: f.optional('passport_country', { max: 100 }),
     passport_expiry: f.date('passport_expiry'),
@@ -496,7 +515,7 @@ export const clientsModule: AppModule = {
                 <div class="muted small">
                   ${row.kind === 'organisation'
                     ? html`Organisation${row.nzbn ? html` · NZBN ${row.nzbn}` : ''}`
-                    : row.nationality ?? ''}
+                    : countryName(row.nationality)}
                 </div>
                 <div class="row-meta show-sm">
                   <code>${row.ref}</code>
@@ -525,6 +544,7 @@ export const clientsModule: AppModule = {
       const [users, organisations, tests] = await Promise.all([
         userOptions(c.env), organisationOptions(c.env), englishTests(c.env)]);
       const englishTestOptions = termOptions(tests);
+      const visaTypeOptions = termOptions(await visaTypes(c.env));
       const kind = c.req.query('kind') === 'organisation' ? 'organisation' : 'individual';
 
       // The assistant, or any other page, may propose a starting point through
@@ -550,7 +570,7 @@ export const clientsModule: AppModule = {
           ? html`<div class="alert alert-ok">Filled in from what the assistant read. Check it before
                    saving — it is a reading, not a fact.</div>`
           : ''}
-        ${clientForm(c, proposed, users, organisations, englishTestOptions)}`);
+        ${clientForm(c, proposed, users, organisations, englishTestOptions, visaTypeOptions)}`);
     });
 
     // --- NZBN register lookup ----------------------------------------------
@@ -670,8 +690,9 @@ export const clientsModule: AppModule = {
         const [users, organisations, tests] = await Promise.all([
         userOptions(c.env), organisationOptions(c.env), englishTests(c.env)]);
       const englishTestOptions = termOptions(tests);
+      const visaTypeOptions = termOptions(await visaTypes(c.env));
         return page(c, { title: 'New client', active: '/clients', status: 400 }, html`
-          ${pageHeader('New client')}${clientForm(c, v as Partial<ClientRow>, users, organisations, englishTestOptions, f.errors)}`);
+          ${pageHeader('New client')}${clientForm(c, v as Partial<ClientRow>, users, organisations, englishTestOptions, visaTypeOptions, f.errors)}`);
       }
 
       const id = newId('cli');
@@ -728,7 +749,7 @@ export const clientsModule: AppModule = {
       if (!client) return c.notFound();
 
       const [cases, quotes, inquiries, entries, tasks, partyCases, related, employer, people,
-             feesByCase, englishTestTerms, certificates, passports] = await Promise.all([
+             feesByCase, englishTestTerms, visaTerms, certificates, passports] = await Promise.all([
         all<any>(c.env.DB, `SELECT id, ref, title, case_type, status, priority, next_action, next_action_due, updated_at
                               FROM cases WHERE client_id = ? ORDER BY updated_at DESC`, id),
         all<any>(c.env.DB, `SELECT id, ref, description, amount_cents, gst_cents, disbursements_cents, currency, status, created_at
@@ -764,6 +785,7 @@ export const clientsModule: AppModule = {
             WHERE k.client_id = ? AND f.status != 'cancelled'
             GROUP BY k.id ORDER BY k.updated_at DESC`, id),
         englishTests(c.env),
+        visaTypes(c.env),
         certificatesFor(c.env, id),
         passportsFor(c.env, id),
       ]);
@@ -923,7 +945,7 @@ export const clientsModule: AppModule = {
                       <dt>Works for</dt><dd><a href="/clients/${employer.id}">${employer.full_name}</a>
                         ${client.organisation_role ? html`<div class="muted small">${client.organisation_role}</div>` : ''}
                         ${employer.primary_contact_id === client.id ? badge('Primary contact', 'green') : ''}</dd>` : ''}
-                    <dt>Nationality</dt><dd>${client.nationality ?? '—'}</dd>
+                    <dt>Nationality</dt><dd>${countryName(client.nationality) || '—'}</dd>
                     <dt>Date of birth</dt><dd>${dateShort(client.date_of_birth)}</dd>
                     <dt>Passport</dt><dd>${passports.length === 0
                       ? html`<span class="muted">—</span>`
@@ -932,7 +954,7 @@ export const clientsModule: AppModule = {
                              ${passports.length > 1
                                ? html`<div class="muted small"><a href="#passports">${passports.length} passports on file</a></div>`
                                : html`<div class="muted small"><a href="#passports">Details</a></div>`}`}</dd>
-                    <dt>Current visa</dt><dd>${client.current_visa_type ?? '—'}</dd>
+                    <dt>Current visa</dt><dd>${labelFor(visaTerms, client.current_visa_type) || '—'}</dd>
                     <dt>Visa expiry</dt><dd>${expiryCell(client.current_visa_expiry)}</dd>
                     <dt>Police cert.</dt><dd>${client.police_certificate_country
                       ? html`${client.police_certificate_country}<br>` : ''}${expiryCell(client.police_certificate_expiry)}</dd>
@@ -1144,12 +1166,13 @@ export const clientsModule: AppModule = {
         userOptions(c.env), organisationOptions(c.env), englishTests(c.env),
         passportsFor(c.env, client.id)]);
       const englishTestOptions = termOptions(tests);
+      const visaTypeOptions = termOptions(await visaTypes(c.env));
       const primary = passports.find((row) => row.is_primary === 1) ?? null;
       return page(c, { title: `Edit ${client.full_name}`, active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { href: `/clients/${client.id}`, label: client.ref }, { label: 'Edit' }])}
         ${pageHeader(`Edit ${client.full_name}`)}
         ${clientForm(c, { ...client, passport_issued: primary?.issued_on ?? null },
-                     users, organisations, englishTestOptions)}`);
+                     users, organisations, englishTestOptions, visaTypeOptions)}`);
     });
 
     // --- Passports ----------------------------------------------------------
@@ -1339,9 +1362,10 @@ export const clientsModule: AppModule = {
         const [users, organisations, tests] = await Promise.all([
         userOptions(c.env), organisationOptions(c.env), englishTests(c.env)]);
       const englishTestOptions = termOptions(tests);
+      const visaTypeOptions = termOptions(await visaTypes(c.env));
         return page(c, { title: 'Edit client', active: '/clients', status: 400 }, html`
           ${pageHeader(`Edit ${existing.full_name}`)}
-          ${clientForm(c, { ...existing, ...v } as Partial<ClientRow>, users, organisations, englishTestOptions, f.errors)}`);
+          ${clientForm(c, { ...existing, ...v } as Partial<ClientRow>, users, organisations, englishTestOptions, visaTypeOptions, f.errors)}`);
       }
 
       // Three outcomes, and the contradictory one is refused rather than

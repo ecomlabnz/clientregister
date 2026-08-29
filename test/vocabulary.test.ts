@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
-  CASE_TYPE_VOCAB, isTerm, labelFor, parseVocabulary, termOptions,
+  CASE_TYPE_VOCAB, VISA_TYPE_VOCAB, VOCABULARIES, isTerm, labelFor, parseVocabulary, termOptions,
 } from '../src/core/vocabulary';
 import { LEGACY_CASE_TYPE_LABELS } from '../src/domain';
 
@@ -87,5 +87,53 @@ describe('the case types shipped as the default', () => {
     for (const target of targets) {
       expect(isTerm(terms, target), `${target} is mapped to but not offered`).toBe(true);
     }
+  });
+});
+
+/**
+ * The visa a client holds, as a choice rather than a sentence.
+ *
+ * It was a text box, and the box did what text boxes do: "AEWV", "AEWV
+ * (pending)", "Work visa" and "None — visitor visa declined" were four
+ * unrelated strings describing three situations. Unlike nationality this list
+ * is the practice's own, so it is vocabulary an administrator edits — not
+ * something the database polices.
+ */
+describe('the visa a client currently holds', () => {
+  const terms = parseVocabulary(VISA_TYPE_VOCAB.defaults);
+
+  it('covers the states a person can actually be in, including the ones that are not visas', () => {
+    // A client with no immigration status recorded raises an alert. An alert
+    // that cannot be cleared honestly is one people learn to ignore, so
+    // "none" has to be sayable — and there is more than one kind of none.
+    const keys = terms.map((t) => t.key);
+    expect(keys).toContain('none_offshore');
+    expect(keys).toContain('none_unlawful');
+    expect(keys).toContain('none_expired');
+    expect(keys).toContain('other_interim');
+    expect(keys).toContain('other_citizen_nz');
+    expect(keys).toContain('unknown');
+  });
+
+  it('uses the same prefixes as the case types, so the two read as one family', () => {
+    for (const prefix of ['VV.', 'SV.', 'WV.', 'RV.']) {
+      expect(terms.some((t) => t.label.startsWith(prefix)), prefix).toBe(true);
+    }
+  });
+
+  it('is a separate list from the case types', () => {
+    // What somebody holds is not what is being applied for. A single list
+    // would offer "S.61" as a visa somebody holds, and "Resident" as a matter.
+    const caseKeys = new Set(parseVocabulary(CASE_TYPE_VOCAB.defaults).map((t) => t.key));
+    expect(caseKeys.has('rq_section_61_request')).toBe(true);
+    expect(terms.some((t) => t.key === 'rq_section_61_request')).toBe(false);
+  });
+
+  it('is editable by an administrator, like every other list here', () => {
+    expect(VOCABULARIES.some((v) => v.key === VISA_TYPE_VOCAB.key)).toBe(true);
+  });
+
+  it('has a unique key for every entry', () => {
+    expect(new Set(terms.map((t) => t.key)).size).toBe(terms.length);
   });
 });
