@@ -28,7 +28,7 @@ import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../c
 import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABELS, SPLIT_BASES } from '../../core/fees';
 import { currentModel, isAiEnabled } from '../../ai/provider';
 import { nzbnConfigured } from '../../integrations/nzbn';
-import { mailConfigured, mailSetupGaps } from '../../mail/provider';
+import { mailConfigured, mailSetupGaps, mailTransportDetail } from '../../mail/provider';
 import { flushQueue, queueEmail } from '../../mail/queue';
 import { registeredModules } from '../../registry';
 import { PRACTICE_SETTINGS } from '../../core/practice';
@@ -214,11 +214,7 @@ export const adminModule: AppModule = {
                 + ' automatically.'
               : `AI_PROVIDER=${env.AI_PROVIDER ?? 'none'}. Set it to “anthropic” with an`
                 + ' ANTHROPIC_API_KEY to switch the assistant on. The register works without it.'),
-          statusRow('Outbound email', mailConfigured(env),
-            mailConfigured(env)
-              ? `MAIL_PROVIDER=${env.MAIL_PROVIDER} — sending.`
-              : `MAIL_PROVIDER=${env.MAIL_PROVIDER ?? 'none'}. Mail queues until this is set; nothing is lost.${
-                  mailSetupGaps(env).length ? ` Still needed: ${mailSetupGaps(env).join(', ')}.` : ''}`),
+          statusRow('Outbound email', mailConfigured(env), mailTransportDetail(env)),
           statusRow('Document storage', Boolean(env.DOCS),
             'R2 bucket binding DOCS. Enable R2 in the dashboard, then uncomment the binding.'),
         ])}`) : ''}

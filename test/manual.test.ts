@@ -30,12 +30,17 @@ describe('the manual keeps up with the application', () => {
   });
 
   it('documents each way of sending mail out', () => {
+    // Both transports, because the choice between them is not about
+    // deliverability — it decides whether a copy of what you sent ends up in
+    // your own mailbox, and a manual that names only one leaves that invisible.
     expect(help).toContain('Resend');
+    expect(help).toContain('gmail.send');
     expect(help).toContain('Replies should go to');
-    // Checked by what the feature does rather than by the label on its button,
-    // which may reasonably be reworded — as it was, one version after this test
-    // first pinned the old wording and duly failed the build.
-    expect(help).toMatch(/Admin → Integrations[\s\S]{0,300}test message/);
+    // Checked by what the feature does rather than by where it lives. The
+    // section was called Admin and is now called Settings; pinning the name
+    // failed the build once already, and pinning it again would only mean
+    // failing it the next time something is renamed.
+    expect(help).toMatch(/Integrations[\s\S]{0,300}test message/);
   });
 
   it('names a module for every registered feature that has a page', () => {

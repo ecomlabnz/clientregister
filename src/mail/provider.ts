@@ -57,6 +57,35 @@ export function mailSetupGaps(env: Env): string[] {
   return needed.filter((name) => !env[name as keyof Env]);
 }
 
+/**
+ * What the configured transport actually does, for the integrations page.
+ *
+ * The page used to print `MAIL_PROVIDER=resend — sending.` and stop, which is
+ * true and tells an administrator nothing they wanted to know. The question a
+ * practice actually has is "where does the copy of what I sent end up, and can I
+ * have it in my own mailbox" — and the answer depends entirely on which of the
+ * two transports is in use. So the answer is written next to the switch.
+ */
+export function mailTransportDetail(env: Env): string {
+  const provider = (env.MAIL_PROVIDER ?? 'none').toLowerCase();
+  if (!mailConfigured(env)) {
+    const gaps = mailSetupGaps(env);
+    return `MAIL_PROVIDER=${env.MAIL_PROVIDER ?? 'none'}. Mail queues until this is set; nothing is `
+      + `lost.${gaps.length ? ` Still needed: ${gaps.join(', ')}.` : ''} Two transports are `
+      + 'available: “gmail” sends from the practice’s own mailbox and leaves the message in its '
+      + 'Sent folder; “resend” sends from a domain verified with Resend.';
+  }
+  if (provider === 'gmail') {
+    return `MAIL_PROVIDER=gmail — sending as ${env.MAIL_FROM ?? 'the authorised account'}. `
+      + 'Each message is sent through Gmail’s API, so a copy stays in that account’s Sent folder '
+      + 'and replies land in its inbox.';
+  }
+  return 'MAIL_PROVIDER=resend — sending from a domain verified with Resend. What was sent is '
+    + 'recorded here, but no copy reaches any mailbox. To keep a copy in Gmail instead, set '
+    + 'MAIL_PROVIDER=gmail with GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN — '
+    + 'see Help → Connecting Telegram, WhatsApp and email.';
+}
+
 export async function getMailProvider(env: Env): Promise<MailProvider | null> {
   const provider = (env.MAIL_PROVIDER ?? 'none').toLowerCase();
   if (provider === 'resend' && env.RESEND_API_KEY) {
