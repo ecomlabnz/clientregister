@@ -29,6 +29,7 @@ import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABE
 import { currentModel, isAiEnabled } from '../../ai/provider';
 import { nzbnConfigured } from '../../integrations/nzbn';
 import { mailConfigured, mailSetupGaps, mailTransportDetail } from '../../mail/provider';
+import { inboxCredentials, inboxSetupGaps } from '../../ingest/gmail';
 import { flushQueue, queueEmail } from '../../mail/queue';
 import { registeredModules } from '../../registry';
 import { PRACTICE_SETTINGS } from '../../core/practice';
@@ -214,6 +215,14 @@ export const adminModule: AppModule = {
                 + ' automatically.'
               : `AI_PROVIDER=${env.AI_PROVIDER ?? 'none'}. Set it to “anthropic” with an`
                 + ' ANTHROPIC_API_KEY to switch the assistant on. The register works without it.'),
+          statusRow('Inbound email — Gmail poll', Boolean(inboxCredentials(env)),
+            inboxCredentials(env)
+              ? `Reading ${env.GMAIL_INBOX_ADDRESS ?? 'the authorised mailbox'} every five minutes, `
+                + 'read-only. Forward your working mail into it and it arrives here without being '
+                + 'forwarded twice.'
+              : `Not set up. Forward your mail into a dedicated Gmail account and the register `
+                + `reads it on a schedule, so nothing has to be forwarded by hand. Still needed: `
+                + `${inboxSetupGaps(env).join(', ')}.`),
           statusRow('Outbound email', mailConfigured(env), mailTransportDetail(env)),
           statusRow('Document storage', Boolean(env.DOCS),
             'R2 bucket binding DOCS. Enable R2 in the dashboard, then uncomment the binding.'),

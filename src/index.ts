@@ -11,6 +11,7 @@
 import type { Env } from './types';
 import { createApp } from './app';
 import { handleInboundEmail } from './ingest/email';
+import { pollInbox } from './ingest/gmail';
 import { flushQueue } from './mail/queue';
 import { nowIso, run } from './core/db';
 import { audit } from './core/audit';
@@ -29,10 +30,39 @@ export default {
     await handleInboundEmail(message, env);
   },
 
-  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(housekeeping(env));
+  /**
+   * Two schedules with different jobs.
+   *
+   * The frequent one reads the forwarded-mail account, because mail that takes
+   * a day to appear is mail somebody goes back to their own inbox for — and
+   * then keeps going there. The nightly one does the housekeeping, which is
+   * expensive and has no reason to run more often.
+   */
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(event.cron === MAIL_POLL_CRON ? pollMail(env) : housekeeping(env));
   },
 } satisfies ExportedHandler<Env>;
+
+/** Must match the entry in wrangler.jsonc; a test holds the two together. */
+export const MAIL_POLL_CRON = '*/5 * * * *';
+
+async function pollMail(env: Env): Promise<void> {
+  try {
+    const result = await pollInbox(env);
+    // Null means no reading account is configured, which is the ordinary case
+    // until somebody sets one up. Nothing to log and nothing wrong.
+    if (result && result.failed > 0) {
+      console.error('gmail poll finished with failures', result);
+    }
+  } catch (err) {
+    console.error('gmail poll failed', err);
+    await audit(env, {
+      action: 'ingest.gmail_failed',
+      actorLabel: 'channel:email',
+      meta: { error: err instanceof Error ? err.message : String(err) },
+    });
+  }
+}
 
 async function housekeeping(env: Env): Promise<void> {
   try {

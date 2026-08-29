@@ -37,8 +37,18 @@ export function gmailCredentials(env: Env): GmailCredentials | null {
   return { clientId, clientSecret, refreshToken };
 }
 
-async function accessToken(env: Env, creds: GmailCredentials): Promise<string> {
-  const cached = await env.SESSIONS.get(TOKEN_CACHE_KEY);
+/**
+ * A short-lived access token for a set of credentials.
+ *
+ * Exported because the inbox reader needs one too, for a different account.
+ * `cacheKey` is therefore a parameter: two accounts sharing one cache key would
+ * hand each other's tokens out, and the failure would look like an
+ * intermittent permissions error rather than what it was.
+ */
+export async function accessToken(
+  env: Env, creds: GmailCredentials, cacheKey: string = TOKEN_CACHE_KEY,
+): Promise<string> {
+  const cached = await env.SESSIONS.get(cacheKey);
   if (cached) return cached;
 
   const response = await fetch(TOKEN_ENDPOINT, {
@@ -64,7 +74,7 @@ async function accessToken(env: Env, creds: GmailCredentials): Promise<string> {
   // Renew a minute early rather than at the last moment, so a send that starts
   // just before expiry does not fail on a token that lapses mid-request.
   const ttl = Math.max(60, (body.expires_in ?? 3600) - 60);
-  await env.SESSIONS.put(TOKEN_CACHE_KEY, body.access_token, { expirationTtl: ttl });
+  await env.SESSIONS.put(cacheKey, body.access_token, { expirationTtl: ttl });
   return body.access_token;
 }
 

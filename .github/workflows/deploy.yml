@@ -71,6 +71,13 @@ jobs:
           MAIL_PROVIDER: ${{ secrets.MAIL_PROVIDER }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          GMAIL_INBOX_REFRESH_TOKEN: ${{ secrets.GMAIL_INBOX_REFRESH_TOKEN }}
+          GMAIL_INBOX_CLIENT_ID: ${{ secrets.GMAIL_INBOX_CLIENT_ID }}
+          GMAIL_INBOX_CLIENT_SECRET: ${{ secrets.GMAIL_INBOX_CLIENT_SECRET }}
+          GMAIL_INBOX_ADDRESS: ${{ secrets.GMAIL_INBOX_ADDRESS }}
           AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |

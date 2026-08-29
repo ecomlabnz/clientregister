@@ -60,7 +60,12 @@
 
   // Housekeeping: flush the outbound mail queue and expire stale quotes.
   // 19:00 UTC is 07:00 the next morning in New Zealand (NZST).
+  // Two schedules. The frequent one polls the forwarded-mail account when one
+  // is configured — mail that takes a day to appear is mail somebody goes back
+  // to their own inbox for. The nightly one is the housekeeping pass; 19:00 UTC
+  // is 07:00 the next morning in New Zealand. src/index.ts must agree with the
+  // five-minute expression, and a test holds the two together.
   "triggers": {
-    "crons": ["0 19 * * *"]
+    "crons": ["*/5 * * * *", "0 19 * * *"]
   }
 }

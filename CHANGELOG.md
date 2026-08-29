@@ -7,6 +7,49 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.50.0 — 29 August 2026
+
+### Added
+- **The register can read a mailbox.** Every inbound channel so far worked by
+  forwarding: you see something, you send it on, it lands here. Reliable, and
+  also one more thing to remember on a day with forty of them. Now the practice's
+  own address auto-forwards into a dedicated Gmail account and a five-minute cron
+  polls it. `src/ingest/gmail.ts`.
+- Everything found goes through the **same pipeline as routed mail** — same
+  parser, same dedupe on the message's own `Message-ID`, same allow-list rule for
+  whether it becomes an inquiry or waits in Incoming. A message that arrives this
+  way is indistinguishable afterwards from one forwarded by hand.
+- **Read-only, deliberately.** The scope is `gmail.readonly`; the register never
+  labels, moves, marks or deletes anything in that mailbox. Whatever holds the
+  token can read every message in it, and there is no reason for it to write as
+  well. What has been taken is answered by the register's own Incoming list.
+- **Its own refresh token, never the sending account's.** The client id and
+  secret fall back, because both accounts commonly sit in one Google project. The
+  refresh token does not: it is what names the mailbox, and reading the wrong one
+  is the mistake worth making impossible.
+- **It files; it does not decide.** Nothing in the poll changes a case, a date or
+  a status.
+- A second cron, `*/5 * * * *`, alongside the nightly housekeeping. The
+  expression lives in `wrangler.jsonc` and in `MAIL_POLL_CRON`, and a test holds
+  them together — if they drift, every firing runs the housekeeping and the
+  mailbox is never read.
+- The poll looks back two days each pass, so a missed run or an outage catches up
+  by itself. A message that fails is not marked seen, so the next pass retries
+  it.
+
+### Fixed
+- **The Gmail credentials were never passed through the deploy.** The collector
+  knew the three names, the setup instructions asked for them, and
+  `.github/workflows/deploy.yml` did not put them in the environment the
+  collector reads — so an administrator could set them, watch the deploy succeed,
+  and never have them take effect. `test/secrets.test.ts` now fails if any name
+  the collector knows is missing from the workflow.
+- Setting up Gmail on a **Google Workspace** address is materially simpler than
+  on a personal one, and the instructions said only the hard version. Workspace
+  gets an *Internal* consent screen: no verification, no test-user list, no
+  "unverified app" warning, and none of the seven-day token expiry that catches
+  personal accounts.
+
 ## 0.49.1 — 29 August 2026
 
 ### Fixed

@@ -27,9 +27,13 @@ const SECRET_NAMES = [
   'GMAIL_CLIENT_ID',
   'GMAIL_CLIENT_SECRET',
   'GMAIL_REFRESH_TOKEN',
+  'GMAIL_INBOX_REFRESH_TOKEN',
+  'GMAIL_INBOX_CLIENT_ID',
+  'GMAIL_INBOX_CLIENT_SECRET',
+  'GMAIL_INBOX_ADDRESS',
   'AI_PROVIDER',
   // AI_MODEL is deliberately absent: which model runs is a setting, chosen
-  // under Admin → Settings → Assistant, so there is one place that answers it.
+  // under Settings → AI Assistant, so there is one place that answers it.
   'ANTHROPIC_API_KEY',
 ];
 

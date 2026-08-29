@@ -52,6 +52,20 @@ export interface Env {
   GMAIL_CLIENT_ID?: string;
   GMAIL_CLIENT_SECRET?: string;
   GMAIL_REFRESH_TOKEN?: string;
+  /**
+   * The mailbox the register *reads*, which is not the account it sends from.
+   *
+   * A practice sends as its own firm address and forwards its mail into a
+   * separate Gmail account for the register to poll. Whatever holds this token
+   * can read that entire mailbox, so it must be a dedicated account carrying
+   * forwarded work mail and nothing else. The client id and secret fall back to
+   * the sending ones when both accounts sit in the same Google project.
+   */
+  GMAIL_INBOX_REFRESH_TOKEN?: string;
+  GMAIL_INBOX_CLIENT_ID?: string;
+  GMAIL_INBOX_CLIENT_SECRET?: string;
+  /** Only for display on the integrations page; nothing is authorised by it. */
+  GMAIL_INBOX_ADDRESS?: string;
 
   AI_PROVIDER?: string;
   ANTHROPIC_API_KEY?: string;

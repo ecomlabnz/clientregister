@@ -36,6 +36,41 @@ the inquiry page.
 
 Attachments are listed but their contents are not kept unless R2 is enabled.
 
+## Inbound email — polling a Gmail mailbox
+
+The routing path above needs mail forwarded to it. This one reads a mailbox
+instead, so nothing has to be forwarded twice: the practice's own address
+auto-forwards into a dedicated Gmail account, and a five-minute cron polls it.
+
+**The account must hold nothing else.** Whatever holds this token can read every
+message in that mailbox, and it is a deployment secret rather than something a
+person unlocks. A new, empty account receiving forwarded working mail — never a
+person's own inbox.
+
+Scope: `https://www.googleapis.com/auth/gmail.readonly`. Read-only deliberately —
+the register never labels, moves, marks or deletes anything there. Which
+messages have been taken is answered by the register's own Incoming list.
+
+```bash
+npx wrangler secret put GMAIL_INBOX_REFRESH_TOKEN
+npx wrangler secret put GMAIL_INBOX_CLIENT_ID      # falls back to GMAIL_CLIENT_ID
+npx wrangler secret put GMAIL_INBOX_CLIENT_SECRET  # falls back to GMAIL_CLIENT_SECRET
+echo "practiceinbox@gmail.com" | npx wrangler secret put GMAIL_INBOX_ADDRESS  # display only
+```
+
+The refresh token never falls back to the sending account's. It is what names
+the mailbox, and reading the wrong one is the mistake worth making impossible.
+
+Everything found goes through the same `captureMessage` pipeline as routed mail
+— same parser, same dedupe on the message's own `Message-ID`, same allow-list
+rule for whether it becomes an inquiry or waits in Incoming. **Nothing on a
+matter changes by itself.** The poll looks back two days each pass, so a missed
+cron catches up on its own.
+
+`src/ingest/gmail.ts`. The cron expression lives in `wrangler.jsonc` and in
+`MAIL_POLL_CRON` in `src/index.ts`; a test holds the two together, because if
+they drift every firing runs the housekeeping and the mailbox is never read.
+
 ---
 
 ## Telegram
