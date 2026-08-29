@@ -7,6 +7,21 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.39.2 — 29 August 2026
+
+### Added
+- **A setting can declare the shape its value must have**, checked when it is
+  saved. For settings holding somebody else's identifier, where a wrong one is
+  accepted in silence and fails later in front of a client.
+- The Anthropic workspace ID uses it. A workspace ID starts with `wrkspc_`;
+  the identifier most easily confused with it — the organisation ID — is a
+  plain UUID, and Anthropic answers that with a 404 that only arrives when
+  somebody presses a button. It is refused on sight now, with the message
+  saying where to find the right one rather than restating the rule.
+- Clearing the setting is still allowed: empty means "ordinary key, send no
+  header", and a shape check that rejected empty would make it impossible to
+  undo.
+
 ## 0.39.1 — 29 August 2026
 
 ### Fixed

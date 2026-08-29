@@ -83,3 +83,31 @@ describe('the model the practice runs on', () => {
     expect(anthropic).toContain('input.file.slice(0, 60_000)');
   });
 });
+
+describe('a workspace ID is checked on the way in', () => {
+  const settings = readFileSync('src/core/settings.ts', 'utf8');
+
+  it('refuses a shape Anthropic will only reject later', () => {
+    // A wrong id is answered with a 404 that arrives when somebody presses a
+    // button, not when they save. The id most easily confused with it — the
+    // organisation id — is a plain UUID.
+    const pattern = /^wrkspc_[A-Za-z0-9]+$/;
+    expect(pattern.test('wrkspc_01JwQvzr7rXLA5AGx3HKfFUJ')).toBe(true);
+    expect(pattern.test('0564eab6-2ef4-484f-ac40-12ac677cc672')).toBe(false);
+    expect(pattern.test('wrkspc_')).toBe(false);
+    expect(provider).toContain('/^wrkspc_[A-Za-z0-9]+$/');
+  });
+
+  it('still lets the setting be cleared', () => {
+    // Empty means "ordinary key, send no header". A shape check that rejected
+    // empty would make the setting impossible to undo.
+    expect(settings).toContain("if (raw !== '' && def.pattern");
+  });
+
+  it('says what to do, not what the rule is', () => {
+    const group = provider.slice(provider.indexOf("key: 'ai.workspace_id'"),
+      provider.indexOf('help:', provider.indexOf("key: 'ai.workspace_id'")));
+    expect(group).toContain('Settings → Workspaces');
+    expect(group).toContain('wrkspc_01JwQvzr7rXLA5AGx3HKfFUJ');
+  });
+});
