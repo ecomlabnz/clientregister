@@ -17,7 +17,7 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import { badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, statusTone, table } from '../../ui/components';
-import { dateInputValue, dateShort, isOverdue, relativeDays } from '../../ui/format';
+import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays } from '../../ui/format';
 import { PRIORITIES, PRIORITY_LABELS, TASK_STATUS_LABELS, TASK_STATUSES } from '../../domain';
 import { userOptions } from '../../core/lookups';
 import { addEntry } from '../../core/timeline';
@@ -148,7 +148,7 @@ export const tasksModule: AppModule = {
               { label: '', width: '14' },
             ], rows.map((t: any, i: number) => html`
               <tr id="${t.id}" class="${isOverdue(t.due_at) && t.status !== 'done' && t.status !== 'cancelled' ? 'row-urgent' : ''}">
-                <td><strong class="clamp-2">${t.title}</strong>
+                <td><strong class="clamp-2"><a href="/tasks/${t.id}">${t.title}</a></strong>
                     ${t.priority !== 'normal' ? badge(PRIORITY_LABELS[t.priority as keyof typeof PRIORITY_LABELS], t.priority === 'urgent' ? 'red' : 'amber') : ''}
                     ${t.details ? html`<div class="muted small prewrap clamp-2">${t.details}</div>` : ''}
                     ${t.completion_note
@@ -229,6 +229,89 @@ export const tasksModule: AppModule = {
       }
       await auditFrom(c, { action: 'task.created', entityType: 'task', entityId: id, meta: { title, entityType, entityId } });
       return redirectWith(c, back, 'Task added.');
+    });
+
+    // --- One task, in full ---------------------------------------------------
+    //
+    // The list clamps a task's details to two lines, because a list of twenty
+    // tasks each with a paragraph under it is not a list. That was fine until
+    // the details were where the answer lived — "the key was created on 29
+    // August with 30 days validity, so it stops working around…" and then
+    // nothing. So a task is a record you can open, like every other record
+    // here, rather than a row that only ever shows its first two lines.
+    r.get('/:id', requirePermission('register:read'), async (c) => {
+      const id = c.req.param('id')!;
+      const task = await one<any>(c.env.DB, 'SELECT * FROM tasks WHERE id = ?', id);
+      if (!task) return c.notFound();
+
+      const [link, creator, assignee] = await Promise.all([
+        entityLabel(c.env, task.entity_type, task.entity_id),
+        task.created_by
+          ? one<{ name: string }>(c.env.DB, 'SELECT name FROM users WHERE id = ?', task.created_by)
+          : Promise.resolve(null),
+        task.assigned_to
+          ? one<{ name: string }>(c.env.DB, 'SELECT name FROM users WHERE id = ?', task.assigned_to)
+          : Promise.resolve(null),
+      ]);
+      const csrf = c.get('session')!.csrf;
+      const writable = can(c.get('user')!, 'register:write');
+      const here = `/tasks/${task.id}`;
+      const open = task.status !== 'done' && task.status !== 'cancelled';
+
+      return page(c, { title: task.title, active: '/tasks' }, html`
+        ${breadcrumbs([{ href: '/tasks', label: 'Tasks' }, { label: 'Task' }])}
+        ${pageHeader(task.title, link ? link.label : 'Not attached to a record')}
+
+        <div class="cols">
+          ${card('The task', html`
+            <div class="inline-row">
+              ${badge(TASK_STATUS_LABELS[task.status as keyof typeof TASK_STATUS_LABELS] ?? task.status,
+                      statusTone(task.status))}
+              ${task.priority !== 'normal'
+                ? badge(PRIORITY_LABELS[task.priority as keyof typeof PRIORITY_LABELS],
+                        task.priority === 'urgent' ? 'red' : 'amber')
+                : ''}
+              ${isOverdue(task.due_at) && open ? badge('Overdue', 'red') : ''}
+            </div>
+            ${/* Nothing is clamped here. This page exists to show the whole of it. */ ''}
+            ${task.details
+              ? html`<div class="prewrap">${task.details}</div>`
+              : html`<p class="muted">No details were written down.</p>`}
+            ${link ? html`<p class="small">Attached to <a href="${link.href}">${link.label}</a>.</p>` : ''}`)}
+
+          ${card('Where it stands', html`
+            <dl class="kv">
+              <dt>Due</dt>
+              <dd>${task.due_at
+                ? html`${dateShort(task.due_at)} <span class="muted">${relativeDays(task.due_at)}</span>`
+                : 'No date'}</dd>
+              <dt>Owner</dt><dd>${assignee?.name ?? '—'}</dd>
+              <dt>Raised</dt>
+              <dd>${dateTime(task.created_at)}${creator ? html` by ${creator.name}` : ''}</dd>
+              ${task.completed_at
+                ? html`<dt>Completed</dt><dd>${dateTime(task.completed_at)}</dd>`
+                : ''}
+            </dl>`)}
+        </div>
+
+        ${task.completion_note
+          ? card('What was done', html`<div class="prewrap">${task.completion_note}</div>`)
+          : ''}
+
+        ${writable ? card('Change it', html`
+          <div class="inline-row">
+            <form method="post" action="/tasks/${task.id}/status" class="inline-form">
+              ${csrfField(csrf)}
+              <input type="hidden" name="return_to" value="${here}">
+              <select name="status" class="js-autosubmit" aria-label="Task status">
+                ${TASK_STATUSES.map((st) => html`<option value="${st}" ${st === task.status ? raw('selected') : ''}>${TASK_STATUS_LABELS[st]}</option>`)}
+              </select>
+              <button class="btn btn-secondary js-hide" type="submit">Set status</button>
+            </form>
+            <a class="btn btn-secondary" href="${`/tasks/${task.id}/edit?return_to=${encodeURIComponent(here)}`}">Edit</a>
+            <a class="btn btn-secondary" href="${`/tasks/${task.id}/note?return_to=${encodeURIComponent(here)}`}">${
+              task.completion_note ? 'Change what was done' : 'Record what was done'}</a>
+          </div>`) : ''}`);
     });
 
     r.get('/:id/edit', requirePermission('register:write'), async (c) => {

@@ -61,3 +61,56 @@ describe('what was done, not just that it was done', () => {
     expect(tasks).toContain("const back = safeReturn(c.req.query('return_to'));");
   });
 });
+
+/**
+ * A task you can open.
+ *
+ * The list clamps details to two lines, which is right for a list — twenty
+ * tasks each with a paragraph under it is not a list — but it meant the answer
+ * could be in a task and unreadable from anywhere: "the key was created on 29
+ * August with 30 days validity, so it stops working around…" and then nothing.
+ */
+describe('a task is a record you can open', () => {
+  it('has a page of its own, readable without write permission', () => {
+    // Reading a task is reading the register. Changing it is not.
+    expect(tasks).toContain("r.get('/:id', requirePermission('register:read')");
+  });
+
+  it('shows the details in full, with nothing clamped', () => {
+    const pageBlock = tasks.slice(
+      tasks.indexOf("r.get('/:id', requirePermission('register:read')"),
+      tasks.indexOf("r.get('/:id/edit'"),
+    );
+    expect(pageBlock).toContain('<div class="prewrap">${task.details}</div>');
+    // The whole point of the page. A clamp anywhere in it would defeat it.
+    expect(pageBlock).not.toContain('clamp-');
+  });
+
+  it('is reachable from the list, by the title', () => {
+    expect(tasks).toContain('<a href="/tasks/${t.id}">${t.title}</a>');
+  });
+
+  it('can be worked from there without going anywhere else', () => {
+    const pageBlock = tasks.slice(
+      tasks.indexOf("r.get('/:id', requirePermission('register:read')"),
+      tasks.indexOf("r.get('/:id/edit'"),
+    );
+    // Status, edit, and the note — each returning to this page rather than to
+    // the list, so a change does not lose your place.
+    expect(pageBlock).toContain('action="/tasks/${task.id}/status"');
+    expect(pageBlock).toContain('/edit?return_to=');
+    expect(pageBlock).toContain('/note?return_to=');
+    // The status control still works with scripting off: the select
+    // auto-submits when it can, and the button is there when it cannot.
+    expect(pageBlock).toContain('js-autosubmit');
+    expect(pageBlock).toContain('js-hide');
+  });
+
+  it('is where a task alert points', () => {
+    const alerts = readFileSync('src/modules/alerts/index.ts', 'utf8');
+    // The row is about the task, and the task page links on to whatever it is
+    // attached to. Sending it to the case made the reader find the task again.
+    expect(alerts).toContain('href: `/tasks/${t.id}`');
+    expect(alerts).not.toContain("t.entity_type === 'case' ? `/cases/${t.entity_id}` : '/tasks'");
+  });
+});
