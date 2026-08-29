@@ -37,6 +37,14 @@ export interface SettingDef {
   min?: number;
   max?: number;
   maxLength?: number;
+  /**
+   * For `string`: the shape a value must have, checked when it is saved.
+   *
+   * For settings whose value is somebody else's identifier, where a wrong one
+   * is accepted silently and only fails later, in front of a client. The
+   * message is shown as typed, so write it as advice rather than as a regex.
+   */
+  pattern?: { test: RegExp; message: string };
 }
 
 export interface SettingsGroup {
@@ -102,6 +110,11 @@ export function coerceSetting(def: SettingDef, submitted: string | null): string
     case 'text': {
       const max = def.maxLength ?? (def.type === 'text' ? 4000 : 200);
       if (raw.length > max) throw new SettingValueError(def.key, `${def.label} must be ${max} characters or fewer.`);
+      // An empty value clears the setting, so it is never shape-checked: the
+      // shape describes what a value must look like, not that there must be one.
+      if (raw !== '' && def.pattern && !def.pattern.test.test(raw)) {
+        throw new SettingValueError(def.key, def.pattern.message);
+      }
       return raw;
     }
   }

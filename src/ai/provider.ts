@@ -282,11 +282,22 @@ export const AI_SETTINGS: SettingsGroup = {
     {
       key: 'ai.workspace_id', type: 'string', default: '', maxLength: 80,
       label: 'Anthropic workspace ID',
-      help: 'Only needed for an identity-linked key, which refuses a request that does '
-        + 'not say which workspace it acts in — the error reads “anthropic-workspace-id '
-        + 'is required”. Find it in the Anthropic console under the workspace, in the '
-        + 'address bar or its settings. Leave empty for an ordinary key: the header is '
-        + 'then not sent at all, which is what an ordinary key expects.',
+      // Checked on the way in. Anthropic answers a wrong id with a 404 that
+      // only arrives when somebody presses a button, and the id most easily
+      // confused with it — an organisation id — is a plain UUID, which this
+      // refuses on sight.
+      pattern: {
+        test: /^wrkspc_[A-Za-z0-9]+$/,
+        message: 'A workspace ID starts with “wrkspc_”, like '
+          + 'wrkspc_01JwQvzr7rXLA5AGx3HKfFUJ. A plain UUID is something else — '
+          + 'probably the organisation ID. Anthropic Console → Settings → Workspaces, '
+          + 'open the workspace, and it is in the address bar.',
+      },
+      help: 'Only needed for an identity-linked key, which refuses any request that does '
+        + 'not say which workspace it acts in. It starts with “wrkspc_” and is in the '
+        + 'address bar when you open the workspace in the Anthropic Console under '
+        + 'Settings → Workspaces. Leave empty for an ordinary key: the header is then '
+        + 'not sent at all, which is what an ordinary key expects.',
     },
   ],
 };
