@@ -7,6 +7,28 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.47.0 — 29 August 2026
+
+### Added
+- **A task is a record you can open.** `/tasks/:id`, reached by clicking the
+  title in the list. The details run in full, what it is attached to is a link,
+  and who raised it and when are on the page. If it is finished, what was done
+  is there too.
+- The list still clamps details to two lines — twenty tasks each with a
+  paragraph under it is not a list — but the clamp is no longer where the text
+  ends. That was the bug: an answer could be written on a task and be
+  unreadable from anywhere.
+- Status, **Edit** and **Record what was done** all sit on the task page, and
+  each returns to it rather than throwing you back to the list. The status
+  control still works with scripting off.
+
+### Changed
+- A task alert now opens the task rather than the matter behind it. The row is
+  about the task; the task page links on to whatever it is attached to.
+- New `.inline-row` — a line of small things (badges, buttons, a status select)
+  that sit side by side and wrap together. `.row-meta` did this only on a
+  phone, so the same markup stacked on a desktop.
+
 ## 0.46.0 — 29 August 2026
 
 ### Changed

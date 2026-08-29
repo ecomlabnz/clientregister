@@ -366,7 +366,9 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
       date: t.due_at,
       title: t.title,
       detail: t.assignee_name ? `Assigned to ${t.assignee_name}` : 'Unassigned',
-      href: t.entity_type === 'case' ? `/cases/${t.entity_id}` : '/tasks',
+      // To the task, which is the thing the row is about; the task page links
+      // on to whatever it is attached to.
+      href: `/tasks/${t.id}`,
     })),
     ...quotes.map((q: any) => ({
       kind: 'quote' as const,
@@ -423,7 +425,7 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
       title: t.title,
       detail: `${t.case_title} · ${t.ref} · due the same day as the deadline it serves`
         + `${t.assignee_name ? ` · ${t.assignee_name}` : ''}`,
-      href: `/cases/${t.entity_id}`,
+      href: `/tasks/${t.id}`,
     })),
     ...statusUnknown.map((k: any) => ({
       kind: 'status_unknown' as const,

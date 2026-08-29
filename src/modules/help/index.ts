@@ -32,6 +32,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.47.0', date: '29 August 2026',
+    notes: [
+      'A task can be opened. Click its title in the list and you get the whole thing \u2014 '
+        + 'the details in full rather than the first two lines, what it is attached to, who '
+        + 'raised it and when, and what was done if it is finished.',
+      'Status, edit and the note are all on that page, and each comes back to it rather than '
+        + 'throwing you back to the list.',
+      'A task alert now opens the task rather than the matter behind it.',
+    ],
+  },
+  {
     version: '0.46.0', date: '29 August 2026',
     notes: [
       'The <strong>Admin</strong> section is now called <strong>Settings</strong>. Nothing '

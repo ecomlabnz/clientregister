@@ -624,6 +624,11 @@ textarea { resize: vertical; min-height: 70px; }
 .row-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 16px; align-items: start; }
 .row-form > button { align-self: end; margin-bottom: 14px; }
 .entry-form { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+/* A line of small things — badges, buttons, a status select — sitting side by
+   side and wrapping together rather than stacking one per row. */
+.inline-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.inline-row + .prewrap, .inline-row + p { margin-top: 10px; }
+
 .inline-form { display: inline-flex; gap: 6px; align-items: center; }
 .inline-form select { width: auto; padding: 4px 6px; font-size: 0.82rem; }
 
