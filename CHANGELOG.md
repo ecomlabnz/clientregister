@@ -7,6 +7,18 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.56.1 — 29 August 2026
+
+### Fixed
+- The two ways of adding a party ran into one another: a rule and a heading now
+  separate "somebody already on file" from "somebody not on file yet". Without
+  them the second form read as more of the first, which is how somebody fills in
+  half of each and presses the wrong button.
+- The old route out of that dead end was a sentence of small grey text —
+  *"Create a client first if they are not on file"* — which is exactly the kind
+  of instruction a person does not see when they are looking for a control. It
+  has been replaced by the control.
+
 ## 0.56.0 — 29 August 2026
 
 ### Added

@@ -212,7 +212,8 @@ describe('creating a party from the matter', () => {
     // The rest of what the register holds about a person belongs on that
     // person's page. A longer form here would be a second client form to keep
     // in step with the first.
-    const form = cases.slice(cases.indexOf('Not on file yet?'), cases.indexOf('Creates a client record'));
+    const form = cases.slice(cases.indexOf('<h4>Somebody not on file yet</h4>'),
+                             cases.indexOf('Creates a client record'));
     const fields = [...form.matchAll(/name: '(\w+)'/g)].map((m) => m[1]!);
     expect(fields).toEqual(['given_names', 'family_name', 'role', 'email']);
   });
@@ -232,5 +233,26 @@ describe('creating a party from the matter', () => {
                               cases.indexOf("r.post('/:id/parties',"));
     expect(route).toContain('return redirectWith(c, `/cases/${id}`');
     expect(route).not.toContain('/clients/new');
+  });
+});
+
+describe('two ways of adding a party, told apart', () => {
+  it('divides them, rather than running one into the other', () => {
+    // Without a rule the second form reads as more of the first, which is how
+    // somebody fills in half of each and presses the wrong button.
+    const cases = readFileSync('src/modules/cases/index.ts', 'utf8');
+    const block = cases.slice(cases.indexOf('<summary>Add a party</summary>'),
+                             cases.indexOf('Creates a client record'));
+    expect(block).toContain('<div class="or-rule">or</div>');
+    expect(block.indexOf('or-rule')).toBeGreaterThan(block.indexOf('action="/cases/${kase.id}/parties"'));
+    expect(block.indexOf('or-rule')).toBeLessThan(block.indexOf('/parties/new'));
+  });
+
+  it('names the second choice at heading weight, not as a hint', () => {
+    // The old wording was a sentence in small grey text. A route somebody has
+    // to notice is a route that fails.
+    const cases = readFileSync('src/modules/cases/index.ts', 'utf8');
+    expect(cases).toContain('<h4>Somebody not on file yet</h4>');
+    expect(cases).not.toContain('Create a client</a> first if they are not on file');
   });
 });

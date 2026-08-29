@@ -491,6 +491,18 @@ input:focus, select:focus, textarea:focus {
 }
 textarea { resize: vertical; min-height: 70px; }
 .hint { font-size: 0.78rem; color: var(--muted); margin: 4px 0 0; line-height: 1.45; }
+/* Two ways of doing the same thing, one after the other. Without a divider the
+   second form reads as more of the first — which is how somebody fills in half
+   of each and presses the wrong button. */
+.or-rule {
+  display: flex; align-items: center; gap: 12px;
+  margin: 22px 0 16px; color: var(--muted);
+  font-size: 0.74rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.or-rule::before, .or-rule::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
 /* Two fields that belong side by side inside a form that is otherwise one
    column — Cc and Bcc, which are read as a pair. Falls to one column on a
    narrow screen, where side by side would make both unusable. */
