@@ -86,6 +86,14 @@ ${opts.landing
   </nav>
   <div class="topbar-right">
     ${user
+      ? html`${/* One box for the whole register, on every page. A plain GET
+                   form: it needs no scripting to work, and the results page
+                   refreshes as you type once scripting is there. */ ''}
+             <form method="get" action="/search" class="topsearch" role="search">
+               <input type="search" name="q" placeholder="Search everything"
+                      aria-label="Search the register" autocomplete="off">
+             </form>` : ''}
+    ${user
       ? html`<a class="whoami" href="/account" title="${user.email}">
                <span class="avatar">${initials(user.name)}</span>
                <span class="whoami-name">${user.name}</span>

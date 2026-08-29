@@ -34,8 +34,38 @@ export function composeFullName(
   parts: NameParts,
   organisationName?: string | null,
 ): string {
+  // An organisation's registered name is copied from the register that holds
+  // it and is not the practice's to restyle.
   if (kind === 'organisation') return tidy(organisationName);
-  return tidy(`${tidy(parts.givenNames)} ${familyNameFor(parts.familyName)}`);
+  return tidy(`${plainAscii(parts.givenNames)} ${familyNameFor(parts.familyName)}`);
+}
+
+/**
+ * A name written in plain English letters.
+ *
+ * The practice records names without diacritics: RAWIRI, not RĀWIRI; NGUYEN,
+ * not NGUYỄN. That is a decision about house style, taken knowing what it
+ * costs — a macron in te reo Māori marks vowel length and "Rāwiri" and
+ * "Rawiri" are not the same word — and it is applied consistently rather than
+ * left to whoever typed the record.
+ *
+ * Most marks come off by decomposing and dropping the combining characters.
+ * A few letters do not decompose at all, and the Vietnamese đ is the one that
+ * matters most here: without the map below, "Đặng" would come out "Đang" —
+ * half-converted, which is worse than either end of the choice.
+ */
+const UNDECOMPOSABLE: Record<string, string> = {
+  đ: 'd', Đ: 'D', ø: 'o', Ø: 'O', ł: 'l', Ł: 'L',
+  æ: 'ae', Æ: 'AE', œ: 'oe', Œ: 'OE', ß: 'ss', ð: 'd', Ð: 'D', þ: 'th', Þ: 'Th',
+};
+
+export function plainAscii(value: string | null | undefined): string {
+  return tidy(value)
+    .normalize('NFD')
+    // Combining diacritical marks, which is what NFD has just separated out.
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x00-\x7f]/g, (ch) => UNDECOMPOSABLE[ch] ?? ch)
+    .normalize('NFC');
 }
 
 /**
@@ -58,7 +88,7 @@ export function composeFullName(
  * JavaScript's toUpperCase is Unicode-aware and gets it right.
  */
 export function familyNameFor(value: string | null | undefined): string {
-  return tidy(value).toUpperCase();
+  return plainAscii(value).toUpperCase();
 }
 
 /**
@@ -71,8 +101,8 @@ export function familyNameFor(value: string | null | undefined): string {
  * on a form is the sort of mistake that comes back as a request for evidence.
  */
 export function formalName(parts: NameParts, fallback = ''): string {
-  const family = tidy(parts.familyName).toUpperCase();
-  const given = tidy(parts.givenNames);
+  const family = familyNameFor(parts.familyName);
+  const given = plainAscii(parts.givenNames);
   if (!family) return given || fallback;
   return given ? `${family}, ${given}` : family;
 }

@@ -25,9 +25,11 @@ import { knowledgeModule } from './modules/knowledge';
 import { assistantModule } from './modules/assistant';
 import { workflowsModule } from './modules/workflows';
 import { helpModule } from './modules/help';
+import { searchModule } from './modules/search';
 
 export const registeredModules: AppModule[] = [
   authModule,
+  searchModule,
   // Ahead of the dashboard: both answer for '/', and the website only takes it
   // when nobody is signed in.
   landingModule,

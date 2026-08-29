@@ -7,6 +7,50 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.37.0 — 29 August 2026
+
+### Added
+- **A search box at the top of every page, covering the whole register** —
+  clients, matters, tasks, quotes, invoices, inquiries, file notes, uploaded
+  documents and the knowledge base. A search that only knew about clients is
+  the sort that gets abandoned in a fortnight: "Kiwi Orchards" might be the
+  client, the matter, the invoice, or a note somebody left.
+- A reference typed in full is marked as an exact match and put first. INZ
+  application and client numbers find the matter. A phrase from a file note
+  finds the note, which is often what you were actually after.
+- Results appear as you type, through the same enhancement every other filter
+  uses, and the page is a plain GET form so it works with scripting off.
+- One letter is refused honestly — "one letter matches almost everything" —
+  rather than answered with "no matches", which would be a lie about what the
+  register holds.
+- Not a search engine: no index, no ranking model, nine `LIKE` queries run
+  together. At the size a practice like this reaches that answers in under a
+  millisecond, and a fast plain thing beats a slow clever one. If that stops
+  being true the answer is FTS5, and the comment in `core/search.ts` says so.
+
+### Changed
+- **Names are recorded in plain English letters**: RAWIRI, NGUYEN, DANG. Taken
+  knowing what it costs — a macron in te reo Māori marks vowel length, and
+  "Rāwiri" and "Rawiri" are not the same word — and applied consistently rather
+  than left to whoever typed the record. An organisation's registered name is
+  left as the Companies Office holds it; it is not the practice's to restyle.
+- Most marks come off by decomposition, but a few letters do not decompose at
+  all. The Vietnamese đ matters most here: without an explicit map "Đặng" would
+  come out "Đang", half-converted, which is worse than either end of the
+  choice.
+
+### Fixed
+- `test/css.test.ts` held **two copies** of five tests, and the second was the
+  superseded version of the button-class guard — the one whose substring check
+  passed while the bug was still in the tree. A bad splice of mine left it
+  appended after its own replacement, so the weaker test kept running and
+  kept passing.
+- The clamp guard sliced the stylesheet at the first `@media (max-width: 720px)`
+  and asserted against everything before it. Adding a narrow-screen rule earlier
+  in the file broke it, for no fault of the thing it guards. It counts braces to
+  the rule now: a guard that fails when unrelated CSS moves teaches people to
+  edit the guard.
+
 ## 0.36.2 — 29 August 2026
 
 ### Changed
