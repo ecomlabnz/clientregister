@@ -7,6 +7,28 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.49.1 — 29 August 2026
+
+### Fixed
+- **Settings → Integrations said `MAIL_PROVIDER=resend — sending.` and stopped.**
+  True, and no answer to the question a practice actually has: *where does the
+  copy of what I sent end up, and can I have it in my own mailbox?* That depends
+  entirely on which of the two transports is in use, so the answer now sits next
+  to the switch — including, when Resend is configured, that no copy reaches any
+  mailbox and what to set to change that.
+- The wording lives in `mailTransportDetail` in `src/mail/provider.ts`, beside
+  the transports it describes, rather than in the page that happens to print it.
+- `docs/integrations.md` documented Resend only. Gmail has been in the codebase
+  since it was written and was documented in the application's own help but not
+  in the developer notes.
+- Several help pages still said "Admin → …" after that section was renamed to
+  Settings. The release notes still say Admin, because that is what it was called
+  in those releases.
+- `test/manual.test.ts` pinned the section name and failed the build on the
+  rename — for the second time. It now checks that the manual documents both
+  transports and where the test-message button is, without pinning where it
+  lives.
+
 ## 0.49.0 — 29 August 2026
 
 ### Added

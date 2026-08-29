@@ -185,10 +185,39 @@ obligations before choosing. Every run is logged in `ai_runs` either way.
 
 Also off by default. Mail is written to `outbound_emails` and queued whether or
 not a provider is configured, so the record exists from the start; the queue
-drains once a transport is set. The daily cron flushes it, and Admin has a
-"deliver now" button.
+drains once a transport is set. The daily cron flushes it, and Settings →
+Maintenance has a "deliver now" button.
 
-**Resend:**
+Two transports, and the choice between them is not about deliverability — it is
+about **where the copy of what you sent ends up**.
+
+**Gmail** sends through Gmail's REST API as the account you authorise. The
+message lands in that account's own Sent folder, and replies come back to its
+inbox. For a small practice that already lives in Gmail this is usually the one
+you want: the register and the mailbox hold the same correspondence, and nothing
+has to be BCC'd anywhere to make that true.
+
+Not SMTP — Workers cannot open a raw TCP connection, and Google is retiring app
+passwords in any case. The practice authorises once; the refresh token is a
+Worker secret and is exchanged for a short-lived access token cached in KV.
+
+```bash
+echo "gmail" | npx wrangler secret put MAIL_PROVIDER
+npx wrangler secret put GMAIL_CLIENT_ID
+npx wrangler secret put GMAIL_CLIENT_SECRET
+npx wrangler secret put GMAIL_REFRESH_TOKEN
+echo "Your Name <you@gmail.com>" | npx wrangler secret put MAIL_FROM
+```
+
+`MAIL_FROM` must be the account that was authorised. The scope needed is
+`https://www.googleapis.com/auth/gmail.send`; the full walkthrough, including
+getting a refresh token out of the OAuth Playground, is in the application under
+**Help → Connecting Telegram, WhatsApp and email**. Gmail allows roughly 500
+messages a day on a personal account and 2,000 on Workspace.
+
+**Resend** sends from a domain verified with Resend, so clients see the firm's
+address rather than a personal mailbox. Nothing is written to any mailbox — what
+was sent is recorded in the register and nowhere else.
 
 ```bash
 echo "resend" | npx wrangler secret put MAIL_PROVIDER
@@ -198,6 +227,10 @@ echo "Practice <no-reply@yourdomain.co.nz>" | npx wrangler secret put MAIL_FROM
 
 The sending domain needs SPF and DKIM set up with the provider before anything
 you send will reach an inbox.
+
+**Settings → Integrations** names whichever transport is in use and says what it
+means for where the copy lands, so switching between them is not a thing you have
+to remember the consequences of.
 
 To add another transport, implement `MailProvider` in `src/mail/` and add a case
 to `getMailProvider`.

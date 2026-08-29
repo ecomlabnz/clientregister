@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.49.1', date: '29 August 2026',
+    notes: [
+      'Settings \u2192 Integrations now says what the mail transport in use actually does \u2014 '
+        + 'in particular whether a copy of what you send ends up in your own mailbox. It named '
+        + 'the setting and stopped, which told you nothing you wanted to know.',
+      'A few help pages still said \u201cAdmin \u2192 \u2026\u201d after that section was '
+        + 'renamed to Settings.',
+    ],
+  },
+  {
     version: '0.49.0', date: '29 August 2026',
     notes: [
       'Nationality is now chosen from the full list of countries rather than typed. It is '
@@ -1011,7 +1021,7 @@ function sections(origin: string): Section[] {
         <h4>When that date passes</h4>
         <p>A task is raised to follow it up, assigned to whoever owns the matter. Then another a
            month later, and another the month after — three chases on the default schedule.</p>
-        <p>All of it is adjustable under <strong>Admin → Settings → Decisions and chasing INZ</strong>:
+        <p>All of it is adjustable under <strong>Settings → Decisions and chasing INZ</strong>:
            how long a decision is expected to take, whether to chase at all, on what schedule, and
            at what priority. The schedule counts <em>from the expected decision date</em>, so
            <code>0, 1, 2</code> means on the day it was expected and then monthly twice more.
@@ -1050,7 +1060,7 @@ function sections(origin: string): Section[] {
       id: 'export',
       title: 'Taking your data out',
       body: html`
-        <p><strong>Admin → Export.</strong> Fifteen sets of records, each one link and one file:
+        <p><strong>Settings → Export.</strong> Fifteen sets of records, each one link and one file:
            clients, matters, parties, certificates, fees, quotes and their lines, invoices and their
            lines, payments, tasks, notes, inquiries, the knowledge base and the audit log.</p>
         <p>They are CSV — comma separated, quoted to the standard, and written as UTF-8 with a
@@ -1130,7 +1140,7 @@ function sections(origin: string): Section[] {
       body: html`
         <p>The address of this register also serves a public page, shown to anyone who arrives
            without being signed in. Signing in takes you past it to your own first screen.</p>
-        <p>Everything on it is edited under <strong>Admin → Settings → Website</strong> — the
+        <p>Everything on it is edited under <strong>Settings → Website</strong> — the
            headline, the services, the steps, the questions and the closing invitation — so the
            wording is yours to change without anyone touching code.</p>
         <p>Four of those fields are lists. Put <strong>one item per line</strong>, with a vertical
@@ -1304,7 +1314,7 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
                 <li><code>GMAIL_REFRESH_TOKEN</code> from step 7</li>
               </ul>
           </li>
-          <li>Deploy. <strong>Admin → Integrations</strong> should now show outbound email as
+          <li>Deploy. <strong>Settings → Integrations</strong> should now show outbound email as
               configured. Send a quote by email to test it.</li>
         </ol>
         <p class="hint">Gmail allows roughly 500 messages a day on a personal account and 2,000 on
@@ -1328,7 +1338,7 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
               key, and <code>MAIL_FROM</code> = the sending address, written as
               <code>Your Name &lt;you@yourdomain&gt;</code>.</li>
           <li>Deploy. Secrets only reach the register on the next deploy.</li>
-          <li>Go to <strong>Admin → Integrations</strong> and send a test message. Your own
+          <li>Go to <strong>Settings → Integrations</strong> and send a test message. Your own
               address is filled in, but try one at whatever your clients use — Gmail and Outlook
               judge a new sending domain more harshly than most, and a message they file in spam
               is worth knowing about before a quote goes to a client.</li>
