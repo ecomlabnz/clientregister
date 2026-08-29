@@ -42,6 +42,37 @@ export function collapsibleCard(title: string, body: Raw, note?: string): Raw {
     </section>`;
 }
 
+/**
+ * A twelve-month trend, as one shape.
+ *
+ * The only place on the dashboard where a picture beats a figure: a count tells
+ * you where you are, and this tells you which way you are going. Drawn as an
+ * SVG polyline with presentation attributes rather than inline styles, because
+ * the content policy forbids the latter.
+ *
+ * Deliberately unlabelled inside the plot. Axes and gridlines on a strip
+ * forty pixels tall are decoration; the range is written underneath in words.
+ */
+export function sparkline(values: number[], opts: { label: string } = { label: '' }): Raw {
+  if (values.length < 2) return html`<p class="small muted">Not enough history to show a trend yet.</p>`;
+
+  const width = 300;
+  const height = 40;
+  const max = Math.max(...values, 1);
+  const step = width / (values.length - 1);
+  // The y axis starts at zero rather than at the lowest value: a chart that
+  // crops the bottom makes an ordinary month look like a collapse.
+  const points = values.map((v, i) => `${(i * step).toFixed(1)},${(height - (v / max) * height).toFixed(1)}`);
+  const area = `0,${height} ${points.join(' ')} ${width},${height}`;
+
+  return html`
+    <svg class="sparkline" viewBox="${`0 0 ${width} ${height}`}" preserveAspectRatio="none"
+         role="img" aria-label="${opts.label}">
+      <polygon class="sparkline-area" points="${area}"></polygon>
+      <polyline class="sparkline-line" points="${points.join(' ')}"></polyline>
+    </svg>`;
+}
+
 export function pageHeader(title: string, subtitle?: string | null, actions?: Raw): Raw {
   return html`
     <div class="page-head">

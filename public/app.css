@@ -310,7 +310,12 @@ body.bare {
 .card-body { padding: 14px; }
 
 .cols { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+/* minmax(0, 1fr), not 1fr: a grid track's default min-width is auto, so a plain
+   1fr cannot shrink below its content and a single wide child pushes the column
+   past the viewport. The desktop rule above already guards against this; the
+   narrow-screen rule did not, which is how a table in the main column put three
+   pixels of horizontal scroll on every phone. */
+@media (max-width: 900px) { .cols { grid-template-columns: minmax(0, 1fr); } }
 
 .muted { color: var(--muted); }
 /* Shown only where a column has been dropped for want of room. */
@@ -714,6 +719,19 @@ details[open] > summary { margin-bottom: 12px; }
   overflow-wrap: normal; word-break: normal;
 }
 .stat-warn { border-color: var(--amber); }
+/* Two degrees of pressing, so a glance separates "this week" from "already
+   late" without reading the figure. */
+.stat-urgent { border-color: var(--red); }
+.stat-urgent .stat-value { color: var(--red); }
+
+/* One shape rather than one number, for the only thing on this page that is a
+   trend rather than a state. Presentation attributes on the SVG, not inline
+   styles, because the content policy forbids the latter. */
+.sparkline { display: block; width: 100%; height: 44px; }
+.sparkline-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+.sparkline-area { fill: var(--blue-bg); stroke: none; }
+.sparkline-scale { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted); }
+
 .split-head { margin-top: 22px; }
 .status-now { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 

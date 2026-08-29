@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.29.0', date: '29 August 2026',
+    notes: [
+      'Today is now Dashboard, and leads with one list of what is late or due today.',
+      'The figures turn red when something is overdue and amber when it bites this week.',
+      'New panels: waiting for your approval, invoices overdue, conversations waiting.',
+      'A twelve-month trend of matters lodged.',
+    ],
+  },
+  {
     version: '0.28.0', date: '29 August 2026',
     notes: [
       'Document storage is live — files attach to cases, clients and notes.',
