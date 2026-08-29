@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.38.0', date: '29 August 2026',
+    notes: [
+      'The assistant runs on Claude Haiku 4.5 \u2014 the cheap model, about a fifth the price '
+        + 'of the largest one. Set AI_PROVIDER and ANTHROPIC_API_KEY to switch it on; '
+        + 'Help \u2192 The assistant has the steps.',
+      'Admin \u2192 Integrations now names the model in use.',
+    ],
+  },
+  {
     version: '0.37.0', date: '29 August 2026',
     notes: [
       'A search box at the top of every page, covering the whole register \u2014 clients, '
@@ -621,6 +630,23 @@ function sections(origin: string): Section[] {
            <strong>Brief me on this matter</strong>, on any case, reads that file and proposes
            where things stand, what to do next, what is worth watching, and what the file does not
            say.</p>
+        <h4>Switching it on</h4>
+        <p>Two repository secrets, then a deploy:</p>
+        <ul>
+          <li><code>AI_PROVIDER</code> = <code>anthropic</code></li>
+          <li><code>ANTHROPIC_API_KEY</code> = a key from
+              <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a></li>
+        </ul>
+        <p>Add them under <strong>Settings → Secrets and variables → Actions</strong> in the
+           repository, then push or re-run the deploy. <strong>Admin → Integrations</strong> then
+           shows the AI layer as on, and names the model it is using.</p>
+        <p>It runs on <strong>Claude Haiku 4.5</strong> — deliberately the cheap model, at about a
+           fifth of the price of the largest one. Everything asked of it here is reading a document
+           into form fields, triaging a message, or summarising a file the practice already holds,
+           and all of it is checked by a person before anything is written. Paying five times more
+           would be paying for reasoning this work does not use.</p>
+        <p>To change that, set an <code>AI_MODEL</code> secret: <code>claude-sonnet-5</code> is the
+           next step up, <code>claude-opus-5</code> above it. Nothing else has to change.</p>
         <h4>What it will not do</h4>
         <p><strong>It never writes to the register.</strong> Every suggestion arrives as a form you
            look at and submit, or a note you press save on. Nothing it offers is a step you could

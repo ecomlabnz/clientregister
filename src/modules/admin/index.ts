@@ -207,7 +207,11 @@ export const adminModule: AppModule = {
           statusRow('NZBN register lookup', nzbnConfigured(env),
             'NZBN_API_KEY — free key from portal.api.business.govt.nz. Lets you create a company client from the register.'),
           statusRow('AI layer', isAiEnabled(env),
-            `AI_PROVIDER=${env.AI_PROVIDER ?? 'none'} — suggestions only, never applied automatically.`),
+            isAiEnabled(env)
+              ? `AI_PROVIDER=${env.AI_PROVIDER} · model ${env.AI_MODEL || 'claude-haiku-4-5'}`
+                + ' — suggestions only, never applied automatically.'
+              : `AI_PROVIDER=${env.AI_PROVIDER ?? 'none'}. Set it to “anthropic” with an`
+                + ' ANTHROPIC_API_KEY to switch the assistant on. The register works without it.'),
           statusRow('Outbound email', mailConfigured(env),
             mailConfigured(env)
               ? `MAIL_PROVIDER=${env.MAIL_PROVIDER} — sending.`

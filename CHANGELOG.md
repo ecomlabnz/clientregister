@@ -7,6 +7,27 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.38.0 — 29 August 2026
+
+### Changed
+- **The assistant runs on Claude Haiku 4.5** rather than Opus 5 — $1/$5 per
+  million tokens against $5/$25, about a fifth of the price. Everything asked
+  of it here is extraction and summarisation against a schema, from documents
+  the practice already holds, and all of it is checked by a person before
+  anything is written. Paying five times more would be paying for reasoning
+  this workload does not use.
+- Overridable with an `AI_MODEL` secret and no code change — `claude-sonnet-5`
+  is the next step up, `claude-opus-5` above it. That works because no request
+  here sends `effort` or `thinking`, which are the parameters that differ
+  between the tiers; a test holds that true.
+- Two consequences of the cheaper model, both fine for this workload: a 200K
+  context rather than 1M (the longest thing sent is a case file, capped at
+  60,000 characters) and a 100-page ceiling on a single PDF.
+- **Admin → Integrations names the model in use**, and when the AI layer is off
+  it now says what to set rather than only that it is off.
+- The manual gained the two-secret setup: `AI_PROVIDER=anthropic` and
+  `ANTHROPIC_API_KEY`.
+
 ## 0.37.0 — 29 August 2026
 
 ### Added
