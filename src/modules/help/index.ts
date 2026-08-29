@@ -32,6 +32,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.33.0', date: '29 August 2026',
+    notes: [
+      'A client may hold more than one passport. The one on their form is the primary; '
+        + 'second and third ones go under Passports on their page, and every one still held '
+        + 'is watched for expiry.',
+      'Forms now size themselves to the space they are in rather than to the window, '
+        + 'so a narrow window no longer squeezes them into unreadable columns.',
+      '“For approval” keeps the Alerts tab bar instead of replacing it, so there is a way back.',
+    ],
+  },
+  {
     version: '0.32.0', date: '29 August 2026',
     notes: [
       'The test message can go to any address, so you can see how it lands at a client\'s provider.',
@@ -72,13 +83,15 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
     version: '0.27.0', date: '29 August 2026',
     notes: [
       'A passport number entered against the wrong person can now be removed, not just overwritten.',
+      'A client may hold several passports. The one on their form is the primary; the rest live '
+        + 'under Passports on their page, and every one still held is watched for expiry.',
       'Changing or clearing one is recorded in the audit log as specifically as revealing one.',
     ],
   },
   {
     version: '0.26.0', date: '29 August 2026',
     notes: [
-      'Export: fifteen datasets, each one link and one CSV. Passport numbers excluded.',
+      'Export: sixteen datasets, each one link and one CSV. Passport numbers excluded.',
       'Certificates are records with their own dates — a new one no longer overwrites the old.',
       'English language, and General or Limited on a medical.',
       'A fee summary on the client page; the fee section on a case now starts folded.',
@@ -334,6 +347,23 @@ function sections(origin: string): Section[] {
            lodgement is the sort of thing that stalls a matter, and this is what catches it.</p>
         <p>A passport number is stored encrypted. Viewing one takes a deliberate click and is
            written to the audit log, so there is a record of who looked and when.</p>
+        <h4>More than one passport</h4>
+        <p>A client may hold several. A dual national holds two at once and neither replaces the
+           other; someone who has just renewed holds the new one and the old one carrying a live
+           visa, which is the whole reason <em>Transfer to New Passport</em> exists as a matter
+           type.</p>
+        <p>The passport on the client's own form is the <strong>primary</strong> one — the travel
+           document the file works from, and the one the Alerts page, the client list and the CSV
+           export speak for. Second and third passports are added under
+           <strong>Passports</strong> on the client's page, each with its own country, number and
+           dates. <strong>Make primary</strong> swaps which one the file works from; the summary
+           and the alerts follow immediately.</p>
+        <p>Every passport still marked <em>held</em> is watched for expiry, so a client with two
+           live passports is chased about both, and each alert names the issuing country. Mark one
+           <em>replaced</em> when a new one supersedes it: it stays on the file as a record — a
+           visa may still be stuck in it — but stops being chased. The primary passport is removed
+           from the client form rather than from the list, so a record can never end up with
+           passports but no primary.</p>
         <h4>Companies and organisations</h4>
         <p>Choose <em>Company or organisation</em> as the record type and the form changes: a
            registered name, an NZBN and a Companies Office number instead of personal details.</p>

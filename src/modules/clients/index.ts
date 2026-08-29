@@ -20,7 +20,7 @@ import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
 import { all, nextRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
-import { sealField, unsealField } from '../../core/crypto';
+import { unsealField } from '../../core/crypto';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
@@ -45,6 +45,11 @@ import {
   CERTIFICATE_KINDS, CERTIFICATE_LABELS, MEDICAL_TYPES, type CertificateKind,
   addCertificate, certificatesFor, currentOf, medicalTypeLabel, refreshClientCache, removeCertificate,
 } from '../../core/certificates';
+import {
+  PASSPORT_STATUSES, type PassportStatus,
+  addPassport, passportById, passportStatusLabel, passportsFor, removePassport,
+  setPrimaryPassport, updatePassport,
+} from '../../core/passports';
 import { composeFullName, splitFullName, type ClientKind } from '../../core/names';
 import {
   fetchEntity, isValidNzbnFormat, normaliseNzbn, nzbnConfigured, searchEntities,
@@ -83,9 +88,19 @@ function expiryCell(value: string | null, warnDays = 90): Raw {
     ${soon ? html`<div class="muted small">${relativeDays(value)}</div>` : ''}`;
 }
 
+/**
+ * The client form.
+ *
+ * `passport_issued` is not a column on `clients` — the passport is a record in
+ * its own table now, and only the primary's country and expiry are cached back
+ * onto the client row. The issue date is read from the passport itself and
+ * passed in alongside.
+ */
+type ClientFormValues = Partial<ClientRow> & { passport_issued?: string | null };
+
 function clientForm(
   c: any,
-  values: Partial<ClientRow>,
+  values: ClientFormValues,
   users: Array<{ value: string; label: string }>,
   organisations: Array<{ value: string; label: string }>,
   englishTestOptions: Array<{ value: string; label: string }>,
@@ -199,8 +214,18 @@ function clientForm(
           : html`<div class="field"><label>Passport number</label>
                  <p class="hint">Disabled: set the <code>FIELD_KEY</code> secret to store passport numbers encrypted.</p></div>`}
         ${field({ label: 'Passport country', name: 'passport_country', value: values.passport_country, maxlength: 100 })}
+        ${field({ label: 'Passport issued', name: 'passport_issued', type: 'date',
+                  value: dateInputValue(values.passport_issued ?? null) })}
         ${field({ label: 'Passport expiry', name: 'passport_expiry', type: 'date', value: dateInputValue(values.passport_expiry),
                   hint: 'Watched on the alerts page — a passport expiring mid-application stalls it.' })}
+        <div class="settings-cell-wide">
+          <p class="hint">These boxes are the <strong>primary</strong> passport — the travel document
+             this file works from. A client may hold more than one: a dual national holds two at
+             once, and someone who has just renewed holds the new one plus the old one carrying a
+             live visa. Second and third passports are kept on the client's own
+             page${values.id ? html` — <a href="/clients/${values.id}#passports">add one there</a>` : ''},
+             each with its own country and dates, and every one still held is watched for expiry.</p>
+        </div>
       </div>
 
       ${'' /* INZ assesses four things — immigration history, character, health
@@ -294,6 +319,7 @@ function readClientForm(f: FormReader) {
     date_of_birth: f.date('date_of_birth'),
     passport_country: f.optional('passport_country', { max: 100 }),
     passport_expiry: f.date('passport_expiry'),
+    passport_issued: f.date('passport_issued'),
     english_test_type: f.optional('english_test_type', { max: 60 }),
     english_test_score: f.optional('english_test_score', { max: 40 }),
     english_test_date: f.date('english_test_date'),
@@ -589,27 +615,40 @@ export const clientsModule: AppModule = {
 
       const id = newId('cli');
       const ref = await nextRef(c.env.DB, 'client', 'CL');
-      const passportSealed = v.passport_number && c.env.FIELD_KEY
-        ? await sealField(v.passport_number, c.env.FIELD_KEY)
-        : null;
 
+      // The passport columns are not written here. They are a cache of the
+      // primary row in client_passports, filled in below by the same code that
+      // maintains them everywhere else — so there is one place that can get it
+      // wrong rather than three.
       await run(
         c.env.DB,
         `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name, preferred_name,
             nzbn, company_number, organisation_id, organisation_role,
             email, phone, whatsapp, telegram_username, telegram_user_id,
-            nationality, date_of_birth, passport_sealed, passport_country, passport_expiry,
+            nationality, date_of_birth,
             english_test_type, english_test_score, english_test_date,
             current_visa_type, current_visa_expiry, address, status, assigned_to, notes,
             created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, ref, v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
         v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
-        v.nationality, v.date_of_birth, passportSealed, v.passport_country, v.passport_expiry,
+        v.nationality, v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
         v.current_visa_type, v.current_visa_expiry, v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), nowIso(), user.id,
       );
+
+      if (v.passport_number || v.passport_country || v.passport_expiry || v.passport_issued) {
+        await addPassport(c.env, {
+          clientId: id, country: v.passport_country, number: v.passport_number,
+          issuedOn: v.passport_issued, expiresOn: v.passport_expiry,
+          status: 'held', isPrimary: true, notes: null, userId: user.id,
+        });
+        if (v.passport_number) {
+          await auditFrom(c, { action: 'client.passport_set', entityType: 'client', entityId: id,
+            meta: { replaced: false } });
+        }
+      }
       await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system', body: `Client record created (${ref}).`, createdBy: user.id });
       await auditFrom(c, { action: 'client.created', entityType: 'client', entityId: id, meta: { ref, kind: v.kind } });
       return redirectWith(c, `/clients/${id}`, `Client ${ref} created.`);
@@ -628,7 +667,7 @@ export const clientsModule: AppModule = {
       if (!client) return c.notFound();
 
       const [cases, quotes, inquiries, entries, tasks, partyCases, related, employer, people,
-             feesByCase, englishTestTerms, certificates] = await Promise.all([
+             feesByCase, englishTestTerms, certificates, passports] = await Promise.all([
         all<any>(c.env.DB, `SELECT id, ref, title, case_type, status, priority, next_action, next_action_due, updated_at
                               FROM cases WHERE client_id = ? ORDER BY updated_at DESC`, id),
         all<any>(c.env.DB, `SELECT id, ref, description, amount_cents, gst_cents, disbursements_cents, currency, status, created_at
@@ -665,6 +704,7 @@ export const clientsModule: AppModule = {
             GROUP BY k.id ORDER BY k.updated_at DESC`, id),
         englishTests(c.env),
         certificatesFor(c.env, id),
+        passportsFor(c.env, id),
       ]);
 
       // Cases where this client is a party but not the file owner — an
@@ -824,12 +864,13 @@ export const clientsModule: AppModule = {
                         ${employer.primary_contact_id === client.id ? badge('Primary contact', 'green') : ''}</dd>` : ''}
                     <dt>Nationality</dt><dd>${client.nationality ?? '—'}</dd>
                     <dt>Date of birth</dt><dd>${dateShort(client.date_of_birth)}</dd>
-                    <dt>Passport</dt><dd>${client.passport_sealed
-                      ? html`<span class="muted">On file (encrypted)</span>
-                             ${actionButton(`/clients/${client.id}/passport`, csrf, 'Reveal', { className: 'btn btn-small btn-secondary' })}`
-                      : html`<span class="muted">—</span>`}</dd>
-                    <dt>Passport country</dt><dd>${client.passport_country ?? '—'}</dd>
-                    <dt>Passport expiry</dt><dd>${expiryCell(client.passport_expiry, 180)}</dd>
+                    <dt>Passport</dt><dd>${passports.length === 0
+                      ? html`<span class="muted">—</span>`
+                      : html`${client.passport_country ?? 'Primary'}${
+                          client.passport_expiry ? html` · ${expiryCell(client.passport_expiry, 180)}` : ''}
+                             ${passports.length > 1
+                               ? html`<div class="muted small"><a href="#passports">${passports.length} passports on file</a></div>`
+                               : html`<div class="muted small"><a href="#passports">Details</a></div>`}`}</dd>
                     <dt>Current visa</dt><dd>${client.current_visa_type ?? '—'}</dd>
                     <dt>Visa expiry</dt><dd>${expiryCell(client.current_visa_expiry)}</dd>
                     <dt>Police cert.</dt><dd>${client.police_certificate_country
@@ -843,6 +884,72 @@ export const clientsModule: AppModule = {
                             ? html`<div class="muted small">Taken ${dateShort(client.english_test_date)}</div>` : ''}`
                       : html`<span class="muted">—</span>`}</dd>
                   </dl>`)}
+
+            ${isOrg ? '' : html`
+              <section class="card" id="passports">
+                <header class="card-head"><h2>Passports</h2></header>
+                <div class="card-body">
+                  ${passports.length === 0
+                    ? emptyState('No passport recorded yet. The first one is entered on the client\u2019s '
+                        + 'own form, under Identity.')
+                    : html`<ul class="list">
+                        ${passports.map((pp) => html`
+                          <li class="list-row">
+                            <div>
+                              <strong>${pp.country ?? 'Passport'}</strong>
+                              ${pp.is_primary === 1 ? badge('primary', 'green') : ''}
+                              ${pp.status === 'held' ? '' : badge(passportStatusLabel(pp.status), 'grey')}
+                              <div class="small muted">
+                                ${pp.number_sealed
+                                  ? 'Number on file (encrypted)' : 'No number recorded'}
+                                ${pp.issued_on ? html` \u00b7 issued ${dateShort(pp.issued_on)}` : ''}
+                                ${pp.expires_on ? html` \u00b7 expires ${dateShort(pp.expires_on)}` : ''}
+                              </div>
+                              ${pp.notes ? html`<div class="small muted">${pp.notes}</div>` : ''}
+                            </div>
+                            <div>
+                              ${pp.status === 'held' && pp.expires_on ? expiryCell(pp.expires_on, 180) : ''}
+                              ${pp.number_sealed
+                                ? actionButton(`/clients/${client.id}/passports/${pp.id}/reveal`, csrf,
+                                    'Reveal', { className: 'btn btn-small btn-secondary' })
+                                : ''}
+                              ${writable && pp.is_primary !== 1
+                                ? actionButton(`/clients/${client.id}/passports/${pp.id}/primary`, csrf,
+                                    'Make primary', { className: 'btn btn-small btn-secondary' })
+                                : ''}
+                              ${writable && pp.is_primary !== 1
+                                ? actionButton(`/clients/${client.id}/passports/${pp.id}/remove`, csrf,
+                                    'Remove', { className: 'btn btn-danger btn-small',
+                                      confirm: 'Remove this passport from the file?' })
+                                : ''}
+                            </div>
+                          </li>`)}
+                      </ul>`}
+
+                  ${writable ? html`
+                    <details class="mt">
+                      <summary>Add another passport</summary>
+                      <form method="post" action="/clients/${client.id}/passports" class="row-form">
+                        ${csrfField(csrf)}
+                        ${field({ label: 'Country', name: 'country', maxlength: 100,
+                                  hint: 'The country that issued it.' })}
+                        ${field({ label: 'Number', name: 'number', maxlength: 60,
+                                  hint: c.env.FIELD_KEY ? 'Stored encrypted at rest.'
+                                    : 'Disabled: FIELD_KEY is not set.' })}
+                        ${field({ label: 'Issued', name: 'issued_on', type: 'date' })}
+                        ${field({ label: 'Expires', name: 'expires_on', type: 'date' })}
+                        ${select({ label: 'Status', name: 'status', value: 'held', includeBlank: false,
+                                   options: PASSPORT_STATUSES })}
+                        ${field({ label: 'Note', name: 'notes', maxlength: 300 })}
+                        <button class="btn btn-primary" type="submit">Add it</button>
+                      </form>
+                      <p class="hint">The primary passport is edited on the client\u2019s own form.
+                         Every passport still marked held is watched for expiry, so a dual national
+                         is chased about both. One that has been replaced stays on the file as a
+                         record \u2014 a visa may still be stuck in it \u2014 but is not chased.</p>
+                    </details>` : ''}
+                </div>
+              </section>`}
 
             ${isOrg ? '' : html`
               <section class="card" id="certificates">
@@ -941,13 +1048,86 @@ export const clientsModule: AppModule = {
     r.get('/:id/edit', requirePermission('register:write'), async (c) => {
       const client = await one<ClientRow>(c.env.DB, 'SELECT * FROM clients WHERE id = ?', c.req.param('id')!);
       if (!client) return c.notFound();
-      const [users, organisations, tests] = await Promise.all([
-        userOptions(c.env), organisationOptions(c.env), englishTests(c.env)]);
+      const [users, organisations, tests, passports] = await Promise.all([
+        userOptions(c.env), organisationOptions(c.env), englishTests(c.env),
+        passportsFor(c.env, client.id)]);
       const englishTestOptions = termOptions(tests);
+      const primary = passports.find((row) => row.is_primary === 1) ?? null;
       return page(c, { title: `Edit ${client.full_name}`, active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { href: `/clients/${client.id}`, label: client.ref }, { label: 'Edit' }])}
         ${pageHeader(`Edit ${client.full_name}`)}
-        ${clientForm(c, client, users, organisations, englishTestOptions)}`);
+        ${clientForm(c, { ...client, passport_issued: primary?.issued_on ?? null },
+                     users, organisations, englishTestOptions)}`);
+    });
+
+    // --- Passports ----------------------------------------------------------
+    //
+    // The primary one is edited on the client form; these routes are for the
+    // second and third. A number is sealed on the way in and never read back
+    // except by the reveal route below, one passport at a time.
+    r.post('/:id/passports', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const f = new FormReader(await c.req.formData());
+      const country = f.optional('country', { max: 100 });
+      const number = f.optional('number', { max: 60 });
+      const issuedOn = f.date('issued_on');
+      const expiresOn = f.date('expires_on');
+      const status = f.enum('status', PASSPORT_STATUSES.map((x) => x.value),
+        { fallback: 'held' }) as PassportStatus;
+      const notes = f.optional('notes', { max: 300 });
+
+      if (!country && !number && !issuedOn && !expiresOn) {
+        return redirectWith(c, `/clients/${id}#passports`,
+          'A passport needs at least a country, a number or a date.', 'err');
+      }
+      if (issuedOn && expiresOn && expiresOn < issuedOn) {
+        return redirectWith(c, `/clients/${id}#passports`,
+          'A passport cannot expire before it was issued.', 'err');
+      }
+
+      // Never the primary: that one belongs to the client form, and silently
+      // moving it here would change which passport the alerts and the export
+      // speak for without anybody asking for that.
+      await addPassport(c.env, {
+        clientId: id, country, number, issuedOn, expiresOn, status,
+        isPrimary: false, notes, userId: c.get('user')!.id,
+      });
+      await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system',
+        body: `Passport added${country ? ` (${country})` : ''}.`, createdBy: c.get('user')!.id });
+      await auditFrom(c, { action: 'client.passport_added', entityType: 'client', entityId: id,
+        meta: { country, hadNumber: Boolean(number) } });
+      return redirectWith(c, `/clients/${id}#passports`, 'Passport recorded.');
+    });
+
+    r.post('/:id/passports/:pid/primary', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const ok = await setPrimaryPassport(c.env, id, c.req.param('pid')!);
+      if (ok) {
+        await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system',
+          body: 'A different passport was made the primary one.', createdBy: c.get('user')!.id });
+        await auditFrom(c, { action: 'client.passport_primary_set', entityType: 'client',
+          entityId: id, meta: { passportId: c.req.param('pid') } });
+      }
+      return redirectWith(c, `/clients/${id}#passports`,
+        ok ? 'Primary passport changed.' : 'That passport was not found.', ok ? 'ok' : 'err');
+    });
+
+    r.post('/:id/passports/:pid/remove', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const pid = c.req.param('pid')!;
+      const target = await passportById(c.env, id, pid);
+      if (target?.is_primary === 1) {
+        return redirectWith(c, `/clients/${id}#passports`,
+          'The primary passport is removed from the client form, not here \u2014 so that the '
+          + 'record never ends up with none.', 'err');
+      }
+      const ok = await removePassport(c.env, id, pid);
+      if (ok) {
+        await auditFrom(c, { action: 'client.passport_removed', entityType: 'client', entityId: id,
+          meta: { country: target?.country ?? null } });
+      }
+      return redirectWith(c, `/clients/${id}#passports`,
+        ok ? 'Passport removed.' : 'That passport was already gone.', ok ? 'ok' : 'err');
     });
 
     // --- Certificates -------------------------------------------------------
@@ -1025,28 +1205,44 @@ export const clientsModule: AppModule = {
         return redirectWith(c, `/clients/${id}/edit`,
           'Either enter a new passport number or tick to remove the one on file — not both.', 'err');
       }
-      const passportSealed = v.passport_clear
-        ? null
-        : v.passport_number && c.env.FIELD_KEY
-          ? await sealField(v.passport_number, c.env.FIELD_KEY)
-          : existing.passport_sealed;
-
       await run(
         c.env.DB,
         `UPDATE clients SET kind=?, full_name=?, given_names=?, family_name=?, preferred_name=?,
            nzbn=?, company_number=?, organisation_id=?, organisation_role=?, email=?, phone=?, whatsapp=?, telegram_username=?, telegram_user_id=?,
-           nationality=?, date_of_birth=?, passport_sealed=?, passport_country=?, passport_expiry=?,
+           nationality=?, date_of_birth=?,
            english_test_type=?, english_test_score=?, english_test_date=?,
            current_visa_type=?, current_visa_expiry=?, address=?, status=?, assigned_to=?, notes=?, updated_at=?
          WHERE id=?`,
         v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
         v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role,
         v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
-        v.nationality, v.date_of_birth, passportSealed, v.passport_country, v.passport_expiry,
+        v.nationality, v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
         v.current_visa_type, v.current_visa_expiry, v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), id,
       );
+
+      // This form owns the primary passport and nothing else about the
+      // passports table. A client with none yet gets one made; a client with
+      // one gets it changed. Second and third passports are managed on the
+      // client's own page, and are left alone here.
+      const primary = (await passportsFor(c.env, id)).find((row) => row.is_primary === 1) ?? null;
+      const wantsPassport = Boolean(v.passport_number || v.passport_country
+        || v.passport_expiry || v.passport_issued);
+      if (primary) {
+        await updatePassport(c.env, primary.id, {
+          clientId: id, country: v.passport_country, number: v.passport_number,
+          issuedOn: v.passport_issued, expiresOn: v.passport_expiry,
+          status: primary.status, isPrimary: true, notes: primary.notes,
+          clearNumber: v.passport_clear, userId: user.id,
+        });
+      } else if (wantsPassport) {
+        await addPassport(c.env, {
+          clientId: id, country: v.passport_country, number: v.passport_number,
+          issuedOn: v.passport_issued, expiresOn: v.passport_expiry,
+          status: 'held', isPrimary: true, notes: null, userId: user.id,
+        });
+      }
 
       if (existing.status !== v.status) {
         await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system',
@@ -1059,6 +1255,8 @@ export const clientsModule: AppModule = {
       // The certificate columns on this row are a cache of client_certificates,
       // and nothing on this form owns them any more. Rebuilding after a save
       // keeps that true by construction rather than by everyone remembering.
+      // The passport columns are the same kind of cache; addPassport and
+      // updatePassport above have already rebuilt them.
       await refreshClientCache(c.env, id);
 
       // The encrypted field gets its own entry. A reveal was already recorded
@@ -1085,23 +1283,29 @@ export const clientsModule: AppModule = {
 
     // Revealing a passport number is a separate, audited action, and the
     // response is never cached or reachable by a GET a browser might replay.
-    r.post('/:id/passport', requirePermission('register:read'), async (c) => {
+    // One passport at a time, named in the URL: a client may hold several, and
+    // "show me the passport numbers" is not a request the register answers.
+    r.post('/:id/passports/:pid/reveal', requirePermission('register:read'), async (c) => {
       const id = c.req.param('id')!;
       const client = await one<ClientRow>(c.env.DB, 'SELECT * FROM clients WHERE id = ?', id);
       if (!client) return c.notFound();
-      if (!client.passport_sealed || !c.env.FIELD_KEY) {
-        return redirectWith(c, `/clients/${id}`, 'No passport number on file.', 'err');
+      const passport = await passportById(c.env, id, c.req.param('pid')!);
+      if (!passport?.number_sealed || !c.env.FIELD_KEY) {
+        return redirectWith(c, `/clients/${id}#passports`, 'No passport number on file.', 'err');
       }
-      const value = await unsealField(client.passport_sealed, c.env.FIELD_KEY);
-      await auditFrom(c, { action: 'client.passport_revealed', entityType: 'client', entityId: id });
+      const value = await unsealField(passport.number_sealed, c.env.FIELD_KEY);
+      await auditFrom(c, { action: 'client.passport_revealed', entityType: 'client', entityId: id,
+        meta: { passportId: passport.id, country: passport.country } });
       c.header('Cache-Control', 'no-store, private');
       return page(c, { title: 'Passport number', active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { href: `/clients/${id}`, label: client.ref }, { label: 'Passport' }])}
-        ${pageHeader('Passport number', `${client.full_name} · this view has been recorded in the audit log`)}
+        ${pageHeader('Passport number',
+          `${client.full_name}${passport.country ? ` · ${passport.country}` : ''}`
+          + ' · this view has been recorded in the audit log')}
         ${card('Value', value
           ? html`<p class="key-block"><code>${value}</code></p>`
           : html`<p class="alert alert-error">The stored value could not be decrypted with the current key.</p>`)}
-        <p><a class="btn btn-secondary" href="/clients/${id}">Back to client</a></p>`);
+        <p><a class="btn btn-secondary" href="${`/clients/${id}#passports`}">Back to client</a></p>`);
     });
 
     /**

@@ -97,8 +97,26 @@ Three frameworks make features declarative rather than bespoke:
 **One fact, one owner.** Where a value is derived, the derivation is stated:
 `clients.police_certificate_expiry` is a *cache* of `client_certificates`,
 refreshed by `refreshClientCache`, so the alerts page needs no knowledge of the
-certificates table. A form that no longer owns a column must not write it —
-that mistake wiped the certificate cache once.
+certificates table. `clients.passport_expiry` is the same thing over
+`client_passports`, refreshed by `refreshClientPassportCache`. A form that no
+longer owns a column must not write it — that mistake wiped the certificate
+cache once.
+
+**Records, not fields.** Where a client can hold several of something over
+time, or several at once, it is a table and not a set of columns. Certificates
+were the first: a matter lodged in March relied on the certificate held in
+March, and a practice has to be able to say which one that was. Passports were
+the second, for a different reason — a dual national holds two *simultaneously*
+and neither supersedes the other. In both cases the columns on `clients` stay
+as a cache of the current or primary row, so nothing that reads them has to
+learn about the new table, and one function maintains the cache rather than
+every write path remembering to.
+
+**Invariants belong to the database.** At most one primary passport per client
+is a partial unique index, not a convention: a code path that forgets to stand
+down the old one fails loudly instead of leaving two rows both claiming to be
+the one the alerts speak for. Every such constraint in this schema was tested
+by attacking the database directly rather than through the app.
 
 ---
 

@@ -7,6 +7,49 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.33.0 — 29 August 2026
+
+### Added
+- **A client may hold more than one passport.** A dual national holds two at
+  once and neither supersedes the other; someone who has just renewed holds the
+  new one and the old one carrying a live visa, which is the whole reason
+  *Transfer to New Passport* exists as a matter type. Three columns on the
+  client row could not represent any of that.
+- Each passport is now a record with its own country, number, issue and expiry
+  dates, and a status. One is marked **primary** — the travel document the file
+  works from — and a partial unique index makes the database, not the code,
+  responsible for there being at most one. The columns on `clients` remain as a
+  cache of the primary, refreshed on every change, so the alerts page, the
+  client list, the CSV export and the intake extraction did not have to learn
+  about the new table. That is the same arrangement as certificates,
+  deliberately: one pattern to learn rather than two.
+- The alerts and the automation triggers now watch **every passport still
+  held**, not only the primary, and name the issuing country in each alert — so
+  a dual national is chased about both. A passport marked *replaced* stays on
+  the file as a record but stops being chased.
+- A **Passports** dataset in the export. Numbers are excluded there as they are
+  everywhere else; the column says only whether one is held.
+
+### Changed
+- **Every form sizes itself off the box it is in, not off the window.** The
+  Immigration band on the client form was rendering as three 87px columns on a
+  1440px screen. Two faults, neither visible to the checks that existed — those
+  asked only whether anything ran off the edge of the screen, and nothing ever
+  did. `grid-column: 1 / -1` does not work inside `repeat(auto-fit, ...)`, so
+  the band marked "take the whole form" took one column; and the column counts
+  came from viewport media queries, so a form in the 430px side column of a
+  two-column page was told the window was 1400px wide. Container queries and
+  explicit track counts fix both.
+- **"For approval" keeps the Alerts tab bar** rather than replacing it with its
+  own. A tab that leads to a page wearing a different bar reads as a trapdoor.
+  The queue's three views are a row of buttons now: two tab bars on one page
+  make the lower one look like navigation rather than a filter.
+
+### Fixed
+- `btn-sm` was written in eight places and defined in none, so those buttons
+  rendered full size. An unknown class is not an error in CSS, it is simply
+  nothing.
+
 ## 0.32.0 — 29 August 2026
 
 ### Changed
@@ -150,7 +193,7 @@ The user-facing version of this list, one line per release, is in the app under
 ## 0.26.0 — 29 August 2026
 
 ### Added
-- **Export.** Admin → Export: fifteen datasets, each one link and one CSV —
+- **Export.** Admin → Export: sixteen datasets, each one link and one CSV —
   clients, matters, parties, certificates, fees, quotes and their lines,
   invoices and their lines, payments, tasks, notes, inquiries, the knowledge
   base and the audit log. UTF-8 with a byte-order mark so Excel reads macrons,
