@@ -27,7 +27,7 @@ import {
   isOpenStatus, isPartyRole, OPEN_CASE_STATUSES, PARTY_ROLE_LABELS, PARTY_ROLES, PRIORITIES,
   PRIORITY_LABELS, TASK_STATUS_LABELS, type CaseStatus,
 } from '../../domain';
-import { clientOptions, userOptions } from '../../core/lookups';
+import { clientOptions, isAssignable, userOptions } from '../../core/lookups';
 import { addParty, partiesForCase, removeParty } from '../../core/parties';
 import { findOrCreateTag, listTags, tagCase, tagsForCase, tagsForCases, untagCase } from '../../core/tags';
 import { addEntry, listEntries } from '../../core/timeline';
@@ -150,7 +150,14 @@ function caseForm(
                      options: optionsFrom(['lead', 'engaged'] as const, CASE_STATUS_LABELS as any) })}
         ${select({ label: 'Priority', name: 'priority', value: values.priority ?? 'normal', includeBlank: false,
                    options: optionsFrom(PRIORITIES, PRIORITY_LABELS) })}
-        ${select({ label: 'Assigned to', name: 'assigned_to', value: values.assigned_to ?? '', options: users, includeBlank: 'Unassigned' })}
+        ${'' /* No "Unassigned". A matter nobody owns is a matter nobody is
+                 doing — the same rule tasks have always had — and the database
+                 refuses one either way. It defaults to whoever is opening it,
+                 which is right far more often than not and is one fewer
+                 decision on a form that already has plenty. */}
+        ${select({ label: 'Assigned to', name: 'assigned_to', required: true, includeBlank: false,
+                   value: values.assigned_to ?? c.get('user')?.id ?? '', options: users,
+                   hint: 'Every matter belongs to somebody. Hand it over rather than clearing it.' })}
       </div>
 
       <div class="form-section">
@@ -198,7 +205,7 @@ function readCaseForm(f: FormReader, types: Term[]) {
     descriptor: f.optional('descriptor', { max: 160 }),
     case_type: submittedType,
     priority: f.enum('priority', PRIORITIES, { fallback: 'normal' })!,
-    assigned_to: f.optional('assigned_to', { max: 60 }),
+    assigned_to: f.text('assigned_to', { required: true, label: 'Assigned to', max: 60 }),
     inz_application_number: f.optional('inz_application_number', { max: 60 }),
     inz_client_number: f.optional('inz_client_number', { max: 60 }),
     lodged_at: f.date('lodged_at'),
@@ -409,6 +416,13 @@ export const casesModule: AppModule = {
         ? await one<{ id: string; ref: string }>(c.env.DB, 'SELECT id, ref FROM clients WHERE id = ?', v.client_id)
         : null;
       if (!client) f.errors['client_id'] = 'Choose an existing client.';
+      // The database guarantees a matter has an owner. This guarantees the
+      // owner is somebody who can sign in: a suspended account holding a matter
+      // is a matter nobody is doing, which is the failure the rule exists to
+      // prevent.
+      if (v.assigned_to && !(await isAssignable(c.env, v.assigned_to))) {
+        f.errors['assigned_to'] = 'That person cannot be given work. Choose an active user.';
+      }
 
       if (!f.valid) {
         const [clients, users] = await Promise.all([clientOptions(c.env), userOptions(c.env)]);
@@ -429,7 +443,7 @@ export const casesModule: AppModule = {
             inz_application_number, inz_client_number, lodged_at, decision_due_at,
             next_action, next_action_due, summary, chase_inz, currency, created_at, updated_at, created_by)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NZD',?,?,?)`,
-        id, ref, v.client_id, v.title, v.descriptor, v.case_type, status, v.priority, v.assigned_to || null,
+        id, ref, v.client_id, v.title, v.descriptor, v.case_type, status, v.priority, v.assigned_to,
         v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue,
         v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), nowIso(), user.id,
       );
@@ -766,7 +780,10 @@ export const casesModule: AppModule = {
                 <dt>Client</dt><dd><a href="/clients/${kase.client_id}">${kase.client_name}</a> <code>${kase.client_ref}</code></dd>
                 <dt>Type</dt><dd>${labelFor(types, kase.case_type)}</dd>
                 <dt>Priority</dt><dd>${PRIORITY_LABELS[kase.priority as keyof typeof PRIORITY_LABELS] ?? kase.priority}</dd>
-                <dt>Owner</dt><dd>${kase.assignee_name ?? 'Unassigned'}</dd>
+                ${'' /* Only reachable for a matter whose owner's account was
+                         removed, which nothing in the application does. Kept as
+                         a visible gap rather than an empty cell. */}
+                <dt>Owner</dt><dd>${kase.assignee_name ?? 'Nobody — assign one'}</dd>
                 <dt>INZ application</dt><dd>${kase.inz_application_number ?? '—'}</dd>
                 <dt>INZ client no.</dt><dd>${kase.inz_client_number ?? '—'}</dd>
                 <dt>Lodged</dt><dd>${dateShort(kase.lodged_at)}</dd>
@@ -814,6 +831,9 @@ export const casesModule: AppModule = {
 
       const f = new FormReader(await c.req.formData());
       const v = readCaseForm(f, types);
+      if (v.assigned_to && !(await isAssignable(c.env, v.assigned_to))) {
+        f.errors['assigned_to'] = 'That person cannot be given work. Choose an active user.';
+      }
       if (!f.valid) {
         const [clients, users] = await Promise.all([clientOptions(c.env), userOptions(c.env)]);
         return page(c, { title: 'Edit case', active: '/cases', status: 400 }, html`
@@ -829,7 +849,7 @@ export const casesModule: AppModule = {
            inz_application_number=?, inz_client_number=?, lodged_at=?, decision_due_at=?,
            next_action=?, next_action_due=?, summary=?, chase_inz=?, updated_at=?
          WHERE id=?`,
-        v.client_id, v.title, v.descriptor, v.case_type, v.priority, v.assigned_to || null,
+        v.client_id, v.title, v.descriptor, v.case_type, v.priority, v.assigned_to,
         v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue,
         v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), id,
       );

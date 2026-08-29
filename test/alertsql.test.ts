@@ -44,14 +44,20 @@ beforeAll(() => {
                 VALUES (?, ?, ?, ?, 'active', ?, ?, ?)`)
       .run(id, ref, kind, name, visa, `${TODAY}T00:00:00Z`, `${TODAY}T00:00:00Z`);
 
+  // A matter must be assigned to somebody — the database refuses one that is
+  // not — so the person exists before any matter does.
+  db.prepare(`INSERT INTO users (id, email, name, password_hash, role, created_at, updated_at)
+              VALUES ('u_adviser', 'adviser@example.test', 'An Adviser', 'x', 'adviser', ?, ?)`)
+    .run(`${TODAY}T00:00:00Z`, `${TODAY}T00:00:00Z`);
+
   const matter = (id: string, ref: string, clientId: string, status: string, extra: {
     inz?: string | null; lodged?: string | null; decided?: string | null;
     due?: string | null; created?: string;
   } = {}) =>
-    db.prepare(`INSERT INTO cases (id, ref, client_id, title, case_type, status,
+    db.prepare(`INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
                                    inz_application_number, lodged_at, decided_at,
                                    decision_due_at, created_at, updated_at)
-                VALUES (?, ?, ?, ?, 'wv_aewv', ?, ?, ?, ?, ?, ?, ?)`)
+                VALUES (?, ?, ?, ?, 'wv_aewv', ?, 'u_adviser', ?, ?, ?, ?, ?, ?)`)
       .run(id, ref, clientId, `Matter ${ref}`, status,
         extra.inz ?? null, extra.lodged ?? null, extra.decided ?? null, extra.due ?? null,
         `${extra.created ?? TODAY}T00:00:00Z`, `${TODAY}T00:00:00Z`);
@@ -86,12 +92,6 @@ beforeAll(() => {
     { lodged: '2026-08-01', decided: '2026-07-01', created: '2026-07-01' });
   matter('k_nodate', 'K-NODATE', 'cl_visa', 'declined', { lodged: '2026-08-01', created: '2026-07-01' });
   matter('k_future', 'K-FUTURE', 'cl_visa', 'lodged', { lodged: '2027-01-01', inz: '600999999', created: '2026-08-01' });
-
-  // A task is always assigned to somebody — the database refuses one that is
-  // not — so the seed needs a person to assign them to.
-  db.prepare(`INSERT INTO users (id, email, name, password_hash, role, created_at, updated_at)
-              VALUES ('u_adviser', 'adviser@example.test', 'An Adviser', 'x', 'adviser', ?, ?)`)
-    .run(`${TODAY}T00:00:00Z`, `${TODAY}T00:00:00Z`);
 
   const task = (id: string, caseId: string, due: string | null, status = 'open') =>
     db.prepare(`INSERT INTO tasks (id, title, status, due_at, assigned_to, entity_type, entity_id,

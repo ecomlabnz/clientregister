@@ -1,7 +1,7 @@
 /** Small shared queries used to populate pickers across modules. */
 
 import type { Env } from '../types';
-import { all } from './db';
+import { all, one } from './db';
 import { formalName } from './names';
 
 export interface UserOption { id: string; name: string; email: string }
@@ -47,4 +47,20 @@ export async function organisationOptions(env: Env): Promise<Array<{ value: stri
       WHERE kind = 'organisation' AND status != 'archived' ORDER BY full_name LIMIT 500`,
   );
   return rows.map((r) => ({ value: r.id, label: `${r.full_name} (${r.ref})` }));
+}
+
+/**
+ * Whether this id names somebody who can actually be given work.
+ *
+ * A suspended account cannot sign in, so anything assigned to one is anything
+ * nobody is doing — which is the thing the "always has an owner" rule exists to
+ * prevent, expressed one level up where a person can be told about it. The
+ * database guarantees there *is* an owner; this guarantees the owner is real.
+ *
+ * Shared by tasks and matters, which have the same rule for the same reason.
+ */
+export async function isAssignable(env: Env, userId: string): Promise<boolean> {
+  const row = await one<{ id: string }>(
+    env.DB, `SELECT id FROM users WHERE id = ? AND status = 'active'`, userId);
+  return row !== null;
 }

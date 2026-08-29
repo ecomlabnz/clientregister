@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.54.0', date: '29 August 2026',
+    notes: [
+      'A matter is always assigned to somebody. \u201cUnassigned\u201d is gone from the form, '
+        + 'and the database refuses a matter without an owner \u2014 the same rule tasks have '
+        + 'always had, for the same reason: one nobody owns is one nobody is doing.',
+      'It defaults to whoever is opening it, and it cannot be given to a suspended account.',
+    ],
+  },
+  {
     version: '0.53.0', date: '29 August 2026',
     notes: [
       'A reply you have full control over: To, Cc and Bcc, all with the register\u2019s own '

@@ -7,6 +7,37 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.54.0 — 29 August 2026
+
+### Changed
+- **A matter is always assigned to somebody.** "Unassigned" is gone from the
+  form. It is the rule tasks have had since they were built, for the same
+  reason: a matter nobody owns is a matter nobody is doing, and "unassigned" is
+  not a state a practice can be in — it is a gap that looks like one.
+- Enforced by triggers on `cases`, not by the form. A guarantee in the route
+  that happens to write the row lasts until somebody adds a second route, and
+  this application already has three places that write a case. Triggers rather
+  than `NOT NULL` because adding that to an existing column means rebuilding a
+  table a dozen others hold foreign keys into — the same guarantee at a fraction
+  of the risk, and it can say why.
+- The field **defaults to whoever is opening the matter**, which is right far
+  more often than not and is one fewer decision on a long form.
+- **It cannot be given to a suspended account.** The database guarantees there
+  *is* an owner; this guarantees the owner can sign in. `isAssignable` moved to
+  `core/lookups.ts` and is now shared with tasks rather than duplicated.
+- The migration gives any matter already adrift an owner — whoever created it,
+  failing that the practice's first owner or administrator. Nothing is deleted
+  and nothing is left unassigned. Production had none, but a migration that only
+  works on tidy data is not a migration.
+
+### Verifying
+- `test/caseowner.test.ts` attacks the database directly: insert with no owner,
+  clear it afterwards, hand it over. It also holds the form and the database in
+  agreement, so a blank is a field marked red rather than a database message
+  about matters.
+- The new rule immediately broke `test/alertsql.test.ts`, whose fixture created
+  matters with no owner. That is the guard working on its first day.
+
 ## 0.53.0 — 29 August 2026
 
 ### Added
