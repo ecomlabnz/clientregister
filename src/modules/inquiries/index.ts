@@ -26,7 +26,9 @@ import {
   INQUIRY_SOURCE_LABELS, INQUIRY_SOURCES, INQUIRY_STATUS_LABELS, INQUIRY_STATUSES,
   type InquirySource, type InquiryStatus,
 } from '../../domain';
-import { clientOptions, userOptions } from '../../core/lookups';
+import { countryCodeFor, countryOptions } from '../../core/countries';
+import { clientOptions, isAssignable, userOptions } from '../../core/lookups';
+import { composeFullName, familyNameFor, plainAscii, splitFullName } from '../../core/names';
 import { addEntry, listEntries } from '../../core/timeline';
 import { openThreadCount } from '../../core/channels';
 import { can } from '../../core/rbac';
@@ -295,6 +297,9 @@ export const inquiriesModule: AppModule = {
       const csrf = c.get('session')!.csrf;
       const writable = can(c.get('user'), 'register:write');
       const suggested = inq.client_id ? null : await matchClient(c.env, { email: inq.contact_email, phone: inq.contact_phone });
+      // A first guess at where the family name ends, shown in the form so a
+      // person can correct it before it is saved rather than after.
+      const guessedName = splitFullName(inq.contact_name ?? '');
 
       return page(c, { title: inq.ref, active: '/inquiries' }, html`
         ${breadcrumbs([{ href: '/inquiries', label: 'Inquiries' }, { label: inq.ref }])}
@@ -318,14 +323,51 @@ export const inquiriesModule: AppModule = {
                   ${csrfField(csrf)}
                   ${select({ label: 'Client', name: 'client_id', value: inq.client_id ?? suggested?.id ?? '',
                              options: clients, includeBlank: 'Create a new client from this inquiry' })}
-                  ${field({ label: 'New client name', name: 'new_client_name',
-                            value: inq.contact_name ?? '', maxlength: 200,
-                            hint: 'Used only when no existing client is chosen above.' })}
+
+                  ${'' /* Everything from here to the matter title describes the
+                           client this inquiry would create, and each box is the
+                           box the client form uses, read by the same code and
+                           stored through the same helpers. One field called
+                           "name" produced clients written unlike every other
+                           client, and 'individual' assumed for everybody made a
+                           company into a person named after itself. A guess at
+                           where the family name ends is shown so it can be
+                           corrected before it is saved rather than after. */}
+                  <fieldset class="field-group js-kind">
+                    <legend>New client</legend>
+                    ${select({ label: 'Record type', name: 'kind', value: 'individual', includeBlank: false,
+                               options: [{ value: 'individual', label: 'Individual' },
+                                         { value: 'organisation', label: 'Company or organisation' }],
+                               hint: 'Only used when no existing client is chosen above.' })}
+                    ${'' /* Hidden by the server as well as by the script, so
+                             the wrong half is never on the page whether or not
+                             scripting runs. */}
+                    <div data-kind="individual">
+                      ${field({ label: 'Given names', name: 'given_names', maxlength: 120,
+                                value: guessedName.givenNames,
+                                hint: 'As they appear in the passport.' })}
+                      ${field({ label: 'Family name', name: 'family_name', maxlength: 120,
+                                value: guessedName.familyName,
+                                hint: 'Stored in capitals, as a passport writes it.' })}
+                      ${select({ label: 'Nationality', name: 'nationality', value: '',
+                                 options: countryOptions(), includeBlank: 'Not recorded' })}
+                    </div>
+                    <div data-kind="organisation" ${raw('hidden')}>
+                      ${field({ label: 'Registered name', name: 'organisation_name', maxlength: 200,
+                                value: inq.contact_name ?? '',
+                                hint: 'Exactly as registered — the NZBN register is the authority.' })}
+                    </div>
+                  </fieldset>
                   ${field({ label: 'Matter title', name: 'title', required: true, maxlength: 200,
                             value: inq.subject ?? '', placeholder: 'e.g. Partnership work visa' })}
                   ${select({ label: 'Case type', name: 'case_type', value: '', required: true,
                              options: termOptions(types), includeBlank: 'Choose a type' })}
-                  ${select({ label: 'Assign to', name: 'assigned_to', value: '', options: users, includeBlank: 'Unassigned' })}
+                  ${'' /* No "Unassigned": a matter always belongs to somebody,
+                           and the database refuses one that does not. This form
+                           would otherwise offer a choice that fails on submit. */}
+                  ${select({ label: 'Assign to', name: 'assigned_to', required: true,
+                             includeBlank: false,
+                             value: inq.assigned_to ?? c.get('user')!.id, options: users })}
                   <button class="btn btn-primary" type="submit">Create client and case</button>
                   ${suggested ? html`<p class="hint">Matched an existing client by contact details:
                      <a href="/clients/${suggested.id}">${suggested.full_name}</a> (${suggested.ref}).</p>` : ''}
@@ -488,27 +530,55 @@ export const inquiriesModule: AppModule = {
 
       const f = new FormReader(await c.req.formData());
       const clientId = f.optional('client_id', { max: 60 });
-      const newClientName = f.optional('new_client_name', { max: 200 });
+      const kind = f.enum('kind', ['individual', 'organisation'] as const, { fallback: 'individual' })!;
+      const givenNames = f.optional('given_names', { max: 120 });
+      const familyName = f.optional('family_name', { max: 120 });
+      const organisationName = f.optional('organisation_name', { max: 200 });
+      // A dropdown on the form, so this is already a code. Resolved anyway: a
+      // request built by hand carrying "Vietnam" then lands as VN rather than
+      // as a 500 from the trigger guarding the column.
+      const nationality = countryCodeFor(f.optional('nationality', { max: 100 }));
       const title = f.text('title', { required: true, label: 'Matter title', max: 200 });
       const types = await caseTypes(c.env);
       const caseType = f.text('case_type', { required: true, label: 'Case type', max: 60 });
       if (caseType && !isTerm(types, caseType)) {
         return redirectWith(c, `/inquiries/${id}`, 'That is not one of the case types you have configured.', 'err');
       }
-      const assignedTo = f.optional('assigned_to', { max: 60 });
+      const assignedTo = f.text('assigned_to', { required: true, label: 'Assign to', max: 60 });
       if (!f.valid || !caseType) return redirectWith(c, `/inquiries/${id}`, Object.values(f.errors)[0] ?? 'Invalid conversion.', 'err');
+      if (!(await isAssignable(c.env, assignedTo))) {
+        return redirectWith(c, `/inquiries/${id}`,
+          'That person cannot be given work. Choose an active user.', 'err');
+      }
 
       let targetClientId = clientId || inq.client_id;
       if (!targetClientId) {
-        const name = newClientName || inq.contact_name || inq.contact_email || 'Unnamed client';
+        // Written through the same helpers the client form uses, so a client
+        // created here is stored exactly as one created there: family name in
+        // capitals, in plain English letters, however it arrived.
+        const split = givenNames || familyName
+          ? { givenNames: givenNames ?? '', familyName: familyName ?? '' }
+          : splitFullName(inq.contact_name ?? inq.contact_email ?? 'Unnamed client');
+        const given = kind === 'individual' ? plainAscii(split.givenNames) : '';
+        const family = kind === 'individual' ? familyNameFor(split.familyName) : '';
+        // An organisation is named by its registered name and nothing else. If
+        // the box was left empty the inquiry's own contact name stands in,
+        // because a nameless client helps nobody.
+        const registered = kind === 'organisation'
+          ? (organisationName || inq.contact_name || inq.contact_email || 'Unnamed organisation')
+          : '';
         targetClientId = newId('cli');
         const clientRef = await nextRef(c.env.DB, 'client', 'CL');
         await run(
           c.env.DB,
-          `INSERT INTO clients (id, ref, kind, full_name, email, phone, status, assigned_to, created_at, updated_at, created_by)
-           VALUES (?,?,'individual',?,?,?,'prospect',?,?,?,?)`,
-          targetClientId, clientRef, name, inq.contact_email, inq.contact_phone,
-          assignedTo || null, nowIso(), nowIso(), user.id,
+          `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name, nationality,
+              email, phone, status, assigned_to, created_at, updated_at, created_by)
+           VALUES (?,?,?,?,?,?,?,?,?,'prospect',?,?,?,?)`,
+          targetClientId, clientRef, kind,
+          composeFullName(kind, { givenNames: given, familyName: family }, registered),
+          given || null, family || null, kind === 'individual' ? nationality : null,
+          inq.contact_email, inq.contact_phone,
+          assignedTo, nowIso(), nowIso(), user.id,
         );
         await addEntry(c.env, { entityType: 'client', entityId: targetClientId, kind: 'system',
           body: `Client created from inquiry ${inq.ref}.`, createdBy: user.id });
@@ -521,7 +591,7 @@ export const inquiriesModule: AppModule = {
         `INSERT INTO cases (id, ref, client_id, title, case_type, status, priority, assigned_to,
             summary, currency, created_at, updated_at, created_by)
          VALUES (?,?,?,?,?,'lead','normal',?,?, 'NZD', ?,?,?)`,
-        caseId, caseRef, targetClientId, title, caseType, assignedTo || null,
+        caseId, caseRef, targetClientId, title, caseType, assignedTo,
         inq.body ? `From inquiry ${inq.ref}:\n\n${inq.body}`.slice(0, 4000) : null,
         nowIso(), nowIso(), user.id,
       );

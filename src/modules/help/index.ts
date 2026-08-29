@@ -32,6 +32,19 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.59.0', date: '29 August 2026',
+    notes: [
+      'Converting an inquiry now asks for the same fields as the client form: record type, '
+        + 'given names, family name, nationality, or a company\u2019s registered name. A client '
+        + 'created this way is stored exactly like one created on the client form, so the '
+        + 'list sorts and searches the same for both.',
+      'A guess at where the family name ends is filled in from the inquiry and can be '
+        + 'corrected before it is saved.',
+      'The conversion no longer offers \u201cUnassigned\u201d. A matter always has an owner, and '
+        + 'it now starts with whoever holds the inquiry.',
+    ],
+  },
+  {
     version: '0.58.0', date: '29 August 2026',
     notes: [
       'A reply can carry documents that are already on the client or the matter. Nothing is '
