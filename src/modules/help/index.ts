@@ -32,6 +32,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.44.0', date: '29 August 2026',
+    notes: [
+      'Column headings in Cases and Clients now sort. Click one to sort by it, click it '
+        + 'again to reverse. The sort is part of the address, so a sorted list can be '
+        + 'bookmarked and comes back sorted.',
+      'Sorting by name sorts by family name — TRUONG, Thi Thu Thuy sits under T for '
+        + 'Truong — and ignores capitals, so a name entered any way lands in the right '
+        + 'place.',
+    ],
+  },
+  {
     version: '0.43.0', date: '29 August 2026',
     notes: [
       'Two new alerts that are not about a date: “Gone quiet” lists open matters nothing '

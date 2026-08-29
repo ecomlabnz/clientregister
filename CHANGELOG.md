@@ -7,6 +7,32 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.44.0 — 29 August 2026
+
+### Added
+- **Sortable column headings in Cases and Clients.** Click a heading to sort by
+  it, click it again to reverse. The heading is an ordinary link, not a script:
+  sorting a list is navigation — a different view of the same thing — so it
+  works with JavaScript off, and the sorted list has an address that can be
+  bookmarked and shared.
+- Sorting by name sorts by **family name**, matching the way the register writes
+  them: *TRUONG, Thi Thu Thuy* sits under T for Truong, not under T for Thi. An
+  organisation has no family name and sorts under its registered one.
+- The name and title sorts use `COLLATE NOCASE`. SQLite compares text by byte
+  otherwise, which puts `TRUONG` ahead of `Tagata` because capitals sort before
+  lower case. Family names are stored in capitals, so this only matters for a
+  row that arrived some other way — and that is exactly the row somebody would
+  be scrolling to find.
+
+### Security
+- A sort key arrives in the address bar, so it is **looked up, never
+  interpolated**: an unknown key finds nothing and the list falls back to its
+  default order. The direction narrows to one of two literals at the point of
+  use. `test/sorting.test.ts` holds both — it fails if the raw query value
+  becomes reachable from the ORDER BY clause — and prepares every sort against a
+  database built from the migrations, so a sort naming a column that does not
+  exist fails in the suite rather than as a 500 on a page that worked yesterday.
+
 ## 0.43.0 — 29 August 2026
 
 ### Added
