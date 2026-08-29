@@ -18,10 +18,13 @@ declare module 'node:fs' {
 /**
  * `node:sqlite` reached through the runtime rather than imported: the bundler
  * the tests run under does not treat it as a builtin and tries to resolve a
- * package called "sqlite". Only the two members the schema check uses are
+ * package called "sqlite". Only the members these checks use are
  * declared.
  */
-interface SqliteStatement { run(...params: unknown[]): unknown }
+interface SqliteStatement {
+  run(...params: unknown[]): unknown;
+  all(...params: unknown[]): unknown[];
+}
 interface SqliteDatabase {
   exec(sql: string): void;
   prepare(sql: string): SqliteStatement;

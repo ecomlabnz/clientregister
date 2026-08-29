@@ -74,6 +74,18 @@ export const OPEN_CASE_STATUSES: CaseStatus[] = [
 /** Statuses that carry a deadline the practice must not miss. */
 export const DEADLINE_CASE_STATUSES: CaseStatus[] = ['inz_rfi', 'ppi', 'appeal'];
 
+/**
+ * Statuses that mean the application is with INZ.
+ *
+ * From here on the file is out of the practice's hands, which is exactly when
+ * the things nobody is watching go wrong: an acknowledgement that never
+ * arrived, an immigration status never written down that now cannot be checked
+ * without asking the client.
+ */
+export const LODGED_CASE_STATUSES: CaseStatus[] = [
+  'lodged', 'inz_rfi', 'ppi', 'interim_visa', 'decision_pending',
+];
+
 export function isOpenStatus(status: string): boolean {
   return (OPEN_CASE_STATUSES as string[]).includes(status);
 }
