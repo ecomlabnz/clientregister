@@ -203,3 +203,52 @@ describe('a saved brief stops being a draft', () => {
     expect(mark).not.toMatch(/output_json\s*=|input_hash\s*=|DELETE/);
   });
 });
+
+describe('a brief can be edited or thrown away', () => {
+  const brief = readFileSync('src/ai/brief.ts', 'utf8');
+  const cases = readFileSync('src/modules/cases/index.ts', 'utf8');
+
+  it('writes exactly what was in the box', () => {
+    // The box holds the note as it will be written, so what somebody reads
+    // before pressing save is what the file gets.
+    expect(cases).toContain("form.get('brief_body')");
+    expect(cases).toContain('body: `${opening}\\n\\n${submitted}`');
+  });
+
+  it('says who wrote it, truthfully', () => {
+    // The opening line is a claim about authorship. A note somebody rewrote
+    // that still said the model wrote it would break the one distinction the
+    // file rests on.
+    expect(cases).toContain('const edited = submitted !== drafted.trim();');
+    expect(cases).toContain('Edited before keeping by ${user.name}');
+    expect(cases).toContain('Reviewed and kept by ${user.name}');
+  });
+
+  it('compares against the same text it offered', () => {
+    // One function builds the box's contents and the text compared against it.
+    // Two would drift, and the drift would decide authorship wrongly.
+    expect(brief).toContain('export function briefNoteBody(');
+    expect(cases).toContain('const drafted = briefNoteBody(existing.result);');
+    expect(cases).toContain('value: briefNoteBody(brief.result)');
+  });
+
+  it('does not collide with the file-note form on the same page', () => {
+    // Two fields sharing a name share an id, which is invalid and makes one
+    // label focus the other box.
+    expect(cases).not.toMatch(/name: 'body',[\s\S]{0,200}The note as it will be written/);
+    expect(cases).toContain("name: 'brief_body'");
+  });
+
+  it('records a discard rather than deleting it', () => {
+    // That somebody read a reading and rejected it is the clearest signal
+    // there is about whether the model is earning its place.
+    expect(brief).toContain('export async function markBriefDiscarded(');
+    expect(brief).toContain('UPDATE ai_runs SET discarded_at');
+    expect(brief).not.toMatch(/DELETE FROM ai_runs/);
+    expect(cases).toContain("action: 'case.brief_discarded'");
+  });
+
+  it('refuses to save an empty note', () => {
+    expect(cases).toContain('The note was empty, so nothing was saved.');
+  });
+});
