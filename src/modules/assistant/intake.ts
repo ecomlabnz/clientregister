@@ -21,7 +21,7 @@ import type { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import { requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
-import { all, nextRef, nowIso, one, run } from '../../core/db';
+import { all, nextRef, nextYearlyRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { FormReader } from '../../core/validate';
 import { composeFullName } from '../../core/names';
@@ -308,7 +308,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     }
 
     const caseId = newId('cas');
-    const caseRef = await nextRef(c.env.DB, 'case', 'CASE');
+    const caseRef = await nextYearlyRef(c.env.DB, 'case', 'CASE');
     await run(
       c.env.DB,
       `INSERT INTO cases (id, ref, client_id, title, case_type, status, priority, assigned_to,

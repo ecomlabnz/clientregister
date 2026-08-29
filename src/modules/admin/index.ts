@@ -6,6 +6,7 @@
  */
 
 import { Hono } from 'hono';
+import { registerExportRoutes } from './export';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
 import {
@@ -130,6 +131,7 @@ export function adminTabs(current: string): Raw {
     { id: 'settings', label: 'Practice settings', href: '/admin/settings' },
     { id: 'audit', label: 'Audit log', href: '/admin/audit' },
     { id: 'automations', label: 'Automations', href: '/admin/automations' },
+    { id: 'export', label: 'Export', href: '/admin/export' },
     { id: 'integrations', label: 'Integrations', href: '/admin?tab=integrations' },
     { id: 'modules', label: 'Modules', href: '/admin?tab=modules' },
     { id: 'maintenance', label: 'Maintenance', href: '/admin?tab=maintenance' },
@@ -148,6 +150,8 @@ export const adminModule: AppModule = {
   register(app) {
     const r = new Hono<AppContext>();
     r.use('*', requireAuth);
+
+    registerExportRoutes(r);
 
     // --- Overview -----------------------------------------------------------
     // Tabbed rather than one long scroll. A page that runs past the bottom of

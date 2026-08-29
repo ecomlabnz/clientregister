@@ -40,7 +40,11 @@ import { addEntry, listEntries } from '../../core/timeline';
 import { casesForClient, relatedClients } from '../../core/parties';
 import { can } from '../../core/rbac';
 import { asPrefInteger, preferencesFor } from '../../core/preferences';
-import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
+import { caseTypes, englishTests, labelFor, termOptions } from '../../core/vocabulary';
+import {
+  CERTIFICATE_KINDS, CERTIFICATE_LABELS, MEDICAL_TYPES, type CertificateKind,
+  addCertificate, certificatesFor, currentOf, medicalTypeLabel, refreshClientCache, removeCertificate,
+} from '../../core/certificates';
 import { composeFullName, splitFullName, type ClientKind } from '../../core/names';
 import {
   fetchEntity, isValidNzbnFormat, normaliseNzbn, nzbnConfigured, searchEntities,
@@ -60,6 +64,9 @@ export interface ClientRow {
   police_certificate_country: string | null;
   medical_certificate_date: string | null; medical_certificate_expiry: string | null;
   chest_xray_expiry: string | null;
+  english_test_type: string | null;
+  english_test_score: string | null;
+  english_test_date: string | null;
   current_visa_type: string | null; current_visa_expiry: string | null;
   address: string | null; status: ClientStatus; assigned_to: string | null; notes: string | null;
   created_at: string; updated_at: string; created_by: string | null;
@@ -81,6 +88,7 @@ function clientForm(
   values: Partial<ClientRow>,
   users: Array<{ value: string; label: string }>,
   organisations: Array<{ value: string; label: string }>,
+  englishTestOptions: Array<{ value: string; label: string }>,
   errors?: Record<string, string>,
 ): Raw {
   const csrf = c.get('session').csrf;
@@ -188,18 +196,41 @@ function clientForm(
                   hint: 'Watched on the alerts page — a passport expiring mid-application stalls it.' })}
       </div>
 
-      <div class="form-section" data-kind="individual" data-panel="immigration"
+      ${'' /* INZ assesses four things — immigration history, character, health
+               and English — and they belong together on one tab under four
+               headings rather than on four tabs of three boxes each. A tab per
+               heading looks tidier in a screenshot and reads worse in use: the
+               four are checked as a set, and splitting them makes you click
+               four times to see whether a person is eligible. */}
+      <div class="form-section form-section-wide" data-kind="individual" data-panel="immigration"
            ${kind === 'individual' ? '' : raw('hidden')}>
-        <h3>Immigration and compliance</h3>
-        ${field({ label: 'Current visa type', name: 'current_visa_type', value: values.current_visa_type, maxlength: 120 })}
-        ${field({ label: 'Current visa expiry', name: 'current_visa_expiry', type: 'date', value: dateInputValue(values.current_visa_expiry) })}
-        ${field({ label: 'Police certificate country', name: 'police_certificate_country', value: values.police_certificate_country, maxlength: 100 })}
-        ${field({ label: 'Police certificate issued', name: 'police_certificate_date', type: 'date', value: dateInputValue(values.police_certificate_date) })}
-        ${field({ label: 'Police certificate expires', name: 'police_certificate_expiry', type: 'date', value: dateInputValue(values.police_certificate_expiry),
-                  hint: 'Certificates age out — INZ generally wants one issued within the last 6 months at lodgement.' })}
-        ${field({ label: 'Medical certificate date', name: 'medical_certificate_date', type: 'date', value: dateInputValue(values.medical_certificate_date) })}
-        ${field({ label: 'Medical certificate expires', name: 'medical_certificate_expiry', type: 'date', value: dateInputValue(values.medical_certificate_expiry) })}
-        ${field({ label: 'Chest x-ray expires', name: 'chest_xray_expiry', type: 'date', value: dateInputValue(values.chest_xray_expiry) })}
+        <h3>Immigration, character, health and English</h3>
+
+        <div class="settings-form">
+          <p class="settings-head subhead">Immigration</p>
+          <div class="settings-cell">${field({ label: 'Current visa type', name: 'current_visa_type', value: values.current_visa_type, maxlength: 120 })}</div>
+          <div class="settings-cell">${field({ label: 'Current visa expiry', name: 'current_visa_expiry', type: 'date', value: dateInputValue(values.current_visa_expiry) })}</div>
+
+          <p class="settings-head subhead">Character and health</p>
+          <div class="settings-cell-wide">
+            <p class="hint">Police certificates, medicals and x-rays are kept on the client's own
+               page, each as a record with its own dates${values.id
+                 ? html` — <a href="/clients/${values.id}#certificates">add one there</a>` : ''}.
+               A new certificate does not overwrite the old one: a matter lodged in March relied on
+               what was held in March, and that has to stay answerable. A client may hold police
+               certificates from several countries at once, which a single set of boxes here could
+               never represent.</p>
+          </div>
+
+          <p class="settings-head subhead">English</p>
+          <div class="settings-cell">${select({ label: 'Test or exemption', name: 'english_test_type',
+                    value: values.english_test_type ?? '', options: englishTestOptions,
+                    includeBlank: 'Not recorded' })}</div>
+          <div class="settings-cell">${field({ label: 'Score', name: 'english_test_score', value: values.english_test_score, maxlength: 40,
+                    hint: 'As the certificate states it — 6.5, 58, B2. The tests do not share a scale.' })}</div>
+          <div class="settings-cell">${field({ label: 'Test date', name: 'english_test_date', type: 'date', value: dateInputValue(values.english_test_date),
+                    hint: 'Most results are accepted for two years.' })}</div>
+        </div>
       </div>
 
       <div class="form-section" data-panel="file">
@@ -256,12 +287,9 @@ function readClientForm(f: FormReader) {
     date_of_birth: f.date('date_of_birth'),
     passport_country: f.optional('passport_country', { max: 100 }),
     passport_expiry: f.date('passport_expiry'),
-    police_certificate_country: f.optional('police_certificate_country', { max: 100 }),
-    police_certificate_date: f.date('police_certificate_date'),
-    police_certificate_expiry: f.date('police_certificate_expiry'),
-    medical_certificate_date: f.date('medical_certificate_date'),
-    medical_certificate_expiry: f.date('medical_certificate_expiry'),
-    chest_xray_expiry: f.date('chest_xray_expiry'),
+    english_test_type: f.optional('english_test_type', { max: 60 }),
+    english_test_score: f.optional('english_test_score', { max: 40 }),
+    english_test_date: f.date('english_test_date'),
     current_visa_type: f.optional('current_visa_type', { max: 120 }),
     current_visa_expiry: f.date('current_visa_expiry'),
     address: f.optional('address', { max: 500 }),
@@ -399,7 +427,9 @@ export const clientsModule: AppModule = {
 
     // --- Create -------------------------------------------------------------
     r.get('/new', requirePermission('register:write'), async (c) => {
-      const [users, organisations] = await Promise.all([userOptions(c.env), organisationOptions(c.env)]);
+      const [users, organisations, tests] = await Promise.all([
+        userOptions(c.env), organisationOptions(c.env), englishTests(c.env)]);
+      const englishTestOptions = termOptions(tests);
       const kind = c.req.query('kind') === 'organisation' ? 'organisation' : 'individual';
 
       // The assistant, or any other page, may propose a starting point through
@@ -425,7 +455,7 @@ export const clientsModule: AppModule = {
           ? html`<div class="alert alert-ok">Filled in from what the assistant read. Check it before
                    saving — it is a reading, not a fact.</div>`
           : ''}
-        ${clientForm(c, proposed, users, organisations)}`);
+        ${clientForm(c, proposed, users, organisations, englishTestOptions)}`);
     });
 
     // --- NZBN register lookup ----------------------------------------------
@@ -542,9 +572,11 @@ export const clientsModule: AppModule = {
       const f = new FormReader(await c.req.formData());
       const v = readClientForm(f);
       if (!f.valid) {
-        const [users, organisations] = await Promise.all([userOptions(c.env), organisationOptions(c.env)]);
+        const [users, organisations, tests] = await Promise.all([
+        userOptions(c.env), organisationOptions(c.env), englishTests(c.env)]);
+      const englishTestOptions = termOptions(tests);
         return page(c, { title: 'New client', active: '/clients', status: 400 }, html`
-          ${pageHeader('New client')}${clientForm(c, v as Partial<ClientRow>, users, organisations, f.errors)}`);
+          ${pageHeader('New client')}${clientForm(c, v as Partial<ClientRow>, users, organisations, englishTestOptions, f.errors)}`);
       }
 
       const id = newId('cli');
@@ -559,16 +591,14 @@ export const clientsModule: AppModule = {
             nzbn, company_number, organisation_id, organisation_role,
             email, phone, whatsapp, telegram_username, telegram_user_id,
             nationality, date_of_birth, passport_sealed, passport_country, passport_expiry,
-            police_certificate_country, police_certificate_date, police_certificate_expiry,
-            medical_certificate_date, medical_certificate_expiry, chest_xray_expiry,
+            english_test_type, english_test_score, english_test_date,
             current_visa_type, current_visa_expiry, address, status, assigned_to, notes,
             created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, ref, v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
         v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.nationality, v.date_of_birth, passportSealed, v.passport_country, v.passport_expiry,
-        v.police_certificate_country, v.police_certificate_date, v.police_certificate_expiry,
-        v.medical_certificate_date, v.medical_certificate_expiry, v.chest_xray_expiry,
+        v.english_test_type, v.english_test_score, v.english_test_date,
         v.current_visa_type, v.current_visa_expiry, v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), nowIso(), user.id,
       );
@@ -589,7 +619,8 @@ export const clientsModule: AppModule = {
       );
       if (!client) return c.notFound();
 
-      const [cases, quotes, inquiries, entries, tasks, partyCases, related, employer, people] = await Promise.all([
+      const [cases, quotes, inquiries, entries, tasks, partyCases, related, employer, people,
+             feesByCase, englishTestTerms, certificates] = await Promise.all([
         all<any>(c.env.DB, `SELECT id, ref, title, case_type, status, priority, next_action, next_action_due, updated_at
                               FROM cases WHERE client_id = ? ORDER BY updated_at DESC`, id),
         all<any>(c.env.DB, `SELECT id, ref, description, amount_cents, gst_cents, disbursements_cents, currency, status, created_at
@@ -610,6 +641,22 @@ export const clientsModule: AppModule = {
           c.env.DB,
           `SELECT id, ref, full_name, organisation_role FROM clients
             WHERE organisation_id = ? ORDER BY full_name`, id),
+        // Money across every matter this client owns. Fees are recorded per
+        // case, which is right — but "what does this person owe us" is a
+        // question about the person, and answering it meant opening each file
+        // in turn and adding up.
+        all<{ case_id: string; case_ref: string; case_title: string;
+              gross: number; paid: number; billed: number }>(
+          c.env.DB,
+          `SELECT k.id AS case_id, k.ref AS case_ref, k.title AS case_title,
+                  COALESCE(SUM(f.gross_cents), 0) AS gross,
+                  COALESCE(SUM(CASE WHEN f.status = 'paid' THEN f.gross_cents ELSE 0 END), 0) AS paid,
+                  COALESCE(SUM(CASE WHEN f.status IN ('invoiced','paid') THEN f.gross_cents ELSE 0 END), 0) AS billed
+             FROM cases k JOIN fee_items f ON f.case_id = k.id
+            WHERE k.client_id = ? AND f.status != 'cancelled'
+            GROUP BY k.id ORDER BY k.updated_at DESC`, id),
+        englishTests(c.env),
+        certificatesFor(c.env, id),
       ]);
 
       // Cases where this client is a party but not the file owner — an
@@ -620,6 +667,15 @@ export const clientsModule: AppModule = {
       const csrf = c.get('session')!.csrf;
       const writable = can(c.get('user'), 'register:write');
       const isOrg = client.kind === 'organisation';
+      const feeTotals = feesByCase.reduce(
+        (acc, row) => ({
+          gross: acc.gross + row.gross,
+          billed: acc.billed + row.billed,
+          paid: acc.paid + row.paid,
+          owing: acc.owing + (row.gross - row.paid),
+        }),
+        { gross: 0, billed: 0, paid: 0, owing: 0 },
+      );
 
       return page(c, { title: client.full_name, active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { label: client.ref }])}
@@ -680,6 +736,29 @@ export const clientsModule: AppModule = {
           </div>
 
           <div class="col-side">
+            ${'' /* Fees are recorded per matter, which is right, but "what does
+                     this person owe us" is a question about the person. This
+                     answers it without opening every file, and each line leads
+                     back to the matter it came from. */}
+            ${feesByCase.length > 0 && can(c.get('user'), 'register:read') ? card('Fees', html`
+              <dl class="kv">
+                <dt>Recorded</dt><dd>${money(feeTotals.gross)}</dd>
+                <dt>Invoiced</dt><dd>${money(feeTotals.billed)}</dd>
+                <dt>Paid</dt><dd>${money(feeTotals.paid)}</dd>
+                <dt>Outstanding</dt>
+                <dd class="${feeTotals.owing ? 'warn strong' : ''}">${money(feeTotals.owing)}</dd>
+              </dl>
+              <ul class="list small mt">
+                ${feesByCase.map((row) => html`
+                  <li class="list-row">
+                    <div><a href="/cases/${row.case_id}"><code>${row.case_ref}</code></a>
+                      <div class="muted clamp-1">${row.case_title}</div></div>
+                    <div class="num">${money(row.gross)}
+                      ${row.gross - row.paid > 0
+                        ? html`<div class="muted">${money(row.gross - row.paid)} owing</div>` : ''}</div>
+                  </li>`)}
+              </ul>`) : ''}
+
             ${card('Contact', html`
               <dl class="kv">
                 ${isOrg ? '' : html`
@@ -749,7 +828,72 @@ export const clientsModule: AppModule = {
                       ? html`${client.police_certificate_country}<br>` : ''}${expiryCell(client.police_certificate_expiry)}</dd>
                     <dt>Medical</dt><dd>${expiryCell(client.medical_certificate_expiry)}</dd>
                     <dt>Chest x-ray</dt><dd>${expiryCell(client.chest_xray_expiry)}</dd>
+                    <dt>English</dt><dd>${client.english_test_type
+                      ? html`${labelFor(englishTestTerms, client.english_test_type)}${
+                          client.english_test_score ? html` · <strong>${client.english_test_score}</strong>` : ''}
+                          ${client.english_test_date
+                            ? html`<div class="muted small">Taken ${dateShort(client.english_test_date)}</div>` : ''}`
+                      : html`<span class="muted">—</span>`}</dd>
                   </dl>`)}
+
+            ${isOrg ? '' : html`
+              <section class="card" id="certificates">
+                <header class="card-head"><h2>Certificates</h2></header>
+                <div class="card-body">
+                  ${certificates.length === 0
+                    ? emptyState('No police certificate, medical or x-ray recorded yet.')
+                    : html`${CERTIFICATE_KINDS.map((kind) => {
+                        const mine = certificates.filter((x) => x.kind === kind);
+                        if (mine.length === 0) return '';
+                        const current = new Set(currentOf(certificates, kind).map((x) => x.id));
+                        return html`
+                          <p class="subhead">${CERTIFICATE_LABELS[kind]}</p>
+                          <ul class="list">
+                            ${mine.map((cert) => html`
+                              <li class="list-row">
+                                <div>
+                                  <strong>${cert.country ?? (cert.subtype ? medicalTypeLabel(cert.subtype) : CERTIFICATE_LABELS[kind])}</strong>
+                                  ${current.has(cert.id) ? badge('current', 'green') : badge('superseded', 'grey')}
+                                  <div class="small muted">
+                                    ${cert.issued_on ? html`Issued ${dateShort(cert.issued_on)}` : 'Issue date not recorded'}
+                                    ${cert.expires_on ? html` · expires ${dateShort(cert.expires_on)}` : ''}
+                                    ${cert.reference ? html` · ${cert.reference}` : ''}
+                                  </div>
+                                  ${cert.notes ? html`<div class="small muted">${cert.notes}</div>` : ''}
+                                </div>
+                                <div>
+                                  ${cert.expires_on ? expiryCell(cert.expires_on) : ''}
+                                  ${writable ? actionButton(`/clients/${client.id}/certificates/${cert.id}/remove`, csrf,
+                                      'Remove', { className: 'btn btn-danger btn-sm',
+                                                  confirm: 'Remove this certificate? Its history goes with it.' }) : ''}
+                                </div>
+                              </li>`)}
+                          </ul>`;
+                      })}`}
+
+                  ${writable ? html`
+                    <details class="mt">
+                      <summary>Record a certificate</summary>
+                      <form method="post" action="/clients/${client.id}/certificates" class="row-form">
+                        ${csrfField(csrf)}
+                        ${select({ label: 'What', name: 'kind', required: true, includeBlank: false,
+                                   value: 'police',
+                                   options: CERTIFICATE_KINDS.map((k) => ({ value: k, label: CERTIFICATE_LABELS[k] })) })}
+                        ${field({ label: 'Country', name: 'country', maxlength: 100,
+                                  hint: 'Police certificates only — one per country lived in for 12 months or more.' })}
+                        ${select({ label: 'Medical type', name: 'subtype', includeBlank: 'Not a medical',
+                                   options: MEDICAL_TYPES })}
+                        ${field({ label: 'Issued', name: 'issued_on', type: 'date' })}
+                        ${field({ label: 'Expires', name: 'expires_on', type: 'date' })}
+                        ${field({ label: 'Reference', name: 'reference', maxlength: 80 })}
+                        ${field({ label: 'Note', name: 'notes', maxlength: 300 })}
+                        <button class="btn btn-primary" type="submit">Record it</button>
+                      </form>
+                      <p class="hint">A new one does not replace the old. The most recent of each
+                         kind is marked current and is what the alerts page watches.</p>
+                    </details>` : ''}
+                </div>
+              </section>`}
 
             ${otherRoles.length > 0
               ? card('Also a party to', html`
@@ -789,11 +933,63 @@ export const clientsModule: AppModule = {
     r.get('/:id/edit', requirePermission('register:write'), async (c) => {
       const client = await one<ClientRow>(c.env.DB, 'SELECT * FROM clients WHERE id = ?', c.req.param('id')!);
       if (!client) return c.notFound();
-      const [users, organisations] = await Promise.all([userOptions(c.env), organisationOptions(c.env)]);
+      const [users, organisations, tests] = await Promise.all([
+        userOptions(c.env), organisationOptions(c.env), englishTests(c.env)]);
+      const englishTestOptions = termOptions(tests);
       return page(c, { title: `Edit ${client.full_name}`, active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { href: `/clients/${client.id}`, label: client.ref }, { label: 'Edit' }])}
         ${pageHeader(`Edit ${client.full_name}`)}
-        ${clientForm(c, client, users, organisations)}`);
+        ${clientForm(c, client, users, organisations, englishTestOptions)}`);
+    });
+
+    // --- Certificates -------------------------------------------------------
+    r.post('/:id/certificates', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const f = new FormReader(await c.req.formData());
+      const kind = f.enum('kind', CERTIFICATE_KINDS, { required: true, label: 'What' });
+      if (!kind) return redirectWith(c, `/clients/${id}`, 'Choose what kind of certificate.', 'err');
+
+      const issuedOn = f.date('issued_on');
+      const expiresOn = f.date('expires_on');
+      if (!issuedOn && !expiresOn) {
+        return redirectWith(c, `/clients/${id}#certificates`,
+          'Give at least one date — otherwise there is nothing to watch.', 'err');
+      }
+      if (issuedOn && expiresOn && expiresOn < issuedOn) {
+        return redirectWith(c, `/clients/${id}#certificates`,
+          'A certificate cannot expire before it was issued.', 'err');
+      }
+
+      await addCertificate(c.env, {
+        clientId: id, kind: kind as CertificateKind,
+        // A medical's subtype and a police certificate's country belong to
+        // different kinds; whichever does not apply is dropped rather than
+        // stored against a record it means nothing on.
+        subtype: kind === 'medical' ? f.optional('subtype', { max: 40 }) : null,
+        country: kind === 'police' ? f.optional('country', { max: 100 }) : null,
+        reference: f.optional('reference', { max: 80 }),
+        issuedOn, expiresOn,
+        notes: f.optional('notes', { max: 300 }),
+        userId: c.get('user')!.id,
+      });
+      await addEntry(c.env, {
+        entityType: 'client', entityId: id, kind: 'system',
+        body: `${CERTIFICATE_LABELS[kind as CertificateKind]} recorded`
+          + `${expiresOn ? `, expiring ${expiresOn}` : ''}.`,
+        createdBy: c.get('user')!.id,
+      });
+      await auditFrom(c, { action: 'client.certificate_added', entityType: 'client', entityId: id,
+        meta: { kind, expiresOn } });
+      return redirectWith(c, `/clients/${id}#certificates`, 'Certificate recorded.');
+    });
+
+    r.post('/:id/certificates/:certId/remove', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const ok = await removeCertificate(c.env, id, c.req.param('certId')!);
+      await auditFrom(c, { action: 'client.certificate_removed', entityType: 'client', entityId: id,
+        meta: { ok } });
+      return redirectWith(c, `/clients/${id}#certificates`,
+        ok ? 'Certificate removed.' : 'That certificate was already gone.', ok ? 'ok' : 'err');
     });
 
     r.post('/:id', requirePermission('register:write'), async (c) => {
@@ -805,10 +1001,12 @@ export const clientsModule: AppModule = {
       const f = new FormReader(await c.req.formData());
       const v = readClientForm(f);
       if (!f.valid) {
-        const [users, organisations] = await Promise.all([userOptions(c.env), organisationOptions(c.env)]);
+        const [users, organisations, tests] = await Promise.all([
+        userOptions(c.env), organisationOptions(c.env), englishTests(c.env)]);
+      const englishTestOptions = termOptions(tests);
         return page(c, { title: 'Edit client', active: '/clients', status: 400 }, html`
           ${pageHeader(`Edit ${existing.full_name}`)}
-          ${clientForm(c, { ...existing, ...v } as Partial<ClientRow>, users, organisations, f.errors)}`);
+          ${clientForm(c, { ...existing, ...v } as Partial<ClientRow>, users, organisations, englishTestOptions, f.errors)}`);
       }
 
       const passportSealed = v.passport_number && c.env.FIELD_KEY
@@ -820,16 +1018,14 @@ export const clientsModule: AppModule = {
         `UPDATE clients SET kind=?, full_name=?, given_names=?, family_name=?, preferred_name=?,
            nzbn=?, company_number=?, organisation_id=?, organisation_role=?, email=?, phone=?, whatsapp=?, telegram_username=?, telegram_user_id=?,
            nationality=?, date_of_birth=?, passport_sealed=?, passport_country=?, passport_expiry=?,
-           police_certificate_country=?, police_certificate_date=?, police_certificate_expiry=?,
-           medical_certificate_date=?, medical_certificate_expiry=?, chest_xray_expiry=?,
+           english_test_type=?, english_test_score=?, english_test_date=?,
            current_visa_type=?, current_visa_expiry=?, address=?, status=?, assigned_to=?, notes=?, updated_at=?
          WHERE id=?`,
         v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
         v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role,
         v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.nationality, v.date_of_birth, passportSealed, v.passport_country, v.passport_expiry,
-        v.police_certificate_country, v.police_certificate_date, v.police_certificate_expiry,
-        v.medical_certificate_date, v.medical_certificate_expiry, v.chest_xray_expiry,
+        v.english_test_type, v.english_test_score, v.english_test_date,
         v.current_visa_type, v.current_visa_expiry, v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), id,
       );
@@ -842,6 +1038,10 @@ export const clientsModule: AppModule = {
         await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system',
           body: `Name changed from “${existing.full_name}” to “${v.full_name}”.`, createdBy: user.id });
       }
+      // The certificate columns on this row are a cache of client_certificates,
+      // and nothing on this form owns them any more. Rebuilding after a save
+      // keeps that true by construction rather than by everyone remembering.
+      await refreshClientCache(c.env, id);
       await auditFrom(c, { action: 'client.updated', entityType: 'client', entityId: id });
       return redirectWith(c, `/clients/${id}`, 'Client updated.');
     });

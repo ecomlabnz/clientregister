@@ -9,7 +9,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
-import { all, nextRef, nowIso, one, run } from '../../core/db';
+import { all, nextRef, nextYearlyRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
@@ -459,7 +459,7 @@ export const inquiriesModule: AppModule = {
       }
 
       const caseId = newId('cas');
-      const caseRef = await nextRef(c.env.DB, 'case', 'CASE');
+      const caseRef = await nextYearlyRef(c.env.DB, 'case', 'CASE');
       await run(
         c.env.DB,
         `INSERT INTO cases (id, ref, client_id, title, case_type, status, priority, assigned_to,

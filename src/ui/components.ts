@@ -17,6 +17,31 @@ export function card(title: string, body: Raw, actions?: Raw): Raw {
     </section>`;
 }
 
+/**
+ * A card that starts closed.
+ *
+ * Used where the contents are worth having on the page but not worth showing to
+ * whoever is standing behind you — money, in practice. Built on `<details>`, so
+ * it needs no script and keeps working with one blocked.
+ *
+ * Worth being clear about what this is and is not: it is a screen somebody has
+ * to click past, not access control. The figures are still in the page for
+ * anyone who may open the record at all. Deciding *who* may see money is a
+ * question of roles, not of a fold.
+ */
+export function collapsibleCard(title: string, body: Raw, note?: string): Raw {
+  return html`
+    <section class="card">
+      <details class="card-fold">
+        <summary class="card-head">
+          <h2>${title}</h2>
+          ${note ? html`<span class="small muted">${note}</span>` : ''}
+        </summary>
+        <div class="card-body">${body}</div>
+      </details>
+    </section>`;
+}
+
 export function pageHeader(title: string, subtitle?: string | null, actions?: Raw): Raw {
   return html`
     <div class="page-head">

@@ -164,7 +164,29 @@ ot_second_opinion | OT. Second Opinion
 ot_other | OT. Other`,
 };
 
-export const VOCABULARIES: VocabularyDef[] = [CASE_TYPE_VOCAB];
+/**
+ * English tests INZ accepts. An editable list because the accepted set changes
+ * with instructions, and because a practice that deals mostly with one or two
+ * of them should not have to read past the rest.
+ */
+export const ENGLISH_TEST_VOCAB: VocabularyDef = {
+  key: 'vocab.english_tests',
+  label: 'English tests',
+  help: 'One per line, written as “key | Label”. Used on a client record. '
+    + 'Blank lines and lines starting with # are ignored.',
+  defaults: `ielts | IELTS (General or Academic)
+pte | PTE Academic
+toefl | TOEFL iBT
+cambridge | Cambridge C1 Advanced / C2 Proficiency
+oet | OET
+nzcel | NZCEL
+exempt_nationality | Exempt — recognised country
+exempt_study | Exempt — prior study in English
+exempt_work | Exempt — prior skilled work in English
+other | Other evidence`,
+};
+
+export const VOCABULARIES: VocabularyDef[] = [CASE_TYPE_VOCAB, ENGLISH_TEST_VOCAB];
 
 export const VOCABULARY_SETTINGS: SettingsGroup = {
   id: 'vocabulary',
@@ -187,6 +209,30 @@ export async function vocabulary(env: Env, def: VocabularyDef): Promise<Term[]> 
   return terms.length ? terms : parseVocabulary(def.defaults);
 }
 
+/**
+ * The title a matter gets by default: `AEWV. RUBEZHANSKII, Aleksei`.
+ *
+ * The visa type leads, because every list that shows a title also shows the
+ * client in its own column — so the title should carry what the column does
+ * not. Reading a client's file, their matters then line up by what each one is.
+ *
+ * The type's own label is already written `WV. AEWV`, grouping it under work
+ * visas; the grouping prefix is dropped here, since a title reading
+ * "WV. AEWV. SURNAME" says the same thing twice.
+ */
+export function suggestCaseTitle(typeLabel: string, clientFormalName: string): string {
+  const specific = typeLabel.includes('. ')
+    ? typeLabel.slice(typeLabel.indexOf('. ') + 2).trim()
+    : typeLabel.trim();
+  if (!specific) return clientFormalName;
+  if (!clientFormalName) return specific;
+  return `${specific}. ${clientFormalName}`;
+}
+
 export async function caseTypes(env: Env): Promise<Term[]> {
   return vocabulary(env, CASE_TYPE_VOCAB);
+}
+
+export async function englishTests(env: Env): Promise<Term[]> {
+  return vocabulary(env, ENGLISH_TEST_VOCAB);
 }

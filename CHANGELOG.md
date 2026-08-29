@@ -7,6 +7,53 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.26.0 — 29 August 2026
+
+### Added
+- **Export.** Admin → Export: fifteen datasets, each one link and one CSV —
+  clients, matters, parties, certificates, fees, quotes and their lines,
+  invoices and their lines, payments, tasks, notes, inquiries, the knowledge
+  base and the audit log. UTF-8 with a byte-order mark so Excel reads macrons,
+  RFC 4180 quoting, and a leading `=`, `+`, `-` or `@` defused so a cell cannot
+  become a formula that runs when somebody opens the file. Every download is
+  audited. Passport numbers are excluded — the export says only whether one is
+  held. Reading data back in is a separate job and is not built.
+- **Certificates are records, not fields.** A police certificate, medical or
+  x-ray is now its own row with its own dates, and a new one does not overwrite
+  the old: a matter lodged in March relied on what was held in March, and that
+  has to stay answerable. A client may hold police certificates from several
+  countries at once, which one set of boxes could never represent. Existing
+  values were carried across, and the columns on the client row remain as a
+  cache of the current one, so the alerts page needed no changes.
+- **Medical certificate type** — General Medical (INZ 1007) or Limited Medical
+  (INZ 1201).
+- **English language** on a client: test or exemption from an editable list,
+  score as the certificate states it, and the date, because most results are
+  accepted for only two years.
+- **A fee summary on the client page**, aggregated across their matters and
+  linked back to each one. Fees are recorded per case, which is right, but
+  "what does this person owe us" is a question about the person.
+- **The fee section on a case starts folded.** Worth saying plainly: that is a
+  screen to click past, not access control — the figures are still in the page
+  for anyone who may open the record. Who may see money is a question of roles.
+- **Matter titles follow a convention**: `AEWV. RUBEZHANSKII, Aleksei` —
+  the type first, then the client formally, because every list showing a title
+  also shows the client in its own column. Suggested as you choose, never
+  overwriting a title somebody has typed.
+- **Matter numbers carry their year**: `CASE-26-001`, from a counter per year,
+  allocated in one atomic statement. Existing references are untouched.
+- **ARCHITECTURE.md** — the four commitments (secure, modular, AI-assisted but
+  never AI-dependent, mobile-first), a table of where each guarantee is actually
+  enforced, and the shape of the codebase.
+
+### Fixed
+- **Saving a client wiped its certificate dates.** The form still wrote those
+  columns after its inputs were removed, so a plain save cleared them. Those
+  columns are a cache of the certificates table now and nothing else writes
+  them — one fact, one owner.
+- The Immigration tab is grouped under headings rather than one bucket of
+  fields.
+
 ## 0.25.0 — 29 August 2026
 
 ### Added
