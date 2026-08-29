@@ -32,6 +32,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.63.0', date: '30 August 2026',
+    notes: [
+      'Any message in a conversation can be forwarded. The original is quoted with who it was '
+        + 'from, when, and on which channel, and you write your own line above it.',
+      'A message that arrived on Telegram or WhatsApp can be forwarded too \u2014 a forward '
+        + 'always goes out by email, because that is where you choose the recipient.',
+      'A forward starts its own conversation with whoever you sent it to, filed against the '
+        + 'same client and matter, rather than being buried in the client\u2019s thread.',
+    ],
+  },
+  {
     version: '0.62.0', date: '30 August 2026',
     notes: [
       'A note on a task now shows when it was written and by whom. Notes already on file '

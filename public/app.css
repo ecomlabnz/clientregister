@@ -675,6 +675,9 @@ textarea { resize: vertical; min-height: 70px; }
    controls line up down the table rather than wandering with the text beside
    them, and never wrapped: a button broken across two lines reads as two. */
 .row-actions { text-align: right; white-space: nowrap; }
+/* What you can do to one message in a conversation, under it. Spaced by the
+   layout rather than by margins, so adding a third link changes nothing else. */
+.msg-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
 .inline-form select { width: auto; padding: 4px 6px; font-size: 0.82rem; }
 
 .filters {

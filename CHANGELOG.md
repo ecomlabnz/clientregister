@@ -7,6 +7,30 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.63.0 — 30 August 2026
+
+### Added
+- **Forwarding**, per message, from any conversation. Forwarding is quoting: the
+  recipient gets what was actually said, by whom and when, under the header
+  block every mail reader writes — not a summary typed out again.
+- The message being sent on may come from **any channel** — a client sends a
+  payslip over Telegram and it has to reach INZ — but a forward always *leaves*
+  by email, because that is the only channel where you choose who receives it.
+- **A forward never joins the conversation it came from.** A message to a third
+  party filed in the client's thread is the same mistake 0.61.0 undid at the
+  other end, and a reply to it would come back to the wrong place. It starts, or
+  joins, the conversation with whoever it was sent to — carrying the client and
+  matter across so it still lands on the right file, but never moving a file the
+  recipient already has.
+- The quote sits **in the message box**, so what is about to be sent is what is
+  on the screen, including anything you take out of it. Write your covering line
+  above it. Too long to fit inside the 4,000 characters a message takes, and it
+  says where it stopped rather than trailing off.
+- To, Cc and Bcc offer the same address list as a reply; attachments come from
+  the client's or matter's own documents, as references rather than copies.
+- Only one "Fwd:" on the subject, however many hands it has been through. A
+  forwarded reply takes its subject from whatever it was answering.
+
 ## 0.62.0 — 30 August 2026
 
 ### Added

@@ -289,6 +289,10 @@ async function sendWhatsApp(token: string, phoneNumberId: string, to: string, te
 
 /** One conversation, both directions, oldest first. */
 export interface ThreadEntry {
+  /** The row this came from, so a single message can be acted on. */
+  id: string;
+  /** Which table that is: an inbound capture, or something the practice sent. */
+  kind: 'message' | 'reply';
   direction: 'in' | 'out';
   at: string;
   body: string;
@@ -297,6 +301,55 @@ export interface ThreadEntry {
   /** Why it is not simply sent — a transport that is not connected, or a refusal. */
   note: string | null;
   href: string | null;
+  /** What was sent with it, named, so a forward can say so. */
+  attachments: string | null;
+}
+
+/**
+ * One message from a conversation, written out so it can be sent on.
+ *
+ * Forwarding is quoting: the point is that the recipient sees what was actually
+ * said, by whom and when, rather than a summary of it. The header block is the
+ * one every mail reader writes, because a barrister forwarding to INZ or to
+ * counsel should be sending something that reads like mail, not like an export
+ * from a database.
+ *
+ * Trimmed to fit. A reply is capped at 4,000 characters by the transport, and a
+ * quote that silently loses its last page is worse than one that says where it
+ * stopped.
+ */
+export function forwardQuote(
+  entry: ThreadEntry,
+  opts: {
+    channel: string;
+    subject?: string | null;
+    peer?: string | null;
+    limit?: number;
+    /**
+     * The date as a person reads it. Passed in rather than formatted here: this
+     * is the domain layer, the practice's timezone belongs to the presentation
+     * layer, and a forwarded message showing a raw ISO timestamp reads as an
+     * export rather than as mail.
+     */
+    dateLabel?: string;
+  },
+): string {
+  const limit = opts.limit ?? 3000;
+  const head = [
+    '---------- Forwarded message ----------',
+    `From: ${entry.who}${entry.direction === 'out' ? ' (this practice)' : ''}`,
+    `Date: ${opts.dateLabel ?? entry.at}`,
+    opts.subject ? `Subject: ${opts.subject}` : null,
+    opts.peer ? `Channel: ${opts.channel} · ${opts.peer}` : `Channel: ${opts.channel}`,
+    entry.attachments ? `Attached: ${entry.attachments}` : null,
+  ].filter(Boolean).join('\n');
+
+  const body = entry.body ?? '';
+  const room = Math.max(0, limit - head.length - 2);
+  const quoted = body.length > room
+    ? `${body.slice(0, room)}\n\n[the rest of this message was too long to quote]`
+    : body;
+  return `${head}\n\n${quoted}`;
 }
 
 export async function threadHistory(env: Env, threadId: string): Promise<ThreadEntry[]> {
@@ -331,16 +384,18 @@ export async function threadHistory(env: Env, threadId: string): Promise<ThreadE
 
   const entries: ThreadEntry[] = [
     ...inbound.map((m: any) => ({
+      id: m.id, kind: 'message' as const,
       direction: 'in' as const, at: m.received_at, body: m.body_text ?? '',
       who: m.sender_display ?? m.sender ?? 'them', status: m.status, note: null,
-      href: `/inbox/${m.id}`,
+      href: `/inbox/${m.id}`, attachments: null,
     })),
     ...outbound.map((r: any) => ({
+      id: r.id, kind: 'reply' as const,
       direction: 'out' as const, at: r.created_at, body: r.body,
       who: r.author, status: r.status,
       note: [r.attachments ? `Attached: ${r.attachments}` : null, r.error ?? null]
         .filter(Boolean).join(' · ') || null,
-      href: null,
+      href: null, attachments: r.attachments ?? null,
     })),
   ];
   return entries.sort((a, b) => a.at.localeCompare(b.at));

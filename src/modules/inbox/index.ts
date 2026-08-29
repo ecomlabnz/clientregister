@@ -26,7 +26,8 @@ import { incomingCounts, incomingTabs } from '../inquiries';
 import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
 import { FormReader } from '../../core/validate';
 import {
-  CHANNEL_LABELS, type ThreadRow, linkThread, postReply, threadHistory,
+  CHANNEL_LABELS, type ThreadEntry, type ThreadRow,
+  forwardQuote, linkThread, postReply, threadFor, threadHistory,
 } from '../../core/channels';
 
 interface IngestRow {
@@ -50,6 +51,18 @@ export function replySubject(subject: string): string {
   const trimmed = subject.trim();
   const stripped = trimmed.replace(/^((re|fwd|fw)\s*(\[\d+\])?\s*:\s*)+/i, '');
   return `Re: ${stripped}`.slice(0, 200);
+}
+
+/**
+ * The same, for sending something on.
+ *
+ * "Fwd:" once, whatever the subject already carried. A line reading
+ * "Fwd: Re: Fwd: Re: RFI" tells the reader nothing except how many hands it has
+ * been through.
+ */
+export function forwardSubject(subject: string | null | undefined): string {
+  const stripped = (subject ?? '').trim().replace(/^((re|fwd|fw)\s*(\[\d+\])?\s*:\s*)+/i, '');
+  return `Fwd: ${stripped || '(no subject)'}`.slice(0, 200);
 }
 
 /**
@@ -376,7 +389,16 @@ export const inboxModule: AppModule = {
                           ? badge(entry.status, entry.status === 'failed' ? 'red' : 'amber') : ''}</div>
                       <div class="msg-body">${entry.body}</div>
                       ${entry.note ? html`<div class="small muted">${entry.note}</div>` : ''}
-                      ${entry.href ? html`<div class="small"><a href="${entry.href}">Open in the inbox</a></div>` : ''}
+                      ${'' /* Per message, because that is what you forward — not
+                               the whole exchange. Behind mail:send whatever the
+                               source channel was: a forward always leaves by
+                               email. */}
+                      <div class="small msg-actions">
+                        ${entry.href ? html`<a href="${entry.href}">Open in the inbox</a>` : ''}
+                        ${can(c.get('user'), 'mail:send')
+                          ? html`<a href="${`/inbox/threads/${thread.id}/forward/${entry.kind}/${entry.id}`}">Forward</a>`
+                          : ''}
+                      </div>
                     </div>`)}
                 </div>`)}
 
@@ -482,6 +504,220 @@ export const inboxModule: AppModule = {
               </form>`)}
           </div>
         </div>`);
+    });
+
+    // --- Sending one on ------------------------------------------------------
+    //
+    // Forwarding is quoting: what the recipient needs is what was actually
+    // said, by whom and when, not a summary of it typed out again.
+    //
+    // Two decisions worth writing down. The message being forwarded may come
+    // from any channel — a client sends a payslip over Telegram and it has to
+    // go to INZ — but a forward always *leaves* by email, because that is the
+    // only channel where you choose who receives it. And it never joins the
+    // conversation it came from: a message to a third party filed in the
+    // client's thread would be exactly the mistake migration 0037 undid at the
+    // other end, and a reply to it would come back to the wrong place. It
+    // starts, or joins, the conversation with whoever it was sent to — carrying
+    // the client and matter across, so it still lands on the right file.
+
+    /** One entry of a conversation, fetched on its own so it can be quoted. */
+    const forwardable = async (
+      env: AppContext['Bindings'], threadId: string, kind: string, entryId: string,
+    ): Promise<{ entry: ThreadEntry; subject: string | null } | null> => {
+      if (kind === 'message') {
+        const m = await one<any>(
+          env.DB,
+          `SELECT id, received_at, body_text, subject, sender_display, sender, attachments_json
+             FROM ingest_messages WHERE id = ? AND thread_id = ?`, entryId, threadId);
+        if (!m) return null;
+        const names = ((): string | null => {
+          try {
+            const list = JSON.parse(m.attachments_json ?? '[]') as Array<{ filename?: string }>;
+            const named = list.map((a) => a.filename).filter(Boolean);
+            return named.length ? named.join(', ') : null;
+          } catch { return null; }
+        })();
+        return {
+          subject: m.subject,
+          entry: {
+            id: m.id, kind: 'message', direction: 'in', at: m.received_at,
+            body: m.body_text ?? '', who: m.sender_display ?? m.sender ?? 'them',
+            status: null, note: null, href: null, attachments: names,
+          },
+        };
+      }
+      const r_ = await one<any>(
+        env.DB,
+        `SELECT r.id, r.created_at, r.body, u.name AS author,
+                (SELECT GROUP_CONCAT(d.filename, ', ')
+                   FROM reply_attachments a JOIN documents d ON d.id = a.document_id
+                  WHERE a.reply_id = r.id) AS attachments
+           FROM channel_replies r JOIN users u ON u.id = r.created_by
+          WHERE r.id = ? AND r.thread_id = ?`, entryId, threadId);
+      if (!r_) return null;
+      // What the practice sent carries no subject of its own — it answered
+      // whatever came in. Forwarding it should say what the exchange was about
+      // rather than fall back to the recipient's address.
+      const answered = await one<{ subject: string | null }>(
+        env.DB,
+        `SELECT subject FROM ingest_messages
+          WHERE thread_id = ? AND subject IS NOT NULL AND TRIM(subject) <> ''
+          ORDER BY received_at DESC LIMIT 1`, threadId);
+      return {
+        subject: answered?.subject ?? null,
+        entry: {
+          id: r_.id, kind: 'reply', direction: 'out', at: r_.created_at, body: r_.body,
+          who: r_.author, status: null, note: null, href: null, attachments: r_.attachments ?? null,
+        },
+      };
+    };
+
+    r.get('/threads/:id/forward/:kind/:entryId', requirePermission('mail:send'), async (c) => {
+      const id = c.req.param('id')!;
+      const thread = await one<ThreadRow>(c.env.DB, `SELECT * FROM channel_threads WHERE id = ?`, id);
+      if (!thread) return c.notFound();
+      const found = await forwardable(c.env, id, c.req.param('kind')!, c.req.param('entryId')!);
+      if (!found) return c.notFound();
+
+      const [addressBook, attachable] = await Promise.all([
+        all<{ full_name: string; email: string }>(
+          c.env.DB,
+          `SELECT full_name, email FROM clients
+            WHERE email IS NOT NULL AND TRIM(email) <> '' AND status != 'archived'
+            ORDER BY full_name LIMIT 500`),
+        thread.case_id || thread.client_id
+          ? all<{ id: string; filename: string; size_bytes: number; uploaded_at: string }>(
+              c.env.DB,
+              `SELECT id, filename, size_bytes, uploaded_at FROM documents
+                WHERE (entity_type = 'case' AND entity_id = ?1)
+                   OR (entity_type = 'client' AND entity_id = ?2)
+                ORDER BY uploaded_at DESC LIMIT 40`,
+              thread.case_id ?? '', thread.client_id ?? '')
+          : Promise.resolve([]),
+      ]);
+      const csrf = c.get('session')!.csrf;
+      const here = `/inbox/threads/${thread.id}`;
+      const quote = forwardQuote(found.entry, {
+        channel: CHANNEL_LABELS[thread.channel] ?? thread.channel,
+        subject: found.subject, peer: thread.peer_id,
+        dateLabel: dateTime(found.entry.at),
+      });
+
+      return page(c, { title: 'Forward', active: '/inquiries' }, html`
+        ${breadcrumbs([{ label: 'Conversations', href: '/inbox/threads' },
+                       { label: thread.peer_label ?? thread.peer_id, href: here },
+                       { label: 'Forward' }])}
+        ${pageHeader('Send this on',
+          `From ${found.entry.who} · ${dateTime(found.entry.at)}`)}
+        ${card('Where it goes', html`
+          <form method="post" action="${`${here}/forward/${found.entry.kind}/${found.entry.id}`}"
+                class="entry-form">
+            ${csrfField(csrf)}
+            <datalist id="known-addresses">
+              ${addressBook.map((p) => html`<option value="${p.email}">${p.full_name}</option>`)}
+            </datalist>
+            <div class="field">
+              <label for="f_to">To<span class="req"> *</span></label>
+              <input id="f_to" name="to" list="known-addresses" maxlength="500" required autofocus>
+              <p class="hint">Separate several with commas. The conversation this starts is filed
+                 against the same client and matter as the one it came from.</p>
+            </div>
+            <div class="cols-2">
+              <div class="field">
+                <label for="f_cc">Cc</label>
+                <input id="f_cc" name="cc" list="known-addresses" maxlength="500">
+              </div>
+              <div class="field">
+                <label for="f_bcc">Bcc</label>
+                <input id="f_bcc" name="bcc" list="known-addresses" maxlength="500">
+              </div>
+            </div>
+            <div class="field">
+              <label for="f_subject">Subject</label>
+              <input id="f_subject" name="subject" maxlength="200"
+                     value="${forwardSubject(found.subject ?? thread.peer_label)}">
+            </div>
+            ${'' /* The quote is in the box, not bolted on afterwards, so what
+                     is about to be sent is what is on the screen — including
+                     anything taken out of it. A covering line goes above it. */}
+            <div class="field">
+              <label for="f_body">Message</label>
+              <textarea id="f_body" name="body" rows="14" required maxlength="4000">
+${quote}</textarea>
+              <p class="hint">Write anything of your own above the quoted message.</p>
+            </div>
+            ${attachable.length > 0 ? html`
+              <fieldset class="field-group">
+                <legend>Attach from the file</legend>
+                ${attachable.map((d) => html`
+                  <div class="field checkbox-field">
+                    <label><input type="checkbox" name="documents" value="${d.id}">
+                      ${d.filename}
+                      <span class="muted small">${Math.max(1, Math.round(d.size_bytes / 1024))} KB ·
+                        ${dateShort(d.uploaded_at)}</span></label>
+                  </div>`)}
+                <p class="hint">What arrived on the original is named in the quote above, but a file
+                   is only sent on if it is on this client or matter and picked here.</p>
+              </fieldset>` : ''}
+            <div class="field checkbox-field">
+              <label><input type="checkbox" name="format" value="html" checked> Send it formatted</label>
+            </div>
+            <div class="inline-row">
+              <button class="btn btn-primary" type="submit">Forward</button>
+              <a class="btn btn-secondary" href="${here}">Cancel</a>
+            </div>
+          </form>`)}`);
+    });
+
+    r.post('/threads/:id/forward/:kind/:entryId', requirePermission('mail:send'), async (c) => {
+      const id = c.req.param('id')!;
+      const user = c.get('user')!;
+      const here = `/inbox/threads/${id}`;
+      const thread = await one<ThreadRow>(c.env.DB, `SELECT * FROM channel_threads WHERE id = ?`, id);
+      if (!thread) return c.notFound();
+      const found = await forwardable(c.env, id, c.req.param('kind')!, c.req.param('entryId')!);
+      if (!found) return c.notFound();
+
+      const f = new FormReader(await c.req.formData());
+      const body = f.text('body', { required: true, label: 'Message', max: 4000 });
+      const to = f.text('to', { required: true, label: 'To', max: 500 });
+      const cc = f.optional('cc', { max: 500 });
+      const bcc = f.optional('bcc', { max: 500 });
+      const subject = f.optional('subject', { max: 200 });
+      const asHtml = f.text('format', { max: 10 }) === 'html';
+      const documentIds = f.all('documents').slice(0, 20);
+      if (!f.valid) return redirectWith(c, here, Object.values(f.errors)[0]!, 'err');
+
+      const bad = [to, cc, bcc].flatMap((list) => badAddresses(list));
+      if (bad.length) {
+        return redirectWith(c, here, `That is not an email address: ${bad.join(', ')}.`, 'err');
+      }
+
+      // The first recipient is the counterpart of the conversation this starts.
+      // The rest are on the message, as they are on any other email.
+      const first = to.split(',')[0]!.trim().toLowerCase();
+      const destinationId = await threadFor(c.env, 'email', first, first, nowIso());
+      const destination = await one<ThreadRow>(
+        c.env.DB, `SELECT * FROM channel_threads WHERE id = ?`, destinationId);
+      // Carried across only when the new conversation has no file of its own.
+      // Forwarding one client's message to somebody who is already on another
+      // matter must not move that person's thread onto this one.
+      if (destination && !destination.client_id && !destination.case_id
+          && (thread.client_id || thread.case_id)) {
+        await linkThread(c.env, destinationId, thread.client_id, thread.case_id);
+      }
+
+      const result = await postReply(c.env, {
+        threadId: destinationId, body, userId: user.id,
+        subject: subject ?? forwardSubject(found.subject), to, cc, bcc, asHtml, documentIds,
+      });
+      await auditFrom(c, {
+        action: 'channel.forwarded', entityType: 'channel_thread', entityId: destinationId,
+        meta: { from_thread: id, kind: found.entry.kind, entry: found.entry.id, to, ok: result.ok },
+      });
+      return redirectWith(c, `/inbox/threads/${destinationId}`,
+        result.ok ? `Forwarded to ${first}.` : result.message, result.ok ? 'ok' : 'err');
     });
 
     r.post('/threads/:id/reply', requirePermission('register:write'), async (c) => {
