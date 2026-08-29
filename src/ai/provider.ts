@@ -65,7 +65,11 @@ Use the register's own words. Never expand an abbreviation the file does not
 expand: PPI, RFI, AEWV, SMC, s.61 and the rest are terms of art with fixed
 meanings, and a plausible guess reads as fact to somebody skimming. Write the
 abbreviation as it appears, or ask what it means under "questions".
-The adviser knows what these mean; you do not need to tell them.`;
+The adviser knows what these mean; you do not need to tell them.
+A file note marked as an earlier AI draft is not evidence of anything. Somebody
+kept it, which is worth knowing, but do not repeat its conclusions as if the
+file recorded them and do not count it as correspondence or as a record of
+contact. Work from what people wrote.`;
 
 
 /**

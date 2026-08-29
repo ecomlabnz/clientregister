@@ -7,6 +7,23 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.40.0 — 29 August 2026
+
+### Fixed
+- **A brief no longer reads its own earlier drafts as evidence.** Saving a
+  brief writes it to the file, and the next brief reads the file — so a kept
+  brief came back as ordinary file content. Left alone, each reading summarises
+  the last, the file fills with the model's own output, and a later brief cites
+  it as a record of what happened. Found by running the same case on two models
+  and noticing the second one describing the first one's note.
+- A kept brief is now marked in the text the model reads — *an earlier AI draft
+  kept on the file, not a record of events* — and the prompt says not to repeat
+  its conclusions or count it as correspondence.
+- It is labelled rather than hidden: that somebody read a brief and kept it is
+  a fact about the file. The writer and the reader share one exported constant,
+  because a prefix known to only one of them would drift, and the drift would
+  be invisible.
+
 ## 0.39.4 — 29 August 2026
 
 ### Fixed

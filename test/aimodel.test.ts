@@ -144,3 +144,32 @@ describe('the brief does not invent terminology', () => {
     expect(provider).toMatch(/PPI, RFI, AEWV, SMC/);
   });
 });
+
+describe('a brief cannot mistake its own earlier draft for evidence', () => {
+  const brief = readFileSync('src/ai/brief.ts', 'utf8');
+  const cases = readFileSync('src/modules/cases/index.ts', 'utf8');
+
+  it('writes and recognises a kept brief through the same string', () => {
+    // A prefix known to only one side would drift, and the drift would be
+    // invisible: the file would simply start reading as if the model's own
+    // drafts were evidence.
+    expect(brief).toContain("export const AI_BRIEF_NOTE_PREFIX =");
+    expect(cases).toContain('${AI_BRIEF_NOTE_PREFIX} Reviewed and kept by');
+    expect(brief).toContain('e.body.startsWith(AI_BRIEF_NOTE_PREFIX)');
+  });
+
+  it('marks it in the text the model reads', () => {
+    // Saving a brief puts it on the file, and the next brief reads the file.
+    // Unmarked, each reading summarises the last and the file fills with the
+    // model's own output.
+    expect(brief).toContain('not a record of events');
+    expect(provider).toContain('marked as an earlier AI draft is not evidence');
+  });
+
+  it('keeps it rather than hiding it', () => {
+    // That somebody read a brief and kept it is a fact about the file. The
+    // note is labelled, not dropped.
+    const reader = brief.slice(brief.indexOf('const isOwnDraft'), brief.indexOf('lines.push(`- ${dateShort(e.occurred_at)}') + 200);
+    expect(reader).not.toMatch(/continue;|filter\(/);
+  });
+});
