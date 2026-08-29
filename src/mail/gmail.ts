@@ -31,8 +31,42 @@ export interface GmailCredentials {
   refreshToken: string;
 }
 
+/**
+ * Trim, because these arrive by copy and paste.
+ *
+ * A client id with a trailing newline is a different string, and Google answers
+ * "The OAuth client was not found" — which reads like the client was deleted
+ * rather than like a stray keystroke. Whitespace is never meaningful in any of
+ * these values, so removing it can only help.
+ */
+const clean = (value: string | undefined): string => (value ?? '').trim();
+
+/** What a Google OAuth client id always ends with. */
+export const CLIENT_ID_SUFFIX = '.apps.googleusercontent.com';
+
+/**
+ * Whether a credential is the shape Google issues, in words an administrator
+ * can act on.
+ *
+ * Checked before the request rather than after it, because Google's own answer
+ * to a malformed client id names neither the field nor the problem.
+ */
+export function credentialShapeProblem(creds: GmailCredentials): string | null {
+  if (!creds.clientId.endsWith(CLIENT_ID_SUFFIX)) {
+    return `the client ID does not end "${CLIENT_ID_SUFFIX}", so it is not a Google OAuth client`
+      + ' ID — check it was copied whole, and from the right client';
+  }
+  if (!creds.refreshToken.startsWith('1//')) {
+    return 'the refresh token does not start "1//" — an access token or an authorisation code'
+      + ' may have been saved in its place';
+  }
+  return null;
+}
+
 export function gmailCredentials(env: Env): GmailCredentials | null {
-  const { GMAIL_CLIENT_ID: clientId, GMAIL_CLIENT_SECRET: clientSecret, GMAIL_REFRESH_TOKEN: refreshToken } = env;
+  const clientId = clean(env.GMAIL_CLIENT_ID);
+  const clientSecret = clean(env.GMAIL_CLIENT_SECRET);
+  const refreshToken = clean(env.GMAIL_REFRESH_TOKEN);
   if (!clientId || !clientSecret || !refreshToken) return null;
   return { clientId, clientSecret, refreshToken };
 }
@@ -66,6 +100,10 @@ export async function accessToken(
     access_token?: string; expires_in?: number; error?: string; error_description?: string;
   };
   if (!response.ok || !body.access_token) {
+    // Google's answer to a malformed credential names neither the field nor the
+    // problem, so say what is checkable about the values before repeating it.
+    const shape = credentialShapeProblem(creds);
+    if (shape) throw new Error(`gmail token error ${response.status}: ${shape}`);
     // Google's own wording is the useful part here; a revoked or expired grant
     // says so, and that is what an administrator needs to read.
     throw new Error(`gmail token error ${response.status}: ${body.error_description ?? body.error ?? 'unknown'}`);

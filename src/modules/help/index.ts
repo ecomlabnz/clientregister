@@ -32,6 +32,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.51.1', date: '29 August 2026',
+    notes: [
+      'Gmail credentials are trimmed before use. Pasted with a trailing newline, a client ID '
+        + 'is a different string, and Google answers \u201cThe OAuth client was not found\u201d '
+        + '\u2014 which reads like the client was deleted rather than like a stray keystroke.',
+      'A credential of the wrong shape is now named as such: a client ID that does not end '
+        + '\u201c.apps.googleusercontent.com\u201d, or a refresh token that does not start '
+        + '\u201c1//\u201d, is reported before the request is made.',
+    ],
+  },
+  {
     version: '0.51.0', date: '29 August 2026',
     notes: [
       '\u201cCheck for mail now\u201d under Settings \u2192 Maintenance runs the mailbox poll '

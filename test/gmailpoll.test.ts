@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { decodeRawMessage, inboxCredentials, inboxSetupGaps } from '../src/ingest/gmail';
 import { MAIL_POLL_CRON } from '../src/index';
+import { credentialShapeProblem } from '../src/mail/gmail';
 import type { Env } from '../src/types';
 
 const source = readFileSync('src/ingest/gmail.ts', 'utf8');
@@ -138,5 +139,73 @@ describe('the schedule', () => {
     const wrangler = readFileSync('wrangler.jsonc', 'utf8');
     expect(wrangler).toContain(`"${MAIL_POLL_CRON}"`);
     expect(readFileSync('src/index.ts', 'utf8')).toContain('event.cron === MAIL_POLL_CRON');
+  });
+});
+
+describe('credentials that arrive by copy and paste', () => {
+  it('trims them, because a trailing newline is a different string', () => {
+    // Google answers "The OAuth client was not found" to a client id with a
+    // stray newline on the end, which reads like the client was deleted rather
+    // than like a keystroke.
+    const creds = inboxCredentials(env({
+      GMAIL_INBOX_CLIENT_ID: '  abc.apps.googleusercontent.com\n',
+      GMAIL_INBOX_CLIENT_SECRET: ' secret ',
+      GMAIL_INBOX_REFRESH_TOKEN: '1//token\n',
+      GMAIL_INBOX_ADDRESS: ' inbox@example.test ',
+    }));
+    expect(creds).toEqual({
+      clientId: 'abc.apps.googleusercontent.com',
+      clientSecret: 'secret',
+      refreshToken: '1//token',
+      address: 'inbox@example.test',
+    });
+  });
+
+  it('treats a whitespace-only value as absent, not as present', () => {
+    // Otherwise it falls through to a request that cannot succeed, instead of
+    // to the integrations page saying what is missing.
+    expect(inboxCredentials(env({
+      GMAIL_INBOX_CLIENT_ID: 'a.apps.googleusercontent.com',
+      GMAIL_INBOX_CLIENT_SECRET: 's',
+      GMAIL_INBOX_REFRESH_TOKEN: '   ',
+    }))).toBeNull();
+  });
+
+  it('falls back to the sending pair only when the inbox one is genuinely empty', () => {
+    const creds = inboxCredentials(env({
+      GMAIL_CLIENT_ID: 'send.apps.googleusercontent.com', GMAIL_CLIENT_SECRET: 'send-secret',
+      GMAIL_INBOX_CLIENT_ID: '  ', GMAIL_INBOX_CLIENT_SECRET: '',
+      GMAIL_INBOX_REFRESH_TOKEN: '1//r',
+    }));
+    expect(creds?.clientId).toBe('send.apps.googleusercontent.com');
+  });
+});
+
+describe('naming what is wrong with a credential', () => {
+  it('recognises a client id that is not one', () => {
+    // The commonest paste error: the project number, or half the value.
+    expect(credentialShapeProblem({
+      clientId: '507008', clientSecret: 's', refreshToken: '1//r',
+    })).toMatch(/apps\.googleusercontent\.com/);
+  });
+
+  it('recognises a refresh token that is not one', () => {
+    expect(credentialShapeProblem({
+      clientId: 'a.apps.googleusercontent.com', clientSecret: 's', refreshToken: 'ya29.something',
+    })).toMatch(/1\/\//);
+  });
+
+  it('says nothing when both are the right shape', () => {
+    expect(credentialShapeProblem({
+      clientId: 'a.apps.googleusercontent.com', clientSecret: 's', refreshToken: '1//r',
+    })).toBeNull();
+  });
+
+  it('never repeats the value back', () => {
+    // These end up in a flash message and in the audit log.
+    const problem = credentialShapeProblem({
+      clientId: 'sensitive-looking-value', clientSecret: 's', refreshToken: '1//r',
+    })!;
+    expect(problem).not.toContain('sensitive-looking-value');
   });
 });

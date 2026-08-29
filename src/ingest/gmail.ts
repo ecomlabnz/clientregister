@@ -61,11 +61,17 @@ export interface InboxCredentials extends GmailCredentials {
  * making impossible.
  */
 export function inboxCredentials(env: Env): InboxCredentials | null {
-  const refreshToken = env.GMAIL_INBOX_REFRESH_TOKEN;
-  const clientId = env.GMAIL_INBOX_CLIENT_ID ?? env.GMAIL_CLIENT_ID;
-  const clientSecret = env.GMAIL_INBOX_CLIENT_SECRET ?? env.GMAIL_CLIENT_SECRET;
+  // Trimmed for the same reason as the sending pair: these are pasted, and a
+  // trailing newline turns a valid client id into one Google has never heard of.
+  const trim = (value: string | undefined) => (value ?? '').trim();
+  const refreshToken = trim(env.GMAIL_INBOX_REFRESH_TOKEN);
+  const clientId = trim(env.GMAIL_INBOX_CLIENT_ID) || trim(env.GMAIL_CLIENT_ID);
+  const clientSecret = trim(env.GMAIL_INBOX_CLIENT_SECRET) || trim(env.GMAIL_CLIENT_SECRET);
   if (!refreshToken || !clientId || !clientSecret) return null;
-  return { clientId, clientSecret, refreshToken, address: env.GMAIL_INBOX_ADDRESS ?? null };
+  return {
+    clientId, clientSecret, refreshToken,
+    address: trim(env.GMAIL_INBOX_ADDRESS) || null,
+  };
 }
 
 export function inboxSetupGaps(env: Env): string[] {
