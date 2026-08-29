@@ -29,7 +29,7 @@ import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABE
 import { currentModel, isAiEnabled } from '../../ai/provider';
 import { nzbnConfigured } from '../../integrations/nzbn';
 import { mailConfigured, mailSetupGaps, mailTransportDetail } from '../../mail/provider';
-import { inboxCredentials, inboxSetupGaps } from '../../ingest/gmail';
+import { inboxCredentials, inboxSetupGaps, pollInbox } from '../../ingest/gmail';
 import { flushQueue, queueEmail } from '../../mail/queue';
 import { registeredModules } from '../../registry';
 import { PRACTICE_SETTINGS } from '../../core/practice';
@@ -251,6 +251,18 @@ export const adminModule: AppModule = {
           <p class="hint">Only rows whose identifier begins <code>demo_</code> are removed. The audit
              log is append-only and keeps the record that this data existed.</p>`) : ''}
 
+        ${inboxCredentials(c.env) ? card('Forwarded mail', html`
+          <p>Reading <strong>${c.env.GMAIL_INBOX_ADDRESS ?? 'the authorised mailbox'}</strong>
+             every five minutes.</p>
+          <form method="post" action="/admin/mail/poll">
+            ${csrfField(c.get('session')!.csrf)}
+            <button class="btn btn-secondary" type="submit">Check for mail now</button>
+          </form>
+          <p class="hint">The same pass the schedule runs, on demand. It says what it looked at
+             and what it took, so a mailbox that is connected but silent can be told apart from
+             one that is not connected at all — which is otherwise the same picture from here.</p>`)
+          : ''}
+
         ${card('Outbound mail queue', html`
           <p>${queuedMail} message(s) waiting.</p>
           <form method="post" action="/admin/mail/flush">
@@ -359,6 +371,36 @@ export const adminModule: AppModule = {
             ? 'The provider refused it. Settings → Maintenance shows the queue and the reason.'
             : 'Queued, but nothing was sent — check that MAIL_PROVIDER and its key are set.',
         result.sent > 0 ? 'ok' : 'err');
+    });
+
+    /**
+     * Run the mailbox poll now.
+     *
+     * The schedule runs it every five minutes, and a poll that finds nothing
+     * writes nothing — which means "connected and quiet" and "not working at
+     * all" look identical from the outside. This button tells them apart: it
+     * reports what it looked at, not only what it took, and it surfaces the
+     * provider's own words when the authorisation is refused.
+     */
+    r.post('/mail/poll', requirePermission('admin:settings'), async (c) => {
+      let result: Awaited<ReturnType<typeof pollInbox>>;
+      try {
+        result = await pollInbox(c.env);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        await auditFrom(c, { action: 'admin.mail_poll_failed', meta: { error: message } });
+        return redirectWith(c, '/admin?tab=maintenance',
+          `The mailbox could not be read: ${message}`, 'err');
+      }
+      if (!result) {
+        return redirectWith(c, '/admin?tab=maintenance',
+          'No mailbox is configured to read. Settings → Integrations says what is missing.', 'err');
+      }
+      await auditFrom(c, { action: 'admin.mail_polled', meta: { ...result } });
+      return redirectWith(c, '/admin?tab=maintenance',
+        `Looked at ${result.looked} message(s): ${result.captured} taken, `
+        + `${result.skipped} already seen, ${result.failed} failed.`,
+        result.failed > 0 ? 'err' : 'ok');
     });
 
     r.post('/mail/flush', requirePermission('admin:settings'), async (c) => {
