@@ -32,6 +32,13 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.27.0', date: '29 August 2026',
+    notes: [
+      'A passport number entered against the wrong person can now be removed, not just overwritten.',
+      'Changing or clearing one is recorded in the audit log as specifically as revealing one.',
+    ],
+  },
+  {
     version: '0.26.0', date: '29 August 2026',
     notes: [
       'Export: fifteen datasets, each one link and one CSV. Passport numbers excluded.',

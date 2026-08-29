@@ -7,6 +7,28 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.27.0 — 29 August 2026
+
+### Added
+- **A passport number can be removed, not only overwritten.** Leaving the box
+  blank still keeps what is stored — otherwise every unrelated edit would wipe
+  it — so there was no way to take out a number entered against the wrong
+  person. There is now a "Remove the number on file" tick, shown only when one
+  is held. Asking to replace and remove at once is refused rather than guessed
+  at: those are different intentions and picking one would be picking wrong half
+  the time.
+- **Changing it is recorded as specifically as reading it.**
+  `client.passport_set` (noting whether it replaced an existing number) and
+  `client.passport_cleared` sit alongside the existing
+  `client.passport_revealed`. Until now a change was only a generic
+  `client.updated`, so you could tell who had looked at a passport number but
+  not who had altered it — for the one field the register encrypts, that
+  asymmetry was the wrong way round. A line is also written to the client's own
+  timeline, where somebody looking at the file would see it.
+- The number itself never reaches the audit log or the timeline. Verified
+  against the database after a full set-correct-replace-clear cycle: zero rows
+  in either table contain it.
+
 ## 0.26.0 — 29 August 2026
 
 ### Added

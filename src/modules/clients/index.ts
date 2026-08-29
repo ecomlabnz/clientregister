@@ -185,10 +185,17 @@ function clientForm(
            ${kind === 'individual' ? '' : raw('hidden')}>
         <h3>Identity documents</h3>
         ${sealingAvailable
-          ? field({ label: 'Passport number', name: 'passport_number', value: '',
+          ? html`${field({ label: 'Passport number', name: 'passport_number', value: '',
                     hint: values.passport_sealed
                       ? 'A passport number is on file (encrypted). Enter a new one to replace it, or leave blank to keep it.'
-                      : 'Stored encrypted at rest.' })
+                      : 'Stored encrypted at rest.' })}
+                 ${values.passport_sealed ? html`
+                   <div class="field checkbox-field">
+                     <label><input type="checkbox" name="passport_clear" value="1">
+                       Remove the number on file</label>
+                     <p class="hint">For one entered against the wrong person. Leaving the box above
+                        blank keeps what is stored; this is the only way to take it out.</p>
+                   </div>` : ''}`
           : html`<div class="field"><label>Passport number</label>
                  <p class="hint">Disabled: set the <code>FIELD_KEY</code> secret to store passport numbers encrypted.</p></div>`}
         ${field({ label: 'Passport country', name: 'passport_country', value: values.passport_country, maxlength: 100 })}
@@ -297,6 +304,7 @@ function readClientForm(f: FormReader) {
     assigned_to: f.optional('assigned_to', { max: 60 }),
     notes: f.optional('notes', { max: 4000 }),
     passport_number: f.optional('passport_number', { max: 60 }),
+    passport_clear: f.checkbox('passport_clear'),
   };
 }
 
@@ -1009,9 +1017,19 @@ export const clientsModule: AppModule = {
           ${clientForm(c, { ...existing, ...v } as Partial<ClientRow>, users, organisations, englishTestOptions, f.errors)}`);
       }
 
-      const passportSealed = v.passport_number && c.env.FIELD_KEY
-        ? await sealField(v.passport_number, c.env.FIELD_KEY)
-        : existing.passport_sealed;
+      // Three outcomes, and the contradictory one is refused rather than
+      // guessed at: replacing a number and removing it are different
+      // intentions, and picking one for somebody would be picking wrong half
+      // the time.
+      if (v.passport_clear && v.passport_number) {
+        return redirectWith(c, `/clients/${id}/edit`,
+          'Either enter a new passport number or tick to remove the one on file — not both.', 'err');
+      }
+      const passportSealed = v.passport_clear
+        ? null
+        : v.passport_number && c.env.FIELD_KEY
+          ? await sealField(v.passport_number, c.env.FIELD_KEY)
+          : existing.passport_sealed;
 
       await run(
         c.env.DB,
@@ -1042,6 +1060,25 @@ export const clientsModule: AppModule = {
       // and nothing on this form owns them any more. Rebuilding after a save
       // keeps that true by construction rather than by everyone remembering.
       await refreshClientCache(c.env, id);
+
+      // The encrypted field gets its own entry. A reveal was already recorded
+      // specifically; a change was not, which meant you could tell who had
+      // looked at a passport number but not who had altered it. The number
+      // itself is never written to either the log or the timeline.
+      if (v.passport_clear && existing.passport_sealed) {
+        await auditFrom(c, { action: 'client.passport_cleared', entityType: 'client', entityId: id });
+        await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system',
+          body: 'Passport number removed from the file.', createdBy: c.get('user')!.id });
+      } else if (v.passport_number) {
+        await auditFrom(c, {
+          action: 'client.passport_set', entityType: 'client', entityId: id,
+          meta: { replaced: Boolean(existing.passport_sealed) },
+        });
+        await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system',
+          body: existing.passport_sealed
+            ? 'Passport number replaced.' : 'Passport number recorded.',
+          createdBy: c.get('user')!.id });
+      }
       await auditFrom(c, { action: 'client.updated', entityType: 'client', entityId: id });
       return redirectWith(c, `/clients/${id}`, 'Client updated.');
     });
