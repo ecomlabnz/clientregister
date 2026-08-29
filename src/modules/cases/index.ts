@@ -28,6 +28,7 @@ import {
   PRIORITY_LABELS, TASK_STATUS_LABELS, type CaseStatus,
 } from '../../domain';
 import { clientOptions, isAssignable, userOptions } from '../../core/lookups';
+import { threadsFor } from '../../core/channels';
 import { addParty, partiesForCase, removeParty } from '../../core/parties';
 import { findOrCreateTag, listTags, tagCase, tagsForCase, tagsForCases, untagCase } from '../../core/tags';
 import { addEntry, listEntries } from '../../core/timeline';
@@ -478,7 +479,8 @@ export const casesModule: AppModule = {
       const writable = can(c.get('user'), 'register:write');
       const csrf = c.get('session')!.csrf;
 
-      const [entries, history, tasks, quotes, users, fees, parties, caseTags, allTags, clients] = await Promise.all([
+      const [entries, history, tasks, quotes, users, fees, parties, caseTags, allTags, clients,
+             threads] = await Promise.all([
         listEntries(c.env, 'case', id),
         all<any>(c.env.DB, `SELECT h.*, u.name AS by_name FROM case_status_history h
                               LEFT JOIN users u ON u.id = h.by_user_id
@@ -496,6 +498,7 @@ export const casesModule: AppModule = {
         tagsForCase(c.env, id),
         listTags(c.env),
         clientOptions(c.env),
+        threadsFor(c.env, 'case', id),
       ]);
 
       const nextStatuses = CASE_TRANSITIONS[kase.status] ?? [];
@@ -686,6 +689,27 @@ export const casesModule: AppModule = {
                       </button>
                     </form>
                   </details>` : ''}` : ''}`) : ''}
+
+            ${'' /* Read from where it lives rather than copied onto the
+                     timeline. A file note is what somebody decided to write
+                     down; this is what was actually said. */}
+            ${threads.length > 0
+              ? card('Correspondence', html`
+                  <ul class="list">${threads.map((t) => html`
+                    <li class="list-row">
+                      <div>
+                        <strong><a href="/inbox/threads/${t.id}">${t.peer_label ?? t.peer_id}</a></strong>
+                        ${badge(t.channel, 'grey')}
+                        ${t.waiting > 0 ? badge(`${t.waiting} waiting`, 'amber') : ''}
+                        ${t.last_body
+                          ? html`<div class="muted small clamp-2">${
+                              t.last_direction === 'out' ? 'You: ' : ''}${t.last_body}</div>`
+                          : ''}
+                      </div>
+                      <div class="small muted">${dateShort(t.last_message_at)}</div>
+                    </li>`)}
+                  </ul>`)
+              : ''}
 
             ${card('File notes', html`
               ${writable ? html`

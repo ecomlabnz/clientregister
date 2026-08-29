@@ -68,3 +68,67 @@ describe('one box for the whole register', () => {
     expect(normaliseQuery('')).toBe('');
   });
 });
+
+/**
+ * Correspondence is searchable.
+ *
+ * A file note records what somebody decided to write down. A message records
+ * what was actually said, in the words it was said in — and until now it was
+ * the one body of text in the register that could not be searched at all, which
+ * made "what did we tell them about the police certificate" a question you
+ * answered by scrolling through a conversation.
+ */
+describe('searching what was actually said', () => {
+  const search = readFileSync('src/core/search.ts', 'utf8');
+
+  it('looks in both halves of a conversation', () => {
+    expect(search).toContain('FROM ingest_messages m');
+    expect(search).toContain('FROM channel_replies r');
+  });
+
+  it('leaves out what somebody decided was not correspondence', () => {
+    // The same reason ignored messages leave the conversation.
+    expect(search).toMatch(/FROM ingest_messages m[\s\S]{0,200}m\.status != 'ignored'/);
+  });
+
+  it('lands on the conversation, not on a message in isolation', () => {
+    // A message read without the exchange around it is half an answer.
+    expect(search).toContain('`/inbox/threads/${r.thread_id}`');
+  });
+
+  it('is grouped under its own heading, after file notes', () => {
+    expect(search).toContain("message: 'Correspondence'");
+    const order = search.slice(search.indexOf('KIND_ORDER'), search.indexOf('KIND_ORDER') + 260);
+    expect(order.indexOf("'note'")).toBeLessThan(order.indexOf("'message'"));
+  });
+
+  it('escapes the query in the new clauses like every other one', () => {
+    // Two more LIKEs is two more places a percent sign in a search box could
+    // have become a wildcard.
+    const clauses = search.match(/LIKE \?1 ESCAPE/g) ?? [];
+    expect(clauses.length).toBeGreaterThanOrEqual(12);
+  });
+});
+
+describe('correspondence reaches the file it belongs to', () => {
+  const channels = readFileSync('src/core/channels.ts', 'utf8');
+
+  it('is read from where it lives rather than copied onto a timeline', () => {
+    // A message with two owners disagrees with itself the first time one of
+    // them is edited.
+    expect(channels).toContain('export async function threadsFor');
+    expect(channels).not.toMatch(/threadsFor[\s\S]{0,600}INSERT INTO entries/);
+  });
+
+  it('shows whichever side spoke last', () => {
+    // last_message_at is only bumped on a reply, so it cannot answer this.
+    expect(channels).toContain("const outLater = (row.last_out_at ?? '') > (row.last_in_at ?? '');");
+  });
+
+  it('appears on both a client and a matter', () => {
+    expect(readFileSync('src/modules/clients/index.ts', 'utf8'))
+      .toContain("threadsFor(c.env, 'client', id)");
+    expect(readFileSync('src/modules/cases/index.ts', 'utf8'))
+      .toContain("threadsFor(c.env, 'case', id)");
+  });
+});

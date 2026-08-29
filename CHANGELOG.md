@@ -7,6 +7,25 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.55.0 — 29 August 2026
+
+### Added
+- **Correspondence is searchable.** Global search now covers `ingest_messages`
+  and `channel_replies` under a *Correspondence* heading. A file note records
+  what somebody decided to write down; a message records what was actually said,
+  in the words it was said in — and it was the one body of text in the register
+  that could not be searched at all. "What did we tell them about the police
+  certificate" was a question you answered by scrolling.
+- A hit lands on the **conversation**, not the message in isolation: a message
+  read without the exchange around it is half an answer.
+- Ignored messages are left out, for the same reason they leave the
+  conversation.
+- **A client's page and a matter's page show their conversations** — who with,
+  on what channel, the last thing said and which way round, and whether anything
+  is waiting.
+- Read from where it lives rather than copied onto the timeline. A message with
+  two owners disagrees with itself the first time one of them is edited.
+
 ## 0.54.0 — 29 August 2026
 
 ### Changed

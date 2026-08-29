@@ -42,6 +42,7 @@ import { can } from '../../core/rbac';
 import { asPrefInteger, preferencesFor } from '../../core/preferences';
 import { caseTypes, englishTests, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
 import { countryCodeFor, countryName, countryOptions } from '../../core/countries';
+import { threadsFor } from '../../core/channels';
 import {
   CERTIFICATE_KINDS, CERTIFICATE_LABELS, MEDICAL_TYPES, type CertificateKind,
   CERTIFICATE_VALIDITY,
@@ -749,7 +750,7 @@ export const clientsModule: AppModule = {
       if (!client) return c.notFound();
 
       const [cases, quotes, inquiries, entries, tasks, partyCases, related, employer, people,
-             feesByCase, englishTestTerms, visaTerms, certificates, passports] = await Promise.all([
+             feesByCase, englishTestTerms, visaTerms, certificates, passports, threads] = await Promise.all([
         all<any>(c.env.DB, `SELECT id, ref, title, case_type, status, priority, next_action, next_action_due, updated_at
                               FROM cases WHERE client_id = ? ORDER BY updated_at DESC`, id),
         all<any>(c.env.DB, `SELECT id, ref, description, amount_cents, gst_cents, disbursements_cents, currency, status, created_at
@@ -788,6 +789,7 @@ export const clientsModule: AppModule = {
         visaTypes(c.env),
         certificatesFor(c.env, id),
         passportsFor(c.env, id),
+        threadsFor(c.env, 'client', id),
       ]);
 
       // Cases where this client is a party but not the file owner — an
@@ -1123,6 +1125,27 @@ export const clientsModule: AppModule = {
                     </details>` : ''}
                 </div>
               </section>`}
+
+            ${'' /* Correspondence, read from where it lives rather than copied
+                     onto a timeline. A message with two owners disagrees with
+                     itself the first time one of them is edited. */}
+            ${threads.length > 0
+              ? card('Correspondence', html`
+                  <ul class="list">${threads.map((t) => html`
+                    <li class="list-row">
+                      <div>
+                        <strong><a href="/inbox/threads/${t.id}">${t.peer_label ?? t.peer_id}</a></strong>
+                        ${badge(t.channel, 'grey')}
+                        ${t.waiting > 0 ? badge(`${t.waiting} waiting`, 'amber') : ''}
+                        ${t.last_body
+                          ? html`<div class="muted small clamp-2">${
+                              t.last_direction === 'out' ? 'You: ' : ''}${t.last_body}</div>`
+                          : ''}
+                      </div>
+                      <div class="small muted">${dateShort(t.last_message_at)}</div>
+                    </li>`)}
+                  </ul>`)
+              : ''}
 
             ${otherRoles.length > 0
               ? card('Also a party to', html`
