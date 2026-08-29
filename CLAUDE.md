@@ -15,10 +15,28 @@ finished, with no runtime cost. Migrations are the preferred tool. What is
 forbidden is the *permanent* accommodation — the code path that exists only
 because something used to be different.
 
-"Unless absolutely necessary" means: an outside party depends on the old shape
-and cannot be updated (INZ, a bank, a client's saved link). Then say so
-explicitly, keep the bridge as small as possible, and write down what would let
-it be removed. Convenience is not necessity.
+### When a bridge *is* the right answer
+
+The default is direct. A bridge is warranted when one of these is true:
+
+1. **Data would be lost or put at risk** by changing directly, and that risk
+   cannot be removed by rehearsing the change on a copy and verifying the result
+   before and after. Never trade records for tidiness. A bridge that keeps every
+   record beats a direct change that loses one.
+2. **An outside party depends on the old shape** and cannot be updated — INZ, a
+   bank, a client's saved link.
+3. **The direct change would cost out of proportion** to what it buys.
+
+This weighing changes as the register fills with real data. On an empty register
+direct is nearly always right; once the practice is working in it daily, the
+first test carries more weight than the other two, and "we would have to rebuild
+a lot" becomes a real answer rather than an excuse.
+
+What is actually forbidden is the *unremarked* bridge — the fallback that
+appears because it was easier that afternoon and is still there in two years
+because nobody wrote down why. So: whichever way it goes, say which and why,
+keep the bridge as small as it can be, name it in the code, and write down what
+would let it be removed.
 
 Two things genuinely cannot be changed directly, and are not exceptions to this
 rule but facts about the data:
