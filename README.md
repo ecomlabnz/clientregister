@@ -27,6 +27,12 @@ in from email, Telegram and WhatsApp so nothing sits unread in a phone.
 | **Email out** | Optional. Everything is queued and recorded first, sent second. |
 | **Admin** | Users and roles, practice settings, integration status, append-only audit log. |
 
+## How it is put together
+
+[ARCHITECTURE.md](ARCHITECTURE.md) — the four commitments (secure, modular,
+AI-assisted but never AI-dependent, mobile-first), where each one is actually
+enforced, and the shape of the codebase.
+
 ## Security in one paragraph
 
 Sessions are 256-bit random tokens; only their SHA-256 is stored, in KV and in

@@ -427,6 +427,50 @@
     window.setInterval(check, Math.max(15, every) * 1000);
   })();
 
+  // Suggesting a matter title.
+  //
+  // The house convention is the visa type, then the client, formally: for
+  // instance "AEWV. RUBEZHANSKII, Aleksei". Every list that shows a title also
+  // shows the client in its own column, so the title carries what the column
+  // does not.
+  //
+  // It only ever fills a box the typist has not touched. A title somebody wrote
+  // is theirs, and a form that overwrites what you typed because you changed a
+  // dropdown afterwards is worse than one that suggests nothing.
+  Array.prototype.forEach.call(document.querySelectorAll('.js-case-form'), function (form) {
+    var clientSelect = form.querySelector('.js-case-client');
+    var typeSelect = form.querySelector('.js-case-type');
+    var title = form.querySelector('[name="title"]');
+    if (!clientSelect || !typeSelect || !title) return;
+
+    var suggest = function () {
+      var client = clientSelect.options[clientSelect.selectedIndex];
+      var type = typeSelect.options[typeSelect.selectedIndex];
+      if (!client || !type || !client.value || !type.value) return '';
+      var formal = client.getAttribute('data-formal') || '';
+      // The type's label already reads "WV. AEWV"; the grouping prefix is
+      // dropped so the title does not say the same thing twice.
+      var label = (type.textContent || '').trim();
+      var dot = label.indexOf('. ');
+      var specific = dot === -1 ? label : label.slice(dot + 2).trim();
+      if (!specific) return formal;
+      return formal ? specific + '. ' + formal : specific;
+    };
+
+    var apply = function () {
+      if (title.value && title.dataset.suggested !== '1') return;
+      var next = suggest();
+      if (!next) return;
+      title.value = next;
+      title.dataset.suggested = '1';
+    };
+
+    // Typing in the box takes it out of the machine's hands for good.
+    title.addEventListener('input', function () { delete title.dataset.suggested; });
+    clientSelect.addEventListener('change', apply);
+    typeSelect.addEventListener('change', apply);
+  });
+
   // A file input that also accepts a drop.
   //
   // Progressive enhancement in the strict sense: the input inside the box is an

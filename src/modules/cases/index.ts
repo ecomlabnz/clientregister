@@ -9,7 +9,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
-import { all, nextRef, nowIso, one, run } from '../../core/db';
+import { all, nextYearlyRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
@@ -61,7 +61,7 @@ const DEFAULT_PAGE_SIZE = 25;
 function caseForm(
   c: any,
   values: Partial<CaseRow>,
-  clients: Array<{ value: string; label: string }>,
+  clients: Array<{ value: string; label: string; formal?: string }>,
   users: Array<{ value: string; label: string }>,
   types: Term[],
   errors?: Record<string, string>,
@@ -70,16 +70,33 @@ function caseForm(
   const action = values.id ? `/cases/${values.id}` : '/cases';
   return html`
     ${errorList(errors)}
-    <form method="post" action="${action}" class="form-grid">
+    <form method="post" action="${action}" class="form-grid js-case-form">
       ${csrfField(csrf)}
       <div class="form-section">
         <h3>Matter</h3>
-        ${select({ label: 'Client', name: 'client_id', value: values.client_id ?? '', required: true,
-                   options: clients, includeBlank: 'Choose a client' })}
+        ${'' /* Rendered here rather than through `select` so each option can
+                 carry the client's formal name. The script uses it to suggest a
+                 title; without the script the dropdown is an ordinary dropdown
+                 and the title is typed, as it always was. */}
+        <div class="field">
+          <label for="f_client_id">Client<span class="req"> *</span></label>
+          <select id="f_client_id" name="client_id" required class="js-case-client">
+            <option value="">Choose a client</option>
+            ${clients.map((cl) => html`<option value="${cl.value}" data-formal="${cl.formal ?? ''}"
+              ${cl.value === (values.client_id ?? '') ? raw('selected') : ''}>${cl.label}</option>`)}
+          </select>
+        </div>
         ${field({ label: 'Matter title', name: 'title', value: values.title, required: true, maxlength: 200,
-                  placeholder: 'e.g. AEWV — Chef, Auckland' })}
-        ${select({ label: 'Case type', name: 'case_type', value: values.case_type ?? '', required: true,
-                   options: termOptions(types), includeBlank: 'Choose a type' })}
+                  placeholder: 'e.g. AEWV. RUBEZHANSKII, Aleksei',
+                  hint: 'Filled in from the type and the client as you choose them. Change it freely.' })}
+        <div class="field">
+          <label for="f_case_type">Case type<span class="req"> *</span></label>
+          <select id="f_case_type" name="case_type" required class="js-case-type">
+            <option value="">Choose a type</option>
+            ${termOptions(types).map((t) => html`<option value="${t.value}"
+              ${t.value === (values.case_type ?? '') ? raw('selected') : ''}>${t.label}</option>`)}
+          </select>
+        </div>
         ${values.id
           ? html`<div class="field"><label>Status</label>
                  <p class="hint">Status changes are made from the case page so the reason is recorded.</p></div>`
@@ -334,7 +351,7 @@ export const casesModule: AppModule = {
       }
 
       const id = newId('cas');
-      const ref = await nextRef(c.env.DB, 'case', 'CASE');
+      const ref = await nextYearlyRef(c.env.DB, 'case', 'CASE');
       const policy = await decisionPolicy(c.env);
       // A lodged matter with no expected decision gets the practice's default,
       // because a date nobody typed is still a date the alerts page can watch.

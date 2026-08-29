@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.26.0', date: '29 August 2026',
+    notes: [
+      'Export: fifteen datasets, each one link and one CSV. Passport numbers excluded.',
+      'Certificates are records with their own dates — a new one no longer overwrites the old.',
+      'English language, and General or Limited on a medical.',
+      'A fee summary on the client page; the fee section on a case now starts folded.',
+      'Matter titles read “AEWV. SURNAME, Given”, and numbers carry the year: CASE-26-001.',
+    ],
+  },
+  {
     version: '0.25.0', date: '29 August 2026',
     notes: [
       'Lodging a matter fills in an expected decision date — a month later, by default.',

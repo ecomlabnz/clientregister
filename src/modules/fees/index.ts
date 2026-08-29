@@ -18,7 +18,7 @@ import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
-import { badge, card, csrfField, field, optionsFrom, pageHeader, select, statusTone, table } from '../../ui/components';
+import { badge, card, collapsibleCard, csrfField, field, optionsFrom, pageHeader, select, statusTone, table } from '../../ui/components';
 import { dateShort, money } from '../../ui/format';
 import { addEntry } from '../../core/timeline';
 import {
@@ -151,7 +151,9 @@ export async function feesSection(c: any, caseId: string, currency: string, canW
       </td>
     </tr>`;
 
-  return card('Fees and split', html`
+  // Closed by default. Fees are the one thing on a case page that a client
+  // leaning over the desk should not read by accident.
+  return collapsibleCard('Fees and split', html`
     <div class="fee-summary">
       <div class="stat"><span class="stat-label">Total (incl. GST)</span><span class="stat-value">${money(totals.totalGross, currency)}</span></div>
       <div class="stat"><span class="stat-label">GST</span><span class="stat-value">${money(totals.totalGst, currency)}</span></div>
