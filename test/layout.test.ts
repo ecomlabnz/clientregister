@@ -116,3 +116,39 @@ describe('pages in one family look like one family', () => {
     }
   });
 });
+
+describe('one menu entry for the incoming family', () => {
+  const inbox = readFileSync('src/modules/inbox/index.ts', 'utf8');
+  const inquiries = readFileSync('src/modules/inquiries/index.ts', 'utf8');
+
+  it('declares the entry once, not once per surface', () => {
+    // Inbox, Inquiries and Conversations are three surfaces of "what came in".
+    // Three menu entries made you choose a screen before you knew what had
+    // arrived; the bar between them does that job now.
+    expect(inbox).toContain('nav: [],');
+    expect(inquiries).toMatch(/nav: \[\{ href: '\/inquiries', label: 'Incoming'/);
+  });
+
+  it('highlights that entry from every page in the family', () => {
+    // `active` is matched against the entry's href, so a page setting anything
+    // else leaves the menu with nothing lit while you are standing on it.
+    expect(inbox, 'an inbox page still claims a menu entry of its own')
+      .not.toContain("active: '/inbox'");
+    for (const page of inbox.matchAll(/active: '([^']+)'/g)) {
+      expect(page[1]).toBe('/inquiries');
+    }
+  });
+
+  it('hides triage tabs from a role that cannot triage', () => {
+    // A tab that refuses to open is worse than one that was never offered.
+    expect(inquiries).toContain("const triage = can(user, 'ingest:triage');");
+    expect(inquiries).toMatch(/show: triage[\s\S]{0,200}filter\(\(t\) => t\.show\)/);
+  });
+
+  it('counts what is waiting, not how many rows exist', () => {
+    // A number beside a tab is only useful if it means "this much is asking
+    // for you". Every inquiry ever received is not that.
+    expect(inquiries).toContain("WHERE status IN ('new', 'triaged', 'responded', 'quoted')");
+    expect(inquiries).toContain("FROM ingest_messages WHERE status = 'pending'");
+  });
+});

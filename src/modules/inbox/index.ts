@@ -22,10 +22,11 @@ import { processMessage } from '../../ingest/pipeline';
 import { isAiEnabled } from '../../ai/provider';
 import { latestTriage, runTriage } from '../../ai/triage';
 import { can } from '../../core/rbac';
+import { incomingCounts, incomingTabs } from '../inquiries';
 import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
 import { FormReader } from '../../core/validate';
 import {
-  CHANNEL_LABELS, type ThreadRow, linkThread, openThreadCount, postReply, threadHistory,
+  CHANNEL_LABELS, type ThreadRow, linkThread, postReply, threadHistory,
 } from '../../core/channels';
 
 interface IngestRow {
@@ -56,7 +57,10 @@ export const inboxModule: AppModule = {
   title: 'Inbox',
   basePaths: ['/inbox'],
   settings: [CHANNEL_SETTINGS],
-  nav: [{ href: '/inbox', label: 'Inbox', permission: 'ingest:triage', order: 95 }],
+  // No menu entry of its own. The inbox is one of three surfaces under
+  // "Incoming", declared by the inquiries module, and the bar on these pages is
+  // how you move between them.
+  nav: [],
 
   register(app) {
     const r = new Hono<AppContext>();
@@ -113,12 +117,12 @@ export const inboxModule: AppModule = {
       }
       const whereSql = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
-      const [rows, counts, threads] = await Promise.all([
+      const [rows, counts, family] = await Promise.all([
         all<IngestRow>(c.env.DB,
           `SELECT * FROM ingest_messages ${whereSql} ORDER BY received_at DESC LIMIT 200`, ...params),
         all<{ status: string; n: number }>(c.env.DB,
           `SELECT status, COUNT(*) AS n FROM ingest_messages GROUP BY status`),
-        openThreadCount(c.env),
+        incomingCounts(c.env),
       ]);
       const countFor = (s: string): number => s === 'all'
         ? counts.reduce((sum, row) => sum + row.n, 0)
@@ -132,15 +136,17 @@ export const inboxModule: AppModule = {
       const keep = (extra: Record<string, string>): string =>
         new URLSearchParams({ status, channel, q, ...extra }).toString();
 
-      return page(c, { title: 'Inbox', active: '/inbox' }, html`
+      return page(c, { title: 'Inbox', active: '/inquiries' }, html`
         ${pageHeader('Inbox', 'Everything that arrived from a channel, before anybody has decided about it.')}
+        ${incomingTabs(c.get('user'), 'inbox', family)}
 
-        <nav class="tabs">
+        ${raw('<!-- Buttons, not a second bar of tabs: the bar above moves between the'
+              + ' three surfaces, this row filters the one you are already on. -->')}
+        <div class="filters">
           ${views.map((v) => html`
-            <a class="${v.id === status ? 'tab current' : 'tab'}"
-               href="${`/inbox?${keep({ status: v.id })}`}">${v.label} <span class="muted">${countFor(v.id)}</span></a>`)}
-          <a class="tab" href="/inbox/threads">Conversations <span class="muted">${threads}</span></a>
-        </nav>
+            <a class="${v.id === status ? 'btn btn-primary btn-small' : 'btn btn-secondary btn-small'}"
+               href="${`/inbox?${keep({ status: v.id })}`}">${v.label} (${countFor(v.id)})</a>`)}
+        </div>
 
         <form method="get" action="/inbox" class="filters" data-live-search>
           <input type="hidden" name="status" value="${status}">
@@ -183,24 +189,24 @@ export const inboxModule: AppModule = {
     // declared and '/threads' would otherwise be read as a message id.
     r.get('/threads', requirePermission('ingest:triage'), async (c) => {
       const q = (c.req.query('q') ?? '').trim();
-      const rows = await all<ThreadRow & { client_name: string | null; waiting: number }>(
-        c.env.DB,
-        `SELECT t.*, cl.full_name AS client_name,
-                (SELECT COUNT(*) FROM ingest_messages m
-                  WHERE m.thread_id = t.id AND m.status = 'pending') AS waiting
-           FROM channel_threads t LEFT JOIN clients cl ON cl.id = t.client_id
-          ${q ? 'WHERE t.peer_label LIKE ? OR t.peer_id LIKE ? OR cl.full_name LIKE ?' : ''}
-          ORDER BY t.last_message_at DESC LIMIT 200`,
-        ...(q ? [`%${q}%`, `%${q}%`, `%${q}%`] : []),
-      );
+      const [rows, family] = await Promise.all([
+        all<ThreadRow & { client_name: string | null; waiting: number }>(
+          c.env.DB,
+          `SELECT t.*, cl.full_name AS client_name,
+                  (SELECT COUNT(*) FROM ingest_messages m
+                    WHERE m.thread_id = t.id AND m.status = 'pending') AS waiting
+             FROM channel_threads t LEFT JOIN clients cl ON cl.id = t.client_id
+            ${q ? 'WHERE t.peer_label LIKE ? OR t.peer_id LIKE ? OR cl.full_name LIKE ?' : ''}
+            ORDER BY t.last_message_at DESC LIMIT 200`,
+          ...(q ? [`%${q}%`, `%${q}%`, `%${q}%`] : []),
+        ),
+        incomingCounts(c.env),
+      ]);
 
-      return page(c, { title: 'Conversations', active: '/inbox' }, html`
+      return page(c, { title: 'Conversations', active: '/inquiries' }, html`
         ${pageHeader('Conversations',
           'Each channel as a two-way thread: what they sent, and what the practice sent back.')}
-        <nav class="tabs">
-          <a class="tab" href="/inbox">Messages</a>
-          <a class="tab current" href="/inbox/threads">Conversations <span class="muted">${rows.length}</span></a>
-        </nav>
+        ${incomingTabs(c.get('user'), 'threads', family)}
         <form method="get" action="/inbox/threads" class="filters" data-live-search>
           <input type="search" name="q" value="${q}" placeholder="Search by name, number or client">
           <button class="btn btn-secondary js-hide" type="submit">Search</button>
@@ -253,7 +259,7 @@ export const inboxModule: AppModule = {
         ? can(c.get('user'), 'mail:send')
         : can(c.get('user'), 'register:write');
 
-      return page(c, { title: thread.peer_label ?? thread.peer_id, active: '/inbox' }, html`
+      return page(c, { title: thread.peer_label ?? thread.peer_id, active: '/inquiries' }, html`
         ${breadcrumbs([{ label: 'Inbox', href: '/inbox' },
                        { label: 'Conversations', href: '/inbox/threads' },
                        { label: thread.peer_label ?? thread.peer_id }])}
@@ -365,7 +371,7 @@ export const inboxModule: AppModule = {
       const filed = await all<{ id: string; ref: string }>(
         c.env.DB, 'SELECT id, ref FROM kb_articles WHERE ingest_message_id = ? ORDER BY created_at', id);
 
-      return page(c, { title: 'Inbox message', active: '/inbox' }, html`
+      return page(c, { title: 'Inbox message', active: '/inquiries' }, html`
         ${breadcrumbs([{ href: '/inbox', label: 'Inbox' }, { label: msg.channel }])}
         ${pageHeader(msg.subject || '(no subject)',
           `${msg.channel} · from ${msg.sender_display ?? msg.sender ?? 'unknown'} · ${dateTime(msg.received_at)}`)}

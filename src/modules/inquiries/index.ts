@@ -7,7 +7,7 @@
  */
 
 import { Hono } from 'hono';
-import type { AppContext } from '../../types';
+import type { AppContext, Env, User } from '../../types';
 import type { AppModule } from '../../core/module';
 import { all, nextRef, nextYearlyRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
@@ -15,7 +15,7 @@ import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
-import { html, raw } from '../../ui/html';
+import { html, raw, type Raw } from '../../ui/html';
 import {
   badge, card, csrfField, emptyState, errorList, field, optionsFrom,
   pageHeader, select, statusTone, table,
@@ -28,6 +28,7 @@ import {
 } from '../../domain';
 import { clientOptions, userOptions } from '../../core/lookups';
 import { addEntry, listEntries } from '../../core/timeline';
+import { openThreadCount } from '../../core/channels';
 import { can } from '../../core/rbac';
 import { caseTypes, isTerm, labelFor, termOptions } from '../../core/vocabulary';
 
@@ -99,11 +100,62 @@ export async function matchClient(
   return null;
 }
 
+/**
+ * The three surfaces of "what came in", and one bar across all of them.
+ *
+ * Inbox and Inquiries are different things and stay different things: the inbox
+ * holds raw messages from a channel, untrusted outside text that nothing acts
+ * on by itself; an inquiry is a work item with a reference, a status and an
+ * owner. A twenty-message thread is still one inquiry, and an inquiry taken
+ * over the phone has no message behind it at all. Merging the *data* would lose
+ * that distinction.
+ *
+ * But nobody thinks "I will go to the Inbox" — they think "what came in". So
+ * the three share one menu entry and one bar, and only the current tab moves.
+ *
+ * The counts are what is waiting on each, not how many rows exist: a number
+ * beside a tab is only useful if it means "this much is asking for you".
+ */
+export interface IncomingCounts { inquiries: number; inbox: number; threads: number }
+
+export async function incomingCounts(env: Env): Promise<IncomingCounts> {
+  const [open, waiting, threads] = await Promise.all([
+    one<{ n: number }>(
+      env.DB,
+      `SELECT COUNT(*) AS n FROM inquiries
+        WHERE status IN ('new', 'triaged', 'responded', 'quoted')`),
+    one<{ n: number }>(
+      env.DB, `SELECT COUNT(*) AS n FROM ingest_messages WHERE status = 'pending'`),
+    openThreadCount(env),
+  ]);
+  return { inquiries: open?.n ?? 0, inbox: waiting?.n ?? 0, threads };
+}
+
+export function incomingTabs(
+  user: User | null, current: 'inquiries' | 'inbox' | 'threads', counts: IncomingCounts,
+): Raw {
+  // The inbox and the conversations are triage, which a read-only account does
+  // not do. Their tabs are absent rather than disabled — a tab that refuses to
+  // open is worse than one that was never offered.
+  const triage = can(user, 'ingest:triage');
+  const tabs = [
+    { id: 'inquiries', label: 'Inquiries', href: '/inquiries', count: counts.inquiries, show: true },
+    { id: 'inbox', label: 'Inbox', href: '/inbox', count: counts.inbox, show: triage },
+    { id: 'threads', label: 'Conversations', href: '/inbox/threads', count: counts.threads, show: triage },
+  ].filter((t) => t.show);
+
+  return html`<nav class="tabs">${tabs.map((t) => html`
+    <a class="${t.id === current ? 'tab current' : 'tab'}" href="${t.href}">${t.label}
+      <span class="muted">${t.count}</span></a>`)}</nav>`;
+}
+
 export const inquiriesModule: AppModule = {
   name: 'inquiries',
   title: 'Inquiries',
   basePaths: ['/inquiries'],
-  nav: [{ href: '/inquiries', label: 'Inquiries', permission: 'register:read', order: 85 }],
+  // One entry for the whole family. The inbox declares none of its own: the
+  // bar on these pages is how you get between them.
+  nav: [{ href: '/inquiries', label: 'Incoming', permission: 'register:read', order: 95 }],
 
   register(app) {
     const r = new Hono<AppContext>();
@@ -118,17 +170,21 @@ export const inquiriesModule: AppModule = {
       if ((INQUIRY_SOURCES as readonly string[]).includes(source)) { conds.push('i.source = ?'); params.push(source); }
       const whereSql = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
-      const rows = await all<InquiryRow & { client_name: string | null }>(
-        c.env.DB,
-        `SELECT i.*, cl.full_name AS client_name FROM inquiries i
-           LEFT JOIN clients cl ON cl.id = i.client_id
-           ${whereSql} ORDER BY i.received_at DESC LIMIT 100`,
-        ...params,
-      );
+      const [rows, counts] = await Promise.all([
+        all<InquiryRow & { client_name: string | null }>(
+          c.env.DB,
+          `SELECT i.*, cl.full_name AS client_name FROM inquiries i
+             LEFT JOIN clients cl ON cl.id = i.client_id
+             ${whereSql} ORDER BY i.received_at DESC LIMIT 100`,
+          ...params,
+        ),
+        incomingCounts(c.env),
+      ]);
 
       return page(c, { title: 'Inquiries', active: '/inquiries' }, html`
         ${pageHeader('Inquiries', 'New work coming in, from every channel.',
           can(c.get('user'), 'register:write') ? html`<a class="btn btn-primary" href="/inquiries/new">Record an inquiry</a>` : undefined)}
+        ${incomingTabs(c.get('user'), 'inquiries', counts)}
         <form method="get" action="/inquiries" class="filters">
           <select name="status"><option value="">All statuses</option>
             ${INQUIRY_STATUSES.map((s) => html`<option value="${s}" ${s === status ? raw('selected') : ''}>${INQUIRY_STATUS_LABELS[s]}</option>`)}
