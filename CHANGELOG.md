@@ -7,6 +7,25 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.51.0 — 29 August 2026
+
+### Added
+- **"Check for mail now"** under Settings → Maintenance. The same pass the
+  schedule runs, on demand.
+- It exists because of a gap that only shows once the feature is live: a poll
+  that finds nothing writes nothing, so *connected and quiet* and *not working at
+  all* look identical from outside. The button reports what it **looked at** as
+  well as what it took — `Looked at 3 message(s): 1 taken, 2 already seen, 0
+  failed` — which separates the two.
+- When Google refuses the authorisation the message carries the provider's own
+  words. `invalid_grant` means the refresh token does not match the client id and
+  secret it is being used with, and saying so is more use than "failed".
+
+### Fixed
+- 0.50.1 shipped without its entry in **Help → Recent changes**. The in-app list
+  and this file are written by hand and can drift; this one drifted because a
+  scripted edit failed its guard silently and the commit went out anyway.
+
 ## 0.50.1 — 29 August 2026
 
 ### Changed
