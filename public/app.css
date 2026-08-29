@@ -330,6 +330,11 @@ body.bare {
 .warn { color: var(--red); font-weight: 550; }
 .prewrap { white-space: pre-wrap; word-break: break-word; }
 .nowrap { white-space: nowrap; }
+/* The one row being edited, marked so it reads as the open drawer in a list of
+   closed ones rather than as a row that happens to contain boxes. */
+.row-editing > td { background: var(--surface-2); vertical-align: top; }
+.row-editing input, .row-editing select { margin-bottom: 6px; }
+
 /* A card that starts closed. The summary wears the card's own header, so a
    folded card and an open one look like the same furniture. */
 .card-fold > summary { cursor: pointer; list-style: none; align-items: center; gap: 10px; }

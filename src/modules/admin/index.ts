@@ -296,20 +296,27 @@ export const adminModule: AppModule = {
       );
       const csrf = c.get('session')!.csrf;
       const me = c.get('user')!;
+      const editing = c.req.query('edit') ?? '';
 
       return page(c, { title: 'Users', active: '/admin' }, html`
         ${pageHeader('Users', 'Everyone who can sign in.')}
         ${adminTabs('users')}
 
         ${/*
-          * One form per person, holding everything about them that can be
-          * changed. Name and email are editable — a person marries, or was
-          * entered with a typo, and neither is a reason to make a new account
-          * and lose the audit trail behind the old one.
+          * A list of people is read four times for every time it is edited, so
+          * it reads as a list: one line each, and an Edit button that opens the
+          * one row being changed. Every row carrying live inputs cost four
+          * lines of height apiece and turned six people into a page of boxes.
           *
-          * Your own row keeps its name and email editable but not your role or
-          * status: an owner may rename themselves, and may not accidentally
-          * demote or suspend the account they are signed in with.
+          * The open row is chosen by the address rather than by a script, so it
+          * survives a reload, can be linked to, and works with scripting off.
+          *
+          * Name and email are editable — a person marries, or was entered with
+          * a typo, and neither is a reason to make a new account and lose the
+          * audit trail behind the old one. Your own row keeps its name and
+          * email editable but not your role or status: an owner may rename
+          * themselves, and may not accidentally demote or suspend the account
+          * they are signed in with.
           */ ''}
         ${table([
           { label: 'Name and email', width: '34' },
@@ -317,8 +324,8 @@ export const adminModule: AppModule = {
           { label: 'State', width: '14', hideOn: 'sm' },
           { label: 'Last sign-in', width: '14', hideOn: 'sm' },
           { label: '', width: '14' },
-        ], users.map((u: any) => html`
-          <tr>
+        ], users.map((u: any) => u.id === editing ? html`
+          <tr class="row-editing">
             <td>
               <form method="post" action="/admin/users/${u.id}" class="user-row-form" id="u_${u.id}">
                 ${csrfField(csrf)}
@@ -334,7 +341,6 @@ export const adminModule: AppModule = {
                 <option value="active" ${u.status === 'active' ? raw('selected') : ''}>Active</option>
                 <option value="suspended" ${u.status === 'suspended' ? raw('selected') : ''}>Suspended</option>
               </select>
-              <button class="btn btn-small btn-primary mt" type="submit" form="u_${u.id}">Save</button>
               ${u.id === me.id
                 ? html`<p class="hint">This is you. You can change your own name and email, but not
                          your own role or status.</p>`
@@ -343,14 +349,34 @@ export const adminModule: AppModule = {
             <td class="col-sm-hide">${badge(u.status, u.status === 'active' ? 'green' : 'red')}
                 ${u.locked_until && new Date(u.locked_until) > new Date() ? badge('locked', 'amber') : ''}
                 <div>${u.totp_enabled ? badge('2FA on', 'green') : badge('2FA off', 'amber')}</div></td>
+            <td class="small col-sm-hide">${dateTime(u.last_login_at)}</td>
+            <td>
+              <button class="btn btn-small btn-primary" type="submit" form="u_${u.id}">Save</button>
+              <a class="btn btn-small btn-secondary" href="/admin/users">Cancel</a>
+            </td>
+          </tr>` : html`
+          <tr>
+            <td><strong>${u.name}</strong>${u.id === me.id ? html` <span class="muted small">(you)</span>` : ''}
+                <div class="small muted clamp-1">${u.email}</div></td>
+            <td class="small">${ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] ?? u.role}
+                <div class="row-meta show-sm">
+                  ${badge(u.status, u.status === 'active' ? 'green' : 'red')}
+                  ${u.totp_enabled ? badge('2FA on', 'green') : badge('2FA off', 'amber')}
+                </div></td>
+            <td class="col-sm-hide">${badge(u.status, u.status === 'active' ? 'green' : 'red')}
+                ${u.locked_until && new Date(u.locked_until) > new Date() ? badge('locked', 'amber') : ''}
+                ${u.totp_enabled ? badge('2FA on', 'green') : badge('2FA off', 'amber')}</td>
             <td class="small col-sm-hide">${dateTime(u.last_login_at)}
                 <div><a class="small" href="/admin/audit?actor=${u.id}">Activity</a></div></td>
-            <td>${u.id === me.id ? '' : html`
-              <form method="post" action="/admin/users/${u.id}/reset-password"
-                    data-confirm="Issue a new temporary password for ${u.name}? All their sessions will end.">
-                ${csrfField(csrf)}
-                <button class="btn btn-small btn-secondary" type="submit">Reset password</button>
-              </form>`}</td>
+            <td class="nowrap">
+              <a class="btn btn-small btn-secondary" href="${`/admin/users?edit=${u.id}`}">Edit</a>
+              ${u.id === me.id ? '' : html`
+                <form method="post" action="/admin/users/${u.id}/reset-password" class="inline-form"
+                      data-confirm="Issue a new temporary password for ${u.name}? All their sessions will end.">
+                  ${csrfField(csrf)}
+                  <button class="btn btn-small btn-secondary" type="submit">Reset password</button>
+                </form>`}
+            </td>
           </tr>`), { fixed: true, sticky: true })}
 
         ${card('Add a user', html`

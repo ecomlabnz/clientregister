@@ -7,6 +7,30 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.28.0 — 29 August 2026
+
+### Changed
+- **The user list reads as a list.** Every row carried live inputs — two text
+  boxes, two dropdowns and a Save button apiece — which cost four lines of
+  height each and turned six people into a page of boxes. Rows are now one line
+  each, with an **Edit** button that opens the single row being changed.
+  A list of people is read several times for every time it is edited, and it
+  should be shaped for the reading.
+- The open row is chosen by the address (`?edit=…`) rather than by a script, so
+  it survives a reload, can be linked to, and works with scripting off — the
+  same pattern the service catalogue and the automation rules already use.
+
+### Added
+- **Document storage is live.** R2 enabled, bucket bound, files attach to cases,
+  clients and file notes. Served through the Worker, so every download passes
+  the session check and is written to the audit log.
+- The bucket is in **Oceania**, alongside the D1 database. Getting there took
+  three attempts and the reason is now recorded in `wrangler.jsonc`: R2 honours
+  a location hint only the first time a bucket of a given name is created, so a
+  name whose first bucket landed in the wrong region can never be moved by
+  deleting and recreating it. A different name, created from a browser in New
+  Zealand, was the way out.
+
 ## 0.27.0 — 29 August 2026
 
 ### Added

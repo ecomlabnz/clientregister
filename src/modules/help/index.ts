@@ -32,6 +32,13 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.28.0', date: '29 August 2026',
+    notes: [
+      'Document storage is live — files attach to cases, clients and notes.',
+      'The user list is one line per person, with an Edit button rather than boxes on every row.',
+    ],
+  },
+  {
     version: '0.27.0', date: '29 August 2026',
     notes: [
       'A passport number entered against the wrong person can now be removed, not just overwritten.',
