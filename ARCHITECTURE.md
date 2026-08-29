@@ -54,6 +54,21 @@ sender is on that channel's allow-list — which is a secret, not a setting.
 
 ---
 
+## 1a. Direct, not bridged
+
+When something changes shape, it is changed and the old way deleted. No mapping
+tables, no legacy fallbacks, no dual-write, no shim carried forever because
+something used to be different. Migrations do the work: they run once per
+database at deploy and are then finished, which is not the same thing as a
+bridge.
+
+The one standing exception is data that *cannot* be rewritten because rewriting
+it would be a lie: the audit log and file notes are append-only records of what
+was said at the time. When a reference is renumbered, those keep the old name
+and a new note records the change.
+
+See [CLAUDE.md](CLAUDE.md).
+
 ## 2. Modular
 
 A feature is a folder under `src/modules` exporting one `AppModule`. Adding one
