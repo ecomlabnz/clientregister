@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.42.0', date: '29 August 2026',
+    notes: [
+      'A brief can be edited before it is saved. Edit it and the note records that you '
+        + 'edited it, rather than claiming to be the model\u2019s words.',
+      'A brief can be discarded. Nothing is written to the file; the register keeps a '
+        + 'record that you read it and decided against it.',
+    ],
+  },
+  {
     version: '0.41.0', date: '29 August 2026',
     notes: [
       'Saving a brief now clears it from the panel — it is on the file, so it is no '
@@ -689,6 +698,13 @@ function sections(origin: string): Section[] {
            query the database itself and cannot reach anything you could not already see on the
            page. Passport numbers are never included: they are encrypted at rest precisely so they
            are not casually handled, and no brief needs one.</p>
+        <p>You can change a brief before saving it. The box holds the note exactly as it will be
+           written, so what you read before pressing save is what the file gets. Edit a word of it
+           and the note records that you edited it rather than claiming to be the model's words —
+           the distinction is the point, so it has to stay true.</p>
+        <p><strong>Discard it</strong> throws the reading away without writing anything. The
+           register keeps a record that you read it and decided against it, which over time is the
+           clearest evidence there is about whether the assistant is earning its place.</p>
         <p>A brief saved to the file says in the note that it was drafted by the AI layer and who
            kept it. A file that does not distinguish what a person wrote from what a model drafted
            is a file nobody can rely on.</p>

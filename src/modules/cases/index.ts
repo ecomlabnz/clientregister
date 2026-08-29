@@ -38,7 +38,9 @@ import {
   DECISION_SETTINGS, caseForSync, decisionPolicy, expectedDecisionDate, syncCaseFollowUps,
 } from '../../core/decisions';
 import { isAiEnabled } from '../../ai/provider';
-import { AI_BRIEF_NOTE_PREFIX, briefCase, latestBrief, markBriefKept } from '../../ai/brief';
+import {
+  AI_BRIEF_NOTE_PREFIX, briefCase, briefNoteBody, latestBrief, markBriefDiscarded, markBriefKept,
+} from '../../ai/brief';
 import {
   VOCABULARY_SETTINGS, caseTypes, isTerm, labelFor, termOptions, type Term,
 } from '../../core/vocabulary';
@@ -590,10 +592,35 @@ export const casesModule: AppModule = {
                     ${brief ? 'Draft it again' : 'Read this file and brief me'}
                   </button>
                   ${brief ? html`
-                    <button class="btn btn-primary" type="submit" name="save" value="1">
-                      Save the brief as a file note
+                    <button class="btn btn-secondary" type="submit" name="discard" value="1">
+                      Discard it
                     </button>` : ''}
-                </form>` : ''}`) : ''}
+                </form>
+                ${/* The box holds exactly what will be written, so what you
+                      read before pressing save is what the file gets. Edit it
+                      and the opening line says so — a note that claimed to be
+                      the model's words after somebody rewrote them would break
+                      the one distinction this file rests on. */ ''}
+                ${brief ? html`
+                  <details class="mt">
+                    <summary>Save it to the file</summary>
+                    <form method="post" action="/cases/${kase.id}/brief" class="mt">
+                      ${csrfField(csrf)}
+                      ${/* Not `body`: the File notes form on this same page
+                            already uses that name, and two fields sharing a
+                            name share an id — invalid, and it breaks the label
+                            association so clicking one label focuses the other
+                            box. */ ''}
+                      ${field({ label: 'The note as it will be written', name: 'brief_body',
+                                type: 'textarea', rows: 14, value: briefNoteBody(brief.result),
+                                hint: 'Change anything you like. A note you have edited is '
+                                  + 'recorded as edited by you rather than as the model\u2019s '
+                                  + 'words. Once saved it cannot be changed, like any file note.' })}
+                      <button class="btn btn-primary" type="submit" name="save" value="1">
+                        Save as a file note
+                      </button>
+                    </form>
+                  </details>` : ''}` : ''}`) : ''}
 
             ${card('File notes', html`
               ${writable ? html`
@@ -918,32 +945,48 @@ export const casesModule: AppModule = {
       const user = c.get('user')!;
       const form = await c.req.formData();
 
+      // Read and decided against. Recorded rather than deleted: that somebody
+      // rejected a reading is the clearest signal there is about whether the
+      // model is earning its place.
+      if (form.get('discard')) {
+        await markBriefDiscarded(c.env, id);
+        await auditFrom(c, { action: 'case.brief_discarded', entityType: 'case', entityId: id });
+        return redirectWith(c, `/cases/${id}`, 'Brief discarded. Nothing was written to the file.');
+      }
+
       if (form.get('save')) {
         const existing = await latestBrief(c.env, id);
         if (!existing) return redirectWith(c, `/cases/${id}`, 'There is no brief to save yet.', 'err');
-        const lines = [
-          `${AI_BRIEF_NOTE_PREFIX} Reviewed and kept by ${user.name}.`,
-          '',
-          existing.result.summary,
-        ];
-        if (existing.result.next_steps.length) {
-          lines.push('', 'Next steps suggested:', ...existing.result.next_steps.map((s) => `- ${s}`));
+
+        const drafted = briefNoteBody(existing.result);
+        const submitted = String(form.get('brief_body') ?? '').replace(/\r\n/g, '\n').trim();
+        if (!submitted) {
+          return redirectWith(c, `/cases/${id}`, 'The note was empty, so nothing was saved.', 'err');
         }
-        if (existing.result.risks.length) {
-          lines.push('', 'Worth watching:', ...existing.result.risks.map((s) => `- ${s}`));
-        }
-        if (existing.result.questions.length) {
-          lines.push('', 'Not answered by the file:', ...existing.result.questions.map((s) => `- ${s}`));
-        }
+
+        // The first line is a claim about who wrote what, and it has to be
+        // true. A note kept as drafted says the model wrote it; one somebody
+        // changed says so, because a file that cannot tell those apart is a
+        // file nobody can rely on — which is the whole reason the line exists.
+        const edited = submitted !== drafted.trim();
+        const opening = edited
+          ? `${AI_BRIEF_NOTE_PREFIX} Edited before keeping by ${user.name}.`
+          : `${AI_BRIEF_NOTE_PREFIX} Reviewed and kept by ${user.name}.`;
+
         await addEntry(c.env, {
-          entityType: 'case', entityId: id, kind: 'note', body: lines.join('\n'), createdBy: user.id,
+          entityType: 'case', entityId: id, kind: 'note',
+          body: `${opening}\n\n${submitted}`, createdBy: user.id,
         });
-        await auditFrom(c, { action: 'case.brief_saved', entityType: 'case', entityId: id });
+        await auditFrom(c, { action: 'case.brief_saved', entityType: 'case', entityId: id,
+          meta: { edited } });
         // The draft has become a file note, so it stops being a draft. Left in
         // the panel it went on offering to save the same words again, with
         // nothing on screen to say it had already been kept.
         await markBriefKept(c.env, id);
-        return redirectWith(c, `/cases/${id}`, 'Brief saved to the file. Like any note, it cannot now be changed.');
+        return redirectWith(c, `/cases/${id}`,
+          edited
+            ? 'Brief saved to the file as you edited it. Like any note, it cannot now be changed.'
+            : 'Brief saved to the file. Like any note, it cannot now be changed.');
       }
 
       const result = await briefCase(c.env, id, user.id);

@@ -197,14 +197,15 @@ export async function briefCase(
  *
  * A brief that has been saved is on the file, and showing it again in the panel
  * offered to save the same words a second time with nothing on screen to say it
- * had already happened.
+ * had already happened. One that was discarded had been decided against, which
+ * is equally a decision.
  */
 export async function latestBrief(env: Env, caseId: string): Promise<{ result: BriefResult; at: string } | null> {
   const row = await one<{ output_json: string; created_at: string }>(
     env.DB,
     `SELECT output_json, created_at FROM ai_runs
       WHERE kind = 'brief' AND entity_type = 'case' AND entity_id = ? AND status = 'ok'
-        AND kept_at IS NULL
+        AND kept_at IS NULL AND discarded_at IS NULL
       ORDER BY created_at DESC LIMIT 1`,
     caseId,
   );
@@ -231,8 +232,48 @@ export async function markBriefKept(env: Env, caseId: string): Promise<void> {
     `UPDATE ai_runs SET kept_at = ?
       WHERE id = (SELECT id FROM ai_runs
                    WHERE kind = 'brief' AND entity_type = 'case' AND entity_id = ?
-                     AND status = 'ok' AND kept_at IS NULL
+                     AND status = 'ok' AND kept_at IS NULL AND discarded_at IS NULL
                    ORDER BY created_at DESC LIMIT 1)`,
     nowIso(), caseId,
   );
+}
+
+/**
+ * Mark the last undecided brief on a case as discarded.
+ *
+ * Recorded, not deleted. That a person read a reading and rejected it is the
+ * clearest signal there is about whether the model is earning its place, and
+ * throwing it away would throw that away too.
+ */
+export async function markBriefDiscarded(env: Env, caseId: string): Promise<void> {
+  await run(
+    env.DB,
+    `UPDATE ai_runs SET discarded_at = ?
+      WHERE id = (SELECT id FROM ai_runs
+                   WHERE kind = 'brief' AND entity_type = 'case' AND entity_id = ?
+                     AND status = 'ok' AND kept_at IS NULL AND discarded_at IS NULL
+                   ORDER BY created_at DESC LIMIT 1)`,
+    nowIso(), caseId,
+  );
+}
+
+/**
+ * The brief written out as it would go on the file, without its opening line.
+ *
+ * One function so the box somebody edits and the text that is compared against
+ * it cannot come out differently — the comparison is what decides whether the
+ * note claims to be the model's words or a person's.
+ */
+export function briefNoteBody(result: BriefResult): string {
+  const lines = [result.summary];
+  if (result.next_steps.length) {
+    lines.push('', 'Next steps suggested:', ...result.next_steps.map((s) => `- ${s}`));
+  }
+  if (result.risks.length) {
+    lines.push('', 'Worth watching:', ...result.risks.map((s) => `- ${s}`));
+  }
+  if (result.questions.length) {
+    lines.push('', 'Not answered by the file:', ...result.questions.map((s) => `- ${s}`));
+  }
+  return lines.join('\n');
 }

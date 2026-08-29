@@ -7,6 +7,29 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.42.0 — 29 August 2026
+
+### Added
+- **A brief can be edited before it is saved.** The box holds the note exactly
+  as it will be written, so what you read before pressing save is what the file
+  gets.
+- **The opening line tells the truth about who wrote it.** A note kept as
+  drafted says the model wrote it; one you changed says *edited before keeping
+  by you*. A note that claimed to be the model's words after somebody rewrote
+  them would break the one distinction this file rests on. The comparison uses
+  the same function that fills the box, so the two cannot drift and decide
+  authorship wrongly.
+- **A brief can be discarded.** Nothing is written to the file. The run is
+  marked discarded rather than deleted: that somebody read a reading and
+  rejected it is the clearest signal there is about whether the model is
+  earning its place, and throwing it away would throw that away too.
+
+### Fixed
+- The new field was called `body`, which the File notes form on the same page
+  already uses — so both rendered with the same `id`. Invalid, and it broke the
+  label association, meaning one label focused the other box. Found by driving
+  the page rather than reading it.
+
 ## 0.41.0 — 29 August 2026
 
 ### Fixed
