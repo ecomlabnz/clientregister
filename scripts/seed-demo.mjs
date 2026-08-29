@@ -50,7 +50,14 @@ function client(key, row) {
     ` passport_expiry, police_certificate_country, police_certificate_date, police_certificate_expiry,` +
     ` medical_certificate_date, medical_certificate_expiry, current_visa_type, current_visa_expiry,` +
     ` address, status, notes, organisation_id, organisation_role, created_at, updated_at) VALUES (` +
-    [id, ref, row.kind ?? 'individual', row.full_name, row.given_names ?? null, row.family_name ?? null,
+    // Family names in capitals, exactly as the application stores them, so
+    // demo data does not look different from data somebody typed.
+    [id, ref, row.kind ?? 'individual',
+     row.kind === 'organisation' || !row.family_name
+       ? row.full_name
+       : `${row.given_names ?? ''} ${row.family_name.toUpperCase()}`.trim(),
+     row.given_names ?? null,
+     row.family_name ? row.family_name.toUpperCase() : null,
      row.preferred_name ?? null, row.nzbn ?? null, row.company_number ?? null, row.email ?? null,
      row.phone ?? null, row.whatsapp ?? null, row.nationality ?? null, row.date_of_birth ?? null,
      row.passport_country ?? null, row.passport_expiry ?? null, row.police_country ?? null,

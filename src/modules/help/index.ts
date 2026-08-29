@@ -32,6 +32,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.36.1', date: '29 August 2026',
+    notes: [
+      'A client\u2019s family name is now stored in capitals however it is typed \u2014 '
+        + 'BUI, NGUYỄN, DE VRIES \u2014 so it is the same on the client, the matter, the '
+        + 'export and in a search.',
+    ],
+  },
+  {
     version: '0.36.0', date: '29 August 2026',
     notes: [
       'A matter now has a name and a separate line for what it is about. '

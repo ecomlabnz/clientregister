@@ -50,7 +50,7 @@ import {
   addPassport, passportById, passportStatusLabel, passportsFor, removePassport,
   setPrimaryPassport, updatePassport,
 } from '../../core/passports';
-import { composeFullName, splitFullName, type ClientKind } from '../../core/names';
+import { composeFullName, familyNameFor, splitFullName, type ClientKind } from '../../core/names';
 import {
   fetchEntity, isValidNzbnFormat, normaliseNzbn, nzbnConfigured, searchEntities,
 } from '../../integrations/nzbn';
@@ -311,7 +311,10 @@ function readClientForm(f: FormReader) {
   return {
     kind,
     given_names: givenNames,
-    family_name: familyName || null,
+    // Stored in capitals, not merely shown that way, so the client, the matter
+    // named from it, the export and any search all agree without each of them
+    // remembering to.
+    family_name: familyNameFor(familyName) || null,
     full_name: composeFullName(kind, { givenNames, familyName }, organisationName),
     nzbn: nzbn ? normaliseNzbn(nzbn) : null,
     company_number: f.optional('company_number', { max: 30 }),

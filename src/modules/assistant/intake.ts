@@ -24,7 +24,7 @@ import { auditFrom } from '../../core/audit';
 import { all, nextRef, nextYearlyRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { FormReader } from '../../core/validate';
-import { composeFullName } from '../../core/names';
+import { composeFullName, familyNameFor } from '../../core/names';
 import { addEntry } from '../../core/timeline';
 import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
 import { CASE_STATUSES, CASE_STATUS_LABELS, PARTY_ROLES, PARTY_ROLE_LABELS,
@@ -378,7 +378,9 @@ async function createPerson(
   c: Parameters<typeof auditFrom>[0], f: FormReader, prefix: string, stamp: string,
 ): Promise<{ id: string; ref: string } | null> {
   const given = f.optional(`${prefix}given_names`, { max: 120 });
-  const family = f.optional(`${prefix}family_name`, { max: 120 });
+  // Capitals, as everywhere else a family name is stored — a record made by
+  // the assistant is a record like any other.
+  const family = familyNameFor(f.optional(`${prefix}family_name`, { max: 120 })) || null;
   const fullName = composeFullName('individual', { givenNames: given, familyName: family });
   if (!fullName) return null;
 
