@@ -7,6 +7,30 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.59.0 — 29 August 2026
+
+### Changed
+- **Converting an inquiry asks what the client form asks.** It offered one box
+  called "name" and assumed everybody was a person. So a name arriving from a
+  chat message — "Nguyễn Văn An" — was stored whole and unlike every other
+  client, and a company inquiry became an individual named after the company.
+  Neither is cosmetic: the register sorts, searches and exports on those
+  columns, and a client list that sorts one row under N and its neighbour under
+  the family name is a list nobody trusts.
+- The conversion now offers **record type, given names, family name, nationality**
+  and, for a company, its **registered name** — the client form's fields, by the
+  client form's names, derived through the same helpers. A person created by
+  converting an inquiry is now stored exactly as one created on the client form:
+  family name in capitals, in plain English letters, `full_name` composed rather
+  than typed.
+- A guess at where the family name ends is **pre-filled and correctable**, taken
+  from whatever the inquiry recorded as the contact's name.
+- The wrong half of that block is hidden by the server as well as by the script,
+  so it is never on the page whether or not scripting runs.
+- **"Unassigned" is gone from the conversion.** The database has refused a matter
+  with no owner since 0.54.0, so the form was offering a choice that failed on
+  submit; it now defaults to whoever holds the inquiry, or to you.
+
 ## 0.58.0 — 29 August 2026
 
 ### Added

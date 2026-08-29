@@ -301,6 +301,26 @@
     render();
   });
 
+  // Individual-or-organisation, outside a tabbed form.
+  //
+  // The client form does this as part of its tab rendering, because there the
+  // record type decides whole tabs. Elsewhere — converting an inquiry, for one
+  // — the same choice governs only a couple of boxes, and marking the block
+  // .js-kind is all it takes. As on the client form, the server marks the
+  // irrelevant half hidden in the HTML, so this only keeps up with a change.
+  Array.prototype.forEach.call(document.querySelectorAll('.js-kind'), function (block) {
+    var kindSelect = block.querySelector('select[name="kind"]');
+    var kindBlocks = block.querySelectorAll('[data-kind]');
+    if (!kindSelect || !kindBlocks.length) return;
+    var render = function () {
+      Array.prototype.forEach.call(kindBlocks, function (el) {
+        el.hidden = el.getAttribute('data-kind') !== kindSelect.value;
+      });
+    };
+    kindSelect.addEventListener('change', render);
+    render();
+  });
+
   // Print buttons. Declared with data-print rather than an inline handler,
   // because the content security policy forbids inline script.
   Array.prototype.forEach.call(document.querySelectorAll('[data-print]'), function (button) {
