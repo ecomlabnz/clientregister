@@ -62,10 +62,17 @@ something used to be different. Migrations do the work: they run once per
 database at deploy and are then finished, which is not the same thing as a
 bridge.
 
-The one standing exception is data that *cannot* be rewritten because rewriting
-it would be a lie: the audit log and file notes are append-only records of what
-was said at the time. When a reference is renumbered, those keep the old name
-and a new note records the change.
+The default is direct; a bridge is a deliberate, recorded decision. It is
+warranted where a direct change would risk losing data and the risk cannot be
+rehearsed away, where an outside party depends on the old shape, or where
+building direct would cost out of proportion to what it buys — and that weighing
+tilts further towards the bridge as the register fills with real data. What is
+forbidden is the *unremarked* fallback that nobody wrote down a reason for.
+
+Separately, some data cannot be rewritten because rewriting it would be a lie:
+the audit log and file notes are append-only records of what was said at the
+time. When a reference is renumbered, those keep the old name and a new note
+records the change.
 
 See [CLAUDE.md](CLAUDE.md).
 
