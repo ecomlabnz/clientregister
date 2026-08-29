@@ -212,7 +212,7 @@ export function registerExportRoutes(r: Hono<AppContext>): void {
             <td><strong>${set.label}</strong></td>
             <td class="num">${counts[set.key] ?? 0}</td>
             <td class="small muted">${set.description}</td>
-            <td><a class="btn btn-secondary btn-sm" href="${`/admin/export/${set.key}.csv`}">Download</a></td>
+            <td><a class="btn btn-secondary btn-small" href="${`/admin/export/${set.key}.csv`}">Download</a></td>
           </tr>`), { fixed: true })}`)}
 
       ${card('Two things worth knowing', html`

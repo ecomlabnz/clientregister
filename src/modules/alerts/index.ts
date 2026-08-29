@@ -18,7 +18,7 @@ import type { SettingsGroup } from '../../core/settings';
 import { all } from '../../core/db';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { page } from '../../ui/layout';
-import { html, raw } from '../../ui/html';
+import { html, raw, type Raw } from '../../ui/html';
 import { badge, card, emptyState, pageHeader, table } from '../../ui/components';
 import { dateShort, relativeDays } from '../../ui/format';
 import { CASE_STATUS_LABELS, DEADLINE_CASE_STATUSES, OPEN_CASE_STATUSES } from '../../domain';
@@ -195,6 +195,37 @@ export const ALERT_SETTINGS: SettingsGroup = {
   ],
 };
 
+/**
+ * The one bar of tabs the alerts family uses.
+ *
+ * Shared with the approvals queue rather than copied, because a tab that leads
+ * to a page wearing a *different* bar reads as a trapdoor: you land somewhere
+ * with no visible way back to where you were. That already happened once with
+ * Automations. Here the bar stays put and only the current tab moves, so
+ * "For approval" is a place inside Alerts rather than a different room.
+ *
+ * The counts come from the list being shown, not from a second query that might
+ * disagree with it.
+ */
+export function alertTabs(
+  opts: { alerts: Alert[]; awaiting: number; horizon: number; current: string },
+): Raw {
+  const views = [
+    { id: '', label: 'Everything', count: opts.alerts.length },
+    ...(Object.keys(KIND_LABELS) as AlertKind[]).map((k) => ({
+      id: k as string, label: KIND_LABELS[k],
+      count: opts.alerts.filter((a) => a.kind === k).length,
+    })),
+  ];
+  return html`<nav class="tabs">
+    ${views.map((v) => html`
+      <a class="${v.id === opts.current ? 'tab current' : 'tab'}"
+         href="${`/alerts?kind=${v.id}&days=${opts.horizon}`}">${v.label} <span class="muted">${v.count}</span></a>`)}
+    <a class="${opts.current === 'approval' ? 'tab current' : 'tab'}"
+       href="/workflows">For approval <span class="muted">${opts.awaiting}</span></a>
+  </nav>`;
+}
+
 export const alertsModule: AppModule = {
   name: 'alerts',
   title: 'Alerts',
@@ -222,14 +253,6 @@ export const alertsModule: AppModule = {
         : alerts;
       const counts = countBySeverity(alerts);
 
-      // Counted from what this horizon actually holds, so the tabs agree with
-      // the list rather than with a second query that might not.
-      const views = [
-        { id: '', label: 'Everything', count: alerts.length },
-        ...(Object.keys(KIND_LABELS) as AlertKind[]).map((k) => ({
-          id: k as string, label: KIND_LABELS[k], count: alerts.filter((a) => a.kind === k).length,
-        })),
-      ];
 
       return page(c, { title: 'Alerts', active: '/alerts' }, html`
         ${pageHeader('Alerts', `Everything with a date attached, across the whole register, for the next ${horizon} days.`)}
@@ -242,12 +265,7 @@ export const alertsModule: AppModule = {
           <div class="stat"><span class="stat-label">Later</span><span class="stat-value">${counts.soon}</span></div>
         </div>
 
-        <nav class="tabs">
-          ${views.map((v) => html`
-            <a class="${v.id === kindFilter || (v.id === '' && !kindFilter) ? 'tab current' : 'tab'}"
-               href="${`/alerts?kind=${v.id}&days=${horizon}`}">${v.label} <span class="muted">${v.count}</span></a>`)}
-          <a class="tab" href="/workflows">For approval <span class="muted">${awaiting}</span></a>
-        </nav>
+        ${alertTabs({ alerts, awaiting, horizon, current: kindFilter })}
         <form method="get" action="/alerts" class="filters" data-live-search>
           <input type="hidden" name="kind" value="${kindFilter}">
           <select name="days">
