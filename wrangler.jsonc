@@ -38,8 +38,16 @@
   // audit log. Do not attach an r2.dev URL or a custom domain to this bucket —
   // that would make every stored passport scan reachable by anyone holding the
   // link, sign-in bypassed.
+  // The bucket name cannot be recycled to move a bucket. R2 honours a location
+  // hint only the first time a given name is created; delete and recreate the
+  // same name and it returns to the original location, permanently. The first
+  // attempt here was created through the API — which has no location
+  // parameter, so "automatic" placed it near the caller rather than near the
+  // practice — and every recreation of that name came back in eastern North
+  // America. A new name, created from a browser in New Zealand, landed in
+  // Oceania. Hence "files" rather than "docs".
   "r2_buckets": [
-    { "binding": "DOCS", "bucket_name": "clientregister-docs" }
+    { "binding": "DOCS", "bucket_name": "clientregister-files" }
   ],
 
   "vars": {
