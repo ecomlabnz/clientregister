@@ -20,6 +20,15 @@ export interface OutboundMessage {
   subject: string;
   text: string;
   html?: string | null;
+  /**
+   * Where a reply should go, when that is not the sending address.
+   *
+   * A provider will only put a From address on a domain verified with it, and
+   * that domain may have no mailbox behind it. Reply-To is how a practice sends
+   * from an address its provider authorises and is answered at one somebody
+   * reads. Left empty, replies go to From, which is the ordinary case.
+   */
+  replyTo?: string | null;
 }
 
 export interface MailProvider {

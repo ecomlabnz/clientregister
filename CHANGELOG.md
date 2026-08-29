@@ -7,6 +7,25 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.30.0 — 29 August 2026
+
+### Added
+- **Reply-To.** The address a message is sent *from* and the mailbox a reply
+  lands in are two different questions, and treating them as one forces a
+  practice to choose between a domain its provider will send for and an address
+  somebody actually reads. Sending is authorised by DNS — a provider will only
+  put a From address on a domain verified with it — while receiving is a
+  mailbox that domain may not have. Set **Replies should go to** under
+  Settings → Practice and every outbound message carries it; leave it empty and
+  replies go to the sending address, as before.
+- Resolved once, in `queueEmail`, rather than at each call site: passing an
+  address overrides the setting, passing null suppresses it, and passing nothing
+  uses the setting. Stored on the message rather than read again at send time,
+  so what was queued is what goes out even if the setting changes in between.
+- Carried by both transports — `reply_to` for Resend, a `Reply-To:` header for
+  Gmail, through the same guard the other headers get, so an address containing
+  a newline is folded into the value rather than beginning a line of its own.
+
 ## 0.29.0 — 29 August 2026
 
 ### Changed

@@ -81,6 +81,7 @@ export function buildMimeMessage(message: OutboundMessage, from: string): string
     `From: ${headerValue(from)}`,
     `To: ${headerValue(message.to)}`,
     ...(message.cc ? [`Cc: ${headerValue(message.cc)}`] : []),
+    ...(message.replyTo ? [`Reply-To: ${headerValue(message.replyTo)}`] : []),
     `Subject: ${encodeHeaderText(message.subject)}`,
     'MIME-Version: 1.0',
   ];

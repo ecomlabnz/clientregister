@@ -2,7 +2,7 @@
 
 import type { Env } from '../types';
 import { newId } from '../core/ids';
-import { all, nowIso, run } from '../core/db';
+import { all, getSetting, nowIso, run } from '../core/db';
 import { audit } from '../core/audit';
 import { getMailProvider, looksLikeEmail, type OutboundMessage } from './provider';
 
@@ -13,6 +13,7 @@ export interface QueuedEmail {
   subject: string;
   body_text: string;
   body_html: string | null;
+  reply_to: string | null;
   status: string;
   provider: string | null;
   provider_id: string | null;
@@ -29,13 +30,21 @@ export async function queueEmail(
 ): Promise<string> {
   if (!looksLikeEmail(message.to)) throw new Error('invalid recipient address');
 
+  // Resolved here rather than at each call site: every outbound message wants
+  // the same answer, and a setting read in one place cannot drift from itself.
+  // Passing an explicit replyTo overrides it; passing null suppresses it.
+  const replyTo = message.replyTo === undefined
+    ? (await getSetting(env, 'practice.reply_to', '')) || null
+    : message.replyTo;
+
   const id = newId('out');
   await run(
     env.DB,
-    `INSERT INTO outbound_emails (id, to_addr, cc_addr, subject, body_text, body_html, status,
-        entity_type, entity_id, created_at, created_by)
-     VALUES (?,?,?,?,?,?, 'queued', ?,?,?,?)`,
+    `INSERT INTO outbound_emails (id, to_addr, cc_addr, subject, body_text, body_html, reply_to,
+        status, entity_type, entity_id, created_at, created_by)
+     VALUES (?,?,?,?,?,?,?, 'queued', ?,?,?,?)`,
     id, message.to.trim(), message.cc ?? null, message.subject, message.text, message.html ?? null,
+    replyTo,
     message.entityType ?? null, message.entityId ?? null, nowIso(), message.createdBy ?? null,
   );
   return id;
@@ -63,7 +72,14 @@ export async function flushQueue(env: Env, limit = 20): Promise<{ sent: number; 
   for (const item of queued) {
     try {
       const result = await provider.send(
-        { to: item.to_addr, cc: item.cc_addr, subject: item.subject, text: item.body_text, html: item.body_html },
+        {
+          to: item.to_addr, cc: item.cc_addr, subject: item.subject,
+          text: item.body_text, html: item.body_html,
+          // Stored on the message rather than read from settings at send time,
+          // so what was queued is what goes out even if the setting changes in
+          // between.
+          replyTo: item.reply_to,
+        },
         from,
       );
       await run(

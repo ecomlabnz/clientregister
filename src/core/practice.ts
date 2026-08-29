@@ -25,6 +25,11 @@ export const PRACTICE_SETTINGS: SettingsGroup = {
     { key: 'practice.contact_email', type: 'string', label: 'Contact email',
       default: '', maxLength: 320,
       help: 'Where clients should reply. Shown on quotes.' },
+    { key: 'practice.reply_to', type: 'string', label: 'Replies should go to',
+      default: '', maxLength: 320,
+      help: 'Left empty, replies go back to the sending address. Set it when the address the '
+        + 'provider is allowed to send from is not a mailbox anybody reads — a provider will only '
+        + 'send from a domain verified with it, and that domain may have no mailbox behind it.' },
     { key: 'practice.contact_phone', type: 'string', label: 'Contact phone',
       default: '', maxLength: 60 },
     { key: 'practice.postal_address', type: 'text', label: 'Address',
@@ -61,6 +66,7 @@ export const PRACTICE_SETTINGS: SettingsGroup = {
 export interface PracticeDetails {
   legalName: string;
   contactEmail: string;
+  replyTo: string;
   contactPhone: string;
   postalAddress: string;
   gstNumber: string;
@@ -78,6 +84,7 @@ export async function practiceDetails(env: Env): Promise<PracticeDetails> {
   return {
     legalName: values['practice.legal_name'] || env.APP_NAME || 'Client Register',
     contactEmail: values['practice.contact_email'] ?? '',
+    replyTo: values['practice.reply_to'] ?? '',
     contactPhone: values['practice.contact_phone'] ?? '',
     postalAddress: values['practice.postal_address'] ?? '',
     gstNumber: values['practice.gst_number'] ?? '',
