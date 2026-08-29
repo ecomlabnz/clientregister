@@ -19,7 +19,7 @@ import { html, raw } from '../../ui/html';
 import { badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, statusTone, table } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays } from '../../ui/format';
 import { PRIORITIES, PRIORITY_LABELS, TASK_STATUS_LABELS, TASK_STATUSES } from '../../domain';
-import { userOptions } from '../../core/lookups';
+import { isAssignable, userOptions } from '../../core/lookups';
 import { addEntry } from '../../core/timeline';
 import { can } from '../../core/rbac';
 import { asPrefBoolean, preferencesFor } from '../../core/preferences';
@@ -552,14 +552,3 @@ export const tasksModule: AppModule = {
   },
 };
 
-/**
- * Whether this id names somebody who can actually be given work.
- *
- * A suspended account cannot sign in, so a task assigned to one is a task
- * nobody is doing — which is the thing the NOT NULL constraint exists to
- * prevent, expressed one level up where a person can be told about it.
- */
-async function isAssignable(env: Env, userId: string): Promise<boolean> {
-  const row = await one<{ id: string }>(env.DB, `SELECT id FROM users WHERE id = ? AND status = 'active'`, userId);
-  return row !== null;
-}
