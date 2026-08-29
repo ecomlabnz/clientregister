@@ -119,6 +119,16 @@ export interface ReplyInput {
   bcc?: string | null;
   /** Send the formatted version as well as the plain text. */
   asHtml?: boolean;
+  /**
+   * Documents already on the file to send with it.
+   *
+   * References, never uploads. The practice sends drafts back and forth — a
+   * submission at version three, then version four — and six months later the
+   * question is which one went out on the twelfth. Sending a copy answers
+   * nothing; sending *the document* means the document itself records that it
+   * went, and to whom.
+   */
+  documentIds?: string[];
 }
 
 export async function postReply(
@@ -151,8 +161,22 @@ export async function postReply(
   );
   await run(env.DB, `UPDATE channel_threads SET last_message_at = ? WHERE id = ?`, nowIso(), thread.id);
 
+  const documentIds = email ? (input.documentIds ?? []) : [];
+  if (documentIds.length) {
+    // Recorded before the send, so a message that fails still shows what it was
+    // meant to carry — which is what somebody needs in order to try again.
+    for (const documentId of documentIds) {
+      await run(
+        env.DB,
+        `INSERT OR IGNORE INTO reply_attachments (id, reply_id, document_id, created_at)
+         VALUES (?,?,?,?)`,
+        newId('rat'), id, documentId, nowIso(),
+      );
+    }
+  }
+
   const sent = await deliver(env, thread, body, input.subject ?? null, input.userId,
-    { to, cc, bcc, asHtml });
+    { to, cc, bcc, asHtml, documentIds });
 
   await run(
     env.DB,
@@ -165,7 +189,7 @@ export async function postReply(
     action: 'channel.reply', entityType: 'channel_thread', entityId: thread.id,
     actorId: input.userId,
     meta: { channel: thread.channel, ok: sent.ok, queued: sent.queued, chars: body.length,
-            to, cc, bcc, html: asHtml },
+            to, cc, bcc, html: asHtml, attachments: documentIds.length },
   });
 
   if (sent.ok) return { ok: true, message: 'Sent.' };
@@ -178,7 +202,8 @@ type Delivery = { ok: boolean; queued: boolean; providerId?: string | null; erro
 /** Hand the reply to whichever transport this channel uses. */
 async function deliver(
   env: Env, thread: ThreadRow, body: string, subject: string | null, userId: string,
-  email: { to: string; cc: string | null; bcc: string | null; asHtml: boolean },
+  email: { to: string; cc: string | null; bcc: string | null; asHtml: boolean;
+           documentIds: string[] },
 ): Promise<Delivery> {
   if (thread.channel === 'telegram') {
     if (!env.TELEGRAM_BOT_TOKEN) {
@@ -206,6 +231,7 @@ async function deliver(
       // The plain text goes either way. A formatted message carries both, so a
       // client that will not render HTML still gets a readable letter.
       html: email.asHtml ? renderEmailHtml(body) : null,
+      documentIds: email.documentIds,
       entityType: 'channel_thread', entityId: thread.id, createdBy: userId,
     });
     const { flushQueue } = await import('../mail/queue');
@@ -290,7 +316,13 @@ export async function threadHistory(env: Env, threadId: string): Promise<ThreadE
     ),
     all<any>(
       env.DB,
-      `SELECT r.created_at, r.body, r.status, r.error, u.name AS author
+      // The filenames sent with it, so the conversation shows what actually
+      // went — a reply that says "please find attached" and shows nothing is
+      // the record disagreeing with itself.
+      `SELECT r.id, r.created_at, r.body, r.status, r.error, u.name AS author,
+              (SELECT GROUP_CONCAT(d.filename, ', ')
+                 FROM reply_attachments a JOIN documents d ON d.id = a.document_id
+                WHERE a.reply_id = r.id) AS attachments
          FROM channel_replies r JOIN users u ON u.id = r.created_by
         WHERE r.thread_id = ? ORDER BY r.created_at LIMIT 200`,
       threadId,
@@ -305,7 +337,10 @@ export async function threadHistory(env: Env, threadId: string): Promise<ThreadE
     })),
     ...outbound.map((r: any) => ({
       direction: 'out' as const, at: r.created_at, body: r.body,
-      who: r.author, status: r.status, note: r.error ?? null, href: null,
+      who: r.author, status: r.status,
+      note: [r.attachments ? `Attached: ${r.attachments}` : null, r.error ?? null]
+        .filter(Boolean).join(' · ') || null,
+      href: null,
     })),
   ];
   return entries.sort((a, b) => a.at.localeCompare(b.at));

@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.58.0', date: '29 August 2026',
+    notes: [
+      'A reply can carry documents that are already on the client or the matter. Nothing is '
+        + 'uploaded twice: sending a document records that it went and to whom, so which '
+        + 'version somebody was sent, and when, is answerable from the document itself.',
+      'The documents list now shows how many times each has been sent and when it last was.',
+      'The conversation shows what was attached to each reply.',
+    ],
+  },
+  {
     version: '0.57.0', date: '29 August 2026',
     notes: [
       'A matter has one principal applicant. The database refuses a second, and the message '

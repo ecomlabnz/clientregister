@@ -17,7 +17,7 @@ import { auditFrom } from '../../core/audit';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import { actionButton, badge, card, csrfField, emptyState, pageHeader, statusTone, table } from '../../ui/components';
-import { dateTime, truncate } from '../../ui/format';
+import { dateShort, dateTime, truncate } from '../../ui/format';
 import { processMessage } from '../../ingest/pipeline';
 import { isAiEnabled } from '../../ai/provider';
 import { latestTriage, runTriage } from '../../ai/triage';
@@ -295,7 +295,7 @@ export const inboxModule: AppModule = {
       );
       if (!thread) return c.notFound();
 
-      const [history, clients, matters, addressBook, lastIn] = await Promise.all([
+      const [history, clients, matters, addressBook, lastIn, attachable] = await Promise.all([
         threadHistory(c.env, id),
         all<{ id: string; full_name: string }>(
           c.env.DB, `SELECT id, full_name FROM clients WHERE status != 'archived' ORDER BY full_name LIMIT 500`),
@@ -321,6 +321,19 @@ export const inboxModule: AppModule = {
           c.env.DB,
           `SELECT subject, to_addrs, cc_addrs FROM ingest_messages
             WHERE thread_id = ? ORDER BY received_at DESC LIMIT 1`, id),
+        // Documents on whatever this conversation is linked to. Nothing is
+        // uploaded here: an attachment is a reference to a document already on
+        // the file, so sending one costs no storage and the document itself
+        // records that it went out.
+        thread.case_id || thread.client_id
+          ? all<{ id: string; filename: string; size_bytes: number; uploaded_at: string }>(
+              c.env.DB,
+              `SELECT id, filename, size_bytes, uploaded_at FROM documents
+                WHERE (entity_type = 'case' AND entity_id = ?1)
+                   OR (entity_type = 'client' AND entity_id = ?2)
+                ORDER BY uploaded_at DESC LIMIT 40`,
+              thread.case_id ?? '', thread.client_id ?? '')
+          : Promise.resolve([]),
       ]);
 
       // Everyone on the last message except ourselves and the person we are
@@ -409,6 +422,20 @@ export const inboxModule: AppModule = {
                   <label for="f_body">Message</label>
                   <textarea id="f_body" name="body" rows="8" required maxlength="4000"></textarea>
                 </div>
+                ${thread.channel === 'email' && attachable.length > 0 ? html`
+                  <fieldset class="field-group">
+                    <legend>Attach from the file</legend>
+                    ${attachable.map((d) => html`
+                      <div class="field checkbox-field">
+                        <label><input type="checkbox" name="documents" value="${d.id}">
+                          ${d.filename}
+                          <span class="muted small">${Math.max(1, Math.round(d.size_bytes / 1024))} KB ·
+                            ${dateShort(d.uploaded_at)}</span></label>
+                      </div>`)}
+                    <p class="hint">Documents already on this client or matter. Sending one records
+                       that it went, and to whom — so which version they were sent, and when, stays
+                       answerable from the document itself.</p>
+                  </fieldset>` : ''}
                 ${thread.channel === 'email' ? html`
                   <div class="field checkbox-field">
                     <label><input type="checkbox" name="format" value="html" checked> Send it formatted</label>
@@ -467,6 +494,7 @@ export const inboxModule: AppModule = {
       const cc = f.optional('cc', { max: 500 });
       const bcc = f.optional('bcc', { max: 500 });
       const asHtml = f.text('format', { max: 10 }) === 'html';
+      const documentIds = f.all('documents').slice(0, 20);
       if (!f.valid) return redirectWith(c, `/inbox/threads/${id}`, Object.values(f.errors)[0]!, 'err');
 
       const bad = [to, cc, bcc].flatMap((list) => badAddresses(list));
@@ -483,7 +511,7 @@ export const inboxModule: AppModule = {
 
       const result = await postReply(c.env, {
         threadId: id, body, userId: user.id, subject: subject ?? undefined,
-        to, cc, bcc, asHtml,
+        to, cc, bcc, asHtml, documentIds,
       });
       await auditFrom(c, { action: 'channel.reply_posted', entityType: 'channel_thread', entityId: id,
         meta: { ok: result.ok } });

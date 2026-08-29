@@ -7,6 +7,41 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.58.0 — 29 August 2026
+
+### Added
+- **A reply can carry attachments** — chosen from the documents already on the
+  client or the matter the conversation is linked to.
+- **An attachment is a reference, never a copy.** The practice sends drafts back
+  and forth: a submission at version three, then version four with the client's
+  corrections. Six months later the question is not "was something attached" but
+  *which one did we send them on the twelfth*, and a filename cannot answer that
+  — four near-identical files sit in the folder and nothing ranks them.
+- So `reply_attachments` joins a reply to a document, and the document answers
+  the question from its own end: the documents list shows how many times each has
+  been sent and when it last went. The conversation shows what each reply
+  carried.
+- A document that has been sent to somebody **cannot be deleted** — `ON DELETE
+  RESTRICT`. Deleting it would leave the record that it was sent pointing at
+  nothing.
+- Attachments go out through both transports: `multipart/mixed` for Gmail,
+  wrapping the plain-and-formatted body so a reader that will not show
+  formatting still gets both the letter and the files; base64 for Resend.
+- A **20 MB ceiling** on one message, below the ~35 MB Gmail refuses, because
+  base64 inflates by a third. Anything over is skipped with a note rather than
+  failing the send: a reply that reaches the client without an attachment is
+  recoverable, one that never leaves is not.
+- The queue carries **document ids, not bytes**, and resolves them at the moment
+  of sending. A copy in a queue row would be a second answer to what was sent.
+
+### Documentation
+- `docs/operations.md` gains **What storage actually costs**. The short version:
+  10 GB free, ~US$0.015 per GB-month beyond, and nothing at all for egress — so
+  the thing to watch is not size but how many copies of the same bytes exist.
+  Inbound attachments are recorded and not kept; outbound attachments are
+  references. Both decisions are written down as decisions, so a future
+  suggestion to "just store everything" meets an argument rather than a shrug.
+
 ## 0.57.0 — 29 August 2026
 
 ### Added

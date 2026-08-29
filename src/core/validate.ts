@@ -39,6 +39,19 @@ export class FormReader {
     if (!(name in this.errors)) this.errors[name] = message;
   }
 
+  /**
+   * Every value submitted under one name.
+   *
+   * A group of checkboxes shares a name and sends one entry per box ticked, so
+   * `get` — which returns the first — would quietly send one attachment out of
+   * five. Trimmed and de-blanked; the caller caps how many it will take.
+   */
+  all(name: string): string[] {
+    return this.data.getAll(name)
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean);
+  }
+
   text(name: string, opts: TextOpts = {}): string {
     const label = opts.label ?? name;
     const value = this.get(name);

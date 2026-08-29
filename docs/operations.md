@@ -123,6 +123,36 @@ warning. A personal Gmail account must be **published** (*In production*) before
 the token is taken. Revoking access in the Google account, or changing that
 account's password, also invalidates the token.
 
+## What storage actually costs
+
+Worth knowing before deciding what the register should keep, because the
+intuition that "files are expensive" is from a different era of hosting.
+
+**R2 charges for storage and operations, and nothing for egress.** The free
+allowance is 10 GB stored, 1 million writes and 10 million reads a month; beyond
+it, storage is about US$0.015 per GB-month. A practice holding 5 GB of scans
+pays nothing. At 50 GB it pays about 60 US cents a month. Downloading a document
+a thousand times costs nothing at all, which is the charge that makes object
+storage expensive elsewhere.
+
+So the thing to watch is not size, it is **how many copies of the same bytes
+exist**. Two decisions keep that at one:
+
+- **Inbound attachments are recorded but not kept.** A message stores its
+  attachments' names, types and sizes; the contents are discarded. Forwarded
+  mail carries signature images, logos and newsletters, and keeping all of it
+  would fill the register with things nobody will ever open.
+- **An outbound attachment is a reference to a document already on the file**,
+  never an upload made at the moment of sending. Sending a document costs one
+  read and stores nothing.
+
+The database is smaller still: text and dates, a few megabytes for a practice
+with hundreds of matters.
+
+**Where cost would actually come from**, if it ever did: storing every inbound
+attachment automatically, or making a copy of a document each time it is sent.
+Neither is done, and both are worth refusing again if they are ever proposed.
+
 ## Migrations
 
 Numbered files in `migrations/`, applied in order and tracked in the
