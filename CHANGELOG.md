@@ -7,6 +7,33 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.39.0 — 29 August 2026
+
+### Changed
+- **The model the assistant uses is chosen in the app**, under Admin →
+  Settings → Assistant, and takes effect on the next request. It is a choice
+  about cost and quality that the practice makes for itself — the same kind of
+  choice as a case type or a fee rate — and waiting on a deploy to try a
+  different one was the wrong shape for it. The key stays a secret; only the
+  choice moved.
+- Each option carries its price per million tokens, because the choice is
+  mostly about cost and a choice about cost made without the figures is a
+  guess.
+- The list is fixed in code, and that boundary is deliberate: a model on it is
+  a claim that the requests this register sends have been checked against that
+  model — no `effort`, no `thinking`, the parameters that differ between tiers.
+  A free-text box would let a typo switch the assistant off silently and a
+  stale id look like a working one.
+
+### Removed
+- **`AI_MODEL` as a secret.** The setting owns the model now, and a secret
+  saying one thing while a setting says another is the kind of disagreement
+  nobody finds until it matters. Dropped from the collector, the workflow and
+  the environment type.
+- The Workers AI provider took its model from the same variable, but it names
+  models in its own namespace where the Anthropic setting has nothing to say.
+  It has its own default now and nothing overrides it.
+
 ## 0.38.0 — 29 August 2026
 
 ### Changed

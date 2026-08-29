@@ -94,15 +94,16 @@ const BriefSchema = z.object({
  * a 200K context rather than 1M (the longest thing sent is a case file, capped
  * at 60,000 characters below), and a 100-page ceiling on a single PDF.
  *
- * Set the AI_MODEL secret to override it — `claude-sonnet-5` is the next step
- * up at $2/$10, `claude-opus-5` above that. Nothing else has to change: no
- * request here sends `effort` or `thinking`, which are the parameters that
- * differ between the tiers.
+ * Which model actually runs is chosen in the app, under Admin → Settings →
+ * Assistant; this is only the answer when nobody has chosen. Nothing else has
+ * to change to move between them: no request here sends `effort` or `thinking`,
+ * which are the parameters that differ between the tiers, and a test keeps that
+ * true.
  */
 const DEFAULT_MODEL = 'claude-haiku-4-5';
 
-export function createAnthropicProvider(env: Env): AiProvider {
-  const model = env.AI_MODEL || DEFAULT_MODEL;
+export function createAnthropicProvider(env: Env, chosenModel?: string): AiProvider {
+  const model = chosenModel || DEFAULT_MODEL;
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
 
   return {

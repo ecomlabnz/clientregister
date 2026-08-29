@@ -13,6 +13,8 @@
  */
 
 import type { Env } from '../types';
+import type { SettingsGroup } from '../core/settings';
+import { settingValue } from '../core/settings';
 
 export interface TriageResult {
   /** Best guess at who wrote in. */
@@ -239,11 +241,57 @@ export function isAiEnabled(env: Env): boolean {
   return false;
 }
 
+/**
+ * Which model the practice runs on.
+ *
+ * A setting rather than a secret, because it is a choice about cost and quality
+ * that the practice makes for itself — the same kind of choice as a case type
+ * or a fee rate — and waiting on a deploy to try a different one is the wrong
+ * shape for that. The key stays a secret; only the choice moves.
+ *
+ * The list is fixed in code, and that boundary is deliberate rather than
+ * laziness. A model id in this list is a claim that the requests this register
+ * sends have been checked against that model: they carry no `effort` and no
+ * `thinking`, which are the parameters that differ between tiers, and a test
+ * keeps that true. A free-text box would let a typo switch the assistant off
+ * silently, and a stale id look like a working one.
+ *
+ * Prices are in the labels because the choice is mostly about cost, and a
+ * choice about cost made without the figures is a guess.
+ */
+export const AI_SETTINGS: SettingsGroup = {
+  id: 'ai',
+  title: 'Assistant',
+  order: 60,
+  description: 'Which model the assistant uses. It suggests; a person always '
+    + 'presses the button. The register works with all of this switched off.',
+  settings: [
+    {
+      key: 'ai.model', type: 'enum', default: 'claude-haiku-4-5',
+      label: 'Model',
+      options: [
+        { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — $1 in / $5 out per million tokens' },
+        { value: 'claude-sonnet-5', label: 'Claude Sonnet 5 — $2 in / $10 out per million tokens' },
+        { value: 'claude-opus-5', label: 'Claude Opus 5 — $5 in / $25 out per million tokens' },
+      ],
+      help: 'Haiku is the default and is the right one for this work: reading a '
+        + 'document into form fields, triaging a message, summarising a file — all of '
+        + 'it checked by a person before anything is written. Move up if extraction from '
+        + 'difficult scans starts costing you more in corrections than the model saves.',
+    },
+  ],
+};
+
+/** The chosen model, or the default when nobody has chosen. */
+export async function currentModel(env: Env): Promise<string> {
+  return settingValue(env, AI_SETTINGS.settings[0]!);
+}
+
 export async function getProvider(env: Env): Promise<AiProvider | null> {
   const provider = (env.AI_PROVIDER ?? 'none').toLowerCase();
   if (provider === 'anthropic' && env.ANTHROPIC_API_KEY) {
     const { createAnthropicProvider } = await import('./anthropic');
-    return createAnthropicProvider(env);
+    return createAnthropicProvider(env, await currentModel(env));
   }
   if (provider === 'workers-ai' && env.AI) {
     const { createWorkersAiProvider } = await import('./workers-ai');

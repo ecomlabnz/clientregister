@@ -32,6 +32,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.39.0', date: '29 August 2026',
+    notes: [
+      'The model the assistant uses is now chosen in the app, under '
+        + 'Admin \u2192 Settings \u2192 Assistant, with the price per million tokens beside '
+        + 'each option. No deploy.',
+    ],
+  },
+  {
     version: '0.38.0', date: '29 August 2026',
     notes: [
       'The assistant runs on Claude Haiku 4.5 \u2014 the cheap model, about a fifth the price '
@@ -645,8 +653,13 @@ function sections(origin: string): Section[] {
            into form fields, triaging a message, or summarising a file the practice already holds,
            and all of it is checked by a person before anything is written. Paying five times more
            would be paying for reasoning this work does not use.</p>
-        <p>To change that, set an <code>AI_MODEL</code> secret: <code>claude-sonnet-5</code> is the
-           next step up, <code>claude-opus-5</code> above it. Nothing else has to change.</p>
+        <p>To change it, go to <strong>Admin → Settings → Assistant</strong> and pick another:
+           Sonnet 5 is the next step up, Opus 5 above it, and each carries its price per million
+           tokens so the choice is made with the figures in front of you. It takes effect on the
+           next request — no deploy.</p>
+        <p>Worth moving up only if extraction from difficult scans starts costing you more in
+           corrections than the model saves. The list is short on purpose: a model on it is one
+           whose request shape has been checked against this register.</p>
         <h4>What it will not do</h4>
         <p><strong>It never writes to the register.</strong> Every suggestion arrives as a form you
            look at and submit, or a note you press save on. Nothing it offers is a step you could
