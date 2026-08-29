@@ -38,7 +38,7 @@ import {
   DECISION_SETTINGS, caseForSync, decisionPolicy, expectedDecisionDate, syncCaseFollowUps,
 } from '../../core/decisions';
 import { isAiEnabled } from '../../ai/provider';
-import { briefCase, latestBrief } from '../../ai/brief';
+import { AI_BRIEF_NOTE_PREFIX, briefCase, latestBrief } from '../../ai/brief';
 import {
   VOCABULARY_SETTINGS, caseTypes, isTerm, labelFor, termOptions, type Term,
 } from '../../core/vocabulary';
@@ -922,7 +922,7 @@ export const casesModule: AppModule = {
         const existing = await latestBrief(c.env, id);
         if (!existing) return redirectWith(c, `/cases/${id}`, 'There is no brief to save yet.', 'err');
         const lines = [
-          'Brief drafted by the AI layer from this file. Reviewed and kept by ' + user.name + '.',
+          `${AI_BRIEF_NOTE_PREFIX} Reviewed and kept by ${user.name}.`,
           '',
           existing.result.summary,
         ];

@@ -23,6 +23,17 @@ import { CASE_STATUS_LABELS, PRIORITY_LABELS, TASK_STATUS_LABELS } from '../doma
 import { money } from '../ui/format';
 
 /**
+ * The first line of a brief kept on the file.
+ *
+ * Exported because two places depend on it being exactly this: the route that
+ * writes a kept brief, and the reader below that has to recognise one coming
+ * back. A prefix known to only one of them would drift, and the drift would be
+ * invisible — the file would simply start reading as if the model's own drafts
+ * were evidence.
+ */
+export const AI_BRIEF_NOTE_PREFIX = 'Brief drafted by the AI layer from this file.';
+
+/**
  * The file for one matter, as plain text.
  *
  * Written out rather than passed as JSON because a model reads a file note the
@@ -119,7 +130,14 @@ export async function caseFileText(env: Env, caseId: string): Promise<{ title: s
   if (entries.length) {
     lines.push('', 'File notes, most recent first:');
     for (const e of entries) {
-      lines.push(`- ${dateShort(e.occurred_at)} [${e.kind}]${e.author ? ` ${e.author}` : ''}: ${e.body}`);
+      // A brief kept on the file is a fact — somebody read it and kept it —
+      // but it is not a record of anything that happened. Left unmarked it
+      // comes back as ordinary file content, and each brief starts summarising
+      // the last one: the file fills with the model's own output and a later
+      // reading cites it as evidence. Marked, the model can see what it is.
+      const isOwnDraft = e.body.startsWith(AI_BRIEF_NOTE_PREFIX);
+      const mark = isOwnDraft ? ' (an earlier AI draft kept on the file — not a record of events)' : '';
+      lines.push(`- ${dateShort(e.occurred_at)} [${e.kind}]${e.author ? ` ${e.author}` : ''}${mark}: ${e.body}`);
     }
   }
 
