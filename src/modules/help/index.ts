@@ -32,6 +32,23 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.50.0', date: '29 August 2026',
+    notes: [
+      'The register can read a mailbox for you. Forward your working mail into a dedicated '
+        + 'Gmail account, authorise it read-only, and what arrives there appears in Incoming '
+        + 'within five minutes \u2014 no forwarding by hand. See Help \u2192 Connecting '
+        + 'Telegram, WhatsApp and email, section 4c.',
+      'It files correspondence and nothing more. Whether a message becomes an inquiry follows '
+        + 'the same trusted-sender rule as mail forwarded in; no status, date or task changes '
+        + 'by itself.',
+      'The Gmail credentials were never passed through the deploy \u2014 you could set them, '
+        + 'watch the deploy succeed, and never have them take effect. Fixed, with a test that '
+        + 'now fails if any secret the collector knows is missing from the workflow.',
+      'Setting up Gmail on a Workspace address is simpler than on a personal one: choose '
+        + '\u201cInternal\u201d and there is no verification, no warning and no token expiry.',
+    ],
+  },
+  {
     version: '0.49.1', date: '29 August 2026',
     notes: [
       'Settings \u2192 Integrations now says what the mail transport in use actually does \u2014 '
@@ -1282,18 +1299,20 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
               (top bar → New project); call it anything.</li>
           <li>Open <strong>APIs &amp; Services → Library</strong>, search for
               <strong>Gmail API</strong>, and press <strong>Enable</strong>.</li>
-          <li>Open <strong>APIs &amp; Services → OAuth consent screen</strong>. Choose
-              <strong>External</strong>, fill in the app name and your email where asked, and save.
-              On the <strong>Audience</strong> page, add the Gmail address under
-              <strong>Test users</strong>.
-              <p class="hint">Then press <strong>Publish app</strong> on that same page, so the
-                 publishing status reads <strong>In production</strong> rather than
-                 <strong>Testing</strong>. This matters more than it looks:
-                 <strong>a refresh token issued while the app is in Testing expires after seven
-                 days</strong>, and outbound mail would simply stop a week after you set it up,
-                 with nothing obviously wrong. Publishing does not mean submitting for
-                 verification — you will still see Google's “unverified app” warning when you
-                 authorise, which is expected and is the next step.</p></li>
+          <li>Open <strong>APIs &amp; Services → OAuth consent screen</strong>.
+              <p><strong>On Google Workspace</strong> — a firm address like
+                 <code>you@yourfirm.nz</code> — choose <strong>Internal</strong>. That is the whole
+                 step. Only people in your organisation can use the app, so there is no
+                 verification, no test-user list, no “unverified app” warning, and no token
+                 expiry. If <strong>Internal</strong> is greyed out, the project was created
+                 outside the organisation: start again signed in as a Workspace user.</p>
+              <p class="mb"><strong>On a personal Gmail account</strong> choose
+                 <strong>External</strong>, add the address under <strong>Test users</strong>, and
+                 then press <strong>Publish app</strong> so the status reads <strong>In
+                 production</strong>. This matters more than it looks: <strong>a refresh token
+                 issued while the app is in Testing expires after seven days</strong>, and mail
+                 would stop a week after setup with nothing obviously wrong. Publishing is not
+                 verification — the “unverified app” warning at the next step is expected.</p></li>
           <li>Open <strong>APIs &amp; Services → Credentials → Create credentials → OAuth client
               ID</strong>. Choose <strong>Web application</strong>. Under
               <strong>Authorised redirect URIs</strong> add exactly:
@@ -1310,9 +1329,9 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
               <strong>Advanced → Go to (your app)</strong>.</li>
           <li>Back in the Playground, press <strong>Exchange authorization code for tokens</strong>.
               Copy the <strong>Refresh token</strong> — the long one starting <code>1//</code>.
-              With the app published (step 3) it does not expire unless you revoke it or change
-              the account's password. If mail stops about a week after setup, the app was left in
-              Testing: publish it and take a fresh token.</li>
+              On an Internal (Workspace) app, or a published External one, it does not expire
+              unless you revoke it or change the account's password. If mail stops about a week
+              after setup, the app was left in Testing: fix step 3 and take a fresh token.</li>
           <li>Save four repository secrets:
               <ul>
                 <li><code>MAIL_PROVIDER</code> = <code>gmail</code></li>
@@ -1366,6 +1385,54 @@ Residence | Skilled Migrant, partnership and parent category.</pre>
            under <strong>Settings → Practice</strong> to the address you actually read. Every
            outbound message then carries it. Leave it empty when the sending address is itself a
            working mailbox, which is the ordinary case.</p>
+
+        <h4>4c · Email in — a mailbox the register reads for you</h4>
+        <p>Sections 1 to 3 all work by forwarding: you see something, you send it on, it lands
+           here. That is fine and it is reliable, and it is also one more thing to remember on a
+           day when there are forty of them. This is the other way round — the register reads a
+           mailbox on a schedule and takes what it finds.</p>
+        <div class="alert alert-warn">
+          <p class="mb"><strong>Use an account that holds nothing else.</strong> Whatever holds the
+             authorisation can read every message in that mailbox, and it is a deployment secret
+             rather than something you unlock each morning. So: a new, empty Gmail account whose
+             only job is to receive forwarded working mail. Never your own inbox, and never an
+             account carrying anything privileged that has not been forwarded there deliberately.</p>
+        </div>
+        <ol>
+          <li>Create the account — something like
+              <code>practiceinbox@gmail.com</code> — and turn on two-factor authentication for it.</li>
+          <li>In the mail account you actually work in, set up <strong>forwarding</strong> to that
+              address. In Gmail that is <strong>Settings → Forwarding and POP/IMAP → Add a
+              forwarding address</strong>, then confirm from the new account and choose
+              <strong>Keep Gmail's copy in the Inbox</strong>. Forward <em>received</em> mail only.
+              Do not forward sent items: the register would read its own outgoing mail back.</li>
+          <li>Repeat steps 1 to 7 of section 4 above <em>signed in as the new account</em>, with one
+              change — the scope is
+              <pre>https://www.googleapis.com/auth/gmail.readonly</pre>
+              Read-only on purpose. The register never labels, moves, marks or deletes anything in
+              that mailbox; what it has taken is shown in <strong>Incoming</strong>, which is
+              where you would be looking anyway.</li>
+          <li>Save three repository secrets:
+              <ul>
+                <li><code>GMAIL_INBOX_REFRESH_TOKEN</code> — the refresh token for the new account</li>
+                <li><code>GMAIL_INBOX_CLIENT_ID</code> and <code>GMAIL_INBOX_CLIENT_SECRET</code> —
+                    from that account's OAuth client. If it is the same Google project you used for
+                    sending, you may leave these out and the sending ones are used; the refresh
+                    token is never shared, because it is what names the mailbox.</li>
+                <li><code>GMAIL_INBOX_ADDRESS</code> — optional, and only so the integrations page
+                    can tell you which mailbox is being read.</li>
+              </ul></li>
+          <li>Deploy. <strong>Settings → Integrations</strong> then shows the poll as configured,
+              and mail starts appearing in <strong>Incoming</strong> within five minutes.</li>
+        </ol>
+        <p>What happens to a message it finds is the same as if you had forwarded it by hand: if
+           the sender is on the trusted list it becomes an inquiry, and otherwise it waits in
+           <strong>Incoming</strong> for you. <strong>Nothing on a matter changes by itself</strong>
+           — no status, no date, no task. The register files the correspondence; you decide what it
+           means.</p>
+        <p class="hint">It looks back two days on every pass, so a missed run or an outage catches
+           up by itself. Reading the same message twice costs nothing — it is recognised by its own
+           message id and captured once.</p>
 
         <h4>5 · Document storage — turning on R2</h4>
         <p><strong>R2</strong> is Cloudflare's file storage. The register keeps its records in a
