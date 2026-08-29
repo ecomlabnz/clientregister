@@ -7,6 +7,33 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.60.0 — 29 August 2026
+
+### Added
+- **An inquiry can be deleted**, from the inquiries list or from its own page.
+  Not everything that arrives is work — a chat forwarded twice, a wrong number,
+  somebody's test message — and until now those could only be marked and left
+  there. A list that fills with things nobody will ever act on stops being read,
+  which costs more than the noise did.
+- **Only while it is still only an inquiry.** The database refuses to delete one
+  that has become a matter, been quoted, carries a task, a document, or a file
+  note somebody typed. The rule is a guarantee about the data, so it is a trigger
+  rather than a check in whichever route runs the DELETE — and the refusal is a
+  sentence the screen can show as it stands.
+- Being linked to a client is not one of those lines: a message from somebody
+  already on the register arrives matched, and is still just a message.
+- **Notes stay written.** `entries_cannot_be_deleted` is not relaxed. The system
+  breadcrumb an inquiry is born with stays in `entries` after the inquiry goes —
+  the honest cost of a record that cannot be rewritten — and the audit log keeps
+  the inquiry's reference, source, subject and contact, written before the row
+  is removed.
+- The **message it was made from** is marked ignored rather than left looking
+  unhandled, so the same rubbish is not dismissed twice. Done on the way out
+  rather than after: `ingest_messages.inquiry_id` is `ON DELETE SET NULL`, and
+  SQLite applies that before an `AFTER DELETE` trigger runs, so an `AFTER`
+  version silently did nothing. Found by rehearsing the migration on a scratch
+  database.
+
 ## 0.59.0 — 29 August 2026
 
 ### Changed

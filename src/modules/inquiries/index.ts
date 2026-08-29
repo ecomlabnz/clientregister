@@ -17,7 +17,7 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import {
-  badge, card, csrfField, emptyState, errorList, field, optionsFrom,
+  actionButton, badge, card, csrfField, emptyState, errorList, field, optionsFrom,
   pageHeader, select, statusTone, table,
 } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, truncate } from '../../ui/format';
@@ -80,6 +80,22 @@ export async function createInquiry(
     createdBy: input.createdBy ?? null,
   });
   return { id, ref };
+}
+
+/**
+ * The database's own words when it refuses a delete.
+ *
+ * Every refusal in migration 0036 is already a sentence a person can act on —
+ * "an inquiry that has been quoted cannot be deleted" — so this lifts it out of
+ * whatever D1 wrapped it in rather than keeping a second copy of the rule here
+ * in TypeScript to go stale against the first.
+ */
+function refusal(err: unknown): string | null {
+  const text = err instanceof Error ? err.message : String(err);
+  const found = /an inquiry [^.:\n]*cannot be deleted/i.exec(text);
+  if (!found) return null;
+  const sentence = found[0]!;
+  return `${sentence[0]!.toUpperCase()}${sentence.slice(1)}.`;
 }
 
 /** Best-effort match of an incoming contact to an existing client. */
@@ -182,6 +198,8 @@ export const inquiriesModule: AppModule = {
         ),
         incomingCounts(c.env),
       ]);
+      const csrf = c.get('session')!.csrf;
+      const deletable = can(c.get('user'), 'register:delete');
 
       return page(c, { title: 'Inquiries', active: '/inquiries' }, html`
         ${pageHeader('Inquiries', 'New work coming in, from every channel.',
@@ -196,7 +214,15 @@ export const inquiriesModule: AppModule = {
           </select>
           <button class="btn btn-secondary" type="submit">Filter</button>
         </form>
-        ${table(['Reference', 'Received', 'From', 'Subject', 'Source', 'Status'], rows.map((row) => html`
+        ${'' /* Some of what arrives is not work, and the person reading the
+                 list is the one who knows which. Deleting from here rather
+                 than only from inside each one, because clearing four pieces
+                 of noise should not be four page loads. The button is absent
+                 on a converted inquiry: the database refuses that, and a
+                 button that fails is worse than no button. */}
+        ${table(deletable
+          ? ['Reference', 'Received', 'From', 'Subject', 'Source', 'Status', '']
+          : ['Reference', 'Received', 'From', 'Subject', 'Source', 'Status'], rows.map((row) => html`
           <tr>
             <td><a href="/inquiries/${row.id}"><code>${row.ref}</code></a></td>
             <td class="small">${dateShort(row.received_at)}</td>
@@ -206,6 +232,14 @@ export const inquiriesModule: AppModule = {
             <td><a href="/inquiries/${row.id}">${truncate(row.subject ?? row.body, 70) || '(no subject)'}</a></td>
             <td class="small">${INQUIRY_SOURCE_LABELS[row.source] ?? row.source}</td>
             <td>${badge(INQUIRY_STATUS_LABELS[row.status] ?? row.status, statusTone(row.status))}</td>
+            ${deletable
+              ? html`<td class="row-actions">${row.case_id
+                  ? html`<span class="muted small">—</span>`
+                  : actionButton(`/inquiries/${row.id}/delete`, csrf, 'Delete', {
+                      className: 'btn btn-danger btn-small',
+                      confirm: `Delete ${row.ref}? This cannot be undone.`,
+                    })}</td>`
+              : ''}
           </tr>`))}`);
     });
 
@@ -309,6 +343,16 @@ export const inquiriesModule: AppModule = {
             ? html`<a class="btn btn-secondary" href="/inquiries/${inq.id}/edit">Edit</a>
                    ${inq.client_id
                      ? html`<a class="btn btn-secondary" href="/quotes/new?client_id=${inq.client_id}&inquiry_id=${inq.id}">Quote this</a>`
+                     : ''}
+                   ${'' /* Offered here as well as in the list, because this is
+                            where you are when you have just read it and decided
+                            it is nothing. Absent once it has become a matter —
+                            the database refuses that, and there is no sense in
+                            a button whose only outcome is an error. */}
+                   ${can(c.get('user'), 'register:delete') && !inq.case_id
+                     ? actionButton(`/inquiries/${inq.id}/delete`, csrf, 'Delete', {
+                         className: 'btn btn-danger',
+                         confirm: `Delete ${inq.ref}? This cannot be undone.` })
                      : ''}`
             : undefined)}
 
@@ -518,6 +562,25 @@ export const inquiriesModule: AppModule = {
       await addEntry(c.env, { entityType: 'inquiry', entityId: id, kind, body, createdBy: c.get('user')!.id });
       await run(c.env.DB, 'UPDATE inquiries SET updated_at = ? WHERE id = ?', nowIso(), id);
       return redirectWith(c, `/inquiries/${id}`, 'Timeline updated.');
+    });
+
+    r.post('/:id/delete', requirePermission('register:delete'), async (c) => {
+      const id = c.req.param('id')!;
+      const inq = await one<InquiryRow>(c.env.DB, 'SELECT * FROM inquiries WHERE id = ?', id);
+      if (!inq) return c.notFound();
+
+      // Audited before the delete, not after: once the row is gone there is
+      // nothing left to describe it, and this entry is what remains of it.
+      await auditFrom(c, { action: 'inquiry.deleted', entityType: 'inquiry', entityId: id,
+        meta: { ref: inq.ref, source: inq.source, subject: inq.subject,
+                contact: inq.contact_name ?? inq.contact_email ?? inq.contact_phone } });
+      try {
+        await run(c.env.DB, 'DELETE FROM inquiries WHERE id = ?', id);
+      } catch (err) {
+        return redirectWith(c, `/inquiries/${id}`,
+          refusal(err) ?? 'That inquiry could not be deleted.', 'err');
+      }
+      return redirectWith(c, '/inquiries', `Inquiry ${inq.ref} deleted.`);
     });
 
     // Convert an inquiry into a client (if needed) and an open case, in one go.
