@@ -7,6 +7,23 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.35.1 — 29 August 2026
+
+### Fixed
+- **With scripting off, the client form showed five tab buttons that did
+  nothing.** The bar was marked `js-hide`, which is the opposite arrangement:
+  that marker is for a control which exists *for* the no-script case and is
+  taken away once scripting turns up — a fallback submit button beside an
+  auto-submitting select. A tab bar is useless without scripting, so it ships
+  hidden and the script reveals it. The old marker was also cancelled by the
+  tab code's own `bar.hidden = false`, so the bar showed either way.
+- Found by actually running the app with JavaScript disabled rather than
+  asserting that it worked. Everything else held: signing in, searching,
+  filtering, opening and saving a client through the tabbed form, marking a
+  task done through the fallback button, and recording the completion note.
+  With the bar gone the form reads as one long page with its section headings,
+  which is what it already did.
+
 ## 0.35.0 — 29 August 2026
 
 ### Added

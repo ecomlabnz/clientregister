@@ -152,3 +152,41 @@ describe('one menu entry for the incoming family', () => {
     expect(inquiries).toContain("FROM ingest_messages WHERE status = 'pending'");
   });
 });
+
+describe('a control that needs scripting is not shown without it', () => {
+  const clients = readFileSync('src/modules/clients/index.ts', 'utf8');
+  const appjs = readFileSync('public/app.js', 'utf8');
+
+  it('keeps the tab bar hidden until the script that drives it runs', () => {
+    // The two directions are opposites and were confused once. `js-hide` marks
+    // a control that exists *for* the no-script case and is taken away when
+    // scripting turns up — a fallback submit button beside an auto-submitting
+    // select. A tab bar is the other way round: useless without scripting, so
+    // it ships hidden and the script reveals it.
+    //
+    // Marked `js-hide`, the bar was hidden early and then un-hidden by the tab
+    // code's own `bar.hidden = false`, which meant it showed in both cases —
+    // five buttons that did nothing with scripting off.
+    expect(clients).toMatch(/<nav class="tabs form-tabs"[^>]*\bhidden>/);
+    expect(clients, 'the tab bar must not use the fallback marker')
+      .not.toMatch(/form-tabs[^>]*js-hide/);
+    expect(appjs, 'something has to reveal it').toContain('bar.hidden = false;');
+  });
+
+  it('leaves every panel readable when the bar is gone', () => {
+    // With no script the form is one long page rather than five unreachable
+    // ones. Panels are hidden by the script, never by the server.
+    expect(appjs).toContain("panel.hidden = panel.getAttribute('data-panel') !== current");
+    // Whole opening tags: `data-kind` is written before `data-panel`, so a
+    // pattern anchored on the latter never sees it.
+    const panelMarkup = [...clients.matchAll(/<div [^>]*data-panel="[a-z]+"[^>]*>/g)].map((m) => m[0]);
+    expect(panelMarkup.length).toBeGreaterThan(3);
+    for (const tag of panelMarkup) {
+      // `data-kind` sections carry a server-side hidden on purpose: company
+      // boxes never belong on an individual, script or no script.
+      if (tag.includes('data-kind')) continue;
+      expect(tag, `a panel ships hidden and nothing would reveal it: ${tag}`)
+        .not.toMatch(/\bhidden\b/);
+    }
+  });
+});
