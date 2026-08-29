@@ -209,11 +209,23 @@ npx wrangler secret put GMAIL_REFRESH_TOKEN
 echo "Your Name <you@gmail.com>" | npx wrangler secret put MAIL_FROM
 ```
 
-`MAIL_FROM` must be the account that was authorised. The scope needed is
-`https://www.googleapis.com/auth/gmail.send`; the full walkthrough, including
-getting a refresh token out of the OAuth Playground, is in the application under
-**Help → Connecting Telegram, WhatsApp and email**. Gmail allows roughly 500
-messages a day on a personal account and 2,000 on Workspace.
+`MAIL_FROM` must be the account that was authorised — Gmail will not send as any
+other address, so it is what every client sees. Where replies should land
+somewhere else, set **Settings → Practice → "Replies should go to"**; the
+transport writes it as a `Reply-To` header.
+
+The scope needed is `https://www.googleapis.com/auth/gmail.send`. The full
+walkthrough, including getting a refresh token out of the OAuth Playground, is in
+the application under **Help → Connecting Telegram, WhatsApp and email**.
+
+**Publish the OAuth app before taking the refresh token.** A token issued while
+the consent screen is in *Testing* expires after seven days, and outbound mail
+stops a week after setup with nothing visibly wrong. Publishing sets the status
+to *In production*; it does not mean submitting for verification, and the
+"unverified app" warning at authorisation is expected.
+
+Gmail allows roughly 500 messages a day on a personal account and 2,000 on
+Workspace.
 
 **Resend** sends from a domain verified with Resend, so clients see the firm's
 address rather than a personal mailbox. Nothing is written to any mailbox — what
