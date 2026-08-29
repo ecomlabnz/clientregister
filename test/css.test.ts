@@ -67,9 +67,14 @@ describe('a layout class carries its own layout', () => {
     // It set grid-template-columns and nothing else, so it only worked on the
     // one page where the same element also carried .form-grid. Used alone it
     // stacked into a single column, which is the bug it exists to prevent.
-    const block = css.match(/\.settings-form \{([^}]*)\}/);
-    expect(block).not.toBeNull();
-    expect(block![1]).toContain('display: grid');
+    //
+    // The selector may be one of a group now, and one narrower rule flattens a
+    // nested grid to `display: contents` on purpose — so look for a rule that
+    // names .settings-form on its own and gives it a display.
+    const rule = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+      .find((m) => m[1]!.split(',').some((sel) => sel.trim() === '.settings-form')
+        && /display:\s*grid/.test(m[2]!));
+    expect(rule, '.settings-form must set its own display: grid').toBeTruthy();
   });
 });
 
