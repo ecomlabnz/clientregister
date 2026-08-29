@@ -7,6 +7,20 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.32.0 — 29 August 2026
+
+### Changed
+- **The test message can be sent to any address**, with your own filled in by
+  default. The useful question is not "does my own mail arrive" but "what does a
+  client see": providers judge a new sending domain differently, and a message
+  Proton files in the inbox Gmail may put in spam. Most clients are on Gmail or
+  Outlook rather than wherever the practice reads its own mail.
+- Restricting it to the sender was a bad call on my part, and worth naming.
+  It cost nothing in safety — anybody who can reach that page can already email
+  any address from a quote, through the same queue and the same audit log — and
+  it made the test answer a question nobody was asking. The recipient is
+  recorded in the audit entry either way.
+
 ## 0.31.0 — 29 August 2026
 
 ### Added

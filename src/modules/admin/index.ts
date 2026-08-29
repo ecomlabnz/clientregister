@@ -186,12 +186,15 @@ export const adminModule: AppModule = {
              Keys are set as GitHub repository secrets and reach the Worker on the next deploy —
              they are never stored in this database.</p>
           ${mailConfigured(env) ? html`
-            <form method="post" action="/admin/mail/test" class="inline-form mb">
+            <form method="post" action="/admin/mail/test" class="row-form mb">
               ${csrfField(c.get('session')!.csrf)}
-              <button class="btn btn-secondary" type="submit">Send a test message to myself</button>
-            </form>
-            <p class="hint">Goes only to your own address — a test that could be aimed anywhere
-               would be a way to send mail as the practice to anyone.</p>` : ''}
+              ${field({ label: 'Send a test message to', name: 'to', type: 'email',
+                        value: c.get('user')!.email, maxlength: 320,
+                        hint: 'Try an address at whatever your clients use — Gmail and Outlook '
+                          + 'judge a new sending domain more harshly than most, and a message they '
+                          + 'file in spam is worth knowing about before a quote goes to a client.' })}
+              <button class="btn btn-secondary" type="submit">Send it</button>
+            </form>` : ''}
           ${table(['Capability', 'Status', 'Detail'], [
           statusRow('Encrypted PII fields', Boolean(env.FIELD_KEY),
             'FIELD_KEY — enables storing passport numbers under AES-256-GCM.'),
@@ -286,16 +289,27 @@ export const adminModule: AppModule = {
     });
 
     /**
-     * Send one message to the person pressing the button.
+     * Send one message, by default to the person pressing the button.
      *
-     * Deliberately not to an address they type: a test that can be aimed
-     * anywhere is a way to send mail from the practice's domain to anyone,
-     * which is what the outbound queue's audit trail exists to prevent. Sending
-     * to yourself answers the only question a test asks — does it arrive, and
-     * where — and answering it needs nobody else's inbox.
+     * A recipient may be typed in, because the useful test is not "does my own
+     * mail arrive" but "what does a client see". Providers judge a new sending
+     * domain differently — a message Proton files in the inbox, Gmail may put
+     * in spam — and most clients are on Gmail or Outlook rather than wherever
+     * the practice happens to read its own mail.
+     *
+     * Letting it be aimed anywhere costs nothing in safety: anybody who can
+     * reach this page can already email any address from a quote, through the
+     * same queue and the same audit trail. Restricting it only made the test
+     * less informative.
      */
     r.post('/mail/test', requirePermission('admin:settings'), async (c) => {
       const user = c.get('user')!;
+      const f = new FormReader(await c.req.formData());
+      const typed = f.email('to', { label: 'Address' });
+      if (!f.valid) {
+        return redirectWith(c, '/admin?tab=integrations', Object.values(f.errors)[0]!, 'err');
+      }
+      const recipient = typed ?? user.email;
       if (!mailConfigured(c.env)) {
         return redirectWith(c, '/admin?tab=integrations',
           `Outbound email is not configured yet. Still needed: ${mailSetupGaps(c.env).join(', ')}.`, 'err');
@@ -303,7 +317,7 @@ export const adminModule: AppModule = {
 
       const stamp = new Date().toISOString();
       await queueEmail(c.env, {
-        to: user.email,
+        to: recipient,
         subject: `Test message from ${c.env.APP_NAME ?? 'the register'}`,
         text: [
           `This is a test message from ${c.env.APP_NAME ?? 'the client register'}.`,
@@ -324,11 +338,11 @@ export const adminModule: AppModule = {
       });
 
       const result = await flushQueue(c.env, 5);
-      await auditFrom(c, { action: 'admin.mail_test', meta: { to: user.email, ...result } });
+      await auditFrom(c, { action: 'admin.mail_test', meta: { to: recipient, ...result } });
 
       return redirectWith(c, '/admin?tab=integrations',
         result.sent > 0
-          ? `Test message sent to ${user.email}. If it is not in your inbox, look in spam — `
+          ? `Test message sent to ${recipient}. If it is not in the inbox, look in spam — `
             + 'a domain that has just started sending often lands there for the first few.'
           : result.failed > 0
             ? 'The provider refused it. Admin → Maintenance shows the queue and the reason.'
