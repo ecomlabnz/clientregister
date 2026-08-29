@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { suggestCaseTitle } from '../src/core/vocabulary';
+import { caseTypeShort, suggestCaseTitle } from '../src/core/vocabulary';
 import { formalName } from '../src/core/names';
 
 describe('the house convention for a matter title', () => {
@@ -141,5 +141,40 @@ describe('a matter has a name and a thing it is about', () => {
     // ambiguous with anything.
     expect(cases).toContain("descriptor: f.optional('descriptor', { max: 160 })");
     expect(migration).not.toMatch(/descriptor[^;]*NOT NULL/);
+  });
+});
+
+describe('the short form of a case type', () => {
+  it('drops the grouping prefix, which only sorts the dropdown', () => {
+    expect(caseTypeShort('WV. AEWV')).toBe('AEWV');
+    expect(caseTypeShort('RQ. Section 61 Request')).toBe('Section 61 Request');
+    expect(caseTypeShort('EMP. Job Check')).toBe('Job Check');
+  });
+
+  it('keeps the group where what is left would name nothing', () => {
+    // "SV. General" stripped to "General" gave matters called
+    // "General. NGUYEN, Thi Mai". For a filler the group is the whole meaning.
+    expect(caseTypeShort('SV. General')).toBe('SV');
+    expect(caseTypeShort('RV. Other')).toBe('RV');
+    expect(caseTypeShort('VV. General')).toBe('VV');
+  });
+
+  it('does not mistake a real type for a filler', () => {
+    // "Specific Purpose" and "Permanent" are types in their own right.
+    expect(caseTypeShort('WV. Specific Purpose')).toBe('Specific Purpose');
+    expect(caseTypeShort('RV. Permanent')).toBe('Permanent');
+  });
+
+  it('copes with a label an administrator wrote without a prefix', () => {
+    expect(caseTypeShort('S.61')).toBe('S.61');
+    expect(caseTypeShort('')).toBe('');
+  });
+
+  it('is what the browser does too, so the two never disagree', () => {
+    // app.js repeats this rule for the live suggestion. If one changes and the
+    // other does not, a title proposed as you type differs from one the server
+    // would propose, which is the sort of difference nobody notices for months.
+    const appjs = readFileSync('public/app.js', 'utf8');
+    expect(appjs).toContain("if (specific === 'General' || specific === 'Other') specific = group;");
   });
 });

@@ -7,6 +7,32 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.36.2 — 29 August 2026
+
+### Changed
+- **Five case types got the short forms the practice actually uses**, in the
+  defaults rather than as a stored override, so the list still tracks future
+  additions and an administrator can still edit it: `RQ. S.61`, `EMP. JC`,
+  `RV. Partner RV`, `WV. Partner WV`, `RQ. Recon`.
+
+### Fixed
+- **A type label whose specific half is a filler now keeps its group.**
+  "SV. General" stripped to "General", so matters came out named
+  "General. NGUYEN, Thi Mai". Only "General" and "Other" count as fillers, named
+  explicitly rather than guessed at, because "WV. Specific Purpose" and
+  "RV. Permanent" are real types and must not be mistaken for one.
+- The browser repeats this rule for the live suggestion, and a test now holds
+  the two in step — a title proposed as you type differing from one the server
+  would propose is the sort of difference nobody notices for months.
+
+### Data
+- Existing records were normalised in place rather than by shipped code:
+  nineteen client family names capitalised (with `RĀWIRI` keeping its macron,
+  which SQL's `UPPER` would have flattened to `RāWIRI`), and sixteen matters
+  retitled to the convention with the two mis-typed as `OT. Other` corrected.
+  Both computed with the application's own rules, so a retitled matter is named
+  exactly as a new one would be.
+
 ## 0.36.1 — 29 August 2026
 
 ### Changed
