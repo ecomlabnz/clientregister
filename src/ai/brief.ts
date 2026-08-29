@@ -192,11 +192,19 @@ export async function briefCase(
 }
 
 /** The most recent brief for a record, if one has been run. */
+/**
+ * The last brief still waiting to be read — not one already kept.
+ *
+ * A brief that has been saved is on the file, and showing it again in the panel
+ * offered to save the same words a second time with nothing on screen to say it
+ * had already happened.
+ */
 export async function latestBrief(env: Env, caseId: string): Promise<{ result: BriefResult; at: string } | null> {
   const row = await one<{ output_json: string; created_at: string }>(
     env.DB,
     `SELECT output_json, created_at FROM ai_runs
       WHERE kind = 'brief' AND entity_type = 'case' AND entity_id = ? AND status = 'ok'
+        AND kept_at IS NULL
       ORDER BY created_at DESC LIMIT 1`,
     caseId,
   );
@@ -206,4 +214,25 @@ export async function latestBrief(env: Env, caseId: string): Promise<{ result: B
   } catch {
     return null;
   }
+}
+
+
+/**
+ * Mark the last unkept brief on a case as kept.
+ *
+ * Narrowed the same way `latestBrief` chooses one, so the row marked is the row
+ * that was shown. `ai_runs` is otherwise untouched: it records what the model
+ * was asked and what it answered, and that does not change because somebody
+ * kept the answer.
+ */
+export async function markBriefKept(env: Env, caseId: string): Promise<void> {
+  await run(
+    env.DB,
+    `UPDATE ai_runs SET kept_at = ?
+      WHERE id = (SELECT id FROM ai_runs
+                   WHERE kind = 'brief' AND entity_type = 'case' AND entity_id = ?
+                     AND status = 'ok' AND kept_at IS NULL
+                   ORDER BY created_at DESC LIMIT 1)`,
+    nowIso(), caseId,
+  );
 }

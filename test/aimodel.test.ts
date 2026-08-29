@@ -173,3 +173,33 @@ describe('a brief cannot mistake its own earlier draft for evidence', () => {
     expect(reader).not.toMatch(/continue;|filter\(/);
   });
 });
+
+describe('a saved brief stops being a draft', () => {
+  const brief = readFileSync('src/ai/brief.ts', 'utf8');
+  const cases = readFileSync('src/modules/cases/index.ts', 'utf8');
+  const migration = readFileSync('migrations/0027_ai_run_kept.sql', 'utf8');
+
+  it('leaves the panel once it is on the file', () => {
+    // Saving wrote it to the file but left it in the panel, still offering to
+    // save the same words again, with nothing on screen to say it had been
+    // kept at all.
+    expect(migration).toContain('ALTER TABLE ai_runs ADD COLUMN kept_at TEXT;');
+    expect(brief).toContain('AND kept_at IS NULL');
+    expect(cases).toContain('await markBriefKept(c.env, id);');
+  });
+
+  it('marks the same run the panel was showing', () => {
+    // Narrowed exactly as latestBrief narrows, or the row marked would not be
+    // the row that was read.
+    const mark = brief.slice(brief.indexOf('export async function markBriefKept'));
+    expect(mark).toContain("status = 'ok' AND kept_at IS NULL");
+    expect(mark).toContain('ORDER BY created_at DESC LIMIT 1');
+  });
+
+  it('does not rewrite what the model was asked or answered', () => {
+    // ai_runs is the record of the exchange. Keeping the answer does not
+    // change the exchange.
+    const mark = brief.slice(brief.indexOf('export async function markBriefKept'));
+    expect(mark).not.toMatch(/output_json\s*=|input_hash\s*=|DELETE/);
+  });
+});

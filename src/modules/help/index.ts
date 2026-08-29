@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.41.0', date: '29 August 2026',
+    notes: [
+      'Saving a brief now clears it from the panel — it is on the file, so it is no '
+        + 'longer a draft waiting to be kept.',
+      'A brief no longer reads an earlier brief kept on the file as though it were a '
+        + 'record of what happened.',
+      'The assistant settings are now called AI Assistant and come first.',
+    ],
+  },
+  {
     version: '0.39.1', date: '29 August 2026',
     notes: [
       '“Brief me on this matter” works again — it was failing on a database error.',

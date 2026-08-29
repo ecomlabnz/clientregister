@@ -38,7 +38,7 @@ import {
   DECISION_SETTINGS, caseForSync, decisionPolicy, expectedDecisionDate, syncCaseFollowUps,
 } from '../../core/decisions';
 import { isAiEnabled } from '../../ai/provider';
-import { AI_BRIEF_NOTE_PREFIX, briefCase, latestBrief } from '../../ai/brief';
+import { AI_BRIEF_NOTE_PREFIX, briefCase, latestBrief, markBriefKept } from '../../ai/brief';
 import {
   VOCABULARY_SETTINGS, caseTypes, isTerm, labelFor, termOptions, type Term,
 } from '../../core/vocabulary';
@@ -939,6 +939,10 @@ export const casesModule: AppModule = {
           entityType: 'case', entityId: id, kind: 'note', body: lines.join('\n'), createdBy: user.id,
         });
         await auditFrom(c, { action: 'case.brief_saved', entityType: 'case', entityId: id });
+        // The draft has become a file note, so it stops being a draft. Left in
+        // the panel it went on offering to save the same words again, with
+        // nothing on screen to say it had already been kept.
+        await markBriefKept(c.env, id);
         return redirectWith(c, `/cases/${id}`, 'Brief saved to the file. Like any note, it cannot now be changed.');
       }
 
