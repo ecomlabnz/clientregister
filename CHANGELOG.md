@@ -7,6 +7,22 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.46.0 — 29 August 2026
+
+### Changed
+- **Admin is now Settings.** The menu entry, the page and the section title.
+  Nothing moved: the same tabs at the same addresses. Most of the help text
+  already said "Settings → …", so the menu was the odd one out — and "Admin"
+  reads like user administration when the section is mostly configuration.
+- **The navigation fits the width it is given.** Twelve sections need about
+  970px at full spacing, which is more than the top bar can spare beside the
+  wordmark and the search box on anything but a wide screen, so it wrapped into
+  a ragged second row with a hole in the first. Now the links tighten with the
+  viewport (`clamp()`, not a breakpoint — the width at which twelve labels stop
+  fitting depends on the labels, and those are configuration), and below 1520px
+  the navigation takes a full-width line of its own. One row from 1600px down to
+  820px, two even rows below that, and the swipeable strip on a phone as before.
+
 ## 0.45.0 — 29 August 2026
 
 ### Added

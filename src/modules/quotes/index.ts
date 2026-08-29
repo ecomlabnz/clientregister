@@ -1066,7 +1066,7 @@ export const quotesModule: AppModule = {
           ? ''
           : html`<div class="alert alert-warn">No outgoing mail provider is configured, so this will
                    be recorded and queued but not delivered. It sends as soon as one is set up —
-                   see Admin → Integrations.</div>`}
+                   see Settings → Integrations.</div>`}
 
         <form method="post" action="/quotes/${q.id}/email" class="form-grid compose">
           ${csrfField(csrf)}

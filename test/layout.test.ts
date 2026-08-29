@@ -190,3 +190,42 @@ describe('a control that needs scripting is not shown without it', () => {
     }
   });
 });
+
+/**
+ * The navigation carries twelve sections. At full spacing they need about
+ * 970px, which is more than the top bar can spare beside the wordmark and the
+ * search box on anything but a wide screen — so it used to wrap into a ragged
+ * second row with a hole in the middle of the first.
+ *
+ * Two rules fix it, and both have to stay: the links tighten with the viewport
+ * instead of jumping a row, and below the width where the set can share a line
+ * it takes a full-width line of its own.
+ */
+describe('the navigation fits the width it is given', () => {
+  const css = readFileSync('public/app.css', 'utf8');
+
+  it('tightens the links with the viewport rather than at a breakpoint', () => {
+    // clamp() and not a media query, because the width at which twelve links
+    // stop fitting depends on their labels, and those are configuration.
+    expect(css).toMatch(/\.nav-link\s*\{[^}]*padding:\s*4px clamp\(/);
+    expect(css).toMatch(/\.topnav\s*\{[^}]*gap:\s*clamp\(/);
+  });
+
+  it('gives the navigation its own row before it would wrap raggedly', () => {
+    const block = css.slice(css.indexOf('@media (max-width: 1520px)'));
+    expect(block.slice(0, 400)).toContain('.topnav { order: 3; width: 100%; flex: none; }');
+  });
+
+  it('still becomes one swipeable strip on a phone', () => {
+    // The full-width row above must not have replaced this: on a phone the set
+    // is wider than the screen however tight the spacing, and a strip you can
+    // flick beats four stacked rows of chrome above every page.
+    // There is more than one phone block, so look at all of them rather than
+    // whichever happens to come first.
+    const blocks = css.split('@media (max-width: 720px)').slice(1)
+      .map((b) => b.split('@media')[0]!);
+    expect(blocks.length).toBeGreaterThan(0);
+    expect(blocks.some((b) => b.includes('flex-wrap: nowrap') && b.includes('overflow-x: auto')))
+      .toBe(true);
+  });
+});

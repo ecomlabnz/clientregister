@@ -142,10 +142,10 @@ export function adminTabs(current: string): Raw {
 
 export const adminModule: AppModule = {
   name: 'admin',
-  title: 'Administration',
+  title: 'Settings',
   basePaths: ['/admin'],
   settings: [PRACTICE_SETTINGS],
-  nav: [{ href: '/admin', label: 'Admin', permission: 'admin:settings', order: 10 }],
+  nav: [{ href: '/admin', label: 'Settings', permission: 'admin:settings', order: 10 }],
 
   register(app) {
     const r = new Hono<AppContext>();
@@ -169,8 +169,8 @@ export const adminModule: AppModule = {
         currentModel(env),
       ]);
 
-      return page(c, { title: 'Administration', active: '/admin' }, html`
-        ${pageHeader('Administration', 'Who can get in, how the practice is configured, and what is wired up.')}
+      return page(c, { title: 'Settings', active: '/admin' }, html`
+        ${pageHeader('Settings', 'Who can get in, how the practice is configured, and what is wired up.')}
         ${adminTabs(tab)}
 
         ${tab === 'overview' ? html`
@@ -210,7 +210,7 @@ export const adminModule: AppModule = {
           statusRow('AI layer', isAiEnabled(env),
             isAiEnabled(env)
               ? `AI_PROVIDER=${env.AI_PROVIDER} · model ${aiModel}`
-                + ' — chosen under Settings → Assistant. Suggestions only, never applied'
+                + ' — chosen under Settings → AI Assistant. Suggestions only, never applied'
                 + ' automatically.'
               : `AI_PROVIDER=${env.AI_PROVIDER ?? 'none'}. Set it to “anthropic” with an`
                 + ' ANTHROPIC_API_KEY to switch the assistant on. The register works without it.'),
@@ -351,7 +351,7 @@ export const adminModule: AppModule = {
           ? `Test message sent to ${recipient}. If it is not in the inbox, look in spam — `
             + 'a domain that has just started sending often lands there for the first few.'
           : result.failed > 0
-            ? 'The provider refused it. Admin → Maintenance shows the queue and the reason.'
+            ? 'The provider refused it. Settings → Maintenance shows the queue and the reason.'
             : 'Queued, but nothing was sent — check that MAIL_PROVIDER and its key are set.',
         result.sent > 0 ? 'ok' : 'err');
     });
@@ -649,7 +649,7 @@ export const adminModule: AppModule = {
           <p>API keys, webhook secrets and the field-encryption key are deliberately not settings.
              They are held outside the database, so reading it never yields a credential and
              changing one leaves a trace in the deployment. See
-             <strong>Admin → Integrations</strong> for what is connected.</p>`)}`);
+             <strong>Settings → Integrations</strong> for what is connected.</p>`)}`);
     });
 
     r.post('/settings', requirePermission('admin:settings'), async (c) => {
