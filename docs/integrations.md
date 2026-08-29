@@ -71,6 +71,41 @@ cron catches up on its own.
 `MAIL_POLL_CRON` in `src/index.ts`; a test holds the two together, because if
 they drift every firing runs the housekeeping and the mailbox is never read.
 
+### The arrangement this was built for
+
+Two Google accounts doing two different jobs. Worth writing down because the
+temptation is to use one, and one does not work.
+
+| | Sending | Reading |
+|---|---|---|
+| Account | the firm's own address, on Google Workspace | a dedicated personal Gmail, holding forwarded mail and nothing else |
+| Scope | `gmail.send` | `gmail.readonly` |
+| Consent screen | **Internal** — no verification, no warning, no token expiry | **External**, and it must be **published** |
+| Secrets | `GMAIL_CLIENT_ID` · `GMAIL_CLIENT_SECRET` · `GMAIL_REFRESH_TOKEN` | `GMAIL_INBOX_*` |
+| Effect | clients see the firm's address; a copy stays in its Sent folder | the firm's address auto-forwards in, and the register reads it |
+
+Four things that cost time the first time this was set up, in the order they
+bit:
+
+1. **The workflow did not pass the `GMAIL_*` secrets through.** Set, deployed
+   green, no effect. See *Secrets* in `docs/operations.md` — a test now holds it.
+2. **`MAIL_PROVIDER` was still `resend`.** Every Gmail secret can be correct and
+   nothing changes until that one switch is flipped *and* a deploy runs.
+3. **A poll that finds nothing writes nothing**, so a working mailbox and a
+   broken one looked identical. Hence *Check for mail now* under Settings →
+   Maintenance, which reports what it looked at rather than only what it took.
+4. **A pasted credential carried a trailing newline.** Google's answer is "The
+   OAuth client was not found", which reads like the client was deleted. Values
+   are trimmed now, and a credential of the wrong shape is named before the
+   request is made.
+
+One consequence to expect rather than debug: with auto-forwarding, Gmail
+preserves the **original** sender, so `INGEST_EMAIL_ALLOWED_SENDERS` — which
+matches on the From address — almost never matches. Practically everything the
+poll finds waits in Incoming as unverified. That is the right default, and it is
+a change from hand-forwarding, where the sender was the practice and so was
+trusted.
+
 ---
 
 ## Telegram
