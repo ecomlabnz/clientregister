@@ -7,6 +7,32 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.31.0 — 29 August 2026
+
+### Added
+- **Send a test message to myself**, on Admin → Integrations, once outbound mail
+  is configured. It goes only to the address of the person pressing it: a test
+  that could be aimed anywhere would be a way to send mail as the practice to
+  anyone. The message names the provider, the sending address and the time, and
+  says plainly that a first message landing in spam is normal for a domain that
+  has just started sending.
+
+### Fixed
+- **Three features shipped without a manual section.** Expected decisions and
+  chasing INZ, certificates, and export all had pages and no documentation.
+  Written up now, including why a certificate is a record rather than a field
+  and why passport numbers are in no export.
+- **The rename from Today to Dashboard left the old name in three places** in
+  the manual.
+- **Setting up Resend was one sentence** in the middle of the Gmail section.
+  It now has its own steps — verify the domain, create a sending-scoped key,
+  three secrets, deploy, test — alongside when to use *Replies should go to*
+  and why the sending address and the reply mailbox are two different questions.
+- A test now checks that every registered feature with a page has a section in
+  the manual, that section ids are unique, and that the first screen is called
+  by its current name. The manual is part of the product; it should fail the
+  build when it falls behind.
+
 ## 0.30.0 — 29 August 2026
 
 ### Added
