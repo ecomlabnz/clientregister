@@ -7,6 +7,33 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.65.0 — 30 August 2026
+
+### Fixed
+- **A message forwarded from a group or channel is captured again.** Whether a
+  message was a forward was decided two different ways that could disagree, and
+  for a group forward they did: the database refused the conversation the
+  capture tried to attach, the whole capture aborted, and the message was never
+  recorded at all. One rule now owns the fact, and a forward from anywhere is an
+  inbox message and an inquiry, never a conversation.
+- **The audit log records only what happened.** Deleting an inquiry wrote
+  "deleted" to the audit log before asking the database, so a delete the
+  database refused still went down in the record as done. The delete now
+  happens first and the record is written only when it did.
+- **The size cap on a displayed email can no longer cut a tag in half.** When a
+  very long message ran out of room exactly inside a piece of formatting, a
+  fragment of that formatting could reach the page. Formatting now goes out
+  whole or not at all; the cap itself is unchanged.
+
+### Security
+- **A security test suite now attacks the register from four sides** — the
+  database's own rules, the transport and cross-site defences, the email
+  sanitiser (a corpus of hostile payloads), and route-level access control — 89
+  tests that run with every deploy. The first pass surfaced the two fixes above.
+- Findings are recorded permanently in `docs/security-findings.md`: what was
+  found, what was fixed, where the guarding test lives, and anything accepted
+  as a known gap with the reason written down.
+
 ## 0.64.0 — 30 August 2026
 
 ### Added

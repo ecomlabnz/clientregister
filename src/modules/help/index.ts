@@ -32,6 +32,19 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.65.0', date: '30 August 2026',
+    notes: [
+      'A message forwarded into the bot from a group or channel is captured properly again. '
+        + 'One such forward could be refused by the register’s own rules and never '
+        + 'recorded at all.',
+      'Deleting an inquiry the register refuses to delete no longer leaves a record saying it '
+        + 'was deleted. The audit log records only what actually happened.',
+      'A security test suite now attacks the register’s defences — its database '
+        + 'rules, its headers, the email display, and who may reach what — on every '
+        + 'deploy, so they stay proven rather than assumed.',
+    ],
+  },
+  {
     version: '0.64.0', date: '30 August 2026',
     notes: [
       'Emails are now shown the way they were sent \u2014 paragraphs, lists, tables and links '

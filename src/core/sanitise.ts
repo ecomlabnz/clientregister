@@ -115,12 +115,30 @@ export function sanitiseHtml(input: string | null | undefined, limit = 200_000):
 
   // The budget is spent per push, not merely checked between them: one run of
   // text can be the whole message, and a limit that only applies at the top of
-  // the loop is a limit that never applies to the case it exists for.
+  // the loop is a limit that never applies to the case it exists for. The
+  // charge is what was actually emitted, not what was offered — text past the
+  // cut was never put on the page, so it cannot spend the page's room.
   const push = (text: string) => {
     const room = limit - size;
     if (room <= 0) return;
-    out.push(text.length > room ? text.slice(0, room) : text);
+    const emitted = text.length > room ? text.slice(0, room) : text;
+    out.push(emitted);
+    size += emitted.length;
+  };
+
+  // A rebuilt tag is emitted whole or not at all. Cut mid-token it would leave
+  // live markup like `<a href="…` dangling on the page; dropped, nothing is
+  // lost but emphasis — the tag never reaches the open-stack, so its closer is
+  // ignored, and a tag that no longer fits means the message has reached the
+  // end of the page.
+  const pushTag = (text: string): boolean => {
+    if (text.length > limit - size) {
+      size = limit;
+      return false;
+    }
+    out.push(text);
     size += text.length;
+    return true;
   };
 
   while (i < source.length && size < limit) {
@@ -180,8 +198,9 @@ export function sanitiseHtml(input: string | null | undefined, limit = 200_000):
     // words stay; a stray closing tag is already ignored.
     if (tag.name === 'a' && attrs === '') { i = tag.end; continue; }
 
-    push(`<${tag.name}${attrs}>`);
-    if (!VOID.has(tag.name) && !tag.selfClosing) open.push(tag.name);
+    if (pushTag(`<${tag.name}${attrs}>`) && !VOID.has(tag.name) && !tag.selfClosing) {
+      open.push(tag.name);
+    }
     i = tag.end;
   }
 

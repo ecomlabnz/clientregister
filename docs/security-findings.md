@@ -1,0 +1,117 @@
+# Security findings — the durable record
+
+Every security or data-integrity finding against this register lives here: what
+was found, what was done about it, where the test that guards the fix lives, and
+— for anything left open — why, and what would close it. A finding is added
+*before* its fix is written, and never deleted; a closed finding stays as the
+record that it was found and dealt with.
+
+Each guard test named below was proven the honest way: the bug it guards was
+reintroduced in the source, the test watched to go red, the fix restored, the
+test watched to go green. A guard never verified this way is not counted as one.
+
+The suites themselves (`test/security_*.ts`, run by `npm run test:security`) and
+the route-level harness (`test/support/d1.ts`) are described in
+`.claude/skills/security-sweep/SKILL.md`.
+
+---
+
+## Findings from the 2026-08-30 audit
+
+### 1. A forwarded Telegram message could fail to capture — FIXED (0.65.0)
+
+Whether a message was a forward was decided two different ways that could
+disagree: the peer was suppressed when `originLabel()` could *name* the origin,
+but `meta.forwarded` was set from `forward_origin` itself. A message forwarded
+from a group or channel (origin type `chat`) has an origin but no name that
+function read — so it was given a conversation *and* marked as a forward, which
+migration 0037's trigger refuses. The webhook aborted, Telegram's retry hit the
+dedupe short-circuit, and the message was never captured: no audit entry, an
+orphan thread, no auto-created inquiry.
+
+**Fix:** one predicate owns the fact (`isForwarded()` in
+`src/ingest/telegram.ts`), and the peer follows from it (`peerFor()`). One fact,
+one owner.
+
+**Guard:** `test/forwards.test.ts` — behavioural tests against
+`isForwarded`/`peerFor`, including the group-forward case that broke, and the
+invariant that a forward never gets a peer.
+
+### 2. The audit log could record a deletion that never happened — FIXED (0.65.0)
+
+The inquiry-delete route wrote `inquiry.deleted` to the append-only audit log
+*before* attempting the `DELETE`. When migration 0036 refused the delete (the
+inquiry carried a quote, task, document or typed note but no case), the row
+survived — but the audit log now said it was gone. The one record that must
+never lie, lying.
+
+**Fix:** attempt the delete first; audit only on success
+(`src/modules/inquiries/index.ts`).
+
+**Guard:** `test/security_access.test.ts` — "the audit log records only what
+happened": no `inquiry.deleted` entry when the database refuses, exactly one
+when it succeeds. `test/inquirydelete.test.ts` pins the order in the source.
+
+### 3. Two tests pinned the bugs instead of the behaviour — FIXED (0.65.0)
+
+`test/forwards.test.ts` asserted the source literally contained the buggy
+peer-suppression expression (finding 1's bug); `test/inquirydelete.test.ts`
+asserted the audit call came *before* the delete (finding 2's bug). Both passed
+whether or not the code worked — worse, both defended the defects. A test that
+reads source text instead of exercising behaviour can do that silently.
+
+**Fix:** both converted to behavioural tests (see findings 1 and 2). A sweep of
+the remaining source-text assertions across the test suite is on the programme
+(they are legitimate where the *file itself* is the artefact under test — a
+workflow, a stylesheet — and suspect where they pin a `src/**/*.ts`
+implementation detail).
+
+### 4. The sanitiser's output budget could cut a tag in half — FIXED (0.65.0)
+
+`sanitiseHtml`'s `push` charged the budget with what it was *offered*
+(`size += text.length`) rather than what it emitted, and applied its truncation
+to rebuilt tags as well as text — so a limit landing inside a reconstructed tag
+put a fragment like `<a href="…` on the page as live markup. Not exploitable
+(everything in a rebuilt tag has already passed the allow-list, and the CSP
+stands behind it), but wrong accounting in exactly the place that must never be
+wrong.
+
+**Fix:** the charge is what was actually emitted, and a rebuilt tag goes out
+whole or not at all (`src/core/sanitise.ts`). A dropped tag never reaches the
+open-stack, so its closer is ignored — nothing dangles.
+
+**Guard:** `test/security_sanitiser.test.ts` — "the output budget never leaves a
+partial tag": every cut point through a letter with a rebuilt anchor, asserting
+no partial tag survives and the output stays inert.
+
+---
+
+## Open findings — known, accepted, and what would close them
+
+### 5. Migration 0037's forward guard does not watch `meta_json` — ACCEPTED
+
+The triggers from `0037_a_forward_is_not_a_conversation.sql` stop a forwarded
+message acquiring a thread: one fires on `INSERT`, the other on
+`UPDATE OF thread_id`. Neither fires when an `UPDATE` rewrites **`meta_json`
+alone** — direct SQL could set `forwarded: 1` on a message that already has a
+thread, producing the forbidden state without either trigger noticing.
+
+**Why accepted:** no application path does this. The capture sets `forwarded`
+at insert and never rewrites it; only hand-written SQL against the database
+could. The invariant holds against every path the application has, and the
+attack requires access that already implies far worse.
+
+**What would close it** — a migration adding the third trigger, if ever wanted:
+
+```sql
+CREATE TRIGGER ingest_forward_gets_no_conversation_on_meta_update
+BEFORE UPDATE OF meta_json ON ingest_messages
+WHEN NEW.thread_id IS NOT NULL
+ AND json_extract(NEW.meta_json, '$.forwarded') = 1
+BEGIN
+  SELECT RAISE(ABORT, 'a forwarded message is about somebody, not a conversation with them');
+END;
+```
+
+Recorded 2026-08-30. Revisit if anything ever gains a reason to update
+`meta_json` on captured messages.
