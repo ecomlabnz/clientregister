@@ -28,10 +28,13 @@ function expiry(id: string): string | null {
 
 function add(id: string, kind: string, issued: string | null,
              opts: { submitted?: string | null; expires?: string | null } = {}) {
+  // 0040 refuses a dated row that does not say where its date came from; the
+  // provenance is immaterial to the arithmetic under test here.
   db.prepare(`INSERT INTO client_certificates
-                (id, client_id, kind, issued_on, submitted_on, expires_on, created_at)
-              VALUES (?, 'c1', ?, ?, ?, ?, '2026-01-01T00:00:00Z')`)
-    .run(id, kind, issued, opts.submitted ?? null, opts.expires ?? null);
+                (id, client_id, kind, issued_on, issued_on_provenance, submitted_on, expires_on, created_at)
+              VALUES (?, 'c1', ?, ?, ?, ?, ?, '2026-01-01T00:00:00Z')`)
+    .run(id, kind, issued, issued === null ? null : 'verified',
+         opts.submitted ?? null, opts.expires ?? null);
 }
 
 beforeEach(() => {

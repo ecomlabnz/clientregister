@@ -103,6 +103,18 @@ beforeAll(() => {
   task('t_early', 'k_deadline', '2026-09-08');     // a week of room
   task('t_done', 'k_deadline', '2026-09-15', 'done'); // already finished
   task('t_nodeadline', 'k_prep', '2026-09-15');    // the matter has no deadline
+
+  // Event-relative visa expiries (0041): a rule with no date fixed yet, a rule
+  // whose date has since been fixed, and an archived client's rule.
+  const rule = (id: string, ref: string, expiry: string | null, status = 'active') =>
+    db.prepare(`INSERT INTO clients (id, ref, kind, full_name, status, current_visa_expiry,
+                                     current_visa_expiry_rule, created_at, updated_at)
+                VALUES (?, ?, 'individual', 'Rule PERSON', ?, ?,
+                        '24 months after first arrival in New Zealand', ?, ?)`)
+      .run(id, ref, status, expiry, `${TODAY}T00:00:00Z`, `${TODAY}T00:00:00Z`);
+  rule('cl_rule', 'CL-RULE', null);
+  rule('cl_fixed', 'CL-FIXED', '2027-06-01');
+  rule('cl_gone', 'CL-GONE', null, 'archived');
 });
 
 describe('lodged with no acknowledgement', () => {
@@ -173,6 +185,28 @@ describe('an open matter for someone with no visa recorded', () => {
 
   it('leaves closed matters out of it', () => {
     expect(run()).not.toContain('K-CLOSED');
+  });
+});
+
+describe('a visa expiry that waits on an event', () => {
+  const run = () => ids(CHECKS.expiryUnfixed(), []);
+
+  it('fires while the rule has no date beside it', () => {
+    expect(run()).toContain('CL-RULE');
+  });
+
+  it('clears the moment the date is fixed', () => {
+    expect(run()).not.toContain('CL-FIXED');
+  });
+
+  it('lets an archived client rest', () => {
+    expect(run()).not.toContain('CL-GONE');
+  });
+
+  it('says nothing about a client with no rule recorded — that is a different gap', () => {
+    // CL-2 has neither date nor rule. A blank stays a blank; this check exists
+    // only for the visa whose expiry is known to be waiting on an event.
+    expect(run()).not.toContain('CL-2');
   });
 });
 

@@ -24,6 +24,7 @@ describe('alerts that are not about a date', () => {
     expect(KIND_LABELS_FOR_TEST.unacknowledged).toBe('Not acknowledged');
     expect(KIND_LABELS_FOR_TEST.no_slack).toBe('No room to act');
     expect(KIND_LABELS_FOR_TEST.status_unknown).toBe('Status not recorded');
+    expect(KIND_LABELS_FOR_TEST.expiry_unfixed).toBe('Expiry not yet fixed');
   });
 
   it('reads the acknowledgement grace period once, where the alerts are built', () => {
