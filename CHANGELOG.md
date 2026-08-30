@@ -7,6 +7,19 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.70.1 — 31 August 2026
+
+### Fixed
+- **0.70.0 never reached the live register: its migration was refused, and
+  rightly.** It rebuilt the documents table, which on the live database would
+  have made a note lose its attachment — the append-only rule stopped the
+  whole deploy, exactly as designed, and nothing was half-applied. The
+  migration is rewritten without the rebuild: plain column additions, the
+  stored-or-linked rule carried by triggers, and a linked file marked by a
+  named `link:` storage key the file store never sees. Rehearsed against a
+  copy shaped like the live register — including the document and note
+  reference the practice had created that morning — before shipping again.
+
 ## 0.70.0 — 31 August 2026
 
 ### Added
