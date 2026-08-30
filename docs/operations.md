@@ -58,7 +58,6 @@ missing from the workflow.
 | Secret | Needed for | Notes |
 |---|---|---|
 | `SETUP_TOKEN` | creating the first account | Only `/setup` uses it. Remove it afterwards. |
-| `FIELD_KEY` | sealed passport numbers | 32 random bytes, base64. **Cannot be rotated casually** — see below. |
 | `INGEST_EMAIL_ALLOWED_SENDERS` | inbound mail | Comma-separated. Mail from these addresses becomes an inquiry; everything else waits in Incoming. Unset means nothing is ever trusted. |
 | `TELEGRAM_BOT_TOKEN` · `TELEGRAM_WEBHOOK_SECRET` · `TELEGRAM_ALLOWED_USER_IDS` | Telegram ingest | |
 | `WHATSAPP_APP_SECRET` · `WHATSAPP_VERIFY_TOKEN` · `WHATSAPP_ALLOWED_SENDERS` | WhatsApp ingest | |
@@ -110,10 +109,6 @@ will not reproduce it. Prefer the pipeline.
 ### Rotating
 
 Most secrets rotate by replacing the value and deploying. Two do not:
-
-**`FIELD_KEY` cannot be rotated casually.** Passport numbers sealed under the old
-key cannot be read with a new one. To rotate: decrypt and re-encrypt every sealed
-value in one migration, then swap the key.
 
 **A Gmail refresh token dies if its OAuth app is left in *Testing*.** Google
 issues seven-day tokens to unpublished apps, so mail stops a week after setup

@@ -251,7 +251,7 @@ export const PARTY_ROLE_LABELS: Record<PartyRole, string> = {
   // practice's own assigned owner — opposing counsel, prior counsel, or an
   // external specialist brought in on the file.
   lawyer: 'Lawyer',
-  adviser: 'Licensed immigration adviser',
+  adviser: 'Adviser',
   other: 'Other party',
 };
 

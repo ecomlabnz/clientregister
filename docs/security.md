@@ -110,10 +110,9 @@ interpolation reaches SQL anywhere in the codebase.
 **Mass assignment.** Routes read named fields through a `FormReader`; a field a
 route does not name cannot reach the database, however it is posted.
 
-**Sealed fields.** Passport numbers are encrypted with AES-256-GCM under
-`FIELD_KEY` (32 bytes, base64). Without that secret the field is disabled in the
-UI rather than stored in the clear. Revealing a passport number is a separate
-POST that is written to the audit log and returned with `no-store`.
+**Passport numbers.** Stored as written since migration 0042 (the practice's
+decision, 30 August 2026) and shown on the client's page to any signed-in role.
+They remain excluded from every bulk CSV export.
 
 **Uploads.** Filenames are reduced to `[A-Za-z0-9._-]`. Files are served from
 the Worker, never from a public bucket, with `Content-Disposition: attachment`

@@ -27,7 +27,6 @@ export interface Env {
   // --- Secrets (all optional; features gate on their presence) ---
   SETUP_TOKEN?: string;
   /** base64-encoded 32 bytes; enables sealed (encrypted) PII fields. */
-  FIELD_KEY?: string;
 
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;

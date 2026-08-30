@@ -198,8 +198,6 @@ export const adminModule: AppModule = {
               <button class="btn btn-secondary" type="submit">Send it</button>
             </form>` : ''}
           ${table(['Capability', 'Status', 'Detail'], [
-          statusRow('Encrypted PII fields', Boolean(env.FIELD_KEY),
-            'FIELD_KEY — enables storing passport numbers under AES-256-GCM.'),
           statusRow('Inbound email', Boolean(env.INGEST_EMAIL_ALLOWED_SENDERS),
             'Cloudflare Email Routing → this Worker. INGEST_EMAIL_ALLOWED_SENDERS lists trusted senders.'),
           statusRow('Telegram', Boolean(env.TELEGRAM_WEBHOOK_SECRET && env.TELEGRAM_BOT_TOKEN),

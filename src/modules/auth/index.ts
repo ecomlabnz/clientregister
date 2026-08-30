@@ -175,7 +175,7 @@ export const authModule: AppModule = {
             <p>It has to match the <code>SETUP_TOKEN</code> secret on the Worker exactly.
                Things worth checking:</p>
             <ul class="small">
-              <li>You pasted <code>SETUP_TOKEN</code> and not another secret such as <code>FIELD_KEY</code>.</li>
+              <li>You pasted <code>SETUP_TOKEN</code> and not one of the other secrets.</li>
               <li>The last Deploy run listed <code>SETUP_TOKEN</code> in its
                   <em>Collect configured secrets</em> step.</li>
               <li>Nothing extra came along with the paste — a stray space or a second line.</li>

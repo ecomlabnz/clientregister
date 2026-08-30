@@ -9,22 +9,22 @@ const core = readFileSync('src/core/passports.ts', 'utf8');
 const migration = readFileSync('migrations/0024_passports.sql', 'utf8');
 
 /**
- * The one field the register encrypts. Correcting it, removing it, and being
- * able to tell afterwards who did either.
+ * The passport number is stored as written (0042). Correcting it, removing it,
+ * and being able to tell afterwards who did either.
  */
 describe('a passport number can be corrected and removed', () => {
   it('keeps what is stored when the box is left blank', () => {
     // Otherwise every unrelated edit to a client would silently wipe it. The
-    // form cannot show a sealed number, so an empty box is an absence of
+    // box on the form arrives empty, so an empty box is an absence of
     // instruction, never an instruction to erase.
-    expect(core).toContain(': existing.number_sealed;');
+    expect(core).toContain('?? existing.number;');
   });
 
   it('can be cleared, not only overwritten', () => {
     // A number entered against the wrong person has to come out. Typing a
     // different number over it is not a fix.
     expect(clients).toContain("passport_clear: f.checkbox('passport_clear'),");
-    expect(core).toContain('const sealed = input.clearNumber\n    ? null');
+    expect(core).toContain('const number = input.clearNumber\n    ? null');
   });
 
   it('refuses the contradictory instruction rather than guessing', () => {
@@ -35,22 +35,13 @@ describe('a passport number can be corrected and removed', () => {
 
 describe('changing it is recorded as specifically as reading it', () => {
   it('logs a set and a clear under their own actions', () => {
-    // A reveal was already audited specifically. Without these you could tell
-    // who had looked at a passport number but not who had altered it.
+    // Without these you could see the record change but not who altered it.
     expect(clients).toContain("action: 'client.passport_set'");
     expect(clients).toContain("action: 'client.passport_cleared'");
-    expect(clients).toContain("action: 'client.passport_revealed'");
   });
 
   it('says whether it replaced an existing number', () => {
-    expect(clients).toContain('meta: { replaced: Boolean(existing.passport_sealed) }');
-  });
-
-  it('reveals one passport at a time, named in the URL', () => {
-    // A client may hold several. "Show me the passport numbers" is not a
-    // request the register answers.
-    expect(clients).toContain("r.post('/:id/passports/:pid/reveal'");
-    expect(clients).toContain('meta: { passportId: passport.id, country: passport.country }');
+    expect(clients).toContain('meta: { replaced: Boolean(existing.passport_number) }');
   });
 
   it('never writes the number itself to the log or the timeline', () => {

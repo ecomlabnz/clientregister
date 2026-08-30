@@ -30,16 +30,16 @@ Each of these was verified by attacking the database directly — through the
 Cloudflare API, not through the application — rather than by reading the code
 and believing it.
 
-**Secrets are never settings.** API keys, the field-encryption key and webhook
+**Secrets are never settings.** API keys and webhook
 secrets are environment secrets. A database read never yields a credential, and
 an administrator cannot paste one into a form that ends up in the audit log.
 
-**`FIELD_KEY` must never change.** Passport numbers are sealed with AES-256-GCM
-under it; rotate it and every stored number becomes unreadable.
+**Passport numbers are stored as written** (the practice's decision, 30 August
+2026 — migration 0042) and shown on the client's page.
 
-**Passport numbers do not leave.** They are excluded from the AI brief, from the
-intake extraction, and from every CSV export — the export says only whether one
-is held. They are revealed one at a time on the client page, and every reveal is
+**Passport numbers do not leave in bulk.** They are excluded from the AI brief,
+from the intake extraction, and from every CSV export — the export says only
+whether one is held. Each client's page shows their own; a full list is
 audited.
 
 **Content Security Policy is strict**: `default-src 'none'`, `script-src 'self'`,

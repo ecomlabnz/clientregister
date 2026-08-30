@@ -11,7 +11,6 @@ import { writeFileSync } from 'node:fs';
 
 const SECRET_NAMES = [
   'SETUP_TOKEN',
-  'FIELD_KEY',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_WEBHOOK_SECRET',
   'TELEGRAM_ALLOWED_USER_IDS',

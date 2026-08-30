@@ -212,6 +212,27 @@ a passport number, sealed or plain, and is gated on `admin:settings`.
 
 ---
 
+## Passport-number encryption removed — the owner's decision (0.69.0)
+
+**Decided by the practice, 30 August 2026; carried out the same day
+(migration 0042).** Passport numbers are stored as written and shown on the
+client's page to any signed-in role; the sealed column, `FIELD_KEY` and the
+audited one-at-a-time reveal are gone. The owner's reasoning: the numbers are
+working data the practice reads all day, and the ceremony cost more than it
+bought.
+
+**The caution, recorded so it was said:** a passport number with a name and a
+date of birth is identity-theft material, and the encryption was the second
+wall behind sign-in if a copy of the database ever escaped. The register
+still stands behind authentication, roles, two-factor and sessions — all
+pinned by `test/security_dataprotection.test.ts` — and one hold-back was kept
+deliberately: **passport numbers never appear in the bulk CSV exports**, with
+a guard test (`test/csv.test.ts`) that is now more important, not less.
+Re-encrypting later is one migration away if the practice ever changes its
+mind.
+
+---
+
 ## The 2026-08 intake load — what was held out, and why
 
 The load itself ran from files outside the repository; no client data appears

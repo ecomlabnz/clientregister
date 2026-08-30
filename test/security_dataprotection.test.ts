@@ -1,13 +1,12 @@
 /**
  * The doors that stand between a signed-in request and the practice's most
- * sensitive data: passport sealing on its write path, role-based access to
- * PII pages and exports, and the sessions that decide who is signed in at all.
+ * sensitive data: the passport-number write path, role-based access to PII
+ * pages and exports, and the sessions that decide who is signed in at all.
  *
- * Run as a gate before any real passport or date of birth is loaded. The
- * cryptography itself (round-trip, wrong key, tampering, bad key length) is
- * pinned in `test/crypto.test.ts`; this suite covers the paths a request
- * takes to and from it, and the session machinery, over the real routes and
- * a database built from the migrations.
+ * Since 0042 the number is stored as written (the practice's decision), so
+ * the guards are: it is stored exactly as typed, shown only to a signed-in
+ * active account, and never carried by the bulk exports. Sessions and the
+ * two-factor door are pinned below over the real middleware.
  *
  * All data invented; real client data never enters this repository.
  */
@@ -18,14 +17,11 @@ import { fakeD1, fakeUser, migratedSqlite, mountModule } from './support/d1';
 import { clientsModule } from '../src/modules/clients';
 import { adminModule } from '../src/modules/admin';
 import { addPassport } from '../src/core/passports';
-import { unsealField } from '../src/core/crypto';
 import { requireAuth } from '../src/core/auth';
 import { createSession, destroySessionBySid, readSession, revokeAllSessions } from '../src/core/session';
 import type { AppContext, SessionData } from '../src/types';
 
 const at = '2026-08-29T00:00:00Z';
-// 32 bytes, base64 — the shape FIELD_KEY has in production. Invented, obviously.
-const KEY = Buffer.from(Array.from({ length: 32 }, (_, i) => i + 1)).toString('base64');
 
 function seed(db: any) {
   db.prepare(`INSERT OR IGNORE INTO users (id, email, name, password_hash, role, created_at, updated_at)
@@ -36,70 +32,41 @@ function seed(db: any) {
     .run(at, at);
 }
 
-describe('recording a passport number fails closed when it cannot be sealed', () => {
-  it('the core refuses rather than silently dropping the number', async () => {
-    const h = mountModule(clientsModule); // no FIELD_KEY in env
-    seed(h.db);
-    await expect(addPassport(h.env as any, {
-      clientId: 'cl_1', country: 'NZ', number: 'FAKE12345', issuedOn: null, expiresOn: null,
-      status: 'held', isPrimary: false, notes: null, userId: 'u_test',
-    })).rejects.toThrow(/FIELD_KEY is not configured/);
-    // And nothing was written — not a row with a blank where the number was.
-    expect(h.count(`SELECT COUNT(*) AS n FROM client_passports`)).toBe(0);
-  });
-
-  it('the add-passport route says what is wrong instead of saving half a record', async () => {
-    const h = mountModule(clientsModule);
-    seed(h.db);
-    const res = await h.post('/clients/cl_1/passports', { country: 'NZ', number: 'FAKE12345' });
-    expect(res.status).toBe(303);
-    expect(res.headers.get('location')).toContain('FIELD_KEY');
-    expect(h.count(`SELECT COUNT(*) AS n FROM client_passports`)).toBe(0);
-  });
-
-  it('a passport without a number is still recordable — only the number needs the key', async () => {
-    const h = mountModule(clientsModule);
-    seed(h.db);
-    const res = await h.post('/clients/cl_1/passports', { country: 'NZ', expires_on: '2030-01-01' });
-    expect(res.status).toBe(303);
-    expect(h.count(`SELECT COUNT(*) AS n FROM client_passports`)).toBe(1);
-  });
-});
-
-describe('a sealed number leaves the database only through the reveal', () => {
+describe('a passport number is stored as written and shown on the page (0042)', () => {
   async function withPassport() {
-    const h = mountModule(clientsModule, { env: { FIELD_KEY: KEY } });
+    const h = mountModule(clientsModule);
     seed(h.db);
     const res = await h.post('/clients/cl_1/passports', { country: 'NZ', number: 'FAKE12345' });
     expect(res.status).toBe(303);
     return h;
   }
 
-  it('what is stored is ciphertext, not the number', async () => {
+  it('what is stored is exactly what was typed', async () => {
     const h = await withPassport();
-    const row = h.get<{ number_sealed: string }>(`SELECT number_sealed FROM client_passports`)!;
-    expect(row.number_sealed).toMatch(/^v1\./);
-    expect(row.number_sealed).not.toContain('FAKE12345');
-    expect(await unsealField(row.number_sealed, KEY)).toBe('FAKE12345');
+    const row = h.get<{ number: string }>(`SELECT number FROM client_passports`)!;
+    expect(row.number).toBe('FAKE12345');
   });
 
-  it('the reveal returns the number and goes down in the audit log', async () => {
+  it('and the client page shows it to a signed-in reader', async () => {
     const h = await withPassport();
-    const pid = h.get<{ id: string }>(`SELECT id FROM client_passports`)!.id;
-    const res = await h.post(`/clients/cl_1/passports/${pid}/reveal`);
-    expect(res.status).toBe(200);
-    expect(await res.text()).toContain('FAKE12345');
-    expect(h.count(
-      `SELECT COUNT(*) AS n FROM audit_log WHERE action = 'client.passport_revealed'`)).toBe(1);
+    const body = await (await h.request('/clients/cl_1')).text();
+    expect(body).toContain('FAKE12345');
+  });
+
+  it('a passport without a number is still recordable', async () => {
+    const h = mountModule(clientsModule);
+    seed(h.db);
+    const res = await h.post('/clients/cl_1/passports', { country: 'NZ', expires_on: '2030-01-01' });
+    expect(res.status).toBe(303);
+    expect(h.count(`SELECT COUNT(*) AS n FROM client_passports`)).toBe(1);
   });
 
   it('a suspended account is refused, whatever its role says', async () => {
-    const h = mountModule(clientsModule, {
-      env: { FIELD_KEY: KEY }, user: fakeUser({ role: 'admin', status: 'suspended' }),
-    });
+    const h = mountModule(clientsModule, { user: fakeUser({ role: 'admin', status: 'suspended' }) });
     seed(h.db);
-    const res = await h.post('/clients/cl_1/passports/pas_x/reveal');
+    const res = await h.post('/clients/cl_1/passports', { country: 'NZ', number: 'FAKE12345' });
     expect(res.status).toBe(403);
+    expect(h.count(`SELECT COUNT(*) AS n FROM client_passports`)).toBe(0);
   });
 });
 
@@ -113,8 +80,8 @@ describe('PII does not leave through the export', () => {
     }
   });
 
-  it('and what it hands over carries no passport number, sealed or plain', async () => {
-    const h = mountModule(adminModule, { env: { FIELD_KEY: KEY } });
+  it('and what it hands over carries no passport number', async () => {
+    const h = mountModule(adminModule);
     seed(h.db);
     await addPassport(h.env as any, {
       clientId: 'cl_1', country: 'NZ', number: 'FAKE12345', issuedOn: null,
@@ -125,7 +92,6 @@ describe('PII does not leave through the export', () => {
       expect(res.status, key).toBe(200);
       const csv = await res.text();
       expect(csv, key).not.toContain('FAKE12345');
-      expect(csv, key).not.toContain('v1.');
     }
   });
 });

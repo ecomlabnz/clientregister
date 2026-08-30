@@ -60,18 +60,18 @@ describe('the file itself', () => {
 });
 
 describe('what the export deliberately excludes', () => {
-  it('never selects the sealed passport column', () => {
-    // The one field the register encrypts. Writing it in the clear into a file
-    // that lands in a downloads folder would undo that in a single click.
+  it('never selects the passport number column', () => {
+    // The number is stored in the clear since 0042, which makes this guard
+    // MORE important, not less: a spreadsheet in a downloads folder is the
+    // copy that actually escapes. The export says only whether one is held.
     for (const set of DATASETS) {
-      expect(set.sql, set.key).not.toMatch(/passport_sealed\s*(,|$)/m);
-      // The same field, now that a client may hold several of them.
-      expect(set.sql, set.key).not.toMatch(/number_sealed\s*(,|$)/m);
+      expect(set.sql, set.key).not.toMatch(/passport_number\s*(,|$)/m);
+      expect(set.sql, set.key).not.toMatch(/p\.number\s*(,|$)/m);
     }
     const clients = DATASETS.find((d) => d.key === 'clients')!;
     // Table-qualified since the clients export joins `countries` for the
     // nationality name; the guard is about the column, not the prefix.
-    expect(clients.sql).toMatch(/CASE WHEN (\w+\.)?passport_sealed IS NULL THEN 'no' ELSE 'yes' END/);
+    expect(clients.sql).toMatch(/CASE WHEN (\w+\.)?passport_number IS NULL THEN 'no' ELSE 'yes' END/);
   });
 
   it('names its columns rather than selecting everything', () => {

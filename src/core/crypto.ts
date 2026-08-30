@@ -4,8 +4,9 @@
  *  - Passwords: PBKDF2-SHA256. Argon2/scrypt are not available in the runtime,
  *    so the iteration count carries the cost. It is stored inside the hash so
  *    it can be raised later without invalidating existing credentials.
- *  - Sealed fields: AES-256-GCM under FIELD_KEY, for the handful of columns
- *    that hold document-identity data (passport numbers).
+ *  - Sealed fields: AES-256-GCM under a 32-byte key. Kept as a general
+ *    primitive; since 0042 no register column uses it (passport numbers are
+ *    stored as written, the practice's decision).
  *  - TOTP: RFC 6238, SHA-1/6 digits/30s — what authenticator apps expect.
  */
 

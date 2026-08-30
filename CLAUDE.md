@@ -38,13 +38,15 @@ because nobody wrote down why. So: whichever way it goes, say which and why,
 keep the bridge as small as it can be, name it in the code, and write down what
 would let it be removed.
 
-Two things genuinely cannot be changed directly, and are not exceptions to this
-rule but facts about the data:
+One thing genuinely cannot be changed directly, and is not an exception to this
+rule but a fact about the data:
 
 - **The audit log and file notes are append-only.** They record what was said at
   the time. Never rewrite them to make history tidy.
-- **`FIELD_KEY` must never change.** Passport numbers are sealed under it;
-  rotating it makes every stored number unreadable.
+
+(An earlier rule here — that `FIELD_KEY` must never change — retired with
+migration 0042: passport numbers are stored as written, by the practice's
+explicit decision of 30 August 2026. They still stay out of bulk exports.)
 
 ## The other standing decisions
 
