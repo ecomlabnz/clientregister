@@ -29,6 +29,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Nothing ships with a known high/critical advisory in a runtime
+      # dependency.
+      - name: Dependency audit (runtime)
+        run: npm run audit
+
       - name: Typecheck
         run: npm run typecheck
 

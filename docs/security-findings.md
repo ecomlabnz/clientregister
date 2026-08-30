@@ -86,6 +86,33 @@ no partial tag survives and the output stays inert.
 
 ---
 
+## What CI enforces continuously
+
+Security that is checked once rots. Since the `ci-security-machinery` change,
+every push and pull request must pass, and the deploy runs the same checks
+before anything reaches production:
+
+- **The security suite** (`npm run test:security`) — inside `npm test`, and
+  also as its own named CI step so it passes or fails visibly.
+- **Dependency audit (runtime)** (`npm run audit` =
+  `npm audit --omit=dev --audit-level=high`) — no known high/critical advisory
+  in anything that ships to the Worker. Measured 2026-08-30: runtime
+  dependencies clean; the full audit (dev tooling included) carried 5
+  advisories (1 critical, 1 high, 3 moderate), all in the vitest 2.x → vite →
+  esbuild chain, which never ships. The gate deliberately covers runtime only
+  until that chain is upgraded — a gate that is red on day one teaches people
+  to ignore it. When the dev chain is clean, tighten `audit` by dropping
+  `--omit=dev`.
+- **Secret scan** — gitleaks (pinned by version and checksum) over the full
+  git history on every push, so nothing credential-shaped reaches the remote.
+  The automated backstop to the rules that real client data and `FIELD_KEY`
+  never enter the repository. Baseline 2026-08-30: 53 commits, no leaks.
+
+Branch protection (requiring these checks before merge to `main`) is a GitHub
+setting, not code; it is recorded here when enabled.
+
+---
+
 ## Open findings — known, accepted, and what would close them
 
 ### 5. Migration 0037's forward guard does not watch `meta_json` — ACCEPTED
