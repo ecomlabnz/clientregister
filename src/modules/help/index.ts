@@ -32,6 +32,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.69.2', date: '30 August 2026',
+    notes: [
+      'Leftover notes, tasks and AI runs that still pointed at the removed '
+        + 'demonstration data have been cleaned away, and the demonstration-data '
+        + 'clear now takes such records with it. Real records are untouched.',
+    ],
+  },
+  {
     version: '0.69.1', date: '30 August 2026',
     notes: [
       'On a wide monitor the menu, search box and account controls now sit above the '

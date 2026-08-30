@@ -280,20 +280,34 @@ export const adminModule: AppModule = {
      */
     r.post('/demo-data/remove', requirePermission('admin:settings'), async (c) => {
       const like = `demo\\_%`;
+      /*
+       * Two shapes of demo row, and both must go. Rows created AS the
+       * demonstration data carry an id beginning `demo_`. But rows created
+       * later THROUGH the application against a demo record — the note written
+       * when a demo task was completed, a status change, an AI run over a demo
+       * file — carry real ids and only *reference* `demo_…`. The first version
+       * of this clear matched on own-id alone and left that second shape
+       * behind on the live register (migration 0043 swept it up). So every
+       * table that can accumulate work against a matter or client is cleared
+       * by its references too.
+       */
       const tables = [
         'DELETE FROM case_tags WHERE case_id LIKE ? ESCAPE \'\\\'',
         'DELETE FROM tags WHERE id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM case_parties WHERE id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM fee_shares WHERE id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM fee_items WHERE id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM case_followups WHERE case_id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM case_parties WHERE id LIKE ? ESCAPE \'\\\' OR case_id LIKE ? ESCAPE \'\\\' OR client_id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM fee_shares WHERE id LIKE ? ESCAPE \'\\\' OR case_id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM fee_items WHERE id LIKE ? ESCAPE \'\\\' OR case_id LIKE ? ESCAPE \'\\\'',
         'DELETE FROM quotes WHERE id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM tasks WHERE id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM entries WHERE id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM case_status_history WHERE id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM tasks WHERE id LIKE ? ESCAPE \'\\\' OR entity_id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM entries WHERE id LIKE ? ESCAPE \'\\\' OR entity_id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM ai_runs WHERE id LIKE ? ESCAPE \'\\\' OR entity_id LIKE ? ESCAPE \'\\\'',
+        'DELETE FROM case_status_history WHERE id LIKE ? ESCAPE \'\\\' OR case_id LIKE ? ESCAPE \'\\\'',
         'DELETE FROM cases WHERE id LIKE ? ESCAPE \'\\\'',
         'DELETE FROM clients WHERE id LIKE ? ESCAPE \'\\\'',
       ];
-      await c.env.DB.batch(tables.map((sql) => c.env.DB.prepare(sql).bind(like)));
+      await c.env.DB.batch(tables.map((sql) =>
+        c.env.DB.prepare(sql).bind(...Array<string>(sql.split('?').length - 1).fill(like))));
 
       // Hand the next real record a reference that is not already in use.
       await c.env.DB.batch([
