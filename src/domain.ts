@@ -232,6 +232,8 @@ export const PARTY_ROLES = [
   'employer',
   'sponsor',
   'agent',
+  'lawyer',
+  'adviser',
   'other',
 ] as const;
 
@@ -245,6 +247,11 @@ export const PARTY_ROLE_LABELS: Record<PartyRole, string> = {
   employer: 'Employer',
   sponsor: 'Sponsor',
   agent: 'Agent or representative',
+  // A lawyer or a licensed immigration adviser on the matter who is not the
+  // practice's own assigned owner — opposing counsel, prior counsel, or an
+  // external specialist brought in on the file.
+  lawyer: 'Lawyer',
+  adviser: 'Licensed immigration adviser',
   other: 'Other party',
 };
 

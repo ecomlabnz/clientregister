@@ -107,8 +107,15 @@ before anything reaches production:
   The automated backstop to the rules that real client data and `FIELD_KEY`
   never enter the repository. Baseline 2026-08-30: 53 commits, no leaks.
 
-Branch protection (requiring these checks before merge to `main`) is a GitHub
-setting, not code; it is recorded here when enabled.
+Beyond the workflows, verified enabled on GitHub 2026-08-30:
+
+- **Branch protection**: a ruleset on `main` requires the CI `check` to pass
+  before merging — verified empirically (a pull request's merge state read
+  `blocked` while checks ran and `clean` once they passed).
+- **GitHub secret scanning and push protection**: both enabled (confirmed
+  from the repository's Advanced Security page). A GitGuardian check also
+  runs on pull requests. Three secret scanners now stand between a
+  credential and the remote: gitleaks in CI, GitHub's own, and GitGuardian.
 
 ---
 
@@ -183,7 +190,7 @@ a number does not accept the number.
 **Guard:** `test/security_dataprotection.test.ts` — proven by reintroducing
 the silent-drop expression and watching the guard fail.
 
-### 9. Revealing a sealed passport number requires only `register:read` — OPEN, awaiting a decision
+### 9. Revealing a sealed passport number requires only `register:read` — CLOSED, intended
 
 The reveal route (`POST /clients/:id/passports/:pid/reveal`) is gated on
 `register:read` — the permission every role has, including `readonly`. The
@@ -195,13 +202,39 @@ so this may also be intended. It is recorded here because unsealing a
 passport number is a step beyond looking, and the practice owner, not this
 programme, should say which reading stands.
 
-**Proposal:** gate the reveal on `register:write` (advisers and up), keeping
-the audit entry. One line; no data change. Not applied — awaiting the
-owner's answer.
+**Decision (the owner, 2026-08-30):** every signed-in role may use the
+reveal. The behaviour stands as built; every reveal remains audited. Recorded
+so the question is settled rather than implicit.
 
 **Meanwhile pinned by test:** a suspended account cannot reveal regardless of
 role; every reveal writes its audit entry; the admin CSV export never carries
 a passport number, sealed or plain, and is gated on `admin:settings`.
+
+---
+
+## The 2026-08 intake load — what was held out, and why
+
+The load itself ran from files outside the repository; no client data appears
+here, only the shape of what was withheld. Dry run verified on a scratch
+database before anything real was touched.
+
+- **1 document not loaded**: one client folder holds a drafted letter
+  belonging to a *different family's* matter (found by full-text sweep across
+  all 629 files). It was not attached to the client whose folder it sat in —
+  one client's material must not appear on another's file.
+- **1 passport record skipped**: a sponsor's passport scan defeated OCR
+  entirely; recording nothing beats recording a misread. Noted on the client
+  record for hand entry from the paper.
+- **1 deadline not inferred**: a job-token expiry stated as day-and-month
+  with no year was carried in the file notes verbatim rather than recorded as
+  a date no document states. Every matter it governed was lodged in time, so
+  nothing remained outstanding.
+- **19 police-certificate issue dates** entered as `from_filename` and **8
+  medical dates** as `unverified` (0040): every expiry computed from them is
+  flagged until somebody checks the paper and presses the button.
+- **629 file references stayed in the notes**, not the documents table: the
+  register's documents are real stored files, and the load carried metadata
+  only. Uploading the source files is a separate, later job.
 
 ---
 

@@ -32,6 +32,13 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.68.0', date: '30 August 2026',
+    notes: [
+      'A matter can now name a Lawyer or a Licensed immigration adviser among its parties — '
+        + 'for counsel on the file who is not the matter’s own assigned person.',
+    ],
+  },
+  {
     version: '0.67.0', date: '30 August 2026',
     notes: [
       'Recording a passport number now refuses loudly if the register’s encryption key is '
