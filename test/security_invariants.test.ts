@@ -80,6 +80,25 @@ const CASES: Case[] = [
     attack: (d) => exec(d, `DELETE FROM entries WHERE id='E1'`),
     aborts: /cannot be deleted/,
   },
+  {
+    // 0043: a note about a fabricated record is as fabricated as the record.
+    // The first demo clear matched only a row's own id and left notes written
+    // through the app against demo matters stranded on the live register.
+    name: 'a note about a demonstration record can be deleted',
+    seed: (d) => exec(d, `INSERT INTO entries (id, entity_type, entity_id, kind, body, occurred_at, created_at)
+             VALUES ('E1','case','demo_cas_x','system','b','${AT}','${AT}')`),
+    attack: (d) => exec(d, `DELETE FROM entries WHERE id='E1'`),
+    aborts: null,
+  },
+  {
+    // The exception is a prefix, never a substring: a real record whose
+    // reference happens to contain "demo_" further along stays protected.
+    name: 'a note whose entity merely contains demo_ cannot be deleted',
+    seed: (d) => exec(d, `INSERT INTO entries (id, entity_type, entity_id, kind, body, occurred_at, created_at)
+             VALUES ('E1','case','cas_demo_x','note','b','${AT}','${AT}')`),
+    attack: (d) => exec(d, `DELETE FROM entries WHERE id='E1'`),
+    aborts: /cannot be deleted/,
+  },
 
   // --- An inquiry can be deleted, but only while it is only an inquiry (0036)
   {
@@ -183,4 +202,37 @@ describe('database invariants hold against direct SQL', () => {
       }
     });
   }
+});
+
+/**
+ * Migration 0043 touches existing data, so its behaviour is pinned here: the
+ * database is built to the state the live register was in on 30 August 2026 —
+ * work done through the app against demonstration records, carrying real ids —
+ * and then 0043 runs. Only the demo-referencing rows may go.
+ */
+describe('migration 0043 sweeps the residue the first demo clear left behind', () => {
+  it('deletes rows referencing demo records and keeps every real row', () => {
+    const d = new DatabaseSync(':memory:');
+    for (const f of readdirSync('migrations').filter((f) => f.endsWith('.sql')).sort()) {
+      if (f.startsWith('0043')) {
+        d.exec('PRAGMA foreign_keys = OFF;');
+        d.exec(`INSERT INTO entries (id, entity_type, entity_id, kind, body, occurred_at, created_at) VALUES
+          ('ent_x1','case','demo_cas_x','system','Task completed on a demo matter','${AT}','${AT}'),
+          ('ent_x2','client','demo_cli_x','note','about a demo client','${AT}','${AT}'),
+          ('ent_x3','case','cas_real','note','a real file note','${AT}','${AT}')`);
+        d.exec(`INSERT INTO tasks (id, title, status, priority, assigned_to, entity_type, entity_id, created_at, updated_at) VALUES
+          ('tsk_x1','t','open','normal','U1','case','demo_cas_x','${AT}','${AT}'),
+          ('tsk_x2','t','open','normal','U1','case','cas_real','${AT}','${AT}')`);
+        d.exec(`INSERT INTO ai_runs (id, kind, provider, model, entity_type, entity_id, input_hash, status, created_at) VALUES
+          ('air_x1','brief','p','m','case','demo_cas_x','h','ok','${AT}'),
+          ('air_x2','brief','p','m','case','cas_real','h','ok','${AT}')`);
+      }
+      d.exec(readFileSync(`migrations/${f}`, 'utf8'));
+    }
+    const ids = (sql: string) =>
+      d.prepare(sql).all().map((r) => (r as { id: string }).id).sort();
+    expect(ids('SELECT id FROM entries')).toEqual(['ent_x3']);
+    expect(ids('SELECT id FROM tasks')).toEqual(['tsk_x2']);
+    expect(ids('SELECT id FROM ai_runs')).toEqual(['air_x2']);
+  });
 });
