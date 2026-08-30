@@ -718,6 +718,15 @@ export const clientsModule: AppModule = {
           ${pageHeader('New client')}${clientForm(c, v as Partial<ClientRow>, users, organisations, englishTestOptions, visaTypeOptions, f.errors)}`);
       }
 
+      // Before anything is written: a passport number that cannot be sealed
+      // must not be accepted, and finding that out after the client row exists
+      // would save half a submission.
+      if (v.passport_number && !c.env.FIELD_KEY) {
+        return redirectWith(c, '/clients/new',
+          'The client was not created: a passport number was given, but FIELD_KEY is not '
+          + 'configured so it cannot be sealed. Nothing was saved.', 'err');
+      }
+
       const id = newId('cli');
       const ref = await nextRef(c.env.DB, 'client', 'CL');
 
@@ -1273,6 +1282,14 @@ export const clientsModule: AppModule = {
         return redirectWith(c, `/clients/${id}#passports`,
           'A passport needs at least a country, a number or a date.', 'err');
       }
+      // The core refuses this too (it must — a guarantee in a handler lasts
+      // until somebody adds a second handler); this check exists to say it in
+      // words instead of a 500.
+      if (number && !c.env.FIELD_KEY) {
+        return redirectWith(c, `/clients/${id}#passports`,
+          'Passport numbers cannot be recorded: FIELD_KEY is not configured, so the number '
+          + 'cannot be sealed. Nothing was saved.', 'err');
+      }
       if (issuedOn && expiresOn && expiresOn < issuedOn) {
         return redirectWith(c, `/clients/${id}#passports`,
           'A passport cannot expire before it was issued.', 'err');
@@ -1489,6 +1506,11 @@ export const clientsModule: AppModule = {
       if (v.passport_clear && v.passport_number) {
         return redirectWith(c, `/clients/${id}/edit`,
           'Either enter a new passport number or tick to remove the one on file — not both.', 'err');
+      }
+      if (v.passport_number && !c.env.FIELD_KEY) {
+        return redirectWith(c, `/clients/${id}/edit`,
+          'The client was not updated: a passport number was given, but FIELD_KEY is not '
+          + 'configured so it cannot be sealed. Nothing was saved.', 'err');
       }
       await run(
         c.env.DB,

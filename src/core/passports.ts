@@ -84,11 +84,22 @@ export interface PassportInput {
   userId: string | null;
 }
 
+/**
+ * A number can only be stored sealed. With no FIELD_KEY there is no seal, and
+ * the honest response is refusal: storing NULL instead — which this once did —
+ * throws the number away while telling the person it was saved, and the file
+ * thereafter reads "no passport number on file". Fail closed, loudly.
+ */
+function sealedOrRefuse(number: string, keyB64: string | undefined): Promise<string> {
+  if (!keyB64) {
+    throw new Error('FIELD_KEY is not configured — refusing to record a passport number rather than silently dropping it');
+  }
+  return sealField(number, keyB64);
+}
+
 export async function addPassport(env: Env, input: PassportInput): Promise<string> {
   const id = newId('pas');
-  const sealed = input.number && env.FIELD_KEY
-    ? await sealField(input.number, env.FIELD_KEY)
-    : null;
+  const sealed = input.number ? await sealedOrRefuse(input.number, env.FIELD_KEY) : null;
 
   // The database allows one primary per client, so the old one is stood down
   // first. Doing it in that order means a failure leaves a client with no
@@ -127,8 +138,8 @@ export async function updatePassport(
 
   const sealed = input.clearNumber
     ? null
-    : input.number && env.FIELD_KEY
-      ? await sealField(input.number, env.FIELD_KEY)
+    : input.number
+      ? await sealedOrRefuse(input.number, env.FIELD_KEY)
       : existing.number_sealed;
 
   if (input.isPrimary && !existing.is_primary) await clearPrimary(env, input.clientId);

@@ -157,6 +157,54 @@ check and reverting the display, each watched to fail.
 
 ---
 
+## Findings from the data-protection critical-path check (2026-08-30, pre-load)
+
+The narrow slice of the security sweep run as a gate before real passports and
+dates of birth are loaded: passport sealing, role-based access to PII, and
+sessions. The suite that now pins all of it is
+`test/security_dataprotection.test.ts`.
+
+### 8. A passport number typed with no FIELD_KEY configured silently vanished — FIXED (0.67.0)
+
+`addPassport` and `updatePassport` sealed the number only when `env.FIELD_KEY`
+was set — and when it was not, stored `NULL` without a word. The person typed
+a passport number, the register said "client updated", and the file
+thereafter read "no passport number on file". Silent data loss in the exact
+place the system's rules say must fail closed. (The unseal side was already
+honest: a wrong or absent key yields "could not be decrypted", never
+plaintext and never a fabricated blank.)
+
+**Fix:** recording a passport number with no `FIELD_KEY` configured now
+refuses loudly — the core functions throw rather than discard, and the
+client-form routes catch the misconfiguration first and say plainly what is
+wrong and what was not saved. A register that cannot keep its promise about
+a number does not accept the number.
+
+**Guard:** `test/security_dataprotection.test.ts` — proven by reintroducing
+the silent-drop expression and watching the guard fail.
+
+### 9. Revealing a sealed passport number requires only `register:read` — OPEN, awaiting a decision
+
+The reveal route (`POST /clients/:id/passports/:pid/reveal`) is gated on
+`register:read` — the permission every role has, including `readonly`. The
+sealing design says a reveal is "one passport, asked for on purpose, and
+audited", and the audit does record it; but the weakest role in the system
+can perform it. Showing the client page (with date of birth) to `readonly`
+is the intended coarse model — "who can change money and who can only look" —
+so this may also be intended. It is recorded here because unsealing a
+passport number is a step beyond looking, and the practice owner, not this
+programme, should say which reading stands.
+
+**Proposal:** gate the reveal on `register:write` (advisers and up), keeping
+the audit entry. One line; no data change. Not applied — awaiting the
+owner's answer.
+
+**Meanwhile pinned by test:** a suspended account cannot reveal regardless of
+role; every reveal writes its audit entry; the admin CSV export never carries
+a passport number, sealed or plain, and is gated on `admin:settings`.
+
+---
+
 ## Open findings — known, accepted, and what would close them
 
 ### 5. Migration 0037's forward guard does not watch `meta_json` — ACCEPTED
