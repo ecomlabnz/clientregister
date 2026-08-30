@@ -249,6 +249,12 @@ p:last-child { margin-bottom: 0; }
   display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
   padding: 9px 18px; background: var(--surface);
   border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
+  /* The bar's background and border run the full window, but its contents
+     stop at the same 1400px measure the page does: on a wide monitor the
+     menu, search and account sit above the content they act on, not pinned
+     to the far corners of the screen. The padding grows only once the
+     window is wider than the measure; below that it is the plain 18px. */
+  padding-inline: max(18px, calc((100% - 1400px) / 2 + 18px));
 }
 .brand { font-weight: 640; color: var(--text); letter-spacing: -0.02em; font-size: 0.95rem; }
 .brand:hover { text-decoration: none; }

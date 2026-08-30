@@ -32,6 +32,13 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.69.1', date: '30 August 2026',
+    notes: [
+      'On a wide monitor the menu, search box and account controls now sit above the '
+        + 'content instead of stretching to the corners of the window.',
+    ],
+  },
+  {
     version: '0.69.0', date: '30 August 2026',
     notes: [
       'Passport numbers now show on the client’s page like any other detail — no '

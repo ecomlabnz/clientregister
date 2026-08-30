@@ -54,6 +54,25 @@ describe('nothing but tables and the nav may scroll sideways', () => {
   });
 });
 
+describe('the header keeps to the same measure as the page', () => {
+  it('pads its contents to the 1400px column instead of pinning them to the window edges', () => {
+    // On an ultrawide monitor the menu, search box and account link must sit
+    // above the content, not in the far corners. The bar itself still runs the
+    // full window (background, border, sticky), so the alignment is done with
+    // growing padding, not a max-width on the bar.
+    const block = css.match(/\.topbar \{([^}]*)\}/);
+    expect(block).not.toBeNull();
+    expect(block![1]).toContain('padding-inline: max(18px, calc((100% - 1400px) / 2 + 18px))');
+    expect(block![1]).not.toContain('max-width');
+  });
+
+  it('uses the same measure as .main, so the two cannot drift apart silently', () => {
+    // Both numbers must be 1400: if the page measure ever changes, this test
+    // is the reminder that the header follows it.
+    expect(css).toContain('.main { max-width: 1400px;');
+  });
+});
+
 describe('every custom property that is used is defined', () => {
   it('has no var() pointing at a name that does not exist', () => {
     // A misspelled custom property is invisible: the rule is simply dropped, so
