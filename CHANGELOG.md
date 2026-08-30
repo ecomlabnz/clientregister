@@ -7,6 +7,25 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.69.2 — 30 August 2026
+
+### Fixed
+- **Removing the demonstration data now removes everything about it.** The
+  clear recognised demo rows by their own identifier, so work done through the
+  app *against* a demo record — a task completed on a demo matter, the note
+  written when one was renumbered, an AI run over a demo file — survived it:
+  33 notes, 18 tasks and 7 AI runs were still on the live register. Migration
+  0043 sweeps that residue once (rehearsed on a scratch copy first), widens
+  the append-only rule's one exception to match — a note about a fabricated
+  record is as fabricated as the record — and the clear itself now deletes by
+  reference as well as by identifier, so it cannot happen again. The audit
+  log is untouched: it keeps the record that the demo data existed.
+
+### Changed
+- CLAUDE.md records three things that until now lived only in git history:
+  the register is live (and what that means for how changes are made), what a
+  release consists of, and who the register is built for.
+
 ## 0.69.1 — 30 August 2026
 
 ### Fixed

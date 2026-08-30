@@ -48,6 +48,33 @@ rule but a fact about the data:
 migration 0042: passport numbers are stored as written, by the practice's
 explicit decision of 30 August 2026. They still stay out of bulk exports.)
 
+## The register is live
+
+Since 30 August 2026 the register holds the practice's real client files. This
+is the fact the "when a bridge is right" weighing already anticipates: the
+first test (never put records at risk) now outranks tidiness every time. Any
+change that touches production data is rehearsed on a scratch database seeded
+from a production snapshot, and the rehearsed SQL — not a re-derivation of it —
+is what runs against production. Data-loading tooling lives outside the
+repository (real client data never enters it).
+
+## Releases
+
+Every user-visible change ships as a release, and a release is three edits
+that must agree: the version in `package.json` (middle number for a feature,
+last for a fix), a `CHANGELOG.md` entry, and a line under Help → Recent
+changes (`RELEASES` in `src/modules/help/index.ts`) written in the practice's
+voice — plain words a non-developer reads without translation. Merges to
+`main` go through a pull request: the branch ruleset requires the CI `check`,
+and the merge method is rebase.
+
+## Who you are working with
+
+The owner runs an immigration law practice and is not a developer. Answer in
+plain language, explain a term the first time it appears, and when the answer
+is "it depends", say what it depends on in one sentence. "Do not understand —
+clarify" means shorter and more concrete, not more detail.
+
 ## The other standing decisions
 
 - **Security, modularity and mobile-friendliness rank first** — ahead of how it
