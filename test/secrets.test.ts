@@ -20,7 +20,7 @@ describe('the deploy hands over every secret the collector expects', () => {
   it('finds the list at all', () => {
     // If the extraction stops matching, everything below passes on nothing.
     expect(names.length).toBeGreaterThan(15);
-    expect(names).toContain('FIELD_KEY');
+    expect(names).toContain('SETUP_TOKEN');
   });
 
   it('passes each of them through the workflow environment', () => {

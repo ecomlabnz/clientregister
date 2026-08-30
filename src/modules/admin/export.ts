@@ -6,13 +6,11 @@
  * here is one link and one file: no queue, no email, no "we will prepare your
  * export".
  *
- * One thing is deliberately not exported: passport numbers. They are the single
- * field the register encrypts, and writing them in the clear into a file that
- * lands in a downloads folder undoes that in one click. The export says whether
- * a passport is on file; the number itself is revealed one at a time on the
- * client's page, where each reveal is recorded in the audit log. If the whole
- * set is genuinely needed, that is a deliberate operation and should look like
- * one, rather than riding along inside a routine download.
+ * One thing is deliberately not exported: passport numbers. They show on each
+ * client's own page, but a spreadsheet in a downloads folder is the copy that
+ * actually escapes, so the export says only whether a passport is on file. If
+ * the whole set is genuinely needed, that is a deliberate operation and should
+ * look like one, rather than riding along inside a routine download.
  */
 
 import type { Hono } from 'hono';
@@ -51,7 +49,7 @@ export const DATASETS: Dataset[] = [
                  c.company_number, c.email, c.phone, c.whatsapp, c.telegram_username,
                  c.nationality AS nationality_code, co.name AS nationality,
                  c.date_of_birth,
-                 CASE WHEN c.passport_sealed IS NULL THEN 'no' ELSE 'yes' END AS passport_on_file,
+                 CASE WHEN c.passport_number IS NULL THEN 'no' ELSE 'yes' END AS passport_on_file,
                  c.passport_country, c.passport_expiry, c.current_visa_type, c.current_visa_expiry,
                  c.english_test_type, c.english_test_score, c.english_test_date,
                  c.address, c.status, c.created_at, c.updated_at
@@ -87,7 +85,7 @@ export const DATASETS: Dataset[] = [
     sql: `SELECT cl.ref AS client_ref, cl.full_name AS client, p.country, p.issued_on,
                  p.expires_on, p.status,
                  CASE WHEN p.is_primary = 1 THEN 'yes' ELSE 'no' END AS is_primary,
-                 CASE WHEN p.number_sealed IS NULL THEN 'no' ELSE 'yes' END AS number_on_file,
+                 CASE WHEN p.number IS NULL THEN 'no' ELSE 'yes' END AS number_on_file,
                  p.notes, p.created_at
             FROM client_passports p
             JOIN clients cl ON cl.id = p.client_id

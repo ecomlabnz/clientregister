@@ -14,15 +14,14 @@
  * refreshed from here on every change: this table is the record, those columns
  * are a convenience. Certificates work the same way, deliberately.
  *
- * Numbers are sealed with FIELD_KEY, one at a time, exactly as the single
- * column was. Nothing here ever unseals in bulk — a reveal is one passport,
- * asked for on purpose, and audited by the caller.
+ * The number is stored as written (the practice's decision, 30 August 2026 —
+ * migration 0042). It shows on the client's page like the dates beside it.
+ * The one deliberate hold-back: numbers stay out of the bulk CSV exports.
  */
 
 import type { Env } from '../types';
 import { all, nowIso, one, run } from './db';
 import { newId } from './ids';
-import { sealField } from './crypto';
 
 export type PassportStatus = 'held' | 'replaced' | 'lost' | 'cancelled';
 
@@ -41,7 +40,7 @@ export interface PassportRow {
   id: string;
   client_id: string;
   country: string | null;
-  number_sealed: string | null;
+  number: string | null;
   issued_on: string | null;
   expires_on: string | null;
   status: PassportStatus;
@@ -74,7 +73,6 @@ export async function passportById(
 export interface PassportInput {
   clientId: string;
   country: string | null;
-  /** Plain text. Sealed here; never stored or logged as given. */
   number: string | null;
   issuedOn: string | null;
   expiresOn: string | null;
@@ -84,22 +82,8 @@ export interface PassportInput {
   userId: string | null;
 }
 
-/**
- * A number can only be stored sealed. With no FIELD_KEY there is no seal, and
- * the honest response is refusal: storing NULL instead — which this once did —
- * throws the number away while telling the person it was saved, and the file
- * thereafter reads "no passport number on file". Fail closed, loudly.
- */
-function sealedOrRefuse(number: string, keyB64: string | undefined): Promise<string> {
-  if (!keyB64) {
-    throw new Error('FIELD_KEY is not configured — refusing to record a passport number rather than silently dropping it');
-  }
-  return sealField(number, keyB64);
-}
-
 export async function addPassport(env: Env, input: PassportInput): Promise<string> {
   const id = newId('pas');
-  const sealed = input.number ? await sealedOrRefuse(input.number, env.FIELD_KEY) : null;
 
   // The database allows one primary per client, so the old one is stood down
   // first. Doing it in that order means a failure leaves a client with no
@@ -110,10 +94,10 @@ export async function addPassport(env: Env, input: PassportInput): Promise<strin
   await run(
     env.DB,
     `INSERT INTO client_passports
-       (id, client_id, country, number_sealed, issued_on, expires_on, status, is_primary,
+       (id, client_id, country, number, issued_on, expires_on, status, is_primary,
         notes, created_at, created_by)
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    id, input.clientId, input.country, sealed, input.issuedOn, input.expiresOn,
+    id, input.clientId, input.country, input.number, input.issuedOn, input.expiresOn,
     input.status, input.isPrimary ? 1 : 0, input.notes, nowIso(), input.userId,
   );
   await refreshClientPassportCache(env, input.clientId);
@@ -123,10 +107,9 @@ export async function addPassport(env: Env, input: PassportInput): Promise<strin
 /**
  * Change one.
  *
- * A blank number means "leave the stored one alone", which is the only safe
- * reading: the form cannot show what is sealed, so an empty box is an absence
- * of instruction rather than an instruction to erase. Erasing is `clearNumber`,
- * asked for separately.
+ * A blank number means "leave the stored one alone": on the client form the
+ * box arrives empty, so an empty box is an absence of instruction rather than
+ * an instruction to erase. Erasing is `clearNumber`, asked for separately.
  */
 export async function updatePassport(
   env: Env,
@@ -136,20 +119,18 @@ export async function updatePassport(
   const existing = await passportById(env, input.clientId, id);
   if (!existing) return;
 
-  const sealed = input.clearNumber
+  const number = input.clearNumber
     ? null
-    : input.number
-      ? await sealedOrRefuse(input.number, env.FIELD_KEY)
-      : existing.number_sealed;
+    : input.number ?? existing.number;
 
   if (input.isPrimary && !existing.is_primary) await clearPrimary(env, input.clientId);
 
   await run(
     env.DB,
-    `UPDATE client_passports SET country=?, number_sealed=?, issued_on=?, expires_on=?,
+    `UPDATE client_passports SET country=?, number=?, issued_on=?, expires_on=?,
        status=?, is_primary=?, notes=?
      WHERE id=? AND client_id=?`,
-    input.country, sealed, input.issuedOn, input.expiresOn, input.status,
+    input.country, number, input.issuedOn, input.expiresOn, input.status,
     input.isPrimary ? 1 : 0, input.notes, id, input.clientId,
   );
   await refreshClientPassportCache(env, input.clientId);
@@ -198,9 +179,9 @@ export async function refreshClientPassportCache(env: Env, clientId: string): Pr
   );
   await run(
     env.DB,
-    `UPDATE clients SET passport_sealed = ?, passport_country = ?, passport_expiry = ?, updated_at = ?
+    `UPDATE clients SET passport_number = ?, passport_country = ?, passport_expiry = ?, updated_at = ?
       WHERE id = ?`,
-    primary?.number_sealed ?? null, primary?.country ?? null, primary?.expires_on ?? null,
+    primary?.number ?? null, primary?.country ?? null, primary?.expires_on ?? null,
     nowIso(), clientId,
   );
 }

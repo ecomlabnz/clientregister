@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.69.0', date: '30 August 2026',
+    notes: [
+      'Passport numbers now show on the client’s page like any other detail — no '
+        + 'separate reveal step. Changing or removing one is still recorded.',
+      'They still never appear in the CSV exports; the export says only whether a '
+        + 'passport is on file.',
+    ],
+  },
+  {
     version: '0.68.0', date: '30 August 2026',
     notes: [
       'A matter can now name a Lawyer or a Licensed immigration adviser among its parties — '

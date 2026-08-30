@@ -62,7 +62,6 @@ jobs:
         id: collect
         env:
           SETUP_TOKEN: ${{ secrets.SETUP_TOKEN }}
-          FIELD_KEY: ${{ secrets.FIELD_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
           TELEGRAM_ALLOWED_USER_IDS: ${{ secrets.TELEGRAM_ALLOWED_USER_IDS }}

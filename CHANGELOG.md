@@ -7,6 +7,19 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.69.0 — 30 August 2026
+
+### Changed
+- **Passport numbers are stored as written and shown on the client's page**
+  (the practice's decision). The encryption, the FIELD_KEY secret and the
+  separate "reveal" step are gone: the number sits beside the passport's dates,
+  visible to anyone signed in. Changing or removing a number is still recorded
+  in the audit log — the record says it changed, never what to.
+- One protection was kept on purpose: passport numbers still never appear in
+  the bulk CSV exports. A spreadsheet in a downloads folder is the copy that
+  actually escapes.
+- The "Adviser" party role label shortened from "Licensed immigration adviser".
+
 ## 0.68.0 — 30 August 2026
 
 ### Added
