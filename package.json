@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:security": "vitest run test/security_",
-    "audit": "npm audit --omit=dev --audit-level=high",
+    "audit": "npm audit --audit-level=high",
     "build:check": "wrangler deploy --dry-run --outdir=.wrangler/dry",
     "db:migrate:local": "wrangler d1 migrations apply clientregister-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply clientregister-db --remote",
@@ -26,7 +26,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260827.1",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8",
+    "vitest": "^4.1.11",
     "wrangler": "^4.127.0"
   }
 }

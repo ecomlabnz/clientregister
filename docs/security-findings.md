@@ -94,15 +94,14 @@ before anything reaches production:
 
 - **The security suite** (`npm run test:security`) — inside `npm test`, and
   also as its own named CI step so it passes or fails visibly.
-- **Dependency audit (runtime)** (`npm run audit` =
-  `npm audit --omit=dev --audit-level=high`) — no known high/critical advisory
-  in anything that ships to the Worker. Measured 2026-08-30: runtime
-  dependencies clean; the full audit (dev tooling included) carried 5
-  advisories (1 critical, 1 high, 3 moderate), all in the vitest 2.x → vite →
-  esbuild chain, which never ships. The gate deliberately covers runtime only
-  until that chain is upgraded — a gate that is red on day one teaches people
-  to ignore it. When the dev chain is clean, tighten `audit` by dropping
-  `--omit=dev`.
+- **Dependency audit** (`npm run audit` = `npm audit --audit-level=high`) —
+  no known high/critical advisory in any dependency, runtime or dev. Measured
+  2026-08-30: runtime dependencies were already clean; the dev-side vitest
+  2.x → vite → esbuild chain carried 5 advisories (1 critical, 1 high,
+  3 moderate) and was cleared by upgrading vitest to 4.x (the full suite was
+  re-run and passed unchanged, so the harness bump changed no behaviour). The
+  gate began as runtime-only so it would be green on day one, and was
+  tightened to the full audit the same day once the dev chain was clean.
 - **Secret scan** — gitleaks (pinned by version and checksum) over the full
   git history on every push, so nothing credential-shaped reaches the remote.
   The automated backstop to the rules that real client data and `FIELD_KEY`
