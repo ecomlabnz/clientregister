@@ -8,3 +8,10 @@ dist/
 .DS_Store
 coverage/
 .secrets.json
+
+# The intake files (Job 4) live outside the repo tree and must never be
+# committed — real client data does not enter this repository. These lines are
+# the backstop for the day one of them is dropped into the tree by mistake.
+clients.jsonl
+cases.jsonl
+*.jsonl
