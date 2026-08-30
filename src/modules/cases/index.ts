@@ -35,7 +35,7 @@ import { findOrCreateTag, listTags, tagCase, tagsForCase, tagsForCases, untagCas
 import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
 import { asPrefInteger, preferencesFor } from '../../core/preferences';
-import { storeDocument } from '../documents';
+import { filesPanel, listCaseFiles, storeDocument } from '../documents';
 import {
   DECISION_SETTINGS, caseForSync, decisionPolicy, expectedDecisionDate, syncCaseFollowUps,
 } from '../../core/decisions';
@@ -44,7 +44,7 @@ import {
   AI_BRIEF_NOTE_PREFIX, briefCase, briefNoteBody, latestBrief, markBriefDiscarded, markBriefKept,
 } from '../../ai/brief';
 import {
-  VOCABULARY_SETTINGS, caseTypes, isTerm, labelFor, termOptions, type Term,
+  VOCABULARY_SETTINGS, caseTypes, docCategories, isTerm, labelFor, termOptions, type Term,
 } from '../../core/vocabulary';
 import { feesSection } from '../fees';
 
@@ -481,7 +481,7 @@ export const casesModule: AppModule = {
       const csrf = c.get('session')!.csrf;
 
       const [entries, history, tasks, quotes, users, fees, parties, caseTags, allTags, clients,
-             threads] = await Promise.all([
+             threads, caseFiles, docCats, linkableDocs] = await Promise.all([
         listEntries(c.env, 'case', id),
         all<any>(c.env.DB, `SELECT h.*, u.name AS by_name FROM case_status_history h
                               LEFT JOIN users u ON u.id = h.by_user_id
@@ -500,6 +500,16 @@ export const casesModule: AppModule = {
         listTags(c.env),
         clientOptions(c.env),
         threadsFor(c.env, 'case', id),
+        listCaseFiles(c.env, id),
+        docCategories(c.env),
+        // The client's own documents not yet shown on this matter, offered by
+        // the "show a document from the client's file" picker.
+        all<any>(c.env.DB,
+          `SELECT d.* FROM documents d
+            WHERE d.entity_type = 'client' AND d.entity_id = ?2
+              AND NOT EXISTS (SELECT 1 FROM case_documents cd
+                               WHERE cd.case_id = ?1 AND cd.document_id = d.id)
+            ORDER BY d.uploaded_at DESC`, id, kase.client_id),
       ]);
 
       // The first person on a matter is the principal applicant far more often
@@ -749,6 +759,12 @@ export const casesModule: AppModule = {
                     </li>`)}
                   </ul>`)
               : ''}
+
+            ${card('Files', filesPanel({
+              csrf, entityType: 'case', entityId: kase.id, returnTo: `/cases/${kase.id}`,
+              files: caseFiles, categories: docCats, canDelete: can(viewer, 'register:delete'),
+              caseId: kase.id, linkable: writable ? linkableDocs : [],
+            }))}
 
             ${card('File notes', html`
               ${writable ? html`

@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.70.0', date: '31 August 2026',
+    notes: [
+      'Every client and matter page now has a Files section, grouped under headings '
+        + '(Identity, Health, Character and so on — editable in Settings).',
+      'A file can be an upload or a link to a drive such as Google Drive. For a linked '
+        + 'file, the drive’s own sharing settings decide who can open it.',
+      'A client’s document can be shown on their matter without copying it.',
+    ],
+  },
+  {
     version: '0.69.2', date: '30 August 2026',
     notes: [
       'Leftover notes, tasks and AI runs that still pointed at the removed '

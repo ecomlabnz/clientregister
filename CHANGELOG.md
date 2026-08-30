@@ -7,6 +7,27 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.70.0 — 31 August 2026
+
+### Added
+- **A Files section on every client and matter page.** The document store has
+  existed since the beginning; what was missing was the window onto it. Files
+  now show on the record they belong to, grouped under the practice's own
+  headings — Identity, Health, Character, English, Relationship and the rest —
+  and the heading list is editable in Settings like every other dropdown.
+- **A file can be a link to an external drive** (Google Drive and the like)
+  instead of an upload. Only https addresses are accepted, opening one is
+  recorded in the audit log, and the panel says plainly: the register controls
+  who sees the link; the drive controls who can open the file.
+- **A client's document can be shown on their matter** without copying it —
+  one file, one owner; the link is a reference and unlinking removes only the
+  reference. Only the matter's own client's documents can be linked, enforced
+  in the route's SQL, so a matter can never become a window into someone
+  else's file.
+- Standing decision recorded in the intake prompt: the intake never copies the
+  practice's actual files into the register. A file arrives only when a person
+  uploads or links it.
+
 ## 0.69.2 — 30 August 2026
 
 ### Fixed
