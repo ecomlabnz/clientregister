@@ -20,7 +20,6 @@ import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
 import { all, nextRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
-import { unsealField } from '../../core/crypto';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
@@ -68,7 +67,7 @@ export interface ClientRow {
   primary_contact_id: string | null;
   email: string | null; phone: string | null; whatsapp: string | null;
   telegram_username: string | null; telegram_user_id: string | null;
-  nationality: string | null; date_of_birth: string | null; passport_sealed: string | null;
+  nationality: string | null; date_of_birth: string | null; passport_number: string | null;
   passport_country: string | null; passport_expiry: string | null;
   police_certificate_date: string | null; police_certificate_expiry: string | null;
   police_certificate_country: string | null;
@@ -114,7 +113,6 @@ function clientForm(
   errors?: Record<string, string>,
 ): Raw {
   const csrf = c.get('session').csrf;
-  const sealingAvailable = Boolean(c.env.FIELD_KEY);
   const action = values.id ? `/clients/${values.id}` : '/clients';
   const kind: ClientKind = values.kind ?? 'individual';
 
@@ -224,20 +222,17 @@ function clientForm(
       <div class="form-section" data-kind="individual" data-panel="identity"
            ${kind === 'individual' ? '' : raw('hidden')}>
         <h3>Identity documents</h3>
-        ${sealingAvailable
-          ? html`${field({ label: 'Passport number', name: 'passport_number', value: '',
-                    hint: values.passport_sealed
-                      ? 'A passport number is on file (encrypted). Enter a new one to replace it, or leave blank to keep it.'
-                      : 'Stored encrypted at rest.' })}
-                 ${values.passport_sealed ? html`
-                   <div class="field checkbox-field">
-                     <label><input type="checkbox" name="passport_clear" value="1">
-                       Remove the number on file</label>
-                     <p class="hint">For one entered against the wrong person. Leaving the box above
-                        blank keeps what is stored; this is the only way to take it out.</p>
-                   </div>` : ''}`
-          : html`<div class="field"><label>Passport number</label>
-                 <p class="hint">Disabled: set the <code>FIELD_KEY</code> secret to store passport numbers encrypted.</p></div>`}
+        ${field({ label: 'Passport number', name: 'passport_number', value: '',
+                  hint: values.passport_number
+                    ? `On file: ${values.passport_number}. Enter a new one to replace it, or leave blank to keep it.`
+                    : undefined })}
+        ${values.passport_number ? html`
+          <div class="field checkbox-field">
+            <label><input type="checkbox" name="passport_clear" value="1">
+              Remove the number on file</label>
+            <p class="hint">For one entered against the wrong person. Leaving the box above
+               blank keeps what is stored; this is the only way to take it out.</p>
+          </div>` : ''}
         ${field({ label: 'Passport country', name: 'passport_country', value: values.passport_country, maxlength: 100 })}
         ${field({ label: 'Passport issued', name: 'passport_issued', type: 'date',
                   value: dateInputValue(values.passport_issued ?? null) })}
@@ -718,15 +713,6 @@ export const clientsModule: AppModule = {
           ${pageHeader('New client')}${clientForm(c, v as Partial<ClientRow>, users, organisations, englishTestOptions, visaTypeOptions, f.errors)}`);
       }
 
-      // Before anything is written: a passport number that cannot be sealed
-      // must not be accepted, and finding that out after the client row exists
-      // would save half a submission.
-      if (v.passport_number && !c.env.FIELD_KEY) {
-        return redirectWith(c, '/clients/new',
-          'The client was not created: a passport number was given, but FIELD_KEY is not '
-          + 'configured so it cannot be sealed. Nothing was saved.', 'err');
-      }
-
       const id = newId('cli');
       const ref = await nextRef(c.env.DB, 'client', 'CL');
 
@@ -1025,8 +1011,8 @@ export const clientsModule: AppModule = {
                               ${pp.is_primary === 1 ? badge('primary', 'green') : ''}
                               ${pp.status === 'held' ? '' : badge(passportStatusLabel(pp.status), 'grey')}
                               <div class="small muted">
-                                ${pp.number_sealed
-                                  ? 'Number on file (encrypted)' : 'No number recorded'}
+                                ${pp.number
+                                  ? html`<code>${pp.number}</code>` : 'No number recorded'}
                                 ${pp.issued_on ? html` \u00b7 issued ${dateShort(pp.issued_on)}` : ''}
                                 ${pp.expires_on ? html` \u00b7 expires ${dateShort(pp.expires_on)}` : ''}
                               </div>
@@ -1034,10 +1020,6 @@ export const clientsModule: AppModule = {
                             </div>
                             <div>
                               ${pp.status === 'held' && pp.expires_on ? expiryCell(pp.expires_on, 180) : ''}
-                              ${pp.number_sealed
-                                ? actionButton(`/clients/${client.id}/passports/${pp.id}/reveal`, csrf,
-                                    'Reveal', { className: 'btn btn-small btn-secondary' })
-                                : ''}
                               ${writable && pp.is_primary !== 1
                                 ? actionButton(`/clients/${client.id}/passports/${pp.id}/primary`, csrf,
                                     'Make primary', { className: 'btn btn-small btn-secondary' })
@@ -1059,8 +1041,7 @@ export const clientsModule: AppModule = {
                         ${field({ label: 'Country', name: 'country', maxlength: 100,
                                   hint: 'The country that issued it.' })}
                         ${field({ label: 'Number', name: 'number', maxlength: 60,
-                                  hint: c.env.FIELD_KEY ? 'Stored encrypted at rest.'
-                                    : 'Disabled: FIELD_KEY is not set.' })}
+                                })}
                         ${field({ label: 'Issued', name: 'issued_on', type: 'date' })}
                         ${field({ label: 'Expires', name: 'expires_on', type: 'date' })}
                         ${select({ label: 'Status', name: 'status', value: 'held', includeBlank: false,
@@ -1265,8 +1246,7 @@ export const clientsModule: AppModule = {
     // --- Passports ----------------------------------------------------------
     //
     // The primary one is edited on the client form; these routes are for the
-    // second and third. A number is sealed on the way in and never read back
-    // except by the reveal route below, one passport at a time.
+    // second and third.
     r.post('/:id/passports', requirePermission('register:write'), async (c) => {
       const id = c.req.param('id')!;
       const f = new FormReader(await c.req.formData());
@@ -1281,14 +1261,6 @@ export const clientsModule: AppModule = {
       if (!country && !number && !issuedOn && !expiresOn) {
         return redirectWith(c, `/clients/${id}#passports`,
           'A passport needs at least a country, a number or a date.', 'err');
-      }
-      // The core refuses this too (it must — a guarantee in a handler lasts
-      // until somebody adds a second handler); this check exists to say it in
-      // words instead of a 500.
-      if (number && !c.env.FIELD_KEY) {
-        return redirectWith(c, `/clients/${id}#passports`,
-          'Passport numbers cannot be recorded: FIELD_KEY is not configured, so the number '
-          + 'cannot be sealed. Nothing was saved.', 'err');
       }
       if (issuedOn && expiresOn && expiresOn < issuedOn) {
         return redirectWith(c, `/clients/${id}#passports`,
@@ -1507,11 +1479,6 @@ export const clientsModule: AppModule = {
         return redirectWith(c, `/clients/${id}/edit`,
           'Either enter a new passport number or tick to remove the one on file — not both.', 'err');
       }
-      if (v.passport_number && !c.env.FIELD_KEY) {
-        return redirectWith(c, `/clients/${id}/edit`,
-          'The client was not updated: a passport number was given, but FIELD_KEY is not '
-          + 'configured so it cannot be sealed. Nothing was saved.', 'err');
-      }
       await run(
         c.env.DB,
         `UPDATE clients SET kind=?, full_name=?, given_names=?, family_name=?, preferred_name=?,
@@ -1568,53 +1535,25 @@ export const clientsModule: AppModule = {
       // updatePassport above have already rebuilt them.
       await refreshClientCache(c.env, id);
 
-      // The encrypted field gets its own entry. A reveal was already recorded
-      // specifically; a change was not, which meant you could tell who had
-      // looked at a passport number but not who had altered it. The number
-      // itself is never written to either the log or the timeline.
-      if (v.passport_clear && existing.passport_sealed) {
+      // A change to the passport number gets its own entry, so the file says
+      // who altered it and when. The number itself is never written to either
+      // the log or the timeline — the record says that it changed, not what to.
+      if (v.passport_clear && existing.passport_number) {
         await auditFrom(c, { action: 'client.passport_cleared', entityType: 'client', entityId: id });
         await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system',
           body: 'Passport number removed from the file.', createdBy: c.get('user')!.id });
       } else if (v.passport_number) {
         await auditFrom(c, {
           action: 'client.passport_set', entityType: 'client', entityId: id,
-          meta: { replaced: Boolean(existing.passport_sealed) },
+          meta: { replaced: Boolean(existing.passport_number) },
         });
         await addEntry(c.env, { entityType: 'client', entityId: id, kind: 'system',
-          body: existing.passport_sealed
+          body: existing.passport_number
             ? 'Passport number replaced.' : 'Passport number recorded.',
           createdBy: c.get('user')!.id });
       }
       await auditFrom(c, { action: 'client.updated', entityType: 'client', entityId: id });
       return redirectWith(c, `/clients/${id}`, 'Client updated.');
-    });
-
-    // Revealing a passport number is a separate, audited action, and the
-    // response is never cached or reachable by a GET a browser might replay.
-    // One passport at a time, named in the URL: a client may hold several, and
-    // "show me the passport numbers" is not a request the register answers.
-    r.post('/:id/passports/:pid/reveal', requirePermission('register:read'), async (c) => {
-      const id = c.req.param('id')!;
-      const client = await one<ClientRow>(c.env.DB, 'SELECT * FROM clients WHERE id = ?', id);
-      if (!client) return c.notFound();
-      const passport = await passportById(c.env, id, c.req.param('pid')!);
-      if (!passport?.number_sealed || !c.env.FIELD_KEY) {
-        return redirectWith(c, `/clients/${id}#passports`, 'No passport number on file.', 'err');
-      }
-      const value = await unsealField(passport.number_sealed, c.env.FIELD_KEY);
-      await auditFrom(c, { action: 'client.passport_revealed', entityType: 'client', entityId: id,
-        meta: { passportId: passport.id, country: passport.country } });
-      c.header('Cache-Control', 'no-store, private');
-      return page(c, { title: 'Passport number', active: '/clients' }, html`
-        ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { href: `/clients/${id}`, label: client.ref }, { label: 'Passport' }])}
-        ${pageHeader('Passport number',
-          `${client.full_name}${passport.country ? ` · ${passport.country}` : ''}`
-          + ' · this view has been recorded in the audit log')}
-        ${card('Value', value
-          ? html`<p class="key-block"><code>${value}</code></p>`
-          : html`<p class="alert alert-error">The stored value could not be decrypted with the current key.</p>`)}
-        <p><a class="btn btn-secondary" href="${`/clients/${id}#passports`}">Back to client</a></p>`);
     });
 
     /**
