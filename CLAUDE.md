@@ -73,7 +73,8 @@ and the merge method is rebase.
 The owner runs an immigration law practice and is not a developer. Answer in
 plain language, explain a term the first time it appears, and when the answer
 is "it depends", say what it depends on in one sentence. "Do not understand —
-clarify" means shorter and more concrete, not more detail.
+clarify" means shorter and more concrete, not more detail. Standing
+instruction (31 August 2026): be brief and to the point, no fluff.
 
 ## The other standing decisions
 
