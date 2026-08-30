@@ -37,11 +37,9 @@ jobs:
           ./gitleaks git --no-banner --redact --exit-code 1 .
           rm -f gitleaks gitleaks.tar.gz
 
-      # The dependencies that actually ship to the Worker must be free of
-      # known high/critical advisories. Dev-only tooling is audited separately
-      # (see docs/security-findings.md) so a dev-chain advisory cannot train
-      # anyone to ignore a red build.
-      - name: Dependency audit (runtime)
+      # No dependency — shipped or dev-only — carries a known high/critical
+      # advisory. History and the reasoning live in docs/security-findings.md.
+      - name: Dependency audit
         run: npm run audit
 
       - name: Typecheck
