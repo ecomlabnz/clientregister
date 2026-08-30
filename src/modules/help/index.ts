@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.67.0', date: '30 August 2026',
+    notes: [
+      'Recording a passport number now refuses loudly if the register’s encryption key is '
+        + 'missing, instead of silently saving nothing while saying it saved.',
+      'The protections around passport numbers, dates of birth and sign-in — the sealed '
+        + 'reveal, the export, session expiry and the two-factor door — are now attacked by '
+        + 'tests on every deploy, before any real client data goes behind them.',
+    ],
+  },
+  {
     version: '0.66.0', date: '30 August 2026',
     notes: [
       'A certificate’s issue date now records where it came from — read off the '

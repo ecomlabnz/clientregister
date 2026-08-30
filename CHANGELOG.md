@@ -7,6 +7,29 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.67.0 — 30 August 2026
+
+### Fixed
+- **A passport number that cannot be sealed is refused, not silently lost.**
+  If the encryption key was ever missing from the deployment, recording a
+  passport number would quietly store nothing while saying "saved" — and the
+  file would afterwards read "no passport number on file". The register now
+  refuses in plain words and saves nothing at all, which is the honest half
+  of the bargain.
+
+### Security
+- **The doors in front of the practice's most sensitive data are now attacked
+  by tests before any real data goes behind them**: sealed passport numbers
+  reach a page only through the one audited reveal; the CSV export never
+  carries a number, sealed or plain, and only an administrator can reach it;
+  expired, idle, and revoked sessions all deny; a sign-in that has not passed
+  its two-factor check cannot reach any page but the challenge. Sixteen new
+  tests, each proven by putting the bug back and watching it fail.
+- One open question is recorded in `docs/security-findings.md` for the
+  practice to decide: today any signed-in role, including read-only, may use
+  the audited passport reveal. It may be right; it is now written down
+  rather than implicit.
+
 ## 0.66.0 — 30 August 2026
 
 ### Added
