@@ -33,7 +33,7 @@ export interface CaseParty {
 /** Order parties the way a file reads: applicant first, then the rest. */
 const ROLE_ORDER: PartyRole[] = [
   'principal_applicant', 'secondary_applicant', 'dependent_child',
-  'supporting_partner', 'sponsor', 'employer', 'agent', 'other',
+  'supporting_partner', 'sponsor', 'employer', 'agent', 'lawyer', 'adviser', 'other',
 ];
 
 function byRole(a: { role: PartyRole }, b: { role: PartyRole }): number {
