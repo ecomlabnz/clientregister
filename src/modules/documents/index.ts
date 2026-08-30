@@ -119,10 +119,14 @@ export async function addExternalDocument(
   const id = newId('doc');
   await run(
     env.DB,
-    `INSERT INTO documents (id, entity_type, entity_id, external_url, filename, content_type,
+    // `link:` is the named accommodation from migration 0044: r2_key cannot be
+    // made nullable on D1 without risking note attachments, so a linked
+    // document carries a synthetic key in a namespace R2 never sees. The
+    // database triggers hold the shape; this is the only place that writes it.
+    `INSERT INTO documents (id, entity_type, entity_id, r2_key, external_url, filename, content_type,
         size_bytes, description, category, uploaded_at, uploaded_by)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    id, opts.entityType, opts.entityId, opts.url, opts.title || host, 'link',
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    id, opts.entityType, opts.entityId, `link:${id}`, opts.url, opts.title || host, 'link',
     0, opts.description ?? null, opts.category || 'other', nowIso(), opts.uploadedBy,
   );
   return { id, filename: opts.title || host, size: 0 };
@@ -366,7 +370,7 @@ export const documentsModule: AppModule = {
       const form = await c.req.formData();
       const back = safeReturn(String(form.get('return_to') ?? ''), '/documents');
 
-      if (c.env.DOCS && doc.r2_key) await c.env.DOCS.delete(doc.r2_key);
+      if (c.env.DOCS && !doc.external_url) await c.env.DOCS.delete(doc.r2_key!);
       await run(c.env.DB, 'DELETE FROM documents WHERE id = ?', doc.id);
       await auditFrom(c, { action: 'document.deleted', entityType: doc.entity_type, entityId: doc.entity_id, meta: { id: doc.id } });
       return redirectWith(c, back, 'Document deleted.');
