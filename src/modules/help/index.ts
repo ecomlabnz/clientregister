@@ -32,6 +32,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.66.0', date: '30 August 2026',
+    notes: [
+      'A certificate’s issue date now records where it came from — read off the '
+        + 'certificate, taken from a filename, or unconfirmed. An expiry worked out from an '
+        + 'unconfirmed date is flagged wherever it appears, until somebody checks the paper '
+        + 'and presses the button.',
+      'A visa that expires “so many months after arrival” can be recorded as exactly that. '
+        + 'The expiry shows as not yet fixed rather than blank, and the register asks for '
+        + 'the date once the client has arrived.',
+    ],
+  },
+  {
     version: '0.65.0', date: '30 August 2026',
     notes: [
       'A message forwarded into the bot from a group or channel is captured properly again. '

@@ -45,8 +45,9 @@ import { countryCodeFor, countryName, countryOptions } from '../../core/countrie
 import { threadsFor } from '../../core/channels';
 import {
   CERTIFICATE_KINDS, CERTIFICATE_LABELS, MEDICAL_TYPES, type CertificateKind,
-  CERTIFICATE_VALIDITY,
-  addCertificate, certificatesFor, currentOf, expiryIsDerived, medicalTypeLabel,
+  CERTIFICATE_VALIDITY, PROVENANCE_OPTIONS, type CertificateRow, type IssueDateProvenance,
+  addCertificate, certificatesFor, confirmIssueDate, currentOf, expiryIsDerived,
+  issueDateUnverified, medicalTypeLabel,
   refreshClientCache, removeCertificate, setCertificateSubmitted, validityRule,
 } from '../../core/certificates';
 import {
@@ -77,6 +78,7 @@ export interface ClientRow {
   english_test_score: string | null;
   english_test_date: string | null;
   current_visa_type: string | null; current_visa_expiry: string | null;
+  current_visa_expiry_rule: string | null;
   address: string | null; status: ClientStatus; assigned_to: string | null; notes: string | null;
   created_at: string; updated_at: string; created_by: string | null;
 }
@@ -269,6 +271,12 @@ function clientForm(
             hint: 'What they hold now, not what is being applied for. “None — offshore” is an '
               + 'answer, and so is “None — unlawful”.' })}</div>
           <div class="settings-cell">${field({ label: 'Current visa expiry', name: 'current_visa_expiry', type: 'date', value: dateInputValue(values.current_visa_expiry) })}</div>
+          <div class="settings-cell">${field({ label: 'Expiry rule, if no date is fixed yet',
+            name: 'current_visa_expiry_rule', maxlength: 200,
+            value: values.current_visa_expiry_rule ?? '',
+            hint: 'Some grants have no date until an event happens — “24 months after first '
+              + 'arrival in New Zealand”. Record the rule here; the register shows the expiry '
+              + 'as not yet fixed and prompts for the date once the event has happened.' })}</div>
 
           <p class="settings-head subhead">Character and health</p>
           <div class="settings-cell-wide">
@@ -360,6 +368,7 @@ function readClientForm(f: FormReader) {
     english_test_date: f.date('english_test_date'),
     current_visa_type: f.optional('current_visa_type', { max: 120 }),
     current_visa_expiry: f.date('current_visa_expiry'),
+    current_visa_expiry_rule: f.optional('current_visa_expiry_rule', { max: 200 }),
     address: f.optional('address', { max: 500 }),
     status: f.enum('status', CLIENT_STATUSES, { fallback: 'prospect' })!,
     assigned_to: f.optional('assigned_to', { max: 60 }),
@@ -367,6 +376,19 @@ function readClientForm(f: FormReader) {
     passport_number: f.optional('passport_number', { max: 60 }),
     passport_clear: f.checkbox('passport_clear'),
   };
+}
+
+/**
+ * Whether the summary's cached expiry for this kind rests on an issue date
+ * nobody read off the certificate itself (0040). Matched by expiry date,
+ * because the date is what the cache column stores; if two certificates share
+ * it, the doubt of either taints the value shown.
+ */
+function certificateDateUnverified(
+  rows: CertificateRow[], kind: CertificateKind, cachedExpiry: string | null,
+): boolean {
+  if (!cachedExpiry) return false;
+  return rows.some((r) => r.kind === kind && r.expires_on === cachedExpiry && issueDateUnverified(r));
 }
 
 /**
@@ -710,14 +732,16 @@ export const clientsModule: AppModule = {
             email, phone, whatsapp, telegram_username, telegram_user_id,
             nationality, date_of_birth,
             english_test_type, english_test_score, english_test_date,
-            current_visa_type, current_visa_expiry, address, status, assigned_to, notes,
+            current_visa_type, current_visa_expiry, current_visa_expiry_rule,
+            address, status, assigned_to, notes,
             created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, ref, v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
         v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.nationality, v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
-        v.current_visa_type, v.current_visa_expiry, v.address, v.status, v.assigned_to || null, v.notes,
+        v.current_visa_type, v.current_visa_expiry, v.current_visa_expiry_rule,
+        v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), nowIso(), user.id,
       );
 
@@ -957,10 +981,17 @@ export const clientsModule: AppModule = {
                                ? html`<div class="muted small"><a href="#passports">${passports.length} passports on file</a></div>`
                                : html`<div class="muted small"><a href="#passports">Details</a></div>`}`}</dd>
                     <dt>Current visa</dt><dd>${labelFor(visaTerms, client.current_visa_type) || '—'}</dd>
-                    <dt>Visa expiry</dt><dd>${expiryCell(client.current_visa_expiry)}</dd>
+                    <dt>Visa expiry</dt><dd>${!client.current_visa_expiry && client.current_visa_expiry_rule
+                      ? html`${badge('not yet fixed', 'amber')}
+                             <div class="muted small">${client.current_visa_expiry_rule}</div>`
+                      : expiryCell(client.current_visa_expiry)}</dd>
                     <dt>Police cert.</dt><dd>${client.police_certificate_country
-                      ? html`${client.police_certificate_country}<br>` : ''}${expiryCell(client.police_certificate_expiry)}</dd>
-                    <dt>Medical</dt><dd>${expiryCell(client.medical_certificate_expiry)}</dd>
+                      ? html`${client.police_certificate_country}<br>` : ''}${expiryCell(client.police_certificate_expiry)}
+                      ${certificateDateUnverified(certificates, 'police', client.police_certificate_expiry)
+                        ? badge('unverified date', 'amber') : ''}</dd>
+                    <dt>Medical</dt><dd>${expiryCell(client.medical_certificate_expiry)}
+                      ${certificateDateUnverified(certificates, 'medical', client.medical_certificate_expiry)
+                        ? badge('unverified date', 'amber') : ''}</dd>
                     <dt>Chest x-ray</dt><dd>${expiryCell(client.chest_xray_expiry)}</dd>
                     <dt>English</dt><dd>${client.english_test_type
                       ? html`${labelFor(englishTestTerms, client.english_test_type)}${
@@ -1071,6 +1102,23 @@ export const clientsModule: AppModule = {
                                         : html`Not submitted with an application —
                                                ${CERTIFICATE_VALIDITY[kind]!.held} months from issue.`}
                                     </div>` : ''}
+                                  ${/* A date nobody read off the paper must never look like one
+                                        somebody did — the expiry above is computed from it. */ ''}
+                                  ${issueDateUnverified(cert) ? html`
+                                    <div class="small">
+                                      ${badge('issue date unverified', 'amber')}
+                                      ${cert.issued_on_provenance === 'from_filename'
+                                        ? 'Taken from a document’s filename, never confirmed against the certificate.'
+                                        : 'Never confirmed against the certificate itself.'}
+                                      ${expiryIsDerived(kind) ? 'The expiry shown is worked out from it.' : ''}
+                                      ${writable ? html`
+                                        <form method="post" class="inline-form mt-sm"
+                                              action="/clients/${client.id}/certificates/${cert.id}/confirm-issue-date">
+                                          ${csrfField(csrf)}
+                                          <button class="btn btn-small btn-secondary" type="submit">
+                                            I have checked it against the certificate</button>
+                                        </form>` : ''}
+                                    </div>` : ''}
                                   ${cert.notes ? html`<div class="small muted">${cert.notes}</div>` : ''}
                                   ${writable && expiryIsDerived(kind) ? html`
                                     <form method="post" class="inline-form mt-sm"
@@ -1106,6 +1154,13 @@ export const clientsModule: AppModule = {
                                    options: MEDICAL_TYPES })}
                         ${field({ label: 'Issued', name: 'issued_on', type: 'date',
                                   hint: 'Required for a police certificate or a medical.' })}
+                        ${select({ label: 'The issue date was', name: 'issued_on_provenance',
+                                   value: 'verified', includeBlank: false,
+                                   options: PROVENANCE_OPTIONS,
+                                   hint: 'The expiry is a legal deadline worked out from this date, '
+                                     + 'so the register keeps track of whether it was read off the '
+                                     + 'certificate or only inferred. Anything not read from the '
+                                     + 'certificate is flagged until somebody checks it.' })}
                         ${field({ label: 'Submitted with an application on', name: 'submitted_on', type: 'date',
                                   hint: 'Leave empty if it has not gone in yet. It can be added later.' })}
                         ${field({ label: 'Expires', name: 'expires_on', type: 'date',
@@ -1309,7 +1364,14 @@ export const clientsModule: AppModule = {
         subtype: kind === 'medical' ? f.optional('subtype', { max: 40 }) : null,
         country: kind === 'police' ? f.optional('country', { max: 100 }) : null,
         reference: f.optional('reference', { max: 80 }),
-        issuedOn, submittedOn, expiresOn,
+        issuedOn,
+        // The database refuses a dated row that does not say where its date
+        // came from (0040); 'unverified' is the honest fallback for a request
+        // that failed to say, not a default anyone is shown.
+        issuedOnProvenance: (f.enum('issued_on_provenance',
+          PROVENANCE_OPTIONS.map((o) => o.value), { fallback: 'unverified' })
+          ?? 'unverified') as IssueDateProvenance,
+        submittedOn, expiresOn,
         notes: f.optional('notes', { max: 300 }),
         userId: c.get('user')!.id,
       });
@@ -1364,6 +1426,35 @@ export const clientsModule: AppModule = {
         submittedOn ? 'Noted — the expiry has moved with it.' : 'Cleared.');
     });
 
+    // The way an unverified issue date stops being one: somebody holds the
+    // certificate, checks the date, presses the button. One direction only —
+    // there is no button to make a verified date doubtful again, because the
+    // paper does not stop saying what it says.
+    r.post('/:id/certificates/:certId/confirm-issue-date', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const certId = c.req.param('certId')!;
+      const cert = await one<{ kind: string; issued_on: string | null }>(
+        c.env.DB, 'SELECT kind, issued_on FROM client_certificates WHERE id = ? AND client_id = ?',
+        certId, id);
+      if (!cert) return c.notFound();
+
+      const ok = await confirmIssueDate(c.env, id, certId);
+      if (ok) {
+        await addEntry(c.env, {
+          entityType: 'client', entityId: id, kind: 'system',
+          body: `${CERTIFICATE_LABELS[cert.kind as CertificateKind]} issue date`
+            + `${cert.issued_on ? ` (${dateShort(cert.issued_on)})` : ''}`
+            + ' confirmed against the certificate.',
+          createdBy: c.get('user')!.id,
+        });
+        await auditFrom(c, { action: 'client.certificate_issue_date_confirmed',
+          entityType: 'client', entityId: id, meta: { certId } });
+      }
+      return redirectWith(c, `/clients/${id}#certificates`,
+        ok ? 'Confirmed — the date now counts as read from the certificate.'
+           : 'Nothing to confirm on that certificate.', ok ? 'ok' : 'err');
+    });
+
     r.post('/:id/certificates/:certId/remove', requirePermission('register:write'), async (c) => {
       const id = c.req.param('id')!;
       const ok = await removeCertificate(c.env, id, c.req.param('certId')!);
@@ -1405,14 +1496,16 @@ export const clientsModule: AppModule = {
            nzbn=?, company_number=?, organisation_id=?, organisation_role=?, email=?, phone=?, whatsapp=?, telegram_username=?, telegram_user_id=?,
            nationality=?, date_of_birth=?,
            english_test_type=?, english_test_score=?, english_test_date=?,
-           current_visa_type=?, current_visa_expiry=?, address=?, status=?, assigned_to=?, notes=?, updated_at=?
+           current_visa_type=?, current_visa_expiry=?, current_visa_expiry_rule=?,
+           address=?, status=?, assigned_to=?, notes=?, updated_at=?
          WHERE id=?`,
         v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
         v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role,
         v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.nationality, v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
-        v.current_visa_type, v.current_visa_expiry, v.address, v.status, v.assigned_to || null, v.notes,
+        v.current_visa_type, v.current_visa_expiry, v.current_visa_expiry_rule,
+        v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), id,
       );
 

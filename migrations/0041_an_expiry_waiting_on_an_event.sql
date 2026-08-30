@@ -1,0 +1,21 @@
+-- A visa expiry the calendar does not know yet.
+--
+-- Some grant letters do not name a date. A visa granted offshore is commonly
+-- good for "N months after first arrival in New Zealand" — until the client
+-- flies, no expiry exists anywhere in the world. Recorded as a blank,
+-- `current_visa_expiry` cannot tell that apart from "nobody ever asked", the
+-- alerts engine stays silent, and the one deadline that governs everything
+-- else on the file is the one the register is not watching.
+--
+-- So the *rule* becomes recordable. `current_visa_expiry` keeps its single
+-- meaning — the resolved date, or null — and the rule lives beside it in
+-- words ("24 months after first arrival in New Zealand"). One fact, one
+-- owner: the date column never holds a guess, and the rule column never
+-- holds a date.
+--
+-- A client with a rule and no date shows as "not yet fixed" rather than
+-- blank, and raises its own alert prompting for the date once the anchoring
+-- event has happened. Setting the date clears the alert; the rule stays on
+-- the record as the reason the date is what it is.
+
+ALTER TABLE clients ADD COLUMN current_visa_expiry_rule TEXT;

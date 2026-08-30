@@ -112,6 +112,51 @@ setting, not code; it is recorded here when enabled.
 
 ---
 
+## Data-integrity findings (pre-load, 2026-08-30 intake review)
+
+Both found while reviewing an intake of real client files against the schema,
+and both fixed **before** that data was loaded — each would otherwise have the
+register giving a confident answer about a legal deadline where it has none.
+
+### 6. A filename-derived issue date read as a verified one — FIXED (0.66.0)
+
+The expiry of a police certificate or a medical is computed by the database
+from `issued_on` (0029) and alerted on as a legal deadline. The intake's
+police-certificate issue dates came from document *filenames* — no text layer,
+OCR could not confirm them — and the schema had nowhere to say so: loaded
+bare, a guessed date and a read one were indistinguishable, and every deadline
+derived from the guess looked exactly as trustworthy as a real one.
+
+**Fix:** migration `0040` — `issued_on_provenance`
+(`verified`/`from_filename`/`unverified`) on `client_certificates`, refused by
+trigger when a dated row stays silent, backfilled to `unverified`. Derived
+expiries flag the doubt in the alert row and on the client page, with a
+one-press "checked against the certificate" upgrade.
+
+**Guard:** `test/unverifieddates.test.ts` — the trigger and CHECK attacked
+with raw SQL, the alert caveat, the page flag, and the confirm flow; each
+proven by reintroducing its bug (triggers removed, CHECK removed, caveat
+removed, flag stuck off) and watching it fail.
+
+### 7. An event-relative visa expiry stored as silence — FIXED (0.66.0)
+
+Four of ten grant letters in the intake express expiry as "N months after
+first arrival" — no date exists until the client flies. Stored as a null
+expiry, that is indistinguishable from "never recorded"; the alerts engine
+stays silent about the one deadline that governs everything else on the file.
+
+**Fix:** migration `0041` — `current_visa_expiry_rule` on `clients` holds the
+rule in words; `current_visa_expiry` keeps its single meaning (a resolved
+date, or nothing). The client page shows "not yet fixed" with the rule, and a
+standing alert (`Expiry not yet fixed`) asks for the date once the event has
+happened, clearing the moment it is set.
+
+**Guard:** `test/alertsql.test.ts` ("a visa expiry that waits on an event")
+and `test/unverifieddates.test.ts` (the page states); proven by silencing the
+check and reverting the display, each watched to fail.
+
+---
+
 ## Open findings — known, accepted, and what would close them
 
 ### 5. Migration 0037's forward guard does not watch `meta_json` — ACCEPTED

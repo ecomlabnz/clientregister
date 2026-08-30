@@ -36,7 +36,9 @@ export type AlertKind =
   /** A task that leaves no working time before the deadline it serves. */
   | 'no_slack'
   /** An open matter for someone whose immigration status is not recorded. */
-  | 'status_unknown';
+  | 'status_unknown'
+  /** A visa whose expiry waits on an event that has not happened yet. */
+  | 'expiry_unfixed';
 export type AlertSeverity = 'overdue' | 'urgent' | 'soon';
 
 export interface Alert {
@@ -59,6 +61,7 @@ const KIND_LABELS: Record<AlertKind, string> = {
   unacknowledged: 'Not acknowledged',
   no_slack: 'No room to act',
   status_unknown: 'Status not recorded',
+  expiry_unfixed: 'Expiry not yet fixed',
 };
 
 /** Exposed for the tests, which check that every kind is named. */
@@ -147,25 +150,41 @@ export async function documentAlerts(env: Env, horizonDays = 90): Promise<Alert[
       ALERT_SETTINGS.settings.find((d) => d.key === 'alerts.certificate_notice_days')!),
   ) || 30;
 
-  const rows = await all<{ id: string; ref: string; full_name: string; document: string; expires: string }>(
+  // The certificate arms also ask whether the issue date behind the cached
+  // expiry was ever read off the certificate itself (0040). MIN() because two
+  // certificates can share the cached expiry date: the worst provenance among
+  // them is the honest one to report, and 'from_filename' < 'unverified' <
+  // 'verified' happens to sort exactly that way.
+  const rows = await all<{
+    id: string; ref: string; full_name: string; document: string; expires: string;
+    provenance: string | null;
+  }>(
     env.DB,
     `SELECT c.id, c.ref, c.full_name,
             'Passport' || CASE WHEN p.country IS NULL THEN '' ELSE ' (' || p.country || ')' END AS document,
-            p.expires_on AS expires
+            p.expires_on AS expires, NULL AS provenance
        FROM client_passports p JOIN clients c ON c.id = p.client_id
       WHERE p.status = 'held' AND p.expires_on IS NOT NULL AND p.expires_on <= ?1
         AND c.status != 'archived'
      UNION ALL
-     SELECT id, ref, full_name, 'Current visa', current_visa_expiry FROM clients
+     SELECT id, ref, full_name, 'Current visa', current_visa_expiry, NULL FROM clients
        WHERE current_visa_expiry IS NOT NULL AND current_visa_expiry <= ?1 AND status != 'archived'
      UNION ALL
-     SELECT id, ref, full_name, 'Police certificate', police_certificate_expiry FROM clients
+     SELECT id, ref, full_name, 'Police certificate', police_certificate_expiry,
+            (SELECT MIN(cc.issued_on_provenance) FROM client_certificates cc
+              WHERE cc.client_id = clients.id AND cc.kind = 'police'
+                AND cc.expires_on = clients.police_certificate_expiry)
+       FROM clients
        WHERE police_certificate_expiry IS NOT NULL AND police_certificate_expiry <= ?1 AND status != 'archived'
      UNION ALL
-     SELECT id, ref, full_name, 'Medical certificate', medical_certificate_expiry FROM clients
+     SELECT id, ref, full_name, 'Medical certificate', medical_certificate_expiry,
+            (SELECT MIN(cc.issued_on_provenance) FROM client_certificates cc
+              WHERE cc.client_id = clients.id AND cc.kind = 'medical'
+                AND cc.expires_on = clients.medical_certificate_expiry)
+       FROM clients
        WHERE medical_certificate_expiry IS NOT NULL AND medical_certificate_expiry <= ?1 AND status != 'archived'
      UNION ALL
-     SELECT id, ref, full_name, 'Chest x-ray', chest_xray_expiry FROM clients
+     SELECT id, ref, full_name, 'Chest x-ray', chest_xray_expiry, NULL FROM clients
        WHERE chest_xray_expiry IS NOT NULL AND chest_xray_expiry <= ?1 AND status != 'archived'
      ORDER BY expires
      LIMIT 200`,
@@ -177,7 +196,11 @@ export async function documentAlerts(env: Env, horizonDays = 90): Promise<Alert[
     severity: severityFor(row.expires, today, noticeDays),
     date: row.expires,
     title: `${row.document} — ${row.full_name}`,
-    detail: row.ref,
+    // A deadline computed from a date nobody confirmed says so in the row
+    // itself, not on a page somebody would have to think to open.
+    detail: row.provenance && row.provenance !== 'verified'
+      ? `${row.ref} · worked out from an issue date never confirmed against the certificate`
+      : row.ref,
     href: `/clients/${row.id}`,
   }));
 }
@@ -303,6 +326,20 @@ export const CHECKS_NOT_ABOUT_A_DATE = {
           AND cl.kind = 'individual'
           AND COALESCE(TRIM(cl.current_visa_type), '') = ''
         ORDER BY k.ref LIMIT 100`,
+
+  /**
+   * A visa whose expiry is a rule waiting on an event — "24 months after
+   * first arrival" — with no date fixed yet (0041). Left as a blank this
+   * would be indistinguishable from "never recorded" and nothing would
+   * watch it; the row exists so somebody asks whether the event has
+   * happened, and clears the moment the date is written down.
+   */
+  expiryUnfixed: () => `SELECT id, ref, full_name, current_visa_expiry_rule, updated_at
+         FROM clients
+        WHERE current_visa_expiry IS NULL
+          AND COALESCE(TRIM(current_visa_expiry_rule), '') != ''
+          AND status != 'archived'
+        ORDER BY ref LIMIT 100`,
 };
 
 /** Everything with a date attached, in one list. */
@@ -321,7 +358,7 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
   const lodgedPlaceholders = LODGED_CASE_STATUSES.map(() => '?').join(',');
 
   const [cases, tasks, quotes, documents, quiet, contradictions,
-         unacknowledged, noSlack, statusUnknown] = await Promise.all([
+         unacknowledged, noSlack, statusUnknown, expiryUnfixed] = await Promise.all([
     all<any>(
       env.DB,
       `SELECT k.id, k.ref, k.title, k.descriptor, k.status, k.decision_due_at, cl.full_name AS client_name
@@ -360,6 +397,7 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
       ...OPEN_CASE_STATUSES, today),
     all<any>(env.DB, CHECKS_NOT_ABOUT_A_DATE.statusUnknown(openPlaceholders),
       ...OPEN_CASE_STATUSES),
+    all<any>(env.DB, CHECKS_NOT_ABOUT_A_DATE.expiryUnfixed()),
   ]);
 
   const alerts: Alert[] = [
@@ -457,6 +495,16 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
       // To the client, not the matter: the visa is recorded on the person, and
       // the row exists to be cleared.
       href: `/clients/${k.client_id}`,
+    })),
+    ...expiryUnfixed.map((cl: any) => ({
+      kind: 'expiry_unfixed' as const,
+      // Always pressing, never overdue: there is no date to be late against —
+      // that is the problem the row states. It clears when the date is fixed.
+      severity: 'urgent' as AlertSeverity,
+      date: String(cl.updated_at ?? today).slice(0, 10),
+      title: `Visa expiry not yet fixed — ${cl.full_name}`,
+      detail: `${cl.ref} · ${cl.current_visa_expiry_rule} · record the date once the event has happened`,
+      href: `/clients/${cl.id}`,
     })),
   ];
 

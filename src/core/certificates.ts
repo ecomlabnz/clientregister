@@ -38,6 +38,29 @@ export function medicalTypeLabel(value: string | null): string {
   return MEDICAL_TYPES.find((t) => t.value === value)?.label ?? (value ?? '—');
 }
 
+/**
+ * Where an issue date came from.
+ *
+ * The issue date is the load-bearing fact — the expiry, and therefore a legal
+ * deadline, is worked out from it (0029). A date read off the certificate and
+ * a date guessed from a document's filename must never look the same, so every
+ * issue date states its source and the database refuses one that does not
+ * (migration 0040). Anything not `verified` is flagged wherever the derived
+ * expiry is shown.
+ */
+export type IssueDateProvenance = 'verified' | 'from_filename' | 'unverified';
+
+export const PROVENANCE_OPTIONS: Array<{ value: IssueDateProvenance; label: string }> = [
+  { value: 'verified', label: 'Read from the certificate itself' },
+  { value: 'from_filename', label: 'Taken from a document’s filename' },
+  { value: 'unverified', label: 'Not confirmed — source unknown' },
+];
+
+/** True when a derived expiry rests on a date never confirmed against the paper. */
+export function issueDateUnverified(row: Pick<CertificateRow, 'issued_on' | 'issued_on_provenance'>): boolean {
+  return row.issued_on !== null && row.issued_on_provenance !== 'verified';
+}
+
 export interface CertificateRow {
   id: string;
   client_id: string;
@@ -46,6 +69,8 @@ export interface CertificateRow {
   country: string | null;
   reference: string | null;
   issued_on: string | null;
+  /** How the issue date was established. Never null when `issued_on` is set. */
+  issued_on_provenance: IssueDateProvenance | null;
   /** The day it went in with an application, which is what extends it. */
   submitted_on: string | null;
   /** Worked out by the database for a police certificate or a medical. */
@@ -122,7 +147,8 @@ export async function addCertificate(
   env: Env,
   input: {
     clientId: string; kind: CertificateKind; subtype: string | null; country: string | null;
-    reference: string | null; issuedOn: string | null; submittedOn: string | null;
+    reference: string | null; issuedOn: string | null; issuedOnProvenance: IssueDateProvenance | null;
+    submittedOn: string | null;
     expiresOn: string | null; notes: string | null; userId: string | null;
   },
 ): Promise<string> {
@@ -133,10 +159,10 @@ export async function addCertificate(
   await run(
     env.DB,
     `INSERT INTO client_certificates (id, client_id, kind, subtype, country, reference,
-        issued_on, submitted_on, expires_on, notes, created_at, created_by)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        issued_on, issued_on_provenance, submitted_on, expires_on, notes, created_at, created_by)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     id, input.clientId, input.kind, input.subtype, input.country, input.reference,
-    input.issuedOn, input.submittedOn,
+    input.issuedOn, input.issuedOn ? input.issuedOnProvenance : null, input.submittedOn,
     expiryIsDerived(input.kind) ? null : input.expiresOn,
     input.notes, nowIso(), input.userId,
   );
@@ -159,6 +185,23 @@ export async function setCertificateSubmitted(
     submittedOn, id, clientId,
   );
   await refreshClientCache(env, clientId);
+  return (res.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * Confirm — after the fact — that an issue date was read from the certificate.
+ *
+ * The way an unverified date stops being one: somebody holds the paper, checks
+ * the date, and presses the button. Only the upgrade to `verified` is offered;
+ * un-verifying would mean the paper stopped saying what it says.
+ */
+export async function confirmIssueDate(env: Env, clientId: string, id: string): Promise<boolean> {
+  const res = await run(
+    env.DB,
+    `UPDATE client_certificates SET issued_on_provenance = 'verified'
+      WHERE id = ? AND client_id = ? AND issued_on IS NOT NULL`,
+    id, clientId,
+  );
   return (res.meta?.changes ?? 0) > 0;
 }
 

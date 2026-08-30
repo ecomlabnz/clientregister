@@ -7,6 +7,29 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.66.0 — 30 August 2026
+
+### Added
+- **An issue date now says where it came from.** The expiry of a police
+  certificate or a medical is a legal deadline the register works out from the
+  issue date — so a date read off the certificate and a date inferred from a
+  document's filename must never look the same. Every issue date carries its
+  source, the database refuses one that stays silent about it, and a deadline
+  computed from an unverified date says so on the client's page and in the
+  alert itself. One press — "I have checked it against the certificate" —
+  upgrades it once somebody holds the paper.
+- **A visa expiry that waits on an event is no longer a blank.** Some grants
+  have no date until something happens — "24 months after first arrival in New
+  Zealand". The rule can now be recorded beside the (empty) expiry: the client's
+  page shows the expiry as *not yet fixed* with the rule in words, and a
+  standing alert asks for the date once the event has happened. The expiry
+  field itself keeps its one meaning: a real date, or nothing.
+
+### Security
+- Both changes close the same hole from different sides: the register giving a
+  confident answer about a legal deadline where it does not actually have one.
+  Confidence it has not earned is now visible as exactly that.
+
 ## 0.65.0 — 30 August 2026
 
 ### Fixed
