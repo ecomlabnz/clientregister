@@ -7,6 +7,20 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.68.0 — 30 August 2026
+
+### Added
+- **Two new party roles on a matter: Lawyer and Licensed immigration
+  adviser.** For counsel on a file who is not the matter's own assigned
+  owner — prior counsel, opposing counsel, or an external specialist brought
+  in on the case.
+
+### Security
+- The open question from 0.67.0 is settled by the practice: every signed-in
+  role may use the audited passport reveal. Recorded as decided in
+  `docs/security-findings.md`, together with verification that GitHub's
+  branch protection, secret scanning and push protection are all enabled.
+
 ## 0.67.0 — 30 August 2026
 
 ### Fixed
