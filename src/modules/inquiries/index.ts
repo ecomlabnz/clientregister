@@ -569,17 +569,21 @@ export const inquiriesModule: AppModule = {
       const inq = await one<InquiryRow>(c.env.DB, 'SELECT * FROM inquiries WHERE id = ?', id);
       if (!inq) return c.notFound();
 
-      // Audited before the delete, not after: once the row is gone there is
-      // nothing left to describe it, and this entry is what remains of it.
-      await auditFrom(c, { action: 'inquiry.deleted', entityType: 'inquiry', entityId: id,
-        meta: { ref: inq.ref, source: inq.source, subject: inq.subject,
-                contact: inq.contact_name ?? inq.contact_email ?? inq.contact_phone } });
+      // The delete is attempted first, and audited only if it happens. The row
+      // holds nothing the audit needs — `inq` was read above and keeps every
+      // value — so there is no reason to record the deletion before it is real.
+      // Auditing first wrote `inquiry.deleted` for inquiries the database then
+      // refused (one carrying a quote, a task, a document or a file note but no
+      // case), leaving the log asserting a deletion that never happened.
       try {
         await run(c.env.DB, 'DELETE FROM inquiries WHERE id = ?', id);
       } catch (err) {
         return redirectWith(c, `/inquiries/${id}`,
           refusal(err) ?? 'That inquiry could not be deleted.', 'err');
       }
+      await auditFrom(c, { action: 'inquiry.deleted', entityType: 'inquiry', entityId: id,
+        meta: { ref: inq.ref, source: inq.source, subject: inq.subject,
+                contact: inq.contact_name ?? inq.contact_email ?? inq.contact_phone } });
       return redirectWith(c, '/inquiries', `Inquiry ${inq.ref} deleted.`);
     });
 

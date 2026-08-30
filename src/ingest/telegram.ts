@@ -57,6 +57,31 @@ function originLabel(msg: TelegramMessage): string | null {
   return null;
 }
 
+/**
+ * Whether this is a forward — the single fact the peer suppression and the
+ * `forwarded` flag both derive from.
+ *
+ * A forward is defined by having a `forward_origin`, and by nothing else. In
+ * particular it is *not* defined by whether `originLabel` could name who it came
+ * from: an origin can be present and unnameable (a group forwarding on its own
+ * behalf, a user with no display name), and if "is this a forward" were decided
+ * on the label, an unlabelled forward would keep its chat as a peer while the
+ * `forwarded` flag said otherwise — and the database (migration 0037) rejects
+ * exactly that disagreement, failing the capture.
+ */
+export function isForwarded(msg: TelegramMessage): boolean {
+  return Boolean(msg.forward_origin);
+}
+
+/** The counterpart a reply would go to — none for a forward, which has nobody at the other end. */
+export function peerFor(msg: TelegramMessage): { peerId: string | null; peerLabel: string | null } {
+  if (isForwarded(msg)) return { peerId: null, peerLabel: null };
+  return {
+    peerId: msg.chat?.id !== undefined ? String(msg.chat.id) : null,
+    peerLabel: msg.chat?.title ?? displayName(msg.from),
+  };
+}
+
 export async function handleTelegramWebhook(c: Context<AppContext>): Promise<Response> {
   const env = c.env;
   const configured = env.TELEGRAM_WEBHOOK_SECRET;
@@ -83,6 +108,8 @@ export async function handleTelegramWebhook(c: Context<AppContext>): Promise<Res
   const trusted = allowed.length > 0 && isAllowed(allowed, fromId, (s) => s.trim());
 
   const text = msg.text ?? msg.caption ?? '';
+  const forwarded = isForwarded(msg);
+  const { peerId, peerLabel } = peerFor(msg);
   const forwardedFrom = originLabel(msg);
   const body = forwardedFrom ? `Forwarded from ${forwardedFrom}:\n\n${text}` : text;
 
@@ -104,20 +131,14 @@ export async function handleTelegramWebhook(c: Context<AppContext>): Promise<Res
     attachments,
     trusted,
     receivedAt: new Date((msg.date ?? Math.floor(Date.now() / 1000)) * 1000).toISOString(),
-    // The chat, not the sender: a reply goes back to where the message came
-    // from, which in a group is the group.
-    //
-    // A forward has no counterpart at all, and this is the whole of it. What
-    // arrives is a message *about* somebody, relayed through the practice's own
-    // chat with the bot — there is nobody at the other end of it to answer. Key
-    // it on the chat id and every forward, whoever it was originally from,
-    // lands in one conversation named after whoever forwarded it, which is
-    // exactly what happened: three unrelated people in a thread called "TZ".
-    // So a forward becomes an inbox message and an inquiry, and no
-    // conversation. The database refuses to give it one (migration 0037).
-    peerId: forwardedFrom ? null : (msg.chat?.id !== undefined ? String(msg.chat.id) : null),
-    peerLabel: forwardedFrom ? null : (msg.chat?.title ?? displayName(msg.from)),
-    meta: { from_id: fromId, chat_id: msg.chat?.id, username: msg.from?.username, forwarded: Boolean(msg.forward_origin) },
+    // An ordinary message is keyed on its chat, so a reply goes back where it
+    // came from — the group, in a group. A forward is keyed on nobody: it is
+    // about somebody who is not in this chat, and the database refuses to file
+    // it as a conversation (migration 0037). Both come from `peerFor`, so the
+    // peer and the `forwarded` flag can never disagree.
+    peerId,
+    peerLabel,
+    meta: { from_id: fromId, chat_id: msg.chat?.id, username: msg.from?.username, forwarded },
   });
 
   // Acknowledge in-chat so the sender knows the register has it.
