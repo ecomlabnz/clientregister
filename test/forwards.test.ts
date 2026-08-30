@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
+import { isForwarded, peerFor } from '../src/ingest/telegram';
 const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
 
 /**
@@ -16,7 +17,6 @@ const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
  * the capture is not the only thing that writes `thread_id`.
  */
 
-const telegram = readFileSync('src/ingest/telegram.ts', 'utf8');
 const at = '2026-08-29T00:00:00Z';
 
 /** The register as it stands, migration 0037 not yet applied. */
@@ -118,12 +118,43 @@ describe('and it cannot come back', () => {
 });
 
 describe('the capture no longer offers a forward a peer', () => {
-  it('withholds both the id and the label', () => {
-    expect(telegram).toContain('peerId: forwardedFrom ? null :');
-    expect(telegram).toContain('peerLabel: forwardedFrom ? null :');
+  // These run the mapping itself rather than reading the source for it. What
+  // matters is not that a particular expression appears in the file but that
+  // whether a message is treated as a forward and whether it is denied a peer
+  // are the *same* decision — because the database rejects any case where they
+  // disagree, and it disagreed for forwards `originLabel` could not name.
+  const chat = { id: 555, type: 'private', title: 'TZ' };
+
+  it('withholds the peer for a labelled user forward', () => {
+    const msg = { message_id: 1, date: 0, chat, forward_origin: { type: 'user', sender_user: { id: 9, first_name: 'Real' } } } as any;
+    expect(isForwarded(msg)).toBe(true);
+    expect(peerFor(msg)).toEqual({ peerId: null, peerLabel: null });
   });
 
-  it('still gives an ordinary message the chat, so a reply has somewhere to go', () => {
-    expect(telegram).toContain('String(msg.chat.id)');
+  it('withholds the peer for a forward with no nameable origin', () => {
+    // A group/channel forwarded on its own behalf: `forward_origin` is present
+    // but carries nothing `originLabel` reads. This is the case that used to
+    // keep its chat as a peer and fail the capture.
+    const msg = { message_id: 2, date: 0, chat, forward_origin: { type: 'chat', sender_chat: { id: -100, title: 'A Group' } } } as any;
+    expect(isForwarded(msg)).toBe(true);
+    expect(peerFor(msg)).toEqual({ peerId: null, peerLabel: null });
+  });
+
+  it('gives an ordinary message the chat, so a reply has somewhere to go', () => {
+    const msg = { message_id: 3, date: 0, chat, from: { id: 7, first_name: 'Sender' } } as any;
+    expect(isForwarded(msg)).toBe(false);
+    expect(peerFor(msg)).toEqual({ peerId: '555', peerLabel: 'TZ' });
+  });
+
+  it('never denies a peer while calling something a forward (the disagreement 0037 rejects)', () => {
+    const forwards = [
+      { message_id: 4, date: 0, chat, forward_origin: { type: 'chat', sender_chat: { id: -1 } } },
+      { message_id: 5, date: 0, chat, forward_origin: { type: 'hidden_user', sender_user_name: 'Hidden' } },
+      { message_id: 6, date: 0, chat, forward_origin: { type: 'user', sender_user: { id: 8, username: 'u' } } },
+    ] as any[];
+    for (const msg of forwards) {
+      // The flag written to meta_json and the peer suppression must agree.
+      expect(isForwarded(msg)).toBe(peerFor(msg).peerId === null);
+    }
   });
 });
