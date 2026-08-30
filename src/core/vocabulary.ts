@@ -242,7 +242,32 @@ none_expired | None — visa expired, onshore
 unknown | Not established yet`,
 };
 
-export const VOCABULARIES: VocabularyDef[] = [CASE_TYPE_VOCAB, VISA_TYPE_VOCAB, ENGLISH_TEST_VOCAB];
+
+/**
+ * The headings of the file vault. A document uploaded to a client or matter
+ * carries one of these, and the Files panel groups under them in this order.
+ * "Other" is the resting place, not an error: a file that fits no heading is
+ * still worth keeping.
+ */
+export const DOC_CATEGORY_VOCAB: VocabularyDef = {
+  key: 'vocab.doc_categories',
+  label: 'Document categories',
+  help: 'One per line, written as “key | Label”. The headings files are grouped under on a '
+    + 'client or matter page, in this order. Relabelling is free; removing a key leaves existing '
+    + 'files showing the raw key under Other. Blank lines and lines starting with # are ignored.',
+  defaults: `identity | Identity
+health | Health
+character | Character
+english | English
+relationship | Relationship
+employment | Employment
+financial | Financial
+inz | INZ correspondence
+engagement | Engagement & fees
+other | Other`,
+};
+
+export const VOCABULARIES: VocabularyDef[] = [CASE_TYPE_VOCAB, VISA_TYPE_VOCAB, ENGLISH_TEST_VOCAB, DOC_CATEGORY_VOCAB];
 
 export const VOCABULARY_SETTINGS: SettingsGroup = {
   id: 'vocabulary',
@@ -318,4 +343,8 @@ export async function englishTests(env: Env): Promise<Term[]> {
 
 export async function visaTypes(env: Env): Promise<Term[]> {
   return vocabulary(env, VISA_TYPE_VOCAB);
+}
+
+export async function docCategories(env: Env): Promise<Term[]> {
+  return vocabulary(env, DOC_CATEGORY_VOCAB);
 }
