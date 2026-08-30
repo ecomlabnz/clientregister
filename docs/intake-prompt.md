@@ -175,7 +175,10 @@ the practice, not by the extractor.
 - `notes` — dated file notes, each `{ occurred_at, body }`, in the words they
   were written in
 - `tasks` — anything outstanding, each `{ title, details, due_at }`
-- `documents` — filename, what it is, and the date on it
+- `documents` — filename, what it is, and the date on it. **Record documents;
+  never copy them.** The practice's decision (31 August 2026): the intake does
+  not carry files into the register — a file arrives there only when a person
+  uploads or links it.
 - `fees` — every invoice, receipt and fee mention, see below
 
 **Fees** (`fees` under the matter) — the practice tracks what is owed in the

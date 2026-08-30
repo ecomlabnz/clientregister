@@ -39,7 +39,8 @@ import { addEntry, listEntries } from '../../core/timeline';
 import { casesForClient, relatedClients } from '../../core/parties';
 import { can } from '../../core/rbac';
 import { asPrefInteger, preferencesFor } from '../../core/preferences';
-import { caseTypes, englishTests, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
+import { caseTypes, docCategories, englishTests, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
+import { filesPanel, listDocuments } from '../documents';
 import { countryCodeFor, countryName, countryOptions } from '../../core/countries';
 import { threadsFor } from '../../core/channels';
 import {
@@ -769,7 +770,8 @@ export const clientsModule: AppModule = {
       if (!client) return c.notFound();
 
       const [cases, quotes, inquiries, entries, tasks, partyCases, related, employer, people,
-             feesByCase, englishTestTerms, visaTerms, certificates, passports, threads] = await Promise.all([
+             feesByCase, englishTestTerms, visaTerms, certificates, passports, threads,
+             clientFiles, docCats] = await Promise.all([
         all<any>(c.env.DB, `SELECT id, ref, title, case_type, status, priority, next_action, next_action_due, updated_at
                               FROM cases WHERE client_id = ? ORDER BY updated_at DESC`, id),
         all<any>(c.env.DB, `SELECT id, ref, description, amount_cents, gst_cents, disbursements_cents, currency, status, created_at
@@ -809,6 +811,8 @@ export const clientsModule: AppModule = {
         certificatesFor(c.env, id),
         passportsFor(c.env, id),
         threadsFor(c.env, 'client', id),
+        listDocuments(c.env, 'client', id),
+        docCategories(c.env),
       ]);
 
       // Cases where this client is a party but not the file owner — an
@@ -885,6 +889,12 @@ export const clientsModule: AppModule = {
                       <div class="timeline-body">${e.body}</div>
                     </li>`)}
                 </ul>`}`)}
+
+            ${card('Files', filesPanel({
+              csrf, entityType: 'client', entityId: client.id, returnTo: `/clients/${client.id}`,
+              files: clientFiles as any, categories: docCats,
+              canDelete: can(c.get('user'), 'register:delete'),
+            }))}
           </div>
 
           <div class="col-side">

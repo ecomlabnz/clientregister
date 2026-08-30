@@ -1386,3 +1386,14 @@ body.site { background: var(--bg); }
   .kv dt { margin-top: 6px; }
   h1 { font-size: 1.2rem; }
 }
+
+/* --- Files panel --------------------------------------------------------- */
+/* One row per file under its category heading: name and detail on the left,
+   the single action on the right, and the action never wraps away from its
+   file on a narrow screen because the row is flex, not floated. */
+.file-row {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.file-row:last-of-type { border-bottom: none; }
+.file-row-actions { flex-shrink: 0; }

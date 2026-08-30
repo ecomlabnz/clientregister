@@ -62,6 +62,13 @@ class FakeStatement {
 export function fakeD1(db: SqliteDb): D1Database {
   return {
     prepare: (sql: string) => new FakeStatement(db, sql) as unknown as D1PreparedStatement,
+    // Statements one after another, like D1's batch (without its atomicity —
+    // none of the tests lean on a mid-batch failure rolling back).
+    batch: async (stmts: Array<{ run(): Promise<unknown> }>) => {
+      const results = [];
+      for (const s of stmts) results.push(await s.run());
+      return results;
+    },
   } as unknown as D1Database;
 }
 
