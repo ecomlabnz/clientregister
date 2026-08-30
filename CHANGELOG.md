@@ -7,6 +7,15 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.69.1 — 30 August 2026
+
+### Fixed
+- **The header now keeps to the same width as the page.** On a wide monitor
+  the menu, the search box and the account controls used to pin themselves to
+  the far corners of the window while the content sat centred beneath them.
+  They now stop at the page's own 1400px measure; the bar's background still
+  runs the full window. Nothing changes on a laptop or a phone.
+
 ## 0.69.0 — 30 August 2026
 
 ### Changed
