@@ -118,6 +118,26 @@ describe('the sanitiser output is inert for every hostile input', () => {
   });
 });
 
+describe('the output budget never leaves a partial tag', () => {
+  // Finding 4 of the 2026-08-30 audit: `push` charged the budget with what it
+  // was offered rather than what it emitted, and would slice a rebuilt tag
+  // mid-token — leaving live markup like `<a href="…` open at the cut. A tag
+  // now goes out whole or not at all.
+  const letter = 'Dear practice, <strong>please</strong> see the '
+    + '<a href="https://immigration.govt.nz/forms">form</a> attached.';
+
+  it('every cut point drops tags whole and stays inert', () => {
+    for (let limit = 1; limit <= letter.length + 60; limit++) {
+      const out = String(sanitiseHtml(letter, limit).html);
+      // Once every complete tag is removed, no raw "<" may remain: a leftover
+      // one is a tag the budget cut in half.
+      const stripped = out.replace(/<\/?[a-z][a-z0-9]*(?:\s[^<>]*)?>/gi, '');
+      expect(stripped.includes('<'), `partial tag under limit ${limit}: ${out}`).toBe(false);
+      assertInert(out);
+    }
+  });
+});
+
 describe('safeUrl accepts only navigable schemes', () => {
   const ACCEPT = ['https://x', 'HTTP://X', 'https://a?b=c#d', 'mailto:a@b.test', 'tel:+64211234567'];
   const REJECT = [
