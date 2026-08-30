@@ -32,6 +32,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.70.1', date: '31 August 2026',
+    notes: [
+      'The Files release is now actually live: its first version was stopped at the door '
+        + 'by the register’s own safety rule (a note may never lose its attachment), and '
+        + 'was rebuilt to respect it. Nothing was lost.',
+    ],
+  },
+  {
     version: '0.70.0', date: '31 August 2026',
     notes: [
       'Every client and matter page now has a Files section, grouped under headings '

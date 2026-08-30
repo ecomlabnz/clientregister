@@ -28,24 +28,36 @@ function db() {
 }
 
 describe('a document is stored or linked, never both, never neither', () => {
-  it('refuses a row with no storage key and no link', () => {
-    const d = db();
-    expect(() => d.exec(`INSERT INTO documents (id,entity_type,entity_id,filename,content_type,size_bytes,uploaded_at)
-      VALUES ('D1','client','CL1','f','x',0,'${AT}')`)).toThrow(/CHECK/);
-  });
-
-  it('refuses a row claiming both', () => {
+  // The shape lives in triggers (0044): a stored document has a real R2 key
+  // and no link; a linked one has a link: key and an https address.
+  it('refuses a stored key claiming a link as well', () => {
     const d = db();
     expect(() => d.exec(`INSERT INTO documents (id,entity_type,entity_id,r2_key,external_url,filename,content_type,size_bytes,uploaded_at)
-      VALUES ('D1','client','CL1','k','https://x','f','x',0,'${AT}')`)).toThrow(/CHECK/);
+      VALUES ('D1','client','CL1','k','https://x.example/f','f','x',0,'${AT}')`)).toThrow(/stored in R2 or linked/);
   });
 
-  it('accepts each alone, carrying a category', () => {
+  it('refuses a link: key with no address, and a non-https address', () => {
+    const d = db();
+    expect(() => d.exec(`INSERT INTO documents (id,entity_type,entity_id,r2_key,filename,content_type,size_bytes,uploaded_at)
+      VALUES ('D1','client','CL1','link:D1','f','x',0,'${AT}')`)).toThrow(/stored in R2 or linked/);
+    expect(() => d.exec(`INSERT INTO documents (id,entity_type,entity_id,r2_key,external_url,filename,content_type,size_bytes,uploaded_at)
+      VALUES ('D1','client','CL1','link:D1','http://x.example/f','f','x',0,'${AT}')`)).toThrow(/stored in R2 or linked/);
+  });
+
+  it('refuses turning a stored document into a link afterwards', () => {
+    const d = db();
+    d.exec(`INSERT INTO documents (id,entity_type,entity_id,r2_key,filename,content_type,size_bytes,uploaded_at)
+      VALUES ('D1','client','CL1','k','f','x',10,'${AT}')`);
+    expect(() => d.exec(`UPDATE documents SET external_url='https://x.example/f' WHERE id='D1'`))
+      .toThrow(/stored in R2 or linked/);
+  });
+
+  it('accepts each shape alone, carrying a category', () => {
     const d = db();
     d.exec(`INSERT INTO documents (id,entity_type,entity_id,r2_key,category,filename,content_type,size_bytes,uploaded_at)
       VALUES ('D1','client','CL1','k','identity','passport.pdf','application/pdf',10,'${AT}')`);
-    d.exec(`INSERT INTO documents (id,entity_type,entity_id,external_url,category,filename,content_type,size_bytes,uploaded_at)
-      VALUES ('D2','client','CL1','https://drive.google.com/x','health','eMedical','link',0,'${AT}')`);
+    d.exec(`INSERT INTO documents (id,entity_type,entity_id,r2_key,external_url,category,filename,content_type,size_bytes,uploaded_at)
+      VALUES ('D2','client','CL1','link:D2','https://drive.google.com/x','health','eMedical','link',0,'${AT}')`);
     const rows = d.prepare('SELECT id, category FROM documents ORDER BY id').all() as any[];
     expect(rows.map((r) => r.category)).toEqual(['identity', 'health']);
   });
@@ -100,7 +112,7 @@ describe('an external link is treated as what it is', () => {
   });
 
   it('deleting a linked document never calls R2', () => {
-    expect(src).toContain('if (c.env.DOCS && doc.r2_key)');
+    expect(src).toContain('if (c.env.DOCS && !doc.external_url)');
   });
 });
 
