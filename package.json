@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:security": "vitest run test/security_",
     "build:check": "wrangler deploy --dry-run --outdir=.wrangler/dry",
     "db:migrate:local": "wrangler d1 migrations apply clientregister-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply clientregister-db --remote",

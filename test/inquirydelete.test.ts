@@ -168,14 +168,18 @@ describe('what the screen offers', () => {
     expect(module_).toContain("can(c.get('user'), 'register:delete') && !inq.case_id");
   });
 
-  it('records what the inquiry was before deleting it', () => {
-    // Once the row is gone there is nothing left to describe it, so the audit
-    // entry has to be written first and has to carry the details.
+  it('records the deletion only after it has happened, carrying the details', () => {
+    // The details come from `inq`, read before the delete, so the audit does
+    // not need the row to still exist — and must not be written until the
+    // delete succeeds. Auditing first left the log asserting deletions the
+    // database went on to refuse. That the log stays honest on a refused delete
+    // is proven behaviourally in security_access.test.ts; here we just hold the
+    // order: the DELETE is attempted, then the audit is written.
     const route = module_.slice(module_.indexOf("r.post('/:id/delete'"));
-    const audit = route.indexOf("action: 'inquiry.deleted'");
     const del = route.indexOf('DELETE FROM inquiries');
-    expect(audit).toBeGreaterThan(-1);
-    expect(audit).toBeLessThan(del);
-    expect(route.slice(audit, del)).toContain('ref: inq.ref');
+    const audit = route.indexOf("action: 'inquiry.deleted'");
+    expect(del).toBeGreaterThan(-1);
+    expect(audit).toBeGreaterThan(del);
+    expect(route.slice(audit)).toContain('ref: inq.ref');
   });
 });
