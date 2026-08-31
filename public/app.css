@@ -1047,6 +1047,16 @@ details[open] > summary { margin-bottom: 12px; }
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 
+/* A form kept behind its own button. The summary is the button: the marker is
+   removed in both engines, and the card only exists once the form is open. */
+.reveal { margin-top: 14px; }
+.reveal > summary.reveal-open { list-style: none; }
+.reveal > summary.reveal-open::-webkit-details-marker { display: none; }
+.reveal > summary.reveal-open::marker { content: ''; }
+.reveal > summary.reveal-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.reveal[open] > summary.reveal-open { margin-bottom: 12px; }
+.reveal > .card { margin-bottom: 0; }
+
 .tag-add { margin-top: 10px; }
 .tag-add > summary {
   cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--accent);
