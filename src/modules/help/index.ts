@@ -32,6 +32,29 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.81.0', date: '31 August 2026',
+    notes: [
+      'A person may now hold more than one nationality. The register held one, so a partnership '
+        + 'file naming a dual Vietnamese and New Zealand partner recorded neither. Every client '
+        + 'form has a box for each nationality held and one spare \u2014 fill the spare and save, '
+        + 'and the next one appears. Everyone already on the register keeps exactly the '
+        + 'nationality they had.',
+      'The reading form has the boxes it was missing. Current visa and visa expiry for the client '
+        + 'and for everybody else named, and nationalities for all of them. These were columns the '
+        + 'register already had; they were missing from that one form, so a document that gave '
+        + 'them had nowhere to put them and they were lost on the way in.',
+      'What the reading says is kept as a file note on the matter, in full. Most of what these '
+        + 'summaries carry has no box of its own \u2014 a relationship history, previous '
+        + 'marriages and their dates, where a child lives, an address, something reported to '
+        + 'Police \u2014 and it is now on the file rather than only on the screen you checked. '
+        + 'The summary box is twelve lines instead of four, so you can read it before pressing '
+        + 'the button.',
+      'Choosing an existing client on that form fills in only the boxes that record has left '
+        + 'empty. A document is evidence of what somebody wrote once; it never overwrites what '
+        + 'the practice has since corrected.',
+    ],
+  },
+  {
     version: '0.80.0', date: '31 August 2026',
     notes: [
       'The reader takes Word documents. Drop a .docx into \u201cOpen a matter from what you '

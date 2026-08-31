@@ -27,6 +27,7 @@ import {
   type InquirySource, type InquiryStatus,
 } from '../../domain';
 import { countryCodeFor, countryOptions } from '../../core/countries';
+import { setNationalityStatements } from '../../core/nationalities';
 import { clientOptions, isAssignable, userOptions } from '../../core/lookups';
 import { composeFullName, familyNameFor, plainAscii, splitFullName } from '../../core/names';
 import { addEntry, listEntries } from '../../core/timeline';
@@ -726,15 +727,18 @@ export const inquiriesModule: AppModule = {
         const clientRef = await nextRef(c.env.DB, 'client', 'CL');
         await run(
           c.env.DB,
-          `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name, nationality,
+          `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name,
               email, phone, status, assigned_to, created_at, updated_at, created_by)
-           VALUES (?,?,?,?,?,?,?,?,?,'prospect',?,?,?,?)`,
+           VALUES (?,?,?,?,?,?,?,?,'prospect',?,?,?,?)`,
           targetClientId, clientRef, kind,
           composeFullName(kind, { givenNames: given, familyName: family }, registered),
-          given || null, family || null, kind === 'individual' ? nationality : null,
+          given || null, family || null,
           inq.contact_email, inq.contact_phone,
           assignedTo, nowIso(), nowIso(), user.id,
         );
+        if (kind === 'individual' && nationality) {
+          await c.env.DB.batch(setNationalityStatements(c.env, targetClientId, [nationality]));
+        }
         await addEntry(c.env, { entityType: 'client', entityId: targetClientId, kind: 'system',
           body: `Client created from inquiry ${inq.ref}.`, createdBy: user.id });
       }

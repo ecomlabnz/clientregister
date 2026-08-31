@@ -44,16 +44,24 @@ export const DATASETS: Dataset[] = [
     // Nationality goes out as the country's name as well as its code: an
     // export is read by a person, and a spreadsheet column of "VN" answers
     // nothing. The code goes too, because an export is also read by the next
-    // system, and that one wants the code.
+    // system, and that one wants the code. Both are lists — a person may hold
+    // more than one nationality — in the order the practice entered them, so
+    // the first is the one it would name first.
     sql: `SELECT c.ref, c.kind, c.full_name, c.given_names, c.family_name, c.preferred_name, c.nzbn,
                  c.company_number, c.email, c.phone, c.whatsapp, c.telegram_username,
-                 c.nationality AS nationality_code, co.name AS nationality,
+                 (SELECT GROUP_CONCAT(n.code, ' ') FROM (
+                    SELECT code FROM client_nationalities WHERE client_id = c.id
+                     ORDER BY position, code) n) AS nationality_code,
+                 (SELECT GROUP_CONCAT(n.name, ' · ') FROM (
+                    SELECT co.name AS name FROM client_nationalities cn
+                      JOIN countries co ON co.code = cn.code
+                     WHERE cn.client_id = c.id ORDER BY cn.position, cn.code) n) AS nationality,
                  c.date_of_birth,
                  CASE WHEN c.passport_number IS NULL THEN 'no' ELSE 'yes' END AS passport_on_file,
                  c.passport_country, c.passport_expiry, c.current_visa_type, c.current_visa_expiry,
                  c.english_test_type, c.english_test_score, c.english_test_date,
                  c.address, c.status, c.created_at, c.updated_at
-            FROM clients c LEFT JOIN countries co ON co.code = c.nationality
+            FROM clients c
            ORDER BY c.ref`,
   },
   {

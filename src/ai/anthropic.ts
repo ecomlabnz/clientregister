@@ -50,7 +50,13 @@ const PersonSchema = z.object({
   preferred_name: z.string().nullable(),
   email: z.string().nullable(),
   phone: z.string().nullable(),
-  nationality: z.string().nullable(),
+  // A list, because a person may hold more than one. Asked for as country
+  // names rather than codes: a model guesses "VN" less reliably than it reads
+  // "Vietnam", and the register resolves the names itself.
+  nationalities: z.array(z.string()),
+  current_visa_type: z.string().nullable(),
+  current_visa_expiry: z.string().nullable(),
+  occupation: z.string().nullable(),
   date_of_birth: z.string().nullable(),
   role: z.enum(PARTY_ROLE_VALUES).nullable(),
 });

@@ -76,37 +76,81 @@ describe('the migration is generated from the list', () => {
   });
 });
 
-describe('the database owns the column', () => {
+describe('the database owns the codes', () => {
+  const person = (db: any, id: string) =>
+    db.prepare(`INSERT INTO clients (id, ref, kind, full_name, status, created_at, updated_at)
+                VALUES (?, ?, 'individual', 'A PERSON', 'active', 'x', 'x')`)
+      .run(id, `CL-${id}`);
+
   it('refuses a nationality that is not a country', () => {
     // A guarantee in the route that happens to write the row lasts until
     // somebody adds a second route. Attacked directly, which is the only way
-    // to know it holds.
+    // to know it holds. The guarantee moved from a column to a table on
+    // 31 August 2026 and had to survive the move — this is what proves it did.
     const db = schema();
-    const add = (nat: string | null) =>
-      db.prepare(`INSERT INTO clients (id, ref, kind, full_name, status, nationality,
-                                       created_at, updated_at)
-                  VALUES (?, ?, 'individual', 'A PERSON', 'active', ?, 'x', 'x')`)
-        .run(`c${Math.random()}`, `CL-${Math.random()}`, nat);
+    person(db, 'c1');
+    const add = (code: string) =>
+      db.prepare('INSERT INTO client_nationalities (client_id, code) VALUES (?, ?)')
+        .run('c1', code);
 
     expect(() => add('ZZ')).toThrow(/ISO 3166-1/);
     // The country's name is not a country code, however obviously it means one.
     expect(() => add('Vietnam')).toThrow(/ISO 3166-1/);
     expect(() => add('vn')).toThrow(/ISO 3166-1/);
     expect(() => add('VN')).not.toThrow();
-    // Blank is always allowed. Not knowing is a real state.
-    expect(() => add(null)).not.toThrow();
   });
 
   it('refuses one written in by an update, too', () => {
     const db = schema();
-    db.prepare(`INSERT INTO clients (id, ref, kind, full_name, status, nationality,
-                                     created_at, updated_at)
-                VALUES ('c1', 'CL-1', 'individual', 'A PERSON', 'active', 'VN', 'x', 'x')`).run();
-    expect(() => db.prepare(`UPDATE clients SET nationality = 'Vietnam' WHERE id = 'c1'`).run())
+    person(db, 'c1');
+    db.prepare("INSERT INTO client_nationalities (client_id, code) VALUES ('c1', 'VN')").run();
+    expect(() => db.prepare("UPDATE client_nationalities SET code = 'Vietnam' WHERE client_id = 'c1'").run())
       .toThrow(/ISO 3166-1/);
-    const after = db.prepare(`SELECT nationality FROM clients WHERE id = 'c1'`)
-      .all() as Array<{ nationality: string }>;
-    expect(after[0]!.nationality).toBe('VN');
+    const after = db.prepare("SELECT code FROM client_nationalities WHERE client_id = 'c1'")
+      .all() as Array<{ code: string }>;
+    expect(after[0]!.code).toBe('VN');
+  });
+
+  it('lets one person hold more than one, and keeps the order', () => {
+    // The whole reason the column became a table. A dual national recorded as
+    // holding one nationality is recorded wrongly, and which one comes first
+    // is a fact — it is the passport an application is likely to be made on.
+    const db = schema();
+    person(db, 'c1');
+    db.prepare(`INSERT INTO client_nationalities (client_id, code, position)
+                VALUES ('c1','VN',0), ('c1','NZ',1)`).run();
+    const held = db.prepare(`SELECT code FROM client_nationalities
+                              WHERE client_id = 'c1' ORDER BY position`)
+      .all() as Array<{ code: string }>;
+    expect(held.map((r) => r.code)).toEqual(['VN', 'NZ']);
+  });
+
+  it('refuses the same country twice on one person', () => {
+    const db = schema();
+    person(db, 'c1');
+    db.prepare("INSERT INTO client_nationalities (client_id, code) VALUES ('c1','NZ')").run();
+    expect(() => db.prepare("INSERT INTO client_nationalities (client_id, code) VALUES ('c1','NZ')").run())
+      .toThrow();
+  });
+
+  it("takes a person's nationalities with them when they go", () => {
+    const db = schema();
+    db.prepare('PRAGMA foreign_keys = ON').run();
+    person(db, 'c1');
+    db.prepare("INSERT INTO client_nationalities (client_id, code) VALUES ('c1','NZ')").run();
+    db.prepare("DELETE FROM clients WHERE id = 'c1'").run();
+    const left = db.prepare("SELECT code FROM client_nationalities WHERE client_id = 'c1'")
+      .all() as Array<{ code: string }>;
+    expect(left).toEqual([]);
+  });
+
+  it('has no nationality column on clients any more', () => {
+    // Two places holding one fact is how a register starts disagreeing with
+    // itself. The column went with the migration; this is what keeps it gone.
+    const db = schema();
+    const columns = (db.prepare("SELECT name FROM pragma_table_info('clients')").all() as Array<{ name: string }>)
+      .map((r) => r.name);
+    expect(columns).not.toContain('nationality');
   });
 });
 

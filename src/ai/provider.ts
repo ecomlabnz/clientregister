@@ -15,6 +15,7 @@
 import type { Env } from '../types';
 import type { SettingsGroup } from '../core/settings';
 import { settingValue } from '../core/settings';
+import { codesFromText } from '../core/nationalities';
 
 export interface TriageResult {
   /** Best guess at who wrote in. */
@@ -92,7 +93,18 @@ export interface IntakePerson {
   preferred_name: string | null;
   email: string | null;
   phone: string | null;
-  nationality: string | null;
+  /**
+   * Country codes, in the order the document names them. A list because a
+   * person may hold more than one, and a partnership file that says "Vietnam
+   * and New Zealand" is stating a fact the register has to be able to keep.
+   */
+  nationalities: string[];
+  /** What visa they are on now, as the document words it. */
+  current_visa_type: string | null;
+  /** ISO date, or null when the document does not say. */
+  current_visa_expiry: string | null;
+  /** What they do. Not a field on the register yet; it goes to the summary. */
+  occupation: string | null;
   /** ISO date, or null when the document does not say. */
   date_of_birth: string | null;
   /** One of the register's party roles, or null when it is not clear. */
@@ -132,6 +144,23 @@ Family names in immigration documents are often written in capitals; keep the
 capitalisation the document uses.
 Do not extract passport numbers even when they appear — that field is entered by
 a person.
+
+For every person named, return their nationalities as a list of country names,
+one entry per country. A document that says "Vietnam and New Zealand" or "dual
+Vietnamese/New Zealand citizen" is naming two, and both must come back.
+
+Return current_visa_type and current_visa_expiry for anybody the document says
+holds a visa, including a supporting partner. Return occupation where it is
+stated.
+
+The summary must be the whole of what the document says about these people and
+their situation, written as continuous prose a colleague could read instead of
+the document — relationship history, previous marriages and their dates,
+children and where they are, addresses, employment, any character or health
+matter stated, and what the document says is expected to happen next. It is a
+file note, not a caption: leave out nothing the document states, and add
+nothing it does not.
+
 Do not give immigration advice and do not draft correspondence.`;
 
 /** Defensive normalisation, applied to both providers' output. */
@@ -150,7 +179,12 @@ export function normaliseIntake(input: Partial<IntakeResult>): IntakeResult {
       preferred_name: str(p.preferred_name, 80),
       email: str(p.email, 320),
       phone: str(p.phone, 40),
-      nationality: str(p.nationality, 80),
+      nationalities: Array.isArray(p.nationalities)
+        ? codesFromText(p.nationalities.join(', '))
+        : codesFromText(str(p.nationalities as unknown, 160)),
+      current_visa_type: str(p.current_visa_type, 120),
+      current_visa_expiry: isoDate(p.current_visa_expiry),
+      occupation: str(p.occupation, 120),
       date_of_birth: isoDate(p.date_of_birth),
       role: str(p.role, 40),
     };
@@ -167,7 +201,11 @@ export function normaliseIntake(input: Partial<IntakeResult>): IntakeResult {
     inz_application_number: str(input.inz_application_number, 40),
     lodged_on: isoDate(input.lodged_on),
     decision_due_on: isoDate(input.decision_due_on),
-    summary: str(input.summary, 2000) ?? '',
+    // Eight thousand, not two. The summary is now the file note — the whole of
+    // what a document says about a family, a relationship and its history —
+    // and two thousand characters cut a three-page partnership summary off
+    // mid-sentence.
+    summary: str(input.summary, 8000) ?? '',
     missing: Array.isArray(input.missing)
       ? input.missing.filter((x): x is string => typeof x === 'string').slice(0, 12)
       : [],
