@@ -33,6 +33,7 @@ import { addEntry, listEntries } from '../../core/timeline';
 import { openThreadCount } from '../../core/channels';
 import { can } from '../../core/rbac';
 import { caseTypes, isTerm, labelFor, termOptions } from '../../core/vocabulary';
+import { fileOntoRecord, filingOptions, filingTargetLabel, markLinkedFiled, parseFilingChoice, unfile } from '../../core/filing';
 
 export interface InquiryRow {
   id: string; ref: string; source: InquirySource; source_ref: string | null; received_at: string;
@@ -40,6 +41,7 @@ export interface InquiryRow {
   subject: string | null; body: string | null; status: InquiryStatus;
   client_id: string | null; case_id: string | null; assigned_to: string | null;
   ingest_message_id: string | null; created_at: string; updated_at: string;
+  filed_at: string | null; filed_by: string | null; filed_entry_id: string | null;
 }
 
 /**
@@ -141,9 +143,9 @@ export async function incomingCounts(env: Env): Promise<IncomingCounts> {
     one<{ n: number }>(
       env.DB,
       `SELECT COUNT(*) AS n FROM inquiries
-        WHERE status IN ('new', 'triaged', 'responded', 'quoted')`),
+        WHERE status IN ('new', 'triaged', 'responded', 'quoted') AND filed_at IS NULL`),
     one<{ n: number }>(
-      env.DB, `SELECT COUNT(*) AS n FROM ingest_messages WHERE status = 'pending'`),
+      env.DB, `SELECT COUNT(*) AS n FROM ingest_messages WHERE status = 'pending' AND filed_at IS NULL`),
     openThreadCount(env),
   ]);
   return { inquiries: open?.n ?? 0, inbox: waiting?.n ?? 0, threads };
@@ -182,7 +184,10 @@ export const inquiriesModule: AppModule = {
     r.get('/', requirePermission('register:read'), async (c) => {
       const status = c.req.query('status') ?? '';
       const source = c.req.query('source') ?? '';
-      const conds: string[] = [];
+      // Filed is a view of its own, not a status: an inquiry can be filed at
+      // any stage, and everything else shows only what is still to deal with.
+      const view = c.req.query('view') === 'filed' ? 'filed' : 'open';
+      const conds: string[] = [view === 'filed' ? 'i.filed_at IS NOT NULL' : 'i.filed_at IS NULL'];
       const params: unknown[] = [];
       if ((INQUIRY_STATUSES as readonly string[]).includes(status)) { conds.push('i.status = ?'); params.push(status); }
       if ((INQUIRY_SOURCES as readonly string[]).includes(source)) { conds.push('i.source = ?'); params.push(source); }
@@ -205,7 +210,14 @@ export const inquiriesModule: AppModule = {
         ${pageHeader('Inquiries', 'New work coming in, from every channel.',
           can(c.get('user'), 'register:write') ? html`<a class="btn btn-primary" href="/inquiries/new">Record an inquiry</a>` : undefined)}
         ${incomingTabs(c.get('user'), 'inquiries', counts)}
+        ${raw('<!-- Filed items leave the working list but are never deleted:'
+              + ' they are the record that something arrived, and on what day. -->')}
+        <nav class="tabs">
+          <a class="${view === 'open' ? 'tab current' : 'tab'}" href="/inquiries">To deal with</a>
+          <a class="${view === 'filed' ? 'tab current' : 'tab'}" href="/inquiries?view=filed">Filed</a>
+        </nav>
         <form method="get" action="/inquiries" class="filters">
+          <input type="hidden" name="view" value="${view}">
           <select name="status"><option value="">All statuses</option>
             ${INQUIRY_STATUSES.map((s) => html`<option value="${s}" ${s === status ? raw('selected') : ''}>${INQUIRY_STATUS_LABELS[s]}</option>`)}
           </select>
@@ -334,6 +346,12 @@ export const inquiriesModule: AppModule = {
       // A first guess at where the family name ends, shown in the form so a
       // person can correct it before it is saved rather than after.
       const guessedName = splitFullName(inq.contact_name ?? '');
+      const fileTargets = writable && !inq.filed_at ? await filingOptions(c.env) : [];
+      const filedTarget: 'case' | 'client' | null = inq.filed_at
+        ? (inq.case_id ? 'case' : inq.client_id ? 'client' : null) : null;
+      const filedOn = filedTarget
+        ? await filingTargetLabel(c.env, filedTarget, (filedTarget === 'case' ? inq.case_id : inq.client_id)!)
+        : null;
 
       return page(c, { title: inq.ref, active: '/inquiries' }, html`
         ${breadcrumbs([{ href: '/inquiries', label: 'Inquiries' }, { label: inq.ref }])}
@@ -355,6 +373,31 @@ export const inquiriesModule: AppModule = {
                          confirm: `Delete ${inq.ref}? This cannot be undone.` })
                      : ''}`
             : undefined)}
+
+        ${inq.filed_at
+          ? html`<div class="alert alert-ok">
+                   Filed on ${filedOn && filedTarget
+                     ? html`<a href="/${filedTarget === 'case' ? 'cases' : 'clients'}/${filedTarget === 'case' ? inq.case_id : inq.client_id}">${filedOn}</a>`
+                     : 'a record that has since gone'}
+                   — ${dateShort(inq.filed_at)}. The inquiry itself is kept, unchanged.
+                   ${writable ? html`
+                     <form method="post" action="/inquiries/${inq.id}/unfile" class="inline-form">
+                       ${csrfField(csrf)}
+                       <button class="btn btn-small btn-secondary" type="submit">Put it back in the list</button>
+                     </form>` : ''}
+                 </div>`
+          : writable && fileTargets.length > 0
+            ? card('File it on a matter or client', html`
+                <form method="post" action="/inquiries/${inq.id}/file" class="row-form">
+                  ${csrfField(csrf)}
+                  ${select({ label: 'File on', name: 'onto', required: true,
+                             includeBlank: 'Choose a matter or client', options: fileTargets })}
+                  <button class="btn btn-primary" type="submit">File it</button>
+                </form>
+                <p class="hint">A note is written on that record with this inquiry's date, contact and
+                   text, and the inquiry moves to the Filed tab. Nothing is deleted, and you can put
+                   it back.</p>`)
+            : ''}
 
         <div class="cols">
           <div class="col-main">
@@ -551,6 +594,52 @@ export const inquiriesModule: AppModule = {
         body: `Status set to ${INQUIRY_STATUS_LABELS[status]}.`, createdBy: c.get('user')!.id });
       await auditFrom(c, { action: 'inquiry.status_changed', entityType: 'inquiry', entityId: id, meta: { status } });
       return redirectWith(c, `/inquiries/${id}`, 'Status updated.');
+    });
+
+    /**
+     * File an inquiry onto the matter or client it belongs to.
+     *
+     * Same shape as the inbox: a note is written on the record, the inquiry is
+     * marked filed, and it leaves the working list for the Filed tab. The
+     * inquiry itself is not touched — it is the record that somebody made
+     * contact, and on what day.
+     */
+    r.post('/:id/file', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const inq = await one<InquiryRow>(c.env.DB, 'SELECT * FROM inquiries WHERE id = ?', id);
+      if (!inq) return c.notFound();
+
+      const f = new FormReader(await c.req.formData());
+      const choice = parseFilingChoice(f.optional('onto', { max: 100 }));
+      if (!choice) return redirectWith(c, `/inquiries/${id}`, 'Choose a matter or a client to file it on.', 'err');
+
+      const user = c.get('user')!;
+      const filed = await fileOntoRecord(c.env, {
+        target: choice.target, targetId: choice.targetId, userId: user.id,
+        origin: `inquiry ${inq.ref}`,
+        source: {
+          channel: inq.source, receivedAt: inq.received_at,
+          from: inq.contact_name ?? inq.contact_email ?? inq.contact_phone,
+          subject: inq.subject, body: inq.body,
+        },
+      });
+      if (!filed) return redirectWith(c, `/inquiries/${id}`, 'That matter or client no longer exists.', 'err');
+
+      await markLinkedFiled(c.env, 'inquiries', id, choice.target, choice.targetId,
+        filed.entryId, user.id, nowIso());
+      await auditFrom(c, { action: 'inquiry.filed', entityType: 'inquiry', entityId: id,
+        meta: { target: choice.target, targetId: choice.targetId, entryId: filed.entryId } });
+      return redirectWith(c, `/${choice.target === 'case' ? 'cases' : 'clients'}/${choice.targetId}`,
+        `Filed on ${filed.label}.`);
+    });
+
+    /** Back to the working list. The note it wrote stays on the file. */
+    r.post('/:id/unfile', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      await unfile(c.env, 'inquiries', id);
+      await auditFrom(c, { action: 'inquiry.unfiled', entityType: 'inquiry', entityId: id });
+      return redirectWith(c, `/inquiries/${id}`,
+        'Back in the list. The note written when it was filed stays on the file.');
     });
 
     r.post('/:id/entries', requirePermission('register:write'), async (c) => {

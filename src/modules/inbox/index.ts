@@ -16,7 +16,7 @@ import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
-import { actionButton, badge, card, csrfField, emptyState, pageHeader, statusTone, table } from '../../ui/components';
+import { actionButton, badge, card, csrfField, emptyState, pageHeader, select, statusTone, table } from '../../ui/components';
 import { dateShort, dateTime, truncate } from '../../ui/format';
 import { processMessage } from '../../ingest/pipeline';
 import { isAiEnabled } from '../../ai/provider';
@@ -26,6 +26,7 @@ import { incomingCounts, incomingTabs } from '../inquiries';
 import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
 import { FormReader } from '../../core/validate';
 import { sanitiseHtml } from '../../core/sanitise';
+import { fileOntoRecord, filingOptions, filingTargetLabel, markIngestFiled, markLinkedFiled, parseFilingChoice, unfile } from '../../core/filing';
 import {
   CHANNEL_LABELS, type ThreadEntry, type ThreadRow,
   forwardQuote, linkThread, postReply, threadFor, threadHistory,
@@ -37,6 +38,8 @@ interface IngestRow {
   body_text: string | null; body_html: string | null; attachments_json: string | null; trusted: number;
   status: string; processed_at: string | null; inquiry_id: string | null;
   error: string | null; meta_json: string | null;
+  filed_to_type: string | null; filed_to_id: string | null; filed_at: string | null;
+  filed_by: string | null; filed_entry_id: string | null;
   /** Set when the sender could be identified, which is what makes a reply possible. */
   thread_id: string | null;
 }
@@ -136,11 +139,11 @@ export const inboxModule: AppModule = {
                              latest_subject: string | null; latest_at: string | null }>(
         c.env.DB,
         `SELECT COUNT(*) AS pending,
-                (SELECT id FROM ingest_messages WHERE status = 'pending' ORDER BY received_at DESC LIMIT 1) AS latest_id,
-                (SELECT channel FROM ingest_messages WHERE status = 'pending' ORDER BY received_at DESC LIMIT 1) AS latest_channel,
-                (SELECT subject FROM ingest_messages WHERE status = 'pending' ORDER BY received_at DESC LIMIT 1) AS latest_subject,
-                (SELECT received_at FROM ingest_messages WHERE status = 'pending' ORDER BY received_at DESC LIMIT 1) AS latest_at
-           FROM ingest_messages WHERE status = 'pending'`,
+                (SELECT id FROM ingest_messages WHERE status = 'pending' AND filed_at IS NULL ORDER BY received_at DESC LIMIT 1) AS latest_id,
+                (SELECT channel FROM ingest_messages WHERE status = 'pending' AND filed_at IS NULL ORDER BY received_at DESC LIMIT 1) AS latest_channel,
+                (SELECT subject FROM ingest_messages WHERE status = 'pending' AND filed_at IS NULL ORDER BY received_at DESC LIMIT 1) AS latest_subject,
+                (SELECT received_at FROM ingest_messages WHERE status = 'pending' AND filed_at IS NULL ORDER BY received_at DESC LIMIT 1) AS latest_at
+           FROM ingest_messages WHERE status = 'pending' AND filed_at IS NULL`,
       );
       return c.json({
         pending: row?.pending ?? 0,
@@ -158,14 +161,22 @@ export const inboxModule: AppModule = {
     });
 
     r.get('/', requirePermission('ingest:triage'), async (c) => {
-      const status = ['pending', 'processed', 'ignored', 'failed', 'all'].includes(c.req.query('status') ?? '')
+      const status = ['pending', 'processed', 'ignored', 'failed', 'filed', 'all'].includes(c.req.query('status') ?? '')
         ? c.req.query('status')! : 'pending';
       const channel = c.req.query('channel') ?? '';
       const q = (c.req.query('q') ?? '').trim();
 
       const conds: string[] = [];
       const params: unknown[] = [];
-      if (status !== 'all') { conds.push('status = ?'); params.push(status); }
+      // Filing is not one of the statuses — a message can be waiting and filed,
+      // or processed and filed. It is a separate fact, so it is a separate
+      // condition: every view except Filed shows only what is still to deal
+      // with, and Filed shows what has been put somewhere.
+      if (status === 'filed') conds.push('filed_at IS NOT NULL');
+      else {
+        conds.push('filed_at IS NULL');
+        if (status !== 'all') { conds.push('status = ?'); params.push(status); }
+      }
       if (['email', 'telegram', 'whatsapp', 'api'].includes(channel)) { conds.push('channel = ?'); params.push(channel); }
       if (q) {
         conds.push('(subject LIKE ? OR body_text LIKE ? OR sender_display LIKE ? OR sender LIKE ?)');
@@ -177,7 +188,8 @@ export const inboxModule: AppModule = {
         all<IngestRow>(c.env.DB,
           `SELECT * FROM ingest_messages ${whereSql} ORDER BY received_at DESC LIMIT 200`, ...params),
         all<{ status: string; n: number }>(c.env.DB,
-          `SELECT status, COUNT(*) AS n FROM ingest_messages GROUP BY status`),
+          `SELECT CASE WHEN filed_at IS NOT NULL THEN 'filed' ELSE status END AS status,
+                  COUNT(*) AS n FROM ingest_messages GROUP BY 1`),
         incomingCounts(c.env),
       ]);
       const countFor = (s: string): number => s === 'all'
@@ -187,7 +199,7 @@ export const inboxModule: AppModule = {
       const views = [
         { id: 'pending', label: 'Waiting' }, { id: 'processed', label: 'Processed' },
         { id: 'ignored', label: 'Ignored' }, { id: 'failed', label: 'Failed' },
-        { id: 'all', label: 'All' },
+        { id: 'filed', label: 'Filed' }, { id: 'all', label: 'All' },
       ];
       const keep = (extra: Record<string, string>): string =>
         new URLSearchParams({ status, channel, q, ...extra }).toString();
@@ -249,14 +261,19 @@ export const inboxModule: AppModule = {
     // declared and '/threads' would otherwise be read as a message id.
     r.get('/threads', requirePermission('ingest:triage'), async (c) => {
       const q = (c.req.query('q') ?? '').trim();
+      // Filed is a view, not a status: a conversation is filed at any point,
+      // and the working list shows only what still wants attention.
+      const view = c.req.query('view') === 'filed' ? 'filed' : 'open';
+      const filedCond = view === 'filed' ? 't.filed_at IS NOT NULL' : 't.filed_at IS NULL';
       const [rows, family] = await Promise.all([
         all<ThreadRow & { client_name: string | null; waiting: number }>(
           c.env.DB,
           `SELECT t.*, cl.full_name AS client_name,
                   (SELECT COUNT(*) FROM ingest_messages m
-                    WHERE m.thread_id = t.id AND m.status = 'pending') AS waiting
+                    WHERE m.thread_id = t.id AND m.status = 'pending' AND m.filed_at IS NULL) AS waiting
              FROM channel_threads t LEFT JOIN clients cl ON cl.id = t.client_id
-            ${q ? 'WHERE t.peer_label LIKE ? OR t.peer_id LIKE ? OR cl.full_name LIKE ?' : ''}
+            WHERE ${filedCond}
+              ${q ? 'AND (t.peer_label LIKE ? OR t.peer_id LIKE ? OR cl.full_name LIKE ?)' : ''}
             ORDER BY t.last_message_at DESC LIMIT 200`,
           ...(q ? [`%${q}%`, `%${q}%`, `%${q}%`] : []),
         ),
@@ -267,7 +284,12 @@ export const inboxModule: AppModule = {
         ${pageHeader('Conversations',
           'Each channel as a two-way thread: what they sent, and what the practice sent back.')}
         ${incomingTabs(c.get('user'), 'threads', family)}
+        <nav class="tabs">
+          <a class="${view === 'open' ? 'tab current' : 'tab'}" href="/inbox/threads">To deal with</a>
+          <a class="${view === 'filed' ? 'tab current' : 'tab'}" href="/inbox/threads?view=filed">Filed</a>
+        </nav>
         <form method="get" action="/inbox/threads" class="filters" data-live-search>
+          <input type="hidden" name="view" value="${view}">
           <input type="search" name="q" value="${q}" placeholder="Search by name, number or client">
           <button class="btn btn-secondary js-hide" type="submit">Search</button>
         </form>
@@ -370,6 +392,8 @@ export const inboxModule: AppModule = {
       const canReply = thread.channel === 'email'
         ? can(c.get('user'), 'mail:send')
         : can(c.get('user'), 'register:write');
+      const canFileThread = can(c.get('user'), 'register:write');
+      const threadTargets = canFileThread && !(thread as any).filed_at ? await filingOptions(c.env) : [];
 
       return page(c, { title: thread.peer_label ?? thread.peer_id, active: '/inquiries' }, html`
         ${breadcrumbs([{ label: 'Inbox', href: '/inbox' },
@@ -377,6 +401,28 @@ export const inboxModule: AppModule = {
                        { label: thread.peer_label ?? thread.peer_id }])}
         ${pageHeader(thread.peer_label ?? thread.peer_id,
           `${CHANNEL_LABELS[thread.channel] ?? thread.channel} · ${thread.peer_id}`)}
+
+        ${(thread as any).filed_at
+          ? html`<div class="alert alert-ok">
+                   Filed ${dateShort((thread as any).filed_at)}. The conversation is kept here in full.
+                   ${canFileThread ? html`
+                     <form method="post" action="/inbox/threads/${thread.id}/unfile" class="inline-form">
+                       ${csrfField(session.csrf)}
+                       <button class="btn btn-small btn-secondary" type="submit">Put it back in the list</button>
+                     </form>` : ''}
+                 </div>`
+          : canFileThread && threadTargets.length > 0
+            ? card('File it on a matter or client', html`
+                <form method="post" action="/inbox/threads/${thread.id}/file" class="row-form">
+                  ${csrfField(session.csrf)}
+                  ${select({ label: 'File on', name: 'onto', required: true,
+                             includeBlank: 'Choose a matter or client', options: threadTargets })}
+                  <button class="btn btn-primary" type="submit">File it</button>
+                </form>
+                <p class="hint">A note is written on that record pointing at this conversation, and the
+                   conversation moves to the Filed tab. Nothing is deleted — the messages stay here in
+                   full, and you can put it back.</p>`)
+            : ''}
 
         <div class="cols">
           <div class="col-main">
@@ -777,6 +823,51 @@ ${quote}</textarea>
         clientId || caseId ? 'Linked.' : 'Link removed.', 'ok');
     });
 
+    /**
+     * File a whole conversation onto a matter or client.
+     *
+     * The note carries the peer and the date of the last message rather than
+     * every message in the thread: the thread stays where it is and remains
+     * readable in full, and a file note is a pointer with enough on it to know
+     * what it points at, not a transcript.
+     */
+    r.post('/threads/:id/file', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const thread = await one<ThreadRow>(c.env.DB, 'SELECT * FROM channel_threads WHERE id = ?', id);
+      if (!thread) return c.notFound();
+
+      const f = new FormReader(await c.req.formData());
+      const choice = parseFilingChoice(f.optional('onto', { max: 100 }));
+      if (!choice) return redirectWith(c, `/inbox/threads/${id}`, 'Choose a matter or a client to file it on.', 'err');
+
+      const user = c.get('user')!;
+      const filed = await fileOntoRecord(c.env, {
+        target: choice.target, targetId: choice.targetId, userId: user.id,
+        origin: `the ${thread.channel} conversation with ${thread.peer_label ?? thread.peer_id ?? 'an unknown sender'}`,
+        source: {
+          channel: thread.channel, receivedAt: thread.last_message_at,
+          from: thread.peer_label ?? thread.peer_id, subject: null,
+          body: 'The conversation is kept in full under Incoming → Conversations.',
+        },
+      });
+      if (!filed) return redirectWith(c, `/inbox/threads/${id}`, 'That matter or client no longer exists.', 'err');
+
+      await markLinkedFiled(c.env, 'channel_threads', id, choice.target, choice.targetId,
+        filed.entryId, user.id, nowIso());
+      await auditFrom(c, { action: 'channel.thread_filed', entityType: 'channel_thread', entityId: id,
+        meta: { target: choice.target, targetId: choice.targetId, entryId: filed.entryId } });
+      return redirectWith(c, `/${choice.target === 'case' ? 'cases' : 'clients'}/${choice.targetId}`,
+        `Filed on ${filed.label}.`);
+    });
+
+    r.post('/threads/:id/unfile', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      await unfile(c.env, 'channel_threads', id);
+      await auditFrom(c, { action: 'channel.thread_unfiled', entityType: 'channel_thread', entityId: id });
+      return redirectWith(c, `/inbox/threads/${id}`,
+        'Back in the list. The note written when it was filed stays on the file.');
+    });
+
     r.get('/:id', requirePermission('ingest:triage'), async (c) => {
       const types = await caseTypes(c.env);
       const id = c.req.param('id')!;
@@ -795,6 +886,11 @@ ${quote}</textarea>
         c.env.DB, 'SELECT id, ref FROM kb_articles WHERE ingest_message_id = ? ORDER BY created_at', id);
       const plain = c.req.query('plain') === '1';
       const formatted = msg.body_html ? sanitiseHtml(msg.body_html) : null;
+      const canFile = can(c.get('user'), 'register:write');
+      const fileTargets = canFile && !msg.filed_at ? await filingOptions(c.env) : [];
+      const filedOn = msg.filed_at && msg.filed_to_type && msg.filed_to_id
+        ? await filingTargetLabel(c.env, msg.filed_to_type as 'case' | 'client', msg.filed_to_id)
+        : null;
 
       return page(c, { title: 'Inbox message', active: '/inquiries' }, html`
         ${breadcrumbs([{ href: '/inbox', label: 'Inbox' }, { label: msg.channel }])}
@@ -805,6 +901,31 @@ ${quote}</textarea>
           ? ''
           : html`<div class="alert alert-warn">This sender is not on the channel allow-list. The message was
                    captured but nothing was created from it. Check who it is before acting.</div>`}
+
+        ${msg.filed_at
+          ? html`<div class="alert alert-ok">
+                   Filed on ${filedOn
+                     ? html`<a href="/${msg.filed_to_type === 'case' ? 'cases' : 'clients'}/${msg.filed_to_id}">${filedOn}</a>`
+                     : 'a record that has since gone'}
+                   — ${dateShort(msg.filed_at)}. The message itself is kept here, unchanged.
+                   ${canFile ? html`
+                     <form method="post" action="/inbox/${id}/unfile" class="inline-form">
+                       ${csrfField(csrf)}
+                       <button class="btn btn-small btn-secondary" type="submit">Put it back in the inbox</button>
+                     </form>` : ''}
+                 </div>`
+          : canFile && fileTargets.length > 0
+            ? card('File it on a matter or client', html`
+                <form method="post" action="/inbox/${id}/file" class="row-form">
+                  ${csrfField(csrf)}
+                  ${select({ label: 'File on', name: 'onto', required: true,
+                             includeBlank: 'Choose a matter or client', options: fileTargets })}
+                  <button class="btn btn-primary" type="submit">File it</button>
+                </form>
+                <p class="hint">A note is written on that record with this message's date, sender and
+                   text, and the message moves out of the inbox to the Filed tab. Nothing is deleted:
+                   the message stays here exactly as it arrived, and you can put it back.</p>`)
+            : ''}
 
         <div class="cols">
           <div class="col-main">
@@ -920,6 +1041,55 @@ ${quote}</textarea>
       if (!result) return redirectWith(c, `/inbox/${id}`, 'Could not create an inquiry from this message.', 'err');
       await auditFrom(c, { action: 'inbox.processed', entityType: 'ingest_message', entityId: id, meta: { inquiry: result.inquiryRef } });
       return redirectWith(c, `/inquiries/${result.inquiryId}`, `Created inquiry ${result.inquiryRef}.`);
+    });
+
+    /**
+     * File a message onto the matter or client it belongs to.
+     *
+     * The message is not moved and not changed: a note is written onto the
+     * record, and the message is marked as having been filed there. It leaves
+     * the working list and appears under Filed, which is the only sense in
+     * which anything "moves".
+     */
+    r.post('/:id/file', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const msg = await one<IngestRow>(c.env.DB, 'SELECT * FROM ingest_messages WHERE id = ?', id);
+      if (!msg) return c.notFound();
+
+      const f = new FormReader(await c.req.formData());
+      const choice = parseFilingChoice(f.optional('onto', { max: 100 }));
+      if (!choice) {
+        return redirectWith(c, `/inbox/${id}`, 'Choose a matter or a client to file it on.', 'err');
+      }
+      const { target, targetId } = choice;
+
+      const user = c.get('user')!;
+      const filed = await fileOntoRecord(c.env, {
+        target, targetId, userId: user.id,
+        origin: `the ${msg.channel} inbox`,
+        source: {
+          channel: msg.channel, receivedAt: msg.received_at,
+          from: msg.sender_display ?? msg.sender, subject: msg.subject, body: msg.body_text,
+        },
+      });
+      // A destination that does not exist is refused rather than recorded: an
+      // item filed onto nothing is gone from the list and present on no record.
+      if (!filed) return redirectWith(c, `/inbox/${id}`, 'That matter or client no longer exists.', 'err');
+
+      await markIngestFiled(c.env, id, target, targetId, filed.entryId, user.id, nowIso());
+      await auditFrom(c, { action: 'inbox.filed', entityType: 'ingest_message', entityId: id,
+        meta: { target, targetId, entryId: filed.entryId } });
+      return redirectWith(c, `/${target === 'case' ? 'cases' : 'clients'}/${targetId}`,
+        `Filed on ${filed.label}.`);
+    });
+
+    /** Put it back in the working list. The note it wrote stays on the file. */
+    r.post('/:id/unfile', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      await unfile(c.env, 'ingest_messages', id);
+      await auditFrom(c, { action: 'inbox.unfiled', entityType: 'ingest_message', entityId: id });
+      return redirectWith(c, `/inbox/${id}`,
+        'Back in the inbox. The note written when it was filed stays on the file.');
     });
 
     r.post('/:id/ignore', requirePermission('ingest:triage'), async (c) => {
