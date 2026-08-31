@@ -7,6 +7,23 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.70.2 — 1 September 2026
+
+### Added
+- **A fourth answer to "where did this issue date come from": read off the
+  scan by OCR.** The practice decided machine-reading may be run over scanned
+  certificates for the next intake batch. A machine's reading is better
+  evidence than a filename but is still not a person's, so it arrives flagged
+  like the others and clears the same way — one press after checking the
+  paper. The database refuses any value outside the four (rehearsed on a copy
+  with real-shaped rows before deploy).
+
+### Changed
+- One matter's type corrected on the live register (VV. General → VV. Partner)
+  under the practice's standing decision that a visitor visa for the partner
+  of a named New Zealand person is recorded as VV. Partner. A note on the
+  matter records the change.
+
 ## 0.70.1 — 31 August 2026
 
 ### Fixed
