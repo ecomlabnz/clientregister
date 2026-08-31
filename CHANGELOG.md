@@ -7,6 +7,41 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.73.1 — 1 September 2026
+
+Three items, two of them from the audit session's review of 0.71.0–0.72.0.
+
+### Added
+- **Previous and Next above each list as well as below.** Paging from the top
+  of a long page otherwise meant scrolling to the bottom to move and back to
+  the top to read — the one thing a pager exists to save. The rows-per-page
+  choice is deliberately *not* repeated: two sets of the same control invite
+  the reader to wonder whether they do the same thing, and it is a decision
+  made once rather than once per page turn.
+- **Adding a user is behind a button**, on a bar above the list, like adding a
+  task.
+
+### Fixed
+- **The task list ran one database query per row** to draw the "attached to"
+  column. At 25 rows that was invisible; at the 500 this register now offers
+  it is 500 subrequests against a platform ceiling of 1,000 — it would have
+  worked until it very suddenly did not, which is the same "a page anybody
+  with a link could hang" that the page-size allow-list exists to prevent,
+  reintroduced at a size we ourselves offer. It is now a few queries whatever
+  the page holds, guarded by a test that counts queries rather than looking at
+  the output. Found by the audit session.
+- **`AWAITING_DECISION_STATUSES` is derived rather than retyped.** It was a
+  hand-maintained near-twin of `LODGED_CASE_STATUSES`, differing only by
+  `appeal`; two copies of one list are two lists that eventually disagree with
+  nobody able to say which is right. The `appeal` difference is real and is now
+  written down where it lives. Found by the audit session.
+- **The AI brief printed a decided matter's expected decision date as
+  "Deadline".** A decided matter keeps that date for the expected-versus-actual
+  comparison, so handing it to the model under that label invited it to reason
+  about a deadline that passed with the decision. It now appears only while
+  something is awaited, and the date the decision actually arrived is given
+  alongside. Found by the audit session.
+
 ## 0.73.0 — 1 September 2026
 
 ### Changed

@@ -20,7 +20,7 @@ import { dateShort } from '../ui/format';
 import { getProvider, type BriefResult } from './provider';
 import { labelFor, caseTypes, visaTypes } from '../core/vocabulary';
 import { countryName } from '../core/countries';
-import { CASE_STATUS_LABELS, PRIORITY_LABELS, TASK_STATUS_LABELS } from '../domain';
+import { CASE_STATUS_LABELS, isAwaitingStatus, PRIORITY_LABELS, TASK_STATUS_LABELS } from '../domain';
 import { money } from '../ui/format';
 
 /**
@@ -98,7 +98,14 @@ export async function caseFileText(env: Env, caseId: string): Promise<{ title: s
   }
   if (kase.inz_application_number) lines.push(`INZ application: ${kase.inz_application_number}`);
   if (kase.lodged_at) lines.push(`Lodged: ${dateShort(kase.lodged_at)}`);
-  if (kase.decision_due_at) lines.push(`Deadline: ${dateShort(kase.decision_due_at)}`);
+  // Only while something is still awaited. A decided matter keeps its expected
+  // date for the expected-versus-actual comparison, and printing that to the
+  // model as "Deadline" would have it reason about a deadline that passed with
+  // the decision.
+  if (kase.decision_due_at && isAwaitingStatus(kase.status)) {
+    lines.push(`Decision expected: ${dateShort(kase.decision_due_at)}`);
+  }
+  if (kase.decided_at) lines.push(`Decided: ${dateShort(kase.decided_at)}`);
   if (kase.next_action) lines.push(`Recorded next action: ${kase.next_action}${
     kase.next_action_due ? ` (due ${dateShort(kase.next_action_due)})` : ''}`);
   if (kase.closed_at) lines.push(`Closed: ${dateShort(kase.closed_at)}`);

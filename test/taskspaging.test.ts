@@ -132,3 +132,62 @@ describe('walking the task list', () => {
     expect(body).toMatch(/href="\/tasks\?scope=all[^"]*size=250/);
   });
 });
+
+describe('drawing the "attached to" column', () => {
+  /**
+   * The column cost one database query per row until 0.73.1. At the page sizes
+   * the register now offers that is 500 subrequests to draw one column, against
+   * a Cloudflare ceiling of 1,000 per request — it worked until it very
+   * suddenly would not.
+   *
+   * So the test counts queries rather than looking at the output: the number
+   * must not grow with the number of rows. That is the property; the rendered
+   * links are incidental and already covered above.
+   */
+  const attached = (h: any, n: number) => {
+    h.db.prepare(`INSERT INTO clients (id, ref, kind, full_name, status, created_at, updated_at)
+                  VALUES ('CL1','CL-0001','individual','A CLIENT','active',?,?)`).run(AT, AT);
+    h.db.prepare(`INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
+                                     created_at, updated_at)
+                  VALUES ('K1','CASE-26-001','CL1','A matter','wv_aewv','lead',?,?,?)`)
+      .run(USER.id, AT, AT);
+    for (let i = 1; i <= n; i++) {
+      h.db.prepare(
+        `INSERT INTO tasks (id, title, status, priority, assigned_to, entity_type, entity_id,
+                            created_at, updated_at)
+         VALUES (?, ?, 'open', 'normal', ?, 'case', 'K1', ?, ?)`,
+      ).run(`T${String(i).padStart(3, '0')}`, `Task T${String(i).padStart(3, '0')}`, USER.id, AT, AT);
+    }
+  };
+
+  /** Count the statements the page runs, by watching `prepare`. */
+  async function queriesFor(taskCount: number, size: number): Promise<number> {
+    const h = mount();
+    h.db.prepare(
+      `INSERT INTO users (id, email, name, password_hash, role, created_at, updated_at)
+       VALUES (?, ?, ?, 'x', ?, ?, ?)`,
+    ).run(USER.id, USER.email, USER.name, USER.role, AT, AT);
+    attached(h, taskCount);
+
+    let n = 0;
+    const real = h.db.prepare.bind(h.db);
+    (h.db as any).prepare = (sql: string) => { n++; return real(sql); };
+    await h.request(`/tasks?scope=all&who=&size=${size}`);
+    (h.db as any).prepare = real;
+    return n;
+  }
+
+  it('does not run more queries because there are more rows', async () => {
+    const few = await queriesFor(3, 100);
+    const many = await queriesFor(60, 100);
+    // Both pages draw the same column from the same four-queries-per-kind
+    // lookup, so the count is flat. A per-row SELECT would show ~57 more.
+    expect(many - few).toBeLessThanOrEqual(2);
+  });
+
+  it('stays well inside the subrequest ceiling at the largest page', async () => {
+    // Cloudflare allows 1,000 subrequests per request. A per-row query at
+    // size=500 would sit on that line; this must not be near it.
+    expect(await queriesFor(120, 500)).toBeLessThan(30);
+  });
+});

@@ -1057,6 +1057,12 @@ details[open] > summary { margin-bottom: 12px; }
   flex-wrap: wrap; margin-bottom: 14px;
 }
 .list-bar > .filters { flex: 1; margin-bottom: 0; min-width: 0; }
+.list-bar > .muted { margin-right: auto; }
+
+/* The copy above a list: the same steps and range, no rows-per-page. Sits
+   tighter than the one below, because it is between the filter and the first
+   row rather than at the end of the page. */
+.pager-top { margin-top: 0; margin-bottom: 8px; }
 .list-bar > .reveal { margin-top: 0; margin-left: auto; }
 /* Beats the standalone `.reveal[open] > summary.reveal-open` rule below, which
    has the same specificity and would otherwise win on source order and add

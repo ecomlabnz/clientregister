@@ -33,29 +33,80 @@ export function safeReturn(value: string | null | undefined, fallback = '/tasks'
   return value;
 }
 
-/** Human label + link for whatever a task is attached to. */
-async function entityLabel(env: any, type: string | null, id: string | null): Promise<{ href: string; label: string } | null> {
-  if (!type || !id) return null;
-  switch (type) {
-    case 'case': {
-      const row = await one<{ ref: string; title: string }>(env.DB, 'SELECT ref, title FROM cases WHERE id = ?', id);
-      return row ? { href: `/cases/${id}`, label: `${row.ref} — ${row.title}` } : null;
-    }
-    case 'client': {
-      const row = await one<{ ref: string; full_name: string }>(env.DB, 'SELECT ref, full_name FROM clients WHERE id = ?', id);
-      return row ? { href: `/clients/${id}`, label: `${row.ref} — ${row.full_name}` } : null;
-    }
-    case 'inquiry': {
-      const row = await one<{ ref: string; subject: string | null }>(env.DB, 'SELECT ref, subject FROM inquiries WHERE id = ?', id);
-      return row ? { href: `/inquiries/${id}`, label: `${row.ref} — ${row.subject ?? 'Inquiry'}` } : null;
-    }
-    case 'quote': {
-      const row = await one<{ ref: string }>(env.DB, 'SELECT ref FROM quotes WHERE id = ?', id);
-      return row ? { href: `/quotes/${id}`, label: row.ref } : null;
-    }
-    default:
-      return null;
+export interface EntityLink { href: string; label: string }
+
+/**
+ * Human label + link for whatever a task is attached to.
+ *
+ * One query per *kind* on the page, not one per row. The obvious version — a
+ * `SELECT` inside the loop that renders the list — cost a query per task, so a
+ * page of 500 spent 500 subrequests to draw one column. Cloudflare allows
+ * 1,000 per request, so it worked until it very suddenly would not: exactly
+ * the "a page anybody with a link could hang" that the page-size allow-list
+ * exists to prevent, reintroduced at a size the register itself offers.
+ *
+ * Four queries, whatever the page holds. Ids are interpolated rather than
+ * bound because the count varies; they are the register's own primary keys,
+ * read from rows this query just returned, and are filtered to the id shape
+ * before they go anywhere near the SQL — nothing here comes from a request.
+ */
+export async function entityLinks(
+  env: any, rows: Array<{ entity_type: string | null; entity_id: string | null }>,
+): Promise<Map<string, EntityLink>> {
+  const out = new Map<string, EntityLink>();
+  const byKind = new Map<string, Set<string>>();
+  for (const row of rows) {
+    if (!row.entity_type || !row.entity_id) continue;
+    // Belt and braces: an id is ours, and anything shaped otherwise is not
+    // looked up rather than being pasted into a statement.
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(row.entity_id)) continue;
+    if (!byKind.has(row.entity_type)) byKind.set(row.entity_type, new Set());
+    byKind.get(row.entity_type)!.add(row.entity_id);
   }
+
+  const shapes: Record<string, { sql: (ids: string) => string; label: (r: any) => string; path: string }> = {
+    case: {
+      sql: (ids) => `SELECT id, ref, title AS name FROM cases WHERE id IN (${ids})`,
+      label: (r) => `${r.ref} — ${r.name}`, path: 'cases',
+    },
+    client: {
+      sql: (ids) => `SELECT id, ref, full_name AS name FROM clients WHERE id IN (${ids})`,
+      label: (r) => `${r.ref} — ${r.name}`, path: 'clients',
+    },
+    inquiry: {
+      sql: (ids) => `SELECT id, ref, subject AS name FROM inquiries WHERE id IN (${ids})`,
+      label: (r) => `${r.ref} — ${r.name ?? 'Inquiry'}`, path: 'inquiries',
+    },
+    quote: {
+      sql: (ids) => `SELECT id, ref, NULL AS name FROM quotes WHERE id IN (${ids})`,
+      label: (r) => r.ref, path: 'quotes',
+    },
+  };
+
+  await Promise.all([...byKind].map(async ([kind, ids]) => {
+    const shape = shapes[kind];
+    if (!shape) return;
+    const list = [...ids].map((id) => `'${id}'`).join(',');
+    for (const row of await all<any>(env.DB, shape.sql(list))) {
+      out.set(`${kind}:${row.id}`, { href: `/${shape.path}/${row.id}`, label: shape.label(row) });
+    }
+  }));
+  return out;
+}
+
+/** The same, for a page showing one task. One row, so one query. */
+async function entityLabel(
+  env: any, type: string | null, id: string | null,
+): Promise<EntityLink | null> {
+  const links = await entityLinks(env, [{ entity_type: type, entity_id: id }]);
+  return linkFor(links, type, id);
+}
+
+/** The link for one task, from the map built above. */
+export function linkFor(
+  links: Map<string, EntityLink>, type: string | null, id: string | null,
+): EntityLink | null {
+  return type && id ? links.get(`${type}:${id}`) ?? null : null;
 }
 
 export const tasksModule: AppModule = {
@@ -128,7 +179,7 @@ export const tasksModule: AppModule = {
         ...(who === 'me' ? [nowIso().slice(0, 10), user.id] : [nowIso().slice(0, 10)]),
       );
 
-      const links = await Promise.all(rows.map((t: any) => entityLabel(c.env, t.entity_type, t.entity_id)));
+      const links = await entityLinks(c.env, rows);
       const users = await userOptions(c.env);
       const csrf = c.get('session')!.csrf;
       const writable = can(user, 'register:write');
@@ -174,6 +225,7 @@ export const tasksModule: AppModule = {
         </div>
 
         <div data-live-results>
+        ${pager({ page: pageNum, size: PAGE_SIZE, hasMore, shown: rows.length, href: listHref, compact: true })}
         ${rows.length === 0
           ? emptyState('Nothing here.')
           : table([
@@ -183,7 +235,9 @@ export const tasksModule: AppModule = {
               { label: 'Owner', width: '12', hideOn: 'sm' },
               { label: 'Status', width: '12', hideOn: 'sm' },
               { label: '', width: '14' },
-            ], rows.map((t: any, i: number) => html`
+            ], rows.map((t: any) => {
+              const link = linkFor(links, t.entity_type, t.entity_id);
+              return html`
               <tr id="${t.id}" class="${isOverdue(t.due_at) && t.status !== 'done' && t.status !== 'cancelled' ? 'row-urgent' : ''}">
                 <td><strong class="clamp-2"><a href="/tasks/${t.id}">${t.title}</a></strong>
                     ${t.priority !== 'normal' ? badge(PRIORITY_LABELS[t.priority as keyof typeof PRIORITY_LABELS], t.priority === 'urgent' ? 'red' : 'amber') : ''}
@@ -193,11 +247,11 @@ export const tasksModule: AppModule = {
                           t.completion_note_at ? html` ${dateShort(t.completion_note_at)}` : ''}:</strong> ${t.completion_note}</div>`
                       : ''}
                     <div class="row-meta show-sm">
-                      ${links[i] ? html`<a href="${links[i]!.href}">${links[i]!.label}</a>` : ''}
+                      ${link ? html`<a href="${link.href}">${link.label}</a>` : ''}
                       ${badge(TASK_STATUS_LABELS[t.status as keyof typeof TASK_STATUS_LABELS] ?? t.status, statusTone(t.status))}
                       <span class="muted">${t.assignee_name ?? ''}</span>
                     </div></td>
-                <td class="small col-sm-hide">${links[i] ? html`<a href="${links[i]!.href}">${links[i]!.label}</a>` : '—'}</td>
+                <td class="small col-sm-hide">${link ? html`<a href="${link.href}">${link.label}</a>` : '—'}</td>
                 <td class="small">${t.due_at ? html`${dateShort(t.due_at)}<div class="muted">${relativeDays(t.due_at)}</div>` : '—'}</td>
                 <td class="small col-sm-hide">${t.assignee_name ?? '—'}</td>
                 <td class="col-sm-hide">${badge(TASK_STATUS_LABELS[t.status as keyof typeof TASK_STATUS_LABELS] ?? t.status, statusTone(t.status))}</td>
@@ -210,7 +264,8 @@ export const tasksModule: AppModule = {
                     <button class="btn btn-small btn-secondary js-hide" type="submit">Set</button>
                   </form>
                   <a class="btn btn-small btn-secondary" href="/tasks/${t.id}/edit">Edit</a>` : ''}</td>
-              </tr>`), { sticky: true, fixed: true, empty: 'Nothing here.' })}
+              </tr>`;
+            }), { sticky: true, fixed: true, empty: 'Nothing here.' })}
         ${pager({ page: pageNum, size: PAGE_SIZE, hasMore, shown: rows.length, href: listHref })}
         </div>`);
     });

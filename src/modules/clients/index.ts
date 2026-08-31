@@ -530,6 +530,7 @@ export const clientsModule: AppModule = {
           <button class="btn btn-secondary" type="submit">Filter</button>
         </form>
         <div data-live-results>
+        ${pager({ page: pageNum, size: PAGE_SIZE, hasMore, shown: shown.length, href: listHref, compact: true })}
         ${table([
           { label: 'Reference', width: '14', hideOn: 'sm', sort: 'ref' },
           { label: 'Name', width: '30', sort: 'name' },

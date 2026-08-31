@@ -32,6 +32,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.73.1', date: '1 September 2026',
+    notes: [
+      'Previous and Next now also sit above each list, so you can turn the page without '
+        + 'scrolling to the bottom and back.',
+      'Adding a user (Settings \u2192 Users) is behind a button too, like adding a task.',
+      'The task list drew its \u201cattached to\u201d column with one database lookup per row \u2014 '
+        + 'fine at 25 rows, close to a hard limit at 500. It now does the same work in a '
+        + 'handful of lookups however long the page is.',
+    ],
+  },
+  {
     version: '0.73.0', date: '1 September 2026',
     notes: [
       'The New task button now sits at the top of the task list, beside the filter. '
