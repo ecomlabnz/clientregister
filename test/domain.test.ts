@@ -88,3 +88,46 @@ describe('storing a date somebody typed', () => {
     expect(dateOrDateTime('2026-08-20T03:45:00.000Z')).toContain(':');
   });
 });
+
+/**
+ * Compliance is a state a file is in, not a kind of work.
+ *
+ * Asked for by the practice on 1 September 2026, on a matter whose entire file
+ * was an audio recording of a voluntary INZ Investigations interview. The
+ * extraction had invented a case *type* for it; the practice's answer was that
+ * what INZ is doing there is not work the practice takes on — it is something
+ * that happens to a file, and the file can be in that state whatever the
+ * application underneath it was.
+ */
+describe('a matter under investigation', () => {
+  it('is a status the register knows', () => {
+    expect(isCaseStatus('inz_investigation')).toBe(true);
+    expect(CASE_STATUS_LABELS.inz_investigation).toBe('Under INZ investigation');
+    expect(CASE_STATUS_HELP.inz_investigation).toBeTruthy();
+  });
+
+  it('counts as live work', () => {
+    // A file INZ is asking questions about is the opposite of finished.
+    expect(isOpenStatus('inz_investigation')).toBe(true);
+    expect(OPEN_CASE_STATUSES).toContain('inz_investigation');
+  });
+
+  it('can be entered from anywhere the file is still live', () => {
+    // An investigation does not wait for a convenient moment.
+    for (const from of ['engaged', 'gathering_documents', 'preparing', 'lodged', 'ppi', 'approved'] as const) {
+      expect(canTransition(from, 'inz_investigation'), `from ${from}`).toBe(true);
+    }
+  });
+
+  it('leads back to everywhere the file was going', () => {
+    // It interrupts an application; it does not replace it.
+    for (const to of ['lodged', 'approved', 'declined', 'withdrawn', 'closed'] as const) {
+      expect(canTransition('inz_investigation', to), `to ${to}`).toBe(true);
+    }
+  });
+
+  it('is not a decided status', () => {
+    // Nothing has been decided. It must not be mistaken for an outcome.
+    expect(CASE_STATUS_LABELS.inz_investigation).not.toMatch(/approved|declined|granted/i);
+  });
+});

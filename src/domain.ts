@@ -20,6 +20,12 @@ export const CASE_STATUSES = [
   'declined',
   'ipt_appeal',
   'reconsideration',
+  // Compliance rather than an application. Asked for by the practice on
+  // 1 September 2026, on a matter whose entire file was an audio recording of a
+  // voluntary INZ Investigations interview: what INZ is doing there is not a
+  // kind of work the practice takes on, it is a state the file is in, and the
+  // file can be in it whatever the application underneath was.
+  'inz_investigation',
   'on_hold',
   'withdrawn',
   'closed',
@@ -42,6 +48,7 @@ export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
   declined: 'Declined',
   ipt_appeal: 'IPT appeal',
   reconsideration: 'Reconsideration',
+  inz_investigation: 'Under INZ investigation',
   on_hold: 'On hold',
   withdrawn: 'Withdrawn',
   closed: 'Closed',
@@ -64,6 +71,7 @@ export const CASE_STATUS_HELP: Record<CaseStatus, string> = {
   declined: 'Refused — consider appeal, reconsideration or a fresh application.',
   ipt_appeal: 'With the Immigration and Protection Tribunal. Their timetable, not INZ\u2019s.',
   reconsideration: 'Asking INZ to look at its own decision again, or a s.61 request.',
+  inz_investigation: 'INZ Investigations or MBIE is asking questions — answer carefully and record everything.',
   on_hold: 'Paused at the client’s request or pending an external event.',
   withdrawn: 'Withdrawn before decision.',
   closed: 'File closed; no further action.',
@@ -72,7 +80,8 @@ export const CASE_STATUS_HELP: Record<CaseStatus, string> = {
 /** Statuses that count as live work for dashboards and workload counts. */
 export const OPEN_CASE_STATUSES: CaseStatus[] = [
   'lead', 'engaged', 'gathering_documents', 'preparing', 'ready_to_lodge',
-  'lodged', 'ppi', 'interim_visa', 'decision_pending', 'ipt_appeal', 'reconsideration', 'on_hold',
+  'lodged', 'ppi', 'interim_visa', 'decision_pending', 'ipt_appeal', 'reconsideration',
+  'inz_investigation', 'on_hold',
 ];
 
 /** Statuses that carry a deadline the practice must not miss. */
@@ -118,20 +127,26 @@ export function isOpenStatus(status: string): boolean {
  */
 export const CASE_TRANSITIONS: Record<CaseStatus, CaseStatus[]> = {
   lead: ['engaged', 'on_hold', 'withdrawn', 'closed'],
-  engaged: ['gathering_documents', 'preparing', 'on_hold', 'withdrawn', 'closed'],
-  gathering_documents: ['preparing', 'ready_to_lodge', 'on_hold', 'withdrawn', 'closed'],
-  preparing: ['gathering_documents', 'ready_to_lodge', 'on_hold', 'withdrawn', 'closed'],
+  engaged: ['gathering_documents', 'preparing', 'on_hold', 'withdrawn', 'closed', 'inz_investigation'],
+  gathering_documents: ['preparing', 'ready_to_lodge', 'on_hold', 'withdrawn', 'closed', 'inz_investigation'],
+  preparing: ['gathering_documents', 'ready_to_lodge', 'on_hold', 'withdrawn', 'closed', 'inz_investigation'],
   ready_to_lodge: ['lodged', 'preparing', 'gathering_documents', 'on_hold', 'withdrawn', 'closed'],
-  lodged: ['ppi', 'interim_visa', 'decision_pending', 'approved', 'declined', 'withdrawn', 'on_hold'],
-  ppi: ['gathering_documents', 'decision_pending', 'approved', 'declined', 'withdrawn', 'on_hold'],
+  lodged: ['ppi', 'interim_visa', 'decision_pending', 'approved', 'declined', 'withdrawn', 'on_hold', 'inz_investigation'],
+  ppi: ['gathering_documents', 'decision_pending', 'approved', 'declined', 'withdrawn', 'on_hold', 'inz_investigation'],
   interim_visa: ['ppi', 'decision_pending', 'approved', 'declined', 'withdrawn', 'on_hold'],
   decision_pending: ['approved', 'declined', 'ppi', 'withdrawn', 'on_hold'],
-  approved: ['closed', 'on_hold'],
+  approved: ['closed', 'on_hold', 'inz_investigation'],
   // A refusal can be taken to the Tribunal or put back to INZ, and either can
   // end in a grant, so both routes lead on to the same places.
   declined: ['ipt_appeal', 'reconsideration', 'closed', 'on_hold'],
   ipt_appeal: ['approved', 'declined', 'closed', 'on_hold', 'withdrawn'],
   reconsideration: ['approved', 'declined', 'ipt_appeal', 'closed', 'on_hold', 'withdrawn'],
+  // An investigation does not replace the application; it interrupts it. So it
+  // leads back to every place a live file can be, as well as to an end.
+  inz_investigation: [
+    'engaged', 'gathering_documents', 'preparing', 'ready_to_lodge', 'lodged',
+    'ppi', 'decision_pending', 'approved', 'declined', 'withdrawn', 'closed', 'on_hold',
+  ],
   on_hold: [...CASE_STATUSES].filter((s) => s !== 'on_hold') as CaseStatus[],
   withdrawn: ['closed', 'engaged'],
   closed: ['engaged', 'on_hold'],
