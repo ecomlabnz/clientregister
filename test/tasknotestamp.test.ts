@@ -102,12 +102,15 @@ describe('and an undated note cannot be written again', () => {
 
 describe('what the task page does with it', () => {
   it('shows when the note was written, and by whom when that is known', () => {
-    expect(tasks).toContain('Written ${dateTime(task.completion_note_at)}');
+    // Both the page and the list say when. Written against the helper rather
+    // than a formatter's name: what matters is that a moment is rendered as a
+    // moment — with its time — not which function does it.
+    expect(tasks).toContain('stamp(task.completion_note_at)');
     expect(tasks).toContain('noteAuthor ? html` by ${noteAuthor.name}`');
   });
 
   it('dates the note in the list as well', () => {
-    expect(tasks).toContain('dateShort(t.completion_note_at)');
+    expect(tasks).toContain('stamp(t.completion_note_at)');
   });
 
   it('does not redate a note that was not touched', () => {

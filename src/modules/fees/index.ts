@@ -18,7 +18,9 @@ import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
-import { badge, card, collapsibleCard, csrfField, field, optionsFrom, pageHeader, select, statusTone, table } from '../../ui/components';
+import {
+  badge, card, collapsibleCard, csrfField, field, optionsFrom, pageHeader, select, stamp, statusTone, table,
+} from '../../ui/components';
 import { dateShort, money } from '../../ui/format';
 import { addEntry } from '../../core/timeline';
 import {
@@ -556,7 +558,7 @@ export const feesModule: AppModule = {
         ${card('Fee lines', table(['Date', 'Case', 'Client', 'Line', 'Net', 'GST', 'Gross', 'Status'],
           rows.map((row) => html`
             <tr>
-              <td class="small">${dateShort(row.created_at)}</td>
+              <td class="small">${stamp(row.created_at)}</td>
               <td><a href="/cases/${row.case_id}"><code>${row.case_ref}</code></a></td>
               <td class="small">${row.client_name}</td>
               <td class="small">${row.description}</td>

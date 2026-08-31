@@ -17,10 +17,9 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import {
-  actionButton, badge, card, csrfField, emptyState, errorList, field, optionsFrom,
-  pageHeader, select, statusTone, table,
+  actionButton, badge, card, csrfField, emptyState, errorList, field, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
 } from '../../ui/components';
-import { dateInputValue, dateShort, dateTime, truncate } from '../../ui/format';
+import { dateInputValue, dateOrDateTime, dateShort, dateTime, truncate } from '../../ui/format';
 import {
   CASE_STATUS_LABELS, ENTRY_KIND_LABELS, ENTRY_KINDS,
   INQUIRY_SOURCE_LABELS, INQUIRY_SOURCES, INQUIRY_STATUS_LABELS, INQUIRY_STATUSES,
@@ -30,7 +29,9 @@ import { countryCodeFor, countryOptions } from '../../core/countries';
 import { setNationalityStatements } from '../../core/nationalities';
 import { clientOptions, isAssignable, userOptions } from '../../core/lookups';
 import { composeFullName, familyNameFor, plainAscii, splitFullName } from '../../core/names';
-import { addEntry, listEntries } from '../../core/timeline';
+import {
+  CORRECTION_WINDOW_MINUTES, addEntry, correctable, listEntries,
+} from '../../core/timeline';
 import { openThreadCount } from '../../core/channels';
 import { can } from '../../core/rbac';
 import { caseTypes, isTerm, labelFor, termOptions } from '../../core/vocabulary';
@@ -238,7 +239,7 @@ export const inquiriesModule: AppModule = {
           : ['Reference', 'Received', 'From', 'Subject', 'Source', 'Status'], rows.map((row) => html`
           <tr>
             <td><a href="/inquiries/${row.id}"><code>${row.ref}</code></a></td>
-            <td class="small">${dateShort(row.received_at)}</td>
+            <td class="small">${stamp(row.received_at)}</td>
             <td class="small">${row.client_name
               ? html`<a href="/clients/${row.client_id}">${row.client_name}</a>`
               : html`${row.contact_name ?? row.contact_email ?? row.contact_phone ?? '—'}`}</td>
@@ -357,7 +358,7 @@ export const inquiriesModule: AppModule = {
       return page(c, { title: inq.ref, active: '/inquiries' }, html`
         ${breadcrumbs([{ href: '/inquiries', label: 'Inquiries' }, { label: inq.ref }])}
         ${pageHeader(inq.subject || `Inquiry ${inq.ref}`,
-          `${inq.ref} · ${INQUIRY_SOURCE_LABELS[inq.source]} · received ${dateTime(inq.received_at)}`,
+          `${inq.ref} · ${INQUIRY_SOURCE_LABELS[inq.source]} · received ${stamp(inq.received_at)}`,
           writable
             ? html`<a class="btn btn-secondary" href="/inquiries/${inq.id}/edit">Edit</a>
                    ${inq.client_id
@@ -472,13 +473,18 @@ export const inquiriesModule: AppModule = {
                 </form>` : ''}
               ${entries.length === 0 ? emptyState('Nothing recorded yet.') : html`
                 <ul class="timeline">${entries.map((e) => html`
-                  <li class="timeline-item">
-                    <div class="timeline-meta">
-                      ${badge(ENTRY_KIND_LABELS[e.kind] ?? e.kind, e.kind === 'system' ? 'grey' : 'neutral')}
-                      <span class="muted small">${dateTime(e.occurred_at)}${e.author_name ? ` · ${e.author_name}` : ''}</span>
-                    </div>
-                    <div class="timeline-body">${e.body}</div>
-                  </li>`)}</ul>`}`)}
+                  ${timelineItem({
+                    entry: e,
+                    kindLabel: ENTRY_KIND_LABELS[e.kind] ?? e.kind,
+                    happened: stamp(e.occurred_at),
+                    written: stamp(e.created_at),
+                    correction: writable && correctable(e, c.get('user')?.id ?? null)
+                      ? { csrf, minutes: CORRECTION_WINDOW_MINUTES,
+                          kindOptions: optionsFrom(
+                            ENTRY_KINDS.filter((k) => k !== 'system') as any,
+                            ENTRY_KIND_LABELS as any) }
+                      : null,
+                  })}`)}</ul>`}`)}
           </div>
 
           <div class="col-side">

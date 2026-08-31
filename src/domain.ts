@@ -233,11 +233,17 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 };
 
 export const ENTRY_KINDS = [
-  'note', 'call', 'meeting', 'email_in', 'email_out', 'message', 'system', 'file',
+  'note', 'prelim_consult', 'call', 'meeting', 'email_in', 'email_out', 'message',
+  'system', 'file',
 ] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
 export const ENTRY_KIND_LABELS: Record<EntryKind, string> = {
-  note: 'Note', call: 'Phone call', meeting: 'Meeting', email_in: 'Email received',
+  note: 'Note',
+  // Asked for by the practice on 1 September 2026. A first meeting is the one
+  // that decides whether there is a matter at all, and what was said in it is
+  // the thing most often gone back to.
+  prelim_consult: 'Preliminary consultation',
+  call: 'Phone call', meeting: 'Meeting', email_in: 'Email received',
   email_out: 'Email sent', message: 'Message', system: 'System', file: 'Document',
 };
 

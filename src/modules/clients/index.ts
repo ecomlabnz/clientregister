@@ -27,16 +27,19 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
-  actionButton, badge, card, csrfField, emptyState, errorList, field, optionsFrom,
-  pageHeader, select, statusTone, table,
+  actionButton, badge, card, csrfField, emptyState, errorList, field, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
 } from '../../ui/components';
-import { dateInputValue, dateShort, dateTime, isOverdue, money, relativeDays, truncate } from '../../ui/format';
+import {
+  dateInputValue, dateOrDateTime, dateShort, dateTime, isOverdue, money, relativeDays, truncate,
+} from '../../ui/format';
 import {
   CASE_STATUS_LABELS, CLIENT_STATUSES, CLIENT_STATUS_LABELS,
   ENTRY_KINDS, ENTRY_KIND_LABELS, PARTY_ROLE_LABELS, QUOTE_STATUS_LABELS, type ClientStatus,
 } from '../../domain';
 import { organisationOptions, userOptions } from '../../core/lookups';
-import { addEntry, listEntries } from '../../core/timeline';
+import {
+  CORRECTION_WINDOW_MINUTES, addEntry, correctable, listEntries,
+} from '../../core/timeline';
 import { casesForClient, relatedClients } from '../../core/parties';
 import { can } from '../../core/rbac';
 import { preferencesFor } from '../../core/preferences';
@@ -597,7 +600,7 @@ export const clientsModule: AppModule = {
             <td class="small">${row.email ?? ''}${row.email && row.phone ? raw('<br>') : ''}${row.phone ?? ''}</td>
             <td class="col-sm-hide">${badge(CLIENT_STATUS_LABELS[row.status], statusTone(row.status))}</td>
             <td class="col-sm-hide">${row.open_cases || '—'}</td>
-            <td class="small col-sm-hide">${dateShort(row.updated_at)}</td>
+            <td class="small col-sm-hide">${stamp(row.updated_at)}</td>
           </tr>`), { sticky: true, fixed: true, empty: 'No clients match that.',
             // Sorting resets to page one: the second page of one order holds
             // different rows from the second page of another.
@@ -920,7 +923,7 @@ export const clientsModule: AppModule = {
                 <td>${truncate(qt.description, 70)}</td>
                 <td>${money(qt.amount_cents + qt.gst_cents + qt.disbursements_cents, qt.currency)}</td>
                 <td>${badge(QUOTE_STATUS_LABELS[qt.status as keyof typeof QUOTE_STATUS_LABELS] ?? qt.status, statusTone(qt.status))}</td>
-                <td class="small">${dateShort(qt.created_at)}</td>
+                <td class="small">${stamp(qt.created_at)}</td>
               </tr>`)))}
 
             ${card('Timeline', html`
@@ -935,14 +938,18 @@ export const clientsModule: AppModule = {
               </form>` : ''}
               ${entries.length === 0 ? emptyState('No timeline entries yet.') : html`
                 <ul class="timeline">
-                  ${entries.map((e) => html`
-                    <li class="timeline-item">
-                      <div class="timeline-meta">
-                        ${badge(ENTRY_KIND_LABELS[e.kind] ?? e.kind, e.kind === 'system' ? 'grey' : 'neutral')}
-                        <span class="muted small">${dateTime(e.occurred_at)}${e.author_name ? ` · ${e.author_name}` : ''}</span>
-                      </div>
-                      <div class="timeline-body">${e.body}</div>
-                    </li>`)}
+                  ${entries.map((e) => timelineItem({
+                    entry: e,
+                    kindLabel: ENTRY_KIND_LABELS[e.kind] ?? e.kind,
+                    happened: stamp(e.occurred_at),
+                    written: stamp(e.created_at),
+                    correction: writable && correctable(e, c.get('user')?.id ?? null)
+                      ? { csrf, minutes: CORRECTION_WINDOW_MINUTES,
+                          kindOptions: optionsFrom(
+                            ENTRY_KINDS.filter((k) => k !== 'system') as any,
+                            ENTRY_KIND_LABELS as any) }
+                      : null,
+                  }))}
                 </ul>`}`)}
 
             ${card('Files', filesPanel({
@@ -1258,7 +1265,7 @@ export const clientsModule: AppModule = {
                               t.last_direction === 'out' ? 'You: ' : ''}${t.last_body}</div>`
                           : ''}
                       </div>
-                      <div class="small muted">${dateShort(t.last_message_at)}</div>
+                      <div class="small muted">${stamp(t.last_message_at)}</div>
                     </li>`)}
                   </ul>`)
               : ''}
@@ -1290,7 +1297,7 @@ export const clientsModule: AppModule = {
               ? emptyState('None recorded.')
               : html`<ul class="list">${inquiries.map((i: any) => html`
                   <li><a href="/inquiries/${i.id}">${i.subject || i.ref}</a>
-                      <span class="muted small">${dateShort(i.received_at)}</span></li>`)}</ul>`)}
+                      <span class="muted small">${stamp(i.received_at)}</span></li>`)}</ul>`)}
 
             ${card('Notes', html`<p class="prewrap">${client.notes || '—'}</p>`)}
           </div>

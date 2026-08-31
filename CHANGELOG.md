@@ -7,6 +7,63 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.82.0 — 1 September 2026
+
+### Added
+- **Five minutes to fix a slip.** A file note was saved with the wrong date on
+  it and there was no way to put it right.
+
+  Migration 0014 made entries append-only and that reasoning still holds in
+  full: a note editable months later is not a record of what happened, it is a
+  record of what somebody now wishes had happened, and it is worth nothing in a
+  complaint, a standards inquiry or a Tribunal appeal. What migration 0052
+  admits is narrower. For the first five minutes a note is not yet a record
+  anybody has relied on — it is the sentence just typed, with the wrong date in
+  it, still on the screen. Refusing that correction does not protect the file;
+  it puts a wrong date on it forever, with a second note underneath explaining
+  the first.
+
+  The window is deliberately hard, and the database enforces it, not the
+  screen: five minutes from when the note was written, once, by the person who
+  wrote it, and only the text, the kind and the date it happened. Who wrote it,
+  when it was written and what it is attached to cannot change at all, and a
+  correction that does not mark itself as one is refused — so a corrected note
+  always shows as corrected. The previous text goes to the audit log, which is
+  append-only without exception.
+
+- **"Preliminary consultation" is a kind of note.** A first meeting is the one
+  that decides whether there is a matter at all, and what was said in it is the
+  thing most often gone back to.
+
+- **"Brief" is a document category.** Categories are vocabulary an
+  administrator edits in Settings, but the register has held the defaults
+  unchanged since it was seeded, so migration 0053 adds it to the value
+  actually stored — once, and skipped if it is already there.
+
+### Changed
+- **A timestamp shows the time, everywhere.** A file with two notes written the
+  same afternoon has to be able to say which came first, and "01 Sept 2026"
+  cannot. Every moment the register recorded — when a note was written, when a
+  record was updated, when a message arrived — now shows date and time.
+
+  Set a size or two smaller than the text around it, in `em` so it stays in
+  proportion wherever it sits, with the time smaller and quieter again than the
+  date: a timestamp is a thing you check, not a thing you read, and at the size
+  of the sentence beside it it competes with the sentence.
+
+  Dates that are genuinely dates — a birthday, a visa expiry, the day a matter
+  was lodged — are untouched. They have no time and must not be given a made-up
+  one.
+
+### How it is built
+- `stamp()` in `ui/components.ts` is the one renderer, and it decides from the
+  stored value: an instant gets its time, a date somebody typed does not.
+- `timelineItem()` is shared by clients, matters and inquiries, which had three
+  copies of the same markup that had already drifted apart.
+- The correction rule lives in `core/timeline.ts` for the screen and in the
+  0052 trigger for everything else. The tests attack the database directly —
+  late, twice, silent, backdated, and each field that may never change.
+
 ## 0.81.0 — 31 August 2026
 
 ### Changed

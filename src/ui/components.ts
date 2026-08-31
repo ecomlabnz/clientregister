@@ -1,6 +1,7 @@
 /** Shared building blocks for the server-rendered UI. */
 
 import { html, join, raw, type Raw } from './html';
+import { dateOrDateTime, isDateOnly } from './format';
 
 export function badge(text: string, tone: 'neutral' | 'green' | 'amber' | 'red' | 'blue' | 'grey' = 'neutral'): Raw {
   return html`<span class="badge badge-${raw(tone)}">${text}</span>`;
@@ -66,6 +67,100 @@ export function collapsibleCard(title: string, body: Raw, note?: string): Raw {
         <div class="card-body">${body}</div>
       </details>
     </section>`;
+}
+
+/**
+ * A moment the register recorded, as date and time.
+ *
+ * The practice's decision, 1 September 2026: wherever the register shows when
+ * something happened, it shows the time as well as the date. A file with two
+ * notes written the same afternoon has to be able to say which came first, and
+ * "01 Sept 2026" cannot.
+ *
+ * Set smaller than the text around it — a step or two down, in `em`, so it
+ * stays in proportion wherever it is used. A timestamp is a thing you check,
+ * not a thing you read, and at the same size as the sentence beside it it
+ * competes with the sentence.
+ *
+ * Only for instants. A date somebody typed — a birthday, a visa expiry, the day
+ * a matter was lodged — has no time and must not be given a made-up one, so
+ * `dateShort` still renders those.
+ */
+export function stamp(value: string | null | undefined): Raw {
+  const formatted = dateOrDateTime(value);
+  if (!formatted) return html`<span class="muted">—</span>`;
+  // "01 Sept 2026, 1:32 pm" — the comma is where the two parts divide.
+  const at = formatted.lastIndexOf(', ');
+  if (isDateOnly(value) || at < 0) return html`<span class="stamp">${formatted}</span>`;
+  return html`<span class="stamp">${formatted.slice(0, at)}<span
+    class="stamp-time">${formatted.slice(at)}</span></span>`;
+}
+
+/**
+ * One item on a timeline, with the correction form when there is still time.
+ *
+ * The same on a client, a matter and an inquiry, because a note means the same
+ * thing on each. Written once here rather than three times in three modules,
+ * which is how the three drifted apart before.
+ *
+ * The correction form is a `<details>`, so it costs nothing until it is opened
+ * and needs no script — and it is only rendered while the note may actually be
+ * corrected. A button that fails when pressed teaches people not to trust
+ * buttons.
+ */
+export function timelineItem(opts: {
+  entry: {
+    id: string; kind: string; body: string; occurred_at: string; created_at: string;
+    edited_at?: string | null; author_name?: string | null;
+    document_id?: string | null; document_name?: string | null;
+  };
+  kindLabel: string;
+  /** Rendered by `stamp`, so a timeline reads like the rest of the page. */
+  happened: Raw;
+  written: Raw;
+  /** Null when this note can no longer be corrected, which is the usual case. */
+  correction: { csrf: string; kindOptions: Array<{ value: string; label: string }>; minutes: number } | null;
+}): Raw {
+  const { entry } = opts;
+  return html`
+    <li class="timeline-item">
+      <div class="timeline-meta">
+        <span class="badge badge-${raw(entry.kind === 'system' ? 'grey' : 'neutral')}">${opts.kindLabel}</span>
+        <span class="muted small">${opts.happened}${entry.author_name ? ` · ${entry.author_name}` : ''}</span>
+        ${'' /* When it was written, always — not only when it differs from the
+                 day it happened. "Which of these two notes did I write first"
+                 is asked of a file often enough that the answer belongs on the
+                 page rather than in the database. */}
+        <span class="muted small">written ${opts.written}</span>
+        ${entry.edited_at ? html`<span class="badge badge-amber">corrected</span>` : ''}
+      </div>
+      <div class="timeline-body">${entry.body}</div>
+      ${entry.document_id
+        ? html`<p class="small mt">
+                 <a href="/documents/${entry.document_id}">${entry.document_name ?? 'Attached file'}</a>
+               </p>`
+        : ''}
+      ${opts.correction ? html`
+        <details class="reveal-inline">
+          <summary class="small">Correct this note</summary>
+          <form method="post" action="/entries/${entry.id}/correct" class="entry-form">
+            <input type="hidden" name="_csrf" value="${opts.correction.csrf}">
+            ${field({ label: 'Note', name: 'body', type: 'textarea', rows: 4, required: true,
+                      maxlength: 20000, value: entry.body })}
+            <div class="row-form">
+              ${select({ label: 'Kind', name: 'kind', value: entry.kind, includeBlank: false,
+                         options: opts.correction.kindOptions })}
+              ${field({ label: 'It happened on', name: 'occurred_at', type: 'date',
+                        value: entry.occurred_at.slice(0, 10) })}
+            </div>
+            <button class="btn btn-secondary btn-small" type="submit">Save the correction</button>
+            <p class="hint">Only for ${String(opts.correction.minutes)} minutes after a note is
+               written, and only once. After that the note stands and a correction goes in as a new
+               note — that is what makes the file worth something later. What it said before is
+               kept in the audit log either way.</p>
+          </form>
+        </details>` : ''}
+    </li>`;
 }
 
 /**
