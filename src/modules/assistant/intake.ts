@@ -141,9 +141,9 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
                  there is nowhere to keep it until R2 is switched on. Attach it to the matter
                  afterwards if you need it on the file.</p>
               <p class="small"><strong>Passport numbers are not extracted</strong>, even when they
-                 are in the document. That column is encrypted, and pulling numbers out here would
-                 write them in the clear into the run log on the way past. It is one field, typed
-                 once, on the client's record.</p>
+                 are in the document. Pulling them out here would write them into the run log on the
+                 way past, and a passport number belongs in one place only — typed once, on the
+                 client's record, and kept out of exports.</p>
               <p class="small">Every reading is recorded — what was asked, what came back, how long
                  it took — so anything acted on months from now can still be traced.</p>`)}
           </div>

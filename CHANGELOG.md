@@ -7,6 +7,46 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.80.0 — 31 August 2026
+
+### Added
+- **The reader takes Word documents.** A partnership information form was
+  dropped into the intake tool and came back "this cannot read". Nothing was
+  wrong with the file: a `.docx` is not a document in the way a PDF is, it is a
+  ZIP archive whose words live in one entry inside it. Its bytes are not text
+  and no model reads them, so there was simply nothing here that could open it.
+
+  `core/docx.ts` opens it — finds `word/document.xml`, inflates it, and turns
+  WordprocessingML into the text a person would have copied out by hand.
+  Paragraphs become lines, a table row stays on one line with its cells apart,
+  breaks and tabs survive, and text the author had deleted under tracked
+  changes is left out, because a crossing-out is not part of the document.
+
+  Written rather than installed, for two reasons. The libraries that do this
+  each carry a ZIP implementation, and the platform already has the only piece
+  that is hard: `DecompressionStream('deflate-raw')` is exactly the
+  decompressor a ZIP entry needs. And a dependency that unpacks untrusted
+  archives is a large thing to take on trust for a job this size.
+
+  Still refused, and now saying which: `.doc`, the old binary format, and a
+  password-protected document.
+
+### Security
+- **A Word document is decided by what is inside it, not by its name.** The
+  browser's media type comes from the file extension, so it is absent as often
+  as it is wrong; a spreadsheet renamed `.docx` is turned away by its contents.
+- **An archive that inflates past 8 MB is refused.** An upload limit is no
+  protection against what is inside the upload: a few kilobytes of zeroes claim
+  ten megabytes. Proven with an archive built to do exactly that.
+
+### Fixed
+- **The intake page said passport numbers are not extracted "because that
+  column is encrypted".** The rule is right and the reason was out of date —
+  the column stopped being encrypted on 30 August, by the practice's explicit
+  decision, and the passage was left behind. Corrected here and in the comment
+  on `ai/brief.ts` that made the same claim. Passport numbers are still never
+  extracted and still stay out of exports.
+
 ## 0.79.0 — 31 August 2026
 
 ### Changed

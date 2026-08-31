@@ -24,6 +24,7 @@ import { sha256Hex } from '../core/crypto';
 import { nowIso, one, run } from '../core/db';
 import { base64Encode } from '../core/ids';
 import { getProvider, type IntakeFile, type IntakeResult } from './provider';
+import { DOCX_MEDIA_TYPE, docxToText, isDocxArchive } from '../core/docx';
 
 /** What may be uploaded, and how each kind reaches the model. */
 const TEXTUAL = [
@@ -31,23 +32,31 @@ const TEXTUAL = [
   'message/rfc822', 'text/rfc822-headers',
 ];
 const BINARY = ['application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+/**
+ * Word documents, which are neither. A .docx is a ZIP archive: its bytes are
+ * not text and no model reads them, so it is unpacked here and the words go up
+ * as text. See `core/docx.ts`. `.doc`, the old binary format, is not read.
+ */
+const UNPACKED = [DOCX_MEDIA_TYPE];
 
-export const ACCEPTED_UPLOADS = [...TEXTUAL, ...BINARY];
+export const ACCEPTED_UPLOADS = [...TEXTUAL, ...BINARY, ...UNPACKED];
 
 /** 8 MB each: enough for a scanned letter, small enough not to be a weapon. */
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 export const MAX_UPLOADS = 5;
 
 export function describeAccepted(): string {
-  return 'Text, Markdown, CSV, HTML, JSON, .eml, PDF, PNG, JPEG, GIF or WebP.';
+  return 'Word (.docx), PDF, Text, Markdown, CSV, HTML, JSON, .eml, PNG, JPEG, GIF or WebP.';
 }
 
 /**
  * Turn an uploaded file into something a provider can take.
  *
- * The media type is decided here rather than trusted from the browser for the
- * two that matter — a PDF and a PNG have unmistakable first bytes, and a file
- * claiming to be a PDF that is not would otherwise be forwarded as one.
+ * The media type is decided here rather than trusted from the browser. For a
+ * PDF or a PNG that is because the first bytes are unmistakable and a file
+ * claiming to be a PDF that is not would otherwise be forwarded as one. For a
+ * Word document it is because the browser's answer comes from the extension,
+ * so it is absent as often as it is wrong.
  */
 export async function readUpload(file: File): Promise<IntakeFile | { error: string }> {
   const name = file.name || 'attachment';
@@ -61,6 +70,13 @@ export async function readUpload(file: File): Promise<IntakeFile | { error: stri
   const claimed = (file.type || '').split(';')[0]!.trim().toLowerCase();
   const mediaType = sniffed ?? claimed;
 
+  if (mediaType === DOCX_MEDIA_TYPE) {
+    // Unpacked rather than forwarded: the archive's bytes mean nothing to a
+    // model, and the words inside it are all anybody wanted.
+    const read = await docxToText(bytes);
+    if ('error' in read) return { error: `${name} could not be read — ${read.error}.` };
+    return { name, mediaType, text: read.text };
+  }
   if (BINARY.includes(mediaType)) {
     return { name, mediaType, data: base64Encode(bytes) };
   }
@@ -70,7 +86,7 @@ export async function readUpload(file: File): Promise<IntakeFile | { error: stri
   return { error: `${name} is a ${mediaType || 'kind of file'} this cannot read. ${describeAccepted()}` };
 }
 
-/** First bytes, for the formats where guessing wrong matters. */
+/** What the bytes say the file is, for the formats where guessing wrong matters. */
 function sniff(bytes: Uint8Array): string | null {
   const starts = (...sig: number[]): boolean => sig.every((b, i) => bytes[i] === b);
   if (starts(0x25, 0x50, 0x44, 0x46)) return 'application/pdf';               // %PDF
@@ -78,6 +94,9 @@ function sniff(bytes: Uint8Array): string | null {
   if (starts(0xff, 0xd8, 0xff)) return 'image/jpeg';
   if (starts(0x47, 0x49, 0x46, 0x38)) return 'image/gif';
   if (starts(0x52, 0x49, 0x46, 0x46) && bytes[8] === 0x57 && bytes[9] === 0x45) return 'image/webp';
+  // A Word document has no signature of its own — it is a ZIP, like a
+  // spreadsheet or a slide deck — so this one is settled by what is inside.
+  if (isDocxArchive(bytes)) return DOCX_MEDIA_TYPE;
   return null;
 }
 
