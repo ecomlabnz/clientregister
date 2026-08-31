@@ -7,6 +7,31 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.78.1 — 31 August 2026
+
+### Fixed
+- **Saving a split answered "Not found".** Reported from a real matter: ticking
+  "remove" beside a party on a matter's Fees and split section and pressing
+  Save split landed on the stale-link page.
+
+  Nothing was wrong with the form or the handler. `POST /cases/:caseId/fees/shares`
+  was registered *after* `POST /cases/:caseId/fees/:feeId`, and a parameter
+  matches any single segment — so the router read "shares" as a fee line's id,
+  found no such fee and said so. The literal route now goes first.
+
+  No data was at risk: the split was never written, so nothing was wrong in the
+  meantime. The check that pins it looks at every module rather than this one,
+  because the next route to be swallowed will not be in the fees module — a
+  literal registered behind a parameter is unreachable and nothing says so
+  until somebody presses the button.
+
+- **A menu heading nudged upwards when its menu opened.** The bar held still
+  and the word inside it rose six pixels. Same unstyleable twelve-pixel box as
+  0.78.0: it sits beside the summary as a flex item, and centring measures
+  itself against the pair rather than against the stated height. The heading is
+  pinned to the top of its box instead, level with every other item in the run,
+  open or closed.
+
 ## 0.78.0 — 31 August 2026
 
 ### Changed

@@ -288,8 +288,14 @@ p:last-child { margin-bottom: 0; }
    styled — padding, height, line-height on ::details-content all land on
    nothing — so the twelve pixels cannot be argued away, only made
    irrelevant. Both the group and every item in the run are --nav-item-h tall,
-   so an open menu cannot change the height of the bar. */
-.nav-group { position: relative; display: flex; align-items: center; height: var(--nav-item-h); }
+   so an open menu cannot change the height of the bar.
+
+   flex-start, and not centre, for the same reason. That twelve-pixel box is a
+   flex item beside the summary, and centring measures itself against the pair
+   rather than against the stated height — so the heading rose six pixels when
+   its own menu opened while the bar around it stayed put. Pinned to the top of
+   its box it sits level with every other item in the run, open or closed. */
+.nav-group { position: relative; display: flex; align-items: flex-start; height: var(--nav-item-h); }
 .nav-group > summary { list-style: none; cursor: pointer; }
 .nav-group > summary::-webkit-details-marker { display: none; }
 .nav-group > summary::marker { content: ''; }

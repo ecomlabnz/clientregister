@@ -32,6 +32,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.78.1', date: '31 August 2026',
+    notes: [
+      'Saving a split on a matter works again. Pressing \u201cSave split\u201d \u2014 to change '
+        + 'a percentage or remove a party \u2014 answered \u201cNot found\u201d. The address the '
+        + 'form posts to was being read as a fee line\u2019s address, so the register went looking '
+        + 'for a fee that does not exist. Nothing was lost: the split was never saved, so no '
+        + 'figures were wrong in the meantime.',
+      'A menu heading in the top bar no longer nudges upwards when you open it. The bar held '
+        + 'still, but the word you pressed moved six pixels.',
+    ],
+  },
+  {
     version: '0.78.0', date: '31 August 2026',
     notes: [
       'A matter is now named by what it is about. The new-matter form asks one question '
