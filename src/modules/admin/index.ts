@@ -22,7 +22,7 @@ import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
-import { badge, card, csrfField, field, optionsFrom, pageHeader, select, table } from '../../ui/components';
+import { badge, card, csrfField, field, optionsFrom, pageHeader, revealForm, select, table } from '../../ui/components';
 import { dateShort, dateTime, timeShort, truncate } from '../../ui/format';
 import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../core/rbac';
 import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABELS, SPLIT_BASES } from '../../core/fees';
@@ -439,6 +439,23 @@ export const adminModule: AppModule = {
         ${pageHeader('Users', 'Everyone who can sign in.')}
         ${adminTabs('users')}
 
+        ${/* Adding a user is rare; reading the list is not. The form waits
+              behind its button, on a bar above the list like the other lists'. */ ''}
+        <div class="list-bar">
+          <span class="muted small">${String(users.length)} ${users.length === 1 ? 'person' : 'people'}</span>
+          ${revealForm('Add a user', html`
+            <form method="post" action="/admin/users" class="row-form">
+              ${csrfField(csrf)}
+              ${field({ label: 'Full name', name: 'name', required: true, maxlength: 120 })}
+              ${field({ label: 'Email', name: 'email', type: 'email', required: true, maxlength: 320 })}
+              ${select({ label: 'Role', name: 'role', value: 'assistant', includeBlank: false,
+                         options: optionsFrom(ROLES, ROLE_LABELS) })}
+              <button class="btn btn-primary" type="submit">Create user</button>
+            </form>
+            <p class="hint mt">A temporary password is generated and shown once. The new user should
+               change it and turn on two-factor authentication immediately.</p>`)}
+        </div>
+
         ${/*
           * A list of people is read four times for every time it is edited, so
           * it reads as a list: one line each, and an Edit button that opens the
@@ -516,21 +533,9 @@ export const adminModule: AppModule = {
             </td>
           </tr>`), { fixed: true, sticky: true })}
 
-        ${card('Add a user', html`
-          <form method="post" action="/admin/users" class="row-form">
-            ${csrfField(csrf)}
-            ${field({ label: 'Full name', name: 'name', required: true, maxlength: 120 })}
-            ${field({ label: 'Email', name: 'email', type: 'email', required: true, maxlength: 320 })}
-            ${select({ label: 'Role', name: 'role', value: 'assistant', includeBlank: false,
-                       options: optionsFrom(ROLES, ROLE_LABELS) })}
-            <button class="btn btn-primary" type="submit">Create user</button>
-          </form>
-          <p class="hint mt">A temporary password is generated and shown once. The new user should
-             change it and turn on two-factor authentication immediately.</p>`)}
-
-        ${/* Below the form rather than inside it: the form is a row of columns,
-              and a list of five paragraphs dropped into one of those columns
-              collides with everything beside it. */ ''}
+        ${/* The roles reference stays below the list: it is reference material
+              somebody scrolls to, not an action, and it is a list of five
+              paragraphs that would collide with the columns of a row-form. */ ''}
         ${card('What each role can do', html`
           <dl class="kv role-list">
             ${ROLES.map((role) => html`

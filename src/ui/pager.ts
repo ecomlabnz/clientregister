@@ -62,6 +62,17 @@ export interface PagerOpts {
   shown: number;
   /** Builds an address for this list with some parameters replaced. */
   href: (over: Record<string, string | number>) => string;
+  /**
+   * The copy that sits *above* a list: Previous, Next and the range, without
+   * the rows-per-page choice.
+   *
+   * Paging from the top of a long page otherwise means scrolling to the bottom
+   * to move, then back to the top to read — the one thing a pager exists to
+   * save. The size choice is deliberately not repeated: two sets of the same
+   * control invite the reader to wonder whether they do the same thing, and it
+   * is a decision made once, not once per page turn.
+   */
+  compact?: boolean;
 }
 
 /**
@@ -75,8 +86,12 @@ export interface PagerOpts {
 export function pager(o: PagerOpts): Raw {
   const first = (o.page - 1) * o.size + 1;
   const last = first + o.shown - 1;
+  // Above a list, a pager with nothing to do is a row of empty space between
+  // the filter and the rows. Below it, the size choice earns its place even on
+  // a single page, so only the compact copy disappears.
+  if (o.compact && o.page === 1 && !o.hasMore) return html``;
   return html`
-    <div class="pager">
+    <div class="${o.compact ? 'pager pager-top' : 'pager'}">
       <div class="pager-steps">
         ${o.page > 1
           ? html`<a class="btn btn-secondary" href="${o.href({ page: o.page - 1 })}">Previous</a>`
@@ -88,12 +103,13 @@ export function pager(o: PagerOpts): Raw {
       ${o.shown > 0
         ? html`<div class="pager-range muted small">Showing ${String(first)}–${String(last)}</div>`
         : ''}
+      ${o.compact ? '' : html`
       <div class="pager-size">
         <span class="muted small">Rows</span>
         ${PAGE_SIZES.map((n) => (n === o.size
           ? html`<span class="pager-size-current" aria-current="true">${String(n)}</span>`
           : html`<a href="${o.href({ size: n, page: 1 })}">${String(n)}</a>`))}
-      </div>
+      </div>`}
     </div>`;
 }
 

@@ -329,6 +329,8 @@ export const casesModule: AppModule = {
           <button class="btn btn-secondary" type="submit">Filter</button>
         </form>
         <div data-live-results>
+        ${pager({ page: pageNum, size: PAGE_SIZE, hasMore, shown: shown.length,
+                  href: (over) => `/cases?${qs(over)}`, compact: true })}
         ${/*
           * Six columns will not fit a phone. Rather than shrinking them all
           * until every cell wraps one word per line, four of them are dropped
