@@ -61,14 +61,16 @@ export const notesModule: AppModule = {
       });
       if ('error' in result) return redirectWith(c, back, result.error, 'err');
 
-      // The audit log is append-only without exception, so the note as it stood
-      // before the correction stays answerable even though the note itself now
-      // reads differently.
+      // Who made the correction, and from where. What the note said before is
+      // not repeated here: the database writes that itself, in the same
+      // statement as the correction (migration 0057), so it is kept however the
+      // change was made rather than only when this route makes it. One fact,
+      // one owner — this row owns the actor, that one owns the text.
       await auditFrom(c, {
         action: 'entry.corrected',
         entityType: entry.entity_type as never,
         entityId: entry.entity_id,
-        meta: { entry: id, was: result.was },
+        meta: { entry: id },
       });
       return redirectWith(c, back, 'Note corrected.');
     });

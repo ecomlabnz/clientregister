@@ -103,11 +103,11 @@ A file note was saved with the wrong date and could not be corrected.
 
 Migration 0014's reasoning is unchanged and was not softened. Migration 0052
 admits a narrower thing: for five minutes a note is not yet a record anybody has
-relied on. The window is enforced by the database — five minutes from writing,
-once, by the author, only the text, kind and date-it-happened; who wrote it, when
-it was written and what it is attached to cannot change; a correction that does
-not mark itself as one is refused; a backdated `edited_at` is refused. The
-previous text goes to the audit log.
+relied on. The window is enforced by the database — five minutes from writing, once, and
+only the text, kind and date-it-happened; who wrote it, when it was written and
+what it is attached to cannot change; a correction that does not mark itself as
+one is refused. **Author-only is a route rule, not a database one** — the
+database does not know who is asking.
 
 Also: timestamps show the time everywhere, a size or two smaller; a
 "Preliminary consultation" kind; "Brief" as a document category.

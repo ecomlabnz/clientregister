@@ -32,20 +32,28 @@ function seeded() {
               VALUES ('cl1','CL-1','individual','A PERSON','active',?,?)`).run(AT, AT);
   return db;
 }
-const note = (db: any, id: string, createdAt = AT) =>
+/**
+ * Times relative to now, because the window is measured against the database's
+ * own clock (migration 0057) rather than against a timestamp the caller
+ * supplies. A test pinned to a fixed date would be testing the caller's word.
+ */
+const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+const now = () => new Date().toISOString();
+
+const note = (db: any, id: string, createdAt = ago(1), kind = 'note') =>
   db.prepare(`INSERT INTO entries (id, entity_type, entity_id, kind, body, occurred_at,
                                    pinned, created_at, created_by)
-              VALUES (?, 'client','cl1','note','As written', ?, 0, ?, ?)`)
-    .run(id, createdAt, createdAt, USER.id);
-const attempt = (db: any, sql: string) => {
-  try { db.prepare(sql).run(); return null; } catch (e: any) { return e.message as string; }
+              VALUES (?, 'client','cl1', ?, 'As written', ?, 0, ?, ?)`)
+    .run(id, kind, createdAt, createdAt, USER.id);
+const attempt = (db: any, sql: string, ...params: unknown[]) => {
+  try { db.prepare(sql).run(...params); return null; } catch (e: any) { return e.message as string; }
 };
 
 describe('the database decides, not the screen', () => {
   it('allows one correction inside the window', () => {
     const db = seeded();
     note(db, 'e1');
-    expect(attempt(db, `UPDATE entries SET body='Corrected', edited_at='2026-09-01T09:03:00Z' WHERE id='e1'`))
+    expect(attempt(db, `UPDATE entries SET body='Corrected', edited_at=? WHERE id='e1'`, now()))
       .toBeNull();
     const after = db.prepare("SELECT body, edited_at FROM entries WHERE id='e1'").all() as any[];
     expect(after[0].body).toBe('Corrected');
@@ -55,15 +63,15 @@ describe('the database decides, not the screen', () => {
   it('refuses a second one, even a minute later', () => {
     const db = seeded();
     note(db, 'e1');
-    db.prepare(`UPDATE entries SET body='Corrected', edited_at='2026-09-01T09:01:00Z' WHERE id='e1'`).run();
-    expect(attempt(db, `UPDATE entries SET body='Again', edited_at='2026-09-01T09:02:00Z' WHERE id='e1'`))
+    db.prepare(`UPDATE entries SET body='Corrected', edited_at=? WHERE id='e1'`).run(now());
+    expect(attempt(db, `UPDATE entries SET body='Again', edited_at=? WHERE id='e1'`, now()))
       .toMatch(/append-only/);
   });
 
   it('refuses one after the window has passed', () => {
     const db = seeded();
-    note(db, 'e1');
-    expect(attempt(db, `UPDATE entries SET body='Too late', edited_at='2026-09-01T09:06:00Z' WHERE id='e1'`))
+    note(db, 'e1', ago(6));
+    expect(attempt(db, `UPDATE entries SET body='Too late', edited_at=? WHERE id='e1'`, now()))
       .toMatch(/append-only/);
   });
 
@@ -75,21 +83,50 @@ describe('the database decides, not the screen', () => {
     expect(attempt(db, `UPDATE entries SET body='Sneaky' WHERE id='e1'`)).toMatch(/append-only/);
   });
 
-  it('refuses an edited_at backdated to get inside the window', () => {
+  it('refuses an edited_at that is a fiction', () => {
+    // The gap review found: without this, a handler that stamped
+    // `edited_at = created_at + a second` could edit a note years later and
+    // pass every check. The window is measured against the database's own
+    // clock now, so the claimed moment has to be the real one.
     const db = seeded();
-    note(db, 'e1', '2026-09-01T08:00:00Z');
-    expect(attempt(db, `UPDATE entries SET body='X', edited_at='2026-09-01T07:59:00Z' WHERE id='e1'`))
+    note(db, 'e1', '2020-01-01T09:00:00Z');
+    expect(attempt(db, `UPDATE entries SET body='Years later', edited_at='2020-01-01T09:00:01Z' WHERE id='e1'`))
       .toMatch(/append-only/);
+  });
+
+  it('refuses to rewrite a note the register wrote about itself', () => {
+    // A system entry is nobody's slip: no person typed it. Refused by the
+    // database, not only by the screen that decides whether to offer a button.
+    const db = seeded();
+    note(db, 'e1', ago(1), 'system');
+    expect(attempt(db, `UPDATE entries SET body='Rewritten', edited_at=? WHERE id='e1'`, now()))
+      .toMatch(/append-only/);
+  });
+
+  it('keeps what the note said before, written by the database', () => {
+    // Not by the route. The whole reason this rule is in a trigger is that a
+    // second handler must not be able to disagree with it, and a second handler
+    // that forgot the audit row would lose the original.
+    const db = seeded();
+    note(db, 'e1');
+    db.prepare(`UPDATE entries SET body='Corrected', edited_at=? WHERE id='e1'`).run(now());
+    const kept = db.prepare(
+      "SELECT actor_label, meta_json FROM audit_log WHERE action='entry.corrected_text_kept'")
+      .all() as Array<{ actor_label: string; meta_json: string }>;
+    expect(kept).toHaveLength(1);
+    expect(kept[0]!.actor_label).toBe('database');
+    expect(kept[0]!.meta_json).toContain('As written');
   });
 
   it('never lets who wrote it, when it was written, or what it is on change', () => {
     const db = seeded();
     note(db, 'e1');
+    const at = now();
     for (const sql of [
-      `UPDATE entries SET created_by=NULL, edited_at='2026-09-01T09:01:00Z' WHERE id='e1'`,
-      `UPDATE entries SET created_at='2026-09-01T08:00:00Z', edited_at='2026-09-01T09:01:00Z' WHERE id='e1'`,
-      `UPDATE entries SET entity_id='cl2', edited_at='2026-09-01T09:01:00Z' WHERE id='e1'`,
-    ]) expect(attempt(db, sql), sql).toMatch(/append-only/);
+      `UPDATE entries SET created_by=NULL, edited_at=? WHERE id='e1'`,
+      `UPDATE entries SET created_at='2020-01-01T00:00:00Z', edited_at=? WHERE id='e1'`,
+      `UPDATE entries SET entity_id='cl2', edited_at=? WHERE id='e1'`,
+    ]) expect(attempt(db, sql, at), sql).toMatch(/append-only/);
   });
 
   it('still refuses a delete', () => {
@@ -102,7 +139,7 @@ describe('the database decides, not the screen', () => {
     const db = seeded();
     note(db, 'e1');
     expect(attempt(db, `UPDATE entries SET occurred_at='2026-08-28T00:00:00Z', kind='call',
-                        edited_at='2026-09-01T09:02:00Z' WHERE id='e1'`)).toBeNull();
+                        edited_at=? WHERE id='e1'`, now())).toBeNull();
   });
 });
 
@@ -160,12 +197,20 @@ describe('correcting through the register', () => {
     expect(entry.occurred_at.slice(0, 10)).toBe('2026-08-28');
     expect(entry.edited_at).toBeTruthy();
 
-    // The audit log is append-only without exception, so the original stays
-    // answerable even though the note now reads differently.
-    const audit = h.db.prepare("SELECT action, meta_json FROM audit_log WHERE action='entry.corrected'")
+    // Two rows, and each owns one fact. The route's says who made the
+    // correction; the database's says what the note said before, written in the
+    // same statement as the change so it is kept however the change was made.
+    const who = h.db.prepare("SELECT meta_json FROM audit_log WHERE action='entry.corrected'")
       .all() as any[];
-    expect(audit).toHaveLength(1);
-    expect(audit[0].meta_json).toContain('Wrong date');
+    expect(who).toHaveLength(1);
+    expect(who[0].meta_json).toContain('e1');
+
+    const what = h.db.prepare(
+      "SELECT actor_label, meta_json FROM audit_log WHERE action='entry.corrected_text_kept'")
+      .all() as any[];
+    expect(what).toHaveLength(1);
+    expect(what[0].actor_label).toBe('database');
+    expect(what[0].meta_json).toContain('Wrong date');
   });
 
   it('refuses one that is too late, and says why', async () => {

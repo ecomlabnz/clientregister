@@ -447,8 +447,15 @@ export const inquiriesModule: AppModule = {
                                 hint: 'Exactly as registered — the NZBN register is the authority.' })}
                     </div>
                   </fieldset>
-                  ${field({ label: 'Matter title', name: 'title', required: true, maxlength: 200,
-                            value: inq.subject ?? '', placeholder: 'e.g. Partnership work visa' })}
+                  ${'' /* One naming field, as everywhere else that makes a
+                           matter. A matter is named by what it is about, not by
+                           its type — "Partnership work visa" is what the type
+                           column already says. This form was the third creator
+                           and the last one still asking for a title. */}
+                  ${field({ label: 'What this matter is about', name: 'descriptor', required: true,
+                            maxlength: 200, value: inq.subject ?? '',
+                            placeholder: 'e.g. Partner of a New Zealand citizen, living together since 2024',
+                            hint: 'A sentence a colleague could read instead of the file.' })}
                   ${select({ label: 'Case type', name: 'case_type', value: '', required: true,
                              options: termOptions(types), includeBlank: 'Choose a type' })}
                   ${'' /* No "Unassigned": a matter always belongs to somebody,
@@ -700,7 +707,7 @@ export const inquiriesModule: AppModule = {
       // request built by hand carrying "Vietnam" then lands as VN rather than
       // as a 500 from the trigger guarding the column.
       const nationality = countryCodeFor(f.optional('nationality', { max: 100 }));
-      const title = f.text('title', { required: true, label: 'Matter title', max: 200 });
+      const descriptor = f.text('descriptor', { required: true, label: 'What this matter is about', max: 200 });
       const types = await caseTypes(c.env);
       const caseType = f.text('case_type', { required: true, label: 'Case type', max: 60 });
       if (caseType && !isTerm(types, caseType)) {
@@ -753,10 +760,12 @@ export const inquiriesModule: AppModule = {
       const caseRef = await nextYearlyRef(c.env.DB, 'case', 'CASE');
       await run(
         c.env.DB,
-        `INSERT INTO cases (id, ref, client_id, title, case_type, status, priority, assigned_to,
-            summary, currency, created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,'lead','normal',?,?, 'NZD', ?,?,?)`,
-        caseId, caseRef, targetClientId, title, caseType, assignedTo,
+        `INSERT INTO cases (id, ref, client_id, title, descriptor, case_type, status, priority,
+            assigned_to, summary, currency, created_at, updated_at, created_by)
+         VALUES (?,?,?,?,?,?,'lead','normal',?,?, 'NZD', ?,?,?)`,
+        // Derived, not typed, and written from one place: the description is
+        // the name, and `title` follows it.
+        caseId, caseRef, targetClientId, descriptor, descriptor, caseType, assignedTo,
         inq.body ? `From inquiry ${inq.ref}:\n\n${inq.body}`.slice(0, 4000) : null,
         nowIso(), nowIso(), user.id,
       );
