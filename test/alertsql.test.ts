@@ -76,10 +76,10 @@ beforeAll(() => {
   // Not lodged at all.
   matter('k_prep', 'K-PREP', 'cl_visa', 'preparing', { created: '2026-07-01' });
   // Blank-ish application numbers count as absent.
-  matter('k_blankish', 'K-BLANKISH', 'cl_visa', 'inz_rfi', { lodged: '2026-07-01', inz: '  ', created: '2026-07-01' });
+  matter('k_blankish', 'K-BLANKISH', 'cl_visa', 'ppi', { lodged: '2026-07-01', inz: '  ', created: '2026-07-01' });
 
   // Deadlines, for the task check.
-  matter('k_deadline', 'K-DEADLINE', 'cl_visa', 'inz_rfi', { due: '2026-09-15', created: '2026-08-01' });
+  matter('k_deadline', 'K-DEADLINE', 'cl_visa', 'ppi', { due: '2026-09-15', created: '2026-08-01' });
   // A matter for the client with no visa recorded, and one for the organisation.
   matter('k_blank', 'K-BLANK', 'cl_blank', 'ready_to_lodge', { created: '2026-08-01' });
   matter('k_space', 'K-SPACE', 'cl_space', 'lead', { created: '2026-08-01' });

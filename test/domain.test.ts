@@ -27,8 +27,8 @@ describe('case status lifecycle', () => {
     expect(canTransition('engaged', 'gathering_documents')).toBe(true);
     expect(canTransition('gathering_documents', 'ready_to_lodge')).toBe(true);
     expect(canTransition('ready_to_lodge', 'lodged')).toBe(true);
-    expect(canTransition('lodged', 'inz_rfi')).toBe(true);
-    expect(canTransition('inz_rfi', 'decision_pending')).toBe(true);
+    expect(canTransition('lodged', 'ppi')).toBe(true);
+    expect(canTransition('ppi', 'decision_pending')).toBe(true);
     expect(canTransition('decision_pending', 'approved')).toBe(true);
     expect(canTransition('approved', 'closed')).toBe(true);
   });
@@ -39,8 +39,9 @@ describe('case status lifecycle', () => {
     expect(canTransition('engaged', 'declined')).toBe(false);
   });
 
-  it('lets a declined case go to appeal but not back to lodgement', () => {
-    expect(canTransition('declined', 'appeal')).toBe(true);
+  it('lets a declined case go to the Tribunal or back to INZ, but not back to lodgement', () => {
+    expect(canTransition('declined', 'ipt_appeal')).toBe(true);
+    expect(canTransition('declined', 'reconsideration')).toBe(true);
     expect(canTransition('declined', 'lodged')).toBe(false);
   });
 

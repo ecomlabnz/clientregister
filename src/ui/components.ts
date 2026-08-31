@@ -332,7 +332,7 @@ export function statusTone(status: string): 'neutral' | 'green' | 'amber' | 'red
   switch (status) {
     case 'approved': case 'accepted': case 'active': case 'converted': case 'done':
       return 'green';
-    case 'declined': case 'lost': case 'urgent': case 'ppi': case 'inz_rfi': case 'failed':
+    case 'declined': case 'lost': case 'urgent': case 'ppi': case 'failed':
       return 'red';
     case 'lodged': case 'decision_pending': case 'interim_visa': case 'sent': case 'in_progress':
       return 'blue';

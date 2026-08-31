@@ -835,6 +835,10 @@ ${quote}</textarea>
       const id = c.req.param('id')!;
       const thread = await one<ThreadRow>(c.env.DB, 'SELECT * FROM channel_threads WHERE id = ?', id);
       if (!thread) return c.notFound();
+      // See the inbox route: filing twice leaves a note nobody can remove.
+      if ((thread as any).filed_at) {
+        return redirectWith(c, `/inbox/threads/${id}`, 'That conversation is already filed.', 'err');
+      }
 
       const f = new FormReader(await c.req.formData());
       const choice = parseFilingChoice(f.optional('onto', { max: 100 }));
@@ -849,11 +853,9 @@ ${quote}</textarea>
           from: thread.peer_label ?? thread.peer_id, subject: null,
           body: 'The conversation is kept in full under Incoming → Conversations.',
         },
-      });
+      }, markLinkedFiled(c.env, 'channel_threads', id, choice.target, choice.targetId, user.id));
       if (!filed) return redirectWith(c, `/inbox/threads/${id}`, 'That matter or client no longer exists.', 'err');
 
-      await markLinkedFiled(c.env, 'channel_threads', id, choice.target, choice.targetId,
-        filed.entryId, user.id, nowIso());
       await auditFrom(c, { action: 'channel.thread_filed', entityType: 'channel_thread', entityId: id,
         meta: { target: choice.target, targetId: choice.targetId, entryId: filed.entryId } });
       return redirectWith(c, `/${choice.target === 'case' ? 'cases' : 'clients'}/${choice.targetId}`,
@@ -862,8 +864,8 @@ ${quote}</textarea>
 
     r.post('/threads/:id/unfile', requirePermission('register:write'), async (c) => {
       const id = c.req.param('id')!;
-      await unfile(c.env, 'channel_threads', id);
-      await auditFrom(c, { action: 'channel.thread_unfiled', entityType: 'channel_thread', entityId: id });
+      const cleared = await unfile(c.env, 'channel_threads', id);
+      await auditFrom(c, { action: 'channel.thread_unfiled', entityType: 'channel_thread', entityId: id, meta: { orphanedEntryId: cleared.orphanedEntryId }  });
       return redirectWith(c, `/inbox/threads/${id}`,
         'Back in the list. The note written when it was filed stays on the file.');
     });
@@ -1055,6 +1057,11 @@ ${quote}</textarea>
       const id = c.req.param('id')!;
       const msg = await one<IngestRow>(c.env.DB, 'SELECT * FROM ingest_messages WHERE id = ?', id);
       if (!msg) return c.notFound();
+      // Already filed: the form is hidden once it is, but a double-submit or a
+      // second tab reaches here anyway. Filing twice writes a second note that
+      // can never be removed — notes are append-only — and repoints
+      // `filed_entry_id`, orphaning the first. Refused rather than repeated.
+      if (msg.filed_at) return redirectWith(c, `/inbox/${id}`, 'That message is already filed.', 'err');
 
       const f = new FormReader(await c.req.formData());
       const choice = parseFilingChoice(f.optional('onto', { max: 100 }));
@@ -1071,12 +1078,11 @@ ${quote}</textarea>
           channel: msg.channel, receivedAt: msg.received_at,
           from: msg.sender_display ?? msg.sender, subject: msg.subject, body: msg.body_text,
         },
-      });
+      }, markIngestFiled(c.env, id, target, targetId, user.id));
       // A destination that does not exist is refused rather than recorded: an
       // item filed onto nothing is gone from the list and present on no record.
       if (!filed) return redirectWith(c, `/inbox/${id}`, 'That matter or client no longer exists.', 'err');
 
-      await markIngestFiled(c.env, id, target, targetId, filed.entryId, user.id, nowIso());
       await auditFrom(c, { action: 'inbox.filed', entityType: 'ingest_message', entityId: id,
         meta: { target, targetId, entryId: filed.entryId } });
       return redirectWith(c, `/${target === 'case' ? 'cases' : 'clients'}/${targetId}`,
@@ -1086,8 +1092,8 @@ ${quote}</textarea>
     /** Put it back in the working list. The note it wrote stays on the file. */
     r.post('/:id/unfile', requirePermission('register:write'), async (c) => {
       const id = c.req.param('id')!;
-      await unfile(c.env, 'ingest_messages', id);
-      await auditFrom(c, { action: 'inbox.unfiled', entityType: 'ingest_message', entityId: id });
+      const cleared = await unfile(c.env, 'ingest_messages', id);
+      await auditFrom(c, { action: 'inbox.unfiled', entityType: 'ingest_message', entityId: id, meta: { orphanedEntryId: cleared.orphanedEntryId }  });
       return redirectWith(c, `/inbox/${id}`,
         'Back in the inbox. The note written when it was filed stays on the file.');
     });

@@ -20,7 +20,11 @@
 import { describe, expect, it } from 'vitest';
 import { mountModule, fakeUser } from './support/d1';
 import { casesModule } from '../src/modules/cases';
-import { CASE_STATUS_HELP, CASE_STATUS_LABELS, CASE_STATUSES } from '../src/domain';
+import {
+  AWAITING_CASE_STATUSES, canTransition, CASE_STATUS_HELP, CASE_STATUS_LABELS,
+  CASE_STATUSES, CASE_TRANSITIONS,
+} from '../src/domain';
+import { AWAITING_DECISION_STATUSES } from '../src/core/decisions';
 
 const AT = '2026-08-31T00:00:00Z';
 const USER = fakeUser();
@@ -105,7 +109,7 @@ describe('the response / decision due field', () => {
   it('is taken when the matter is still waiting', async () => {
     const h = mount();
     seed(h);
-    await h.post('/cases/K1/status', { status: 'inz_rfi', decision_due_at: '2026-09-20' });
+    await h.post('/cases/K1/status', { status: 'ppi', decision_due_at: '2026-09-20' });
     expect(caseRow(h).decision_due_at).toBe('2026-09-20');
   });
 
@@ -130,5 +134,106 @@ describe('the line beside a status badge', () => {
       // Nor a bare synonym: a line worth reading says more than one word.
       expect(help.split(/\s+/).length).toBeGreaterThan(2);
     }
+  });
+});
+
+describe('the status list the practice reads', () => {
+  /**
+   * Two changes the practice asked for on 31 August 2026, after reading the
+   * dropdown back and finding it asked questions it should not.
+   *
+   * "INZ — further information requested" and "PPI letter received" described
+   * one working state — a letter from INZ with a clock on it — so the register
+   * was making somebody choose between two words for one thing. One status
+   * now, named for both.
+   *
+   * "Appeal / reconsideration" was the opposite fault: two places with two
+   * clocks under one name, so the list could not answer "who is holding this
+   * file". The Tribunal and INZ are now separate statuses.
+   */
+  it('has one status for a letter from INZ with a clock on it', () => {
+    expect(CASE_STATUSES).not.toContain('inz_rfi');
+    expect(CASE_STATUSES).toContain('ppi');
+    expect(CASE_STATUS_LABELS.ppi).toBe('PPI / RFI letter received');
+  });
+
+  it('separates the Tribunal from asking INZ again', () => {
+    expect(CASE_STATUSES).not.toContain('appeal');
+    expect(CASE_STATUSES).toContain('ipt_appeal');
+    expect(CASE_STATUSES).toContain('reconsideration');
+    // Both are routes out of a refusal, and both can end in a grant.
+    expect(canTransition('declined', 'ipt_appeal')).toBe(true);
+    expect(canTransition('declined', 'reconsideration')).toBe(true);
+    expect(canTransition('ipt_appeal', 'approved')).toBe(true);
+    expect(canTransition('reconsideration', 'approved')).toBe(true);
+  });
+
+  it('keeps every remaining status reachable, so none is a dead letter', () => {
+    // A status nothing can move to is a status nobody can ever set.
+    const reachable = new Set(Object.values(CASE_TRANSITIONS).flat());
+    for (const s of CASE_STATUSES) {
+      if (s === 'lead') continue;  // where a matter starts
+      expect(reachable.has(s), `${s} is unreachable`).toBe(true);
+    }
+  });
+
+  it('still treats both appeal routes as waiting on somebody else', () => {
+    expect(AWAITING_CASE_STATUSES).toContain('ipt_appeal');
+    expect(AWAITING_CASE_STATUSES).toContain('reconsideration');
+    // But neither is chased as if INZ were sitting on it.
+    expect(AWAITING_DECISION_STATUSES).not.toContain('ipt_appeal');
+  });
+});
+
+describe('filtering the case list by what kind of matter it is', () => {
+  /**
+   * This exists because the filter shipped broken in its first draft and no
+   * test noticed: the placeholder was asked for before the parameter was
+   * pushed, so it numbered one slot back and the filter matched nothing.
+   * `tsc` was clean, the page rendered, the dropdown worked — the only
+   * symptom was an empty list, which looks exactly like "no matters of that
+   * type".
+   *
+   * So the test asserts what a filter is for: it returns the rows of that
+   * type, and not the others. An off-by-one in the binding fails it.
+   */
+  function seedTypes(h: any) {
+    seed(h);
+    h.db.prepare(`INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
+                                     created_at, updated_at)
+                  VALUES ('K2','CASE-26-002','CL1','Another','vv_general','lodged',?,?,?)`)
+      .run(USER.id, AT, AT);
+    h.db.prepare(`INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
+                                     created_at, updated_at)
+                  VALUES ('K3','CASE-26-003','CL1','A third','vv_general','lodged',?,?,?)`)
+      .run(USER.id, AT, AT);
+  }
+  const refsOn = (body: string) => [...body.matchAll(/CASE-26-\d{3}/g)].map((m) => m[0]);
+
+  it('returns the matters of that type and no others', async () => {
+    const h = mount();
+    seedTypes(h);
+    // K1 is wv_aewv; K2 and K3 are vv_general.
+    const body = await (await h.request('/cases?scope=all&type=vv_general')).text();
+    const refs = new Set(refsOn(body));
+    expect(refs.has('CASE-26-002')).toBe(true);
+    expect(refs.has('CASE-26-003')).toBe(true);
+    expect(refs.has('CASE-26-001')).toBe(false);
+  });
+
+  it('shows everything when no type is asked for', async () => {
+    const h = mount();
+    seedTypes(h);
+    const refs = new Set(refsOn(await (await h.request('/cases?scope=all')).text()));
+    expect(refs.size).toBe(3);
+  });
+
+  it('ignores a type nobody offers rather than emptying the list', async () => {
+    // A stale bookmark or a typed address should degrade to "unfiltered",
+    // not to a list that silently looks empty.
+    const h = mount();
+    seedTypes(h);
+    const refs = new Set(refsOn(await (await h.request('/cases?scope=all&type=not_a_type')).text()));
+    expect(refs.size).toBe(3);
   });
 });

@@ -1,6 +1,6 @@
 -- 0045_a_date_read_by_a_machine.sql
 --
--- The practice's decision of 1 September 2026, made for intake batch 02: OCR
+-- The practice's decision of 31 August 2026, made for intake batch 02: OCR
 -- may be run over scanned certificates (a third of that batch's paper has no
 -- text layer, and it is precisely the passports and police certificates). A
 -- date read by a machine from the certificate's own image is better evidence

@@ -13,13 +13,13 @@ export const CASE_STATUSES = [
   'preparing',
   'ready_to_lodge',
   'lodged',
-  'inz_rfi',
   'ppi',
   'interim_visa',
   'decision_pending',
   'approved',
   'declined',
-  'appeal',
+  'ipt_appeal',
+  'reconsideration',
   'on_hold',
   'withdrawn',
   'closed',
@@ -34,13 +34,14 @@ export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
   preparing: 'Preparing application',
   ready_to_lodge: 'Ready to lodge',
   lodged: 'Lodged with INZ',
-  inz_rfi: 'INZ — further information requested',
-  ppi: 'PPI letter received',
+
+  ppi: 'PPI / RFI letter received',
   interim_visa: 'Interim visa / awaiting decision',
   decision_pending: 'Decision pending',
   approved: 'Approved',
   declined: 'Declined',
-  appeal: 'Appeal / reconsideration',
+  ipt_appeal: 'IPT appeal',
+  reconsideration: 'Reconsideration',
   on_hold: 'On hold',
   withdrawn: 'Withdrawn',
   closed: 'Closed',
@@ -53,7 +54,7 @@ export const CASE_STATUS_HELP: Record<CaseStatus, string> = {
   preparing: 'Drafting submissions and assembling the application.',
   ready_to_lodge: 'Complete and awaiting lodgement (fees, signatures).',
   lodged: 'Filed with Immigration New Zealand.',
-  inz_rfi: 'INZ has asked for further information — response deadline applies.',
+
   ppi: 'Potentially prejudicial information letter — response deadline applies.',
   interim_visa: 'Onshore application pending; client may hold an interim visa.',
   decision_pending: 'All information provided; awaiting the decision.',
@@ -61,7 +62,8 @@ export const CASE_STATUS_HELP: Record<CaseStatus, string> = {
   // it does not. "Granted." said the same word twice.
   approved: 'Check the conditions and record the visa dates, then tell the client.',
   declined: 'Refused — consider appeal, reconsideration or a fresh application.',
-  appeal: 'Appeal, reconsideration or s.61 request under way.',
+  ipt_appeal: 'With the Immigration and Protection Tribunal. Their timetable, not INZ\u2019s.',
+  reconsideration: 'Asking INZ to look at its own decision again, or a s.61 request.',
   on_hold: 'Paused at the client’s request or pending an external event.',
   withdrawn: 'Withdrawn before decision.',
   closed: 'File closed; no further action.',
@@ -70,11 +72,12 @@ export const CASE_STATUS_HELP: Record<CaseStatus, string> = {
 /** Statuses that count as live work for dashboards and workload counts. */
 export const OPEN_CASE_STATUSES: CaseStatus[] = [
   'lead', 'engaged', 'gathering_documents', 'preparing', 'ready_to_lodge',
-  'lodged', 'inz_rfi', 'ppi', 'interim_visa', 'decision_pending', 'appeal', 'on_hold',
+  'lodged', 'ppi', 'interim_visa', 'decision_pending', 'ipt_appeal', 'reconsideration', 'on_hold',
 ];
 
 /** Statuses that carry a deadline the practice must not miss. */
-export const DEADLINE_CASE_STATUSES: CaseStatus[] = ['inz_rfi', 'ppi', 'appeal'];
+export const DEADLINE_CASE_STATUSES: CaseStatus[] =
+  ['ppi', 'ipt_appeal', 'reconsideration'];
 
 /**
  * Statuses that mean the application is with INZ.
@@ -85,7 +88,7 @@ export const DEADLINE_CASE_STATUSES: CaseStatus[] = ['inz_rfi', 'ppi', 'appeal']
  * without asking the client.
  */
 export const LODGED_CASE_STATUSES: CaseStatus[] = [
-  'lodged', 'inz_rfi', 'ppi', 'interim_visa', 'decision_pending',
+  'lodged', 'ppi', 'interim_visa', 'decision_pending',
 ];
 
 /**
@@ -98,7 +101,8 @@ export const LODGED_CASE_STATUSES: CaseStatus[] = [
  * CASE-26-051. The date a decision arrived is `decided_at`, and the register
  * writes that itself.
  */
-export const AWAITING_CASE_STATUSES: CaseStatus[] = [...LODGED_CASE_STATUSES, 'appeal'];
+export const AWAITING_CASE_STATUSES: CaseStatus[] =
+  [...LODGED_CASE_STATUSES, 'ipt_appeal', 'reconsideration'];
 
 export function isAwaitingStatus(status: string): boolean {
   return (AWAITING_CASE_STATUSES as string[]).includes(status);
@@ -118,14 +122,16 @@ export const CASE_TRANSITIONS: Record<CaseStatus, CaseStatus[]> = {
   gathering_documents: ['preparing', 'ready_to_lodge', 'on_hold', 'withdrawn', 'closed'],
   preparing: ['gathering_documents', 'ready_to_lodge', 'on_hold', 'withdrawn', 'closed'],
   ready_to_lodge: ['lodged', 'preparing', 'gathering_documents', 'on_hold', 'withdrawn', 'closed'],
-  lodged: ['inz_rfi', 'ppi', 'interim_visa', 'decision_pending', 'approved', 'declined', 'withdrawn', 'on_hold'],
-  inz_rfi: ['gathering_documents', 'decision_pending', 'ppi', 'approved', 'declined', 'withdrawn', 'on_hold'],
+  lodged: ['ppi', 'interim_visa', 'decision_pending', 'approved', 'declined', 'withdrawn', 'on_hold'],
   ppi: ['gathering_documents', 'decision_pending', 'approved', 'declined', 'withdrawn', 'on_hold'],
-  interim_visa: ['inz_rfi', 'ppi', 'decision_pending', 'approved', 'declined', 'withdrawn', 'on_hold'],
-  decision_pending: ['approved', 'declined', 'inz_rfi', 'ppi', 'withdrawn', 'on_hold'],
+  interim_visa: ['ppi', 'decision_pending', 'approved', 'declined', 'withdrawn', 'on_hold'],
+  decision_pending: ['approved', 'declined', 'ppi', 'withdrawn', 'on_hold'],
   approved: ['closed', 'on_hold'],
-  declined: ['appeal', 'closed', 'on_hold'],
-  appeal: ['approved', 'declined', 'closed', 'on_hold', 'withdrawn'],
+  // A refusal can be taken to the Tribunal or put back to INZ, and either can
+  // end in a grant, so both routes lead on to the same places.
+  declined: ['ipt_appeal', 'reconsideration', 'closed', 'on_hold'],
+  ipt_appeal: ['approved', 'declined', 'closed', 'on_hold', 'withdrawn'],
+  reconsideration: ['approved', 'declined', 'ipt_appeal', 'closed', 'on_hold', 'withdrawn'],
   on_hold: [...CASE_STATUSES].filter((s) => s !== 'on_hold') as CaseStatus[],
   withdrawn: ['closed', 'engaged'],
   closed: ['engaged', 'on_hold'],

@@ -53,7 +53,7 @@ export type IssueDateProvenance = 'verified' | 'from_filename' | 'from_ocr' | 'u
 export const PROVENANCE_OPTIONS: Array<{ value: IssueDateProvenance; label: string }> = [
   { value: 'verified', label: 'Read from the certificate itself' },
   { value: 'from_filename', label: 'Taken from a document’s filename' },
-  // The practice's decision of 1 September 2026: OCR may read a scanned
+  // The practice's decision of 31 August 2026: OCR may read a scanned
   // certificate, and what it reads is better evidence than a filename — but it
   // is a machine's reading, so it stays flagged until a person confirms it.
   { value: 'from_ocr', label: 'Read off the scan by OCR — not yet confirmed' },

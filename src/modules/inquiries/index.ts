@@ -608,6 +608,8 @@ export const inquiriesModule: AppModule = {
       const id = c.req.param('id')!;
       const inq = await one<InquiryRow>(c.env.DB, 'SELECT * FROM inquiries WHERE id = ?', id);
       if (!inq) return c.notFound();
+      // See the inbox route: filing twice leaves a note nobody can remove.
+      if (inq.filed_at) return redirectWith(c, `/inquiries/${id}`, 'That inquiry is already filed.', 'err');
 
       const f = new FormReader(await c.req.formData());
       const choice = parseFilingChoice(f.optional('onto', { max: 100 }));
@@ -622,11 +624,8 @@ export const inquiriesModule: AppModule = {
           from: inq.contact_name ?? inq.contact_email ?? inq.contact_phone,
           subject: inq.subject, body: inq.body,
         },
-      });
+      }, markLinkedFiled(c.env, 'inquiries', id, choice.target, choice.targetId, user.id));
       if (!filed) return redirectWith(c, `/inquiries/${id}`, 'That matter or client no longer exists.', 'err');
-
-      await markLinkedFiled(c.env, 'inquiries', id, choice.target, choice.targetId,
-        filed.entryId, user.id, nowIso());
       await auditFrom(c, { action: 'inquiry.filed', entityType: 'inquiry', entityId: id,
         meta: { target: choice.target, targetId: choice.targetId, entryId: filed.entryId } });
       return redirectWith(c, `/${choice.target === 'case' ? 'cases' : 'clients'}/${choice.targetId}`,
@@ -636,8 +635,8 @@ export const inquiriesModule: AppModule = {
     /** Back to the working list. The note it wrote stays on the file. */
     r.post('/:id/unfile', requirePermission('register:write'), async (c) => {
       const id = c.req.param('id')!;
-      await unfile(c.env, 'inquiries', id);
-      await auditFrom(c, { action: 'inquiry.unfiled', entityType: 'inquiry', entityId: id });
+      const cleared = await unfile(c.env, 'inquiries', id);
+      await auditFrom(c, { action: 'inquiry.unfiled', entityType: 'inquiry', entityId: id, meta: { orphanedEntryId: cleared.orphanedEntryId }  });
       return redirectWith(c, `/inquiries/${id}`,
         'Back in the list. The note written when it was filed stays on the file.');
     });

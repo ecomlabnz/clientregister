@@ -90,7 +90,11 @@ export const CASE_SORTS: Record<string, string[]> = {
   // same place in both. COLLATE NOCASE for the reason given there.
   client: ["COALESCE(NULLIF(cl.family_name, ''), cl.full_name) COLLATE NOCASE", 'cl.full_name COLLATE NOCASE'],
   status: ['k.status'],
-  due: ["COALESCE(k.decision_due_at, k.next_action_due, '9999')"],
+  type: ['k.case_type'],
+  lodged: ["COALESCE(k.lodged_at, '')"],
+  // The date the row is actually showing: a decision once there is one,
+  // otherwise what is being waited for.
+  due: ["COALESCE(k.decided_at, k.decision_due_at, k.next_action_due, '9999')"],
   owner: ["COALESCE(u.name, '') COLLATE NOCASE"],
 };
 
@@ -263,6 +267,17 @@ export const casesModule: AppModule = {
         params.push(c.get('user')!.id);
         where.push(`k.assigned_to = ${p()}`);
       }
+      // Filter by what kind of matter it is. The types are vocabulary — the
+      // practice edits the list in Settings — so this offers whatever is
+      // configured rather than a list baked in here.
+      const typeFilter = c.req.query('type') ?? '';
+      if (typeFilter && types.some((t) => t.key === typeFilter)) {
+        // Push first, then ask for the placeholder: `p()` numbers from
+        // `params.length`, so calling it before the push points one slot back
+        // and the filter silently matches nothing.
+        params.push(typeFilter);
+        where.push(`k.case_type = ${p()}`);
+      }
       const tagFilter = c.req.query('tag') ?? '';
       if (tagFilter) {
         params.push(tagFilter);
@@ -302,7 +317,7 @@ export const casesModule: AppModule = {
       ]);
 
       const qs = (over: Record<string, string | number>) =>
-        new URLSearchParams({ q, status, assigned, scope, tag: tagFilter, sort: sortKey, dir: sortDir, page: String(pageNum), size: String(PAGE_SIZE), ...Object.fromEntries(Object.entries(over).map(([k2, v]) => [k2, String(v)])) }).toString();
+        new URLSearchParams({ q, status, assigned, scope, type: typeFilter, tag: tagFilter, sort: sortKey, dir: sortDir, page: String(pageNum), size: String(PAGE_SIZE), ...Object.fromEntries(Object.entries(over).map(([k2, v]) => [k2, String(v)])) }).toString();
 
       return page(c, { title: 'Cases', active: '/cases' }, html`
         ${pageHeader('Cases', 'Every matter the practice is running.',
@@ -313,6 +328,10 @@ export const casesModule: AppModule = {
           <select name="status">
             <option value="">${scope === 'all' ? 'All statuses' : 'Open statuses'}</option>
             ${CASE_STATUSES.map((s) => html`<option value="${s}" ${s === status ? raw('selected') : ''}>${CASE_STATUS_LABELS[s]}</option>`)}
+          </select>
+          <select name="type">
+            <option value="">Any type</option>
+            ${types.map((t) => html`<option value="${t.key}" ${t.key === typeFilter ? raw('selected') : ''}>${t.label}</option>`)}
           </select>
           <select name="scope">
             <option value="open" ${scope === 'open' ? raw('selected') : ''}>Open only</option>
@@ -342,9 +361,11 @@ export const casesModule: AppModule = {
           { label: 'Reference', width: '16', hideOn: 'sm', sort: 'ref' },
           { label: 'Matter', width: '30', sort: 'title' },
           { label: 'Client', width: '18', hideOn: 'sm', sort: 'client' },
-          { label: 'Status', width: '18', hideOn: 'sm', sort: 'status' },
-          { label: 'Key date', width: '18', sort: 'due' },
-          { label: 'Owner', width: '12', hideOn: 'sm', sort: 'owner' },
+          { label: 'Type', width: '14', hideOn: 'sm', sort: 'type' },
+          { label: 'Status', width: '14', hideOn: 'sm', sort: 'status' },
+          { label: 'Lodged', width: '10', hideOn: 'sm', sort: 'lodged' },
+          { label: 'Decision', width: '14', sort: 'due' },
+          { label: 'Owner', width: '10', hideOn: 'sm', sort: 'owner' },
         ], shown.map((row) => {
           const overdue = isOverdue(row.decision_due_at) && isOpenStatus(row.status);
           return html`
@@ -371,13 +392,22 @@ export const casesModule: AppModule = {
                 : ''}
             </td>
             <td class="small col-sm-hide"><a href="/clients/${row.client_id}">${row.client_name}</a></td>
+            <td class="small col-sm-hide">${labelFor(types, row.case_type)}</td>
             <td class="col-sm-hide">${badge(CASE_STATUS_LABELS[row.status] ?? row.status, statusTone(row.status))}</td>
+            <td class="small col-sm-hide">${row.lodged_at ? dateShort(row.lodged_at) : '—'}</td>
+            ${'' /* One column, three different facts, each labelled for what it
+                     is. A decided matter shows the date the decision came — it
+                     was showing the old expected date, which on an approval
+                     read as a deadline that had passed. Only a matter still
+                     waiting can be overdue. */}
             <td class="small ${overdue ? 'warn' : ''}">
-              ${row.decision_due_at
-                ? html`${dateShort(row.decision_due_at)}<div class="muted">${relativeDays(row.decision_due_at)}</div>`
-                : row.next_action_due
-                  ? html`${dateShort(row.next_action_due)}<div class="muted">next action</div>`
-                  : '—'}</td>
+              ${row.decided_at
+                ? html`${dateShort(row.decided_at)}<div class="muted">decided</div>`
+                : row.decision_due_at
+                  ? html`${dateShort(row.decision_due_at)}<div class="muted">${relativeDays(row.decision_due_at)}</div>`
+                  : row.next_action_due
+                    ? html`${dateShort(row.next_action_due)}<div class="muted">next action</div>`
+                    : '—'}</td>
             <td class="small col-sm-hide">${row.assignee_name ?? '—'}</td>
           </tr>`;
         }), { sticky: true, fixed: true, empty: 'No cases match that.',

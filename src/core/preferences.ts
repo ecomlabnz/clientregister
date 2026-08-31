@@ -146,7 +146,7 @@ export const PREFERENCE_GROUPS: PreferenceGroup[] = [
       },
       {
         // The three "opens on" preferences below all default to the unfiltered
-        // view, by the practice's decision of 1 September 2026. A list that
+        // view, by the practice's decision of 31 August 2026. A list that
         // hides part of itself before anybody has asked it to is how work goes
         // unnoticed: the filter is one click away, and choosing to narrow is
         // safer than being narrowed by default and not realising.

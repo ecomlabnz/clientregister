@@ -32,7 +32,23 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
-    version: '0.74.1', date: '1 September 2026',
+    version: '0.75.0', date: '31 August 2026',
+    notes: [
+      'Cases can now be filtered by type \u2014 AEWV, partner residence, visitor visa and the '
+        + 'rest \u2014 and the list shows the type, the date it was lodged with INZ, and the '
+        + 'decision date once there is one.',
+      '\u201cKey date\u201d is now \u201cDecision\u201d and says which date it is showing. On an '
+        + 'approved or declined matter it shows when the decision came, not the deadline that '
+        + 'has passed.',
+      '\u201cINZ \u2014 further information requested\u201d is gone: \u201cPPI / RFI letter received\u201d '
+        + 'covers both. \u201cAppeal / reconsideration\u201d is now two statuses, \u201cIPT appeal\u201d '
+        + 'and \u201cReconsideration\u201d, because they are different places with different clocks.',
+      'Filing something twice is refused, and the dates on last week\u2019s release notes were '
+        + 'wrong by a day \u2014 corrected.',
+    ],
+  },
+  {
+    version: '0.74.1', date: '31 August 2026',
     notes: [
       'Help was telling you passport numbers are stored encrypted. They have not been since '
         + '30 August, when the practice decided otherwise \u2014 corrected in the four places it '
@@ -42,7 +58,7 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
     ],
   },
   {
-    version: '0.74.0', date: '1 September 2026',
+    version: '0.74.0', date: '31 August 2026',
     notes: [
       'Anything in Incoming \u2014 an inbox message, an inquiry, a conversation \u2014 can now be '
         + 'filed onto a matter or a client. A note appears on that record with the date, '
@@ -52,7 +68,7 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
     ],
   },
   {
-    version: '0.73.1', date: '1 September 2026',
+    version: '0.73.1', date: '31 August 2026',
     notes: [
       'Previous and Next now also sit above each list, so you can turn the page without '
         + 'scrolling to the bottom and back.',
@@ -63,7 +79,7 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
     ],
   },
   {
-    version: '0.73.0', date: '1 September 2026',
+    version: '0.73.0', date: '31 August 2026',
     notes: [
       'The New task button now sits at the top of the task list, beside the filter. '
         + 'The form drops down over the list rather than pushing it out of the way.',
@@ -75,14 +91,14 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
     ],
   },
   {
-    version: '0.72.1', date: '1 September 2026',
+    version: '0.72.1', date: '31 August 2026',
     notes: [
       'The task list ends with the list again: the New task form is now behind a '
         + '“New task” button, and opens only when you press it.',
     ],
   },
   {
-    version: '0.72.0', date: '1 September 2026',
+    version: '0.72.0', date: '31 August 2026',
     notes: [
       'When a matter is approved or declined, the date the decision arrived now shows '
         + 'beside the status. It was always recorded — it was just further down the page.',
@@ -94,7 +110,7 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
     ],
   },
   {
-    version: '0.71.0', date: '1 September 2026',
+    version: '0.71.0', date: '31 August 2026',
     notes: [
       'Clients, Cases and Tasks now let you choose how many rows to show — 25, 50, '
         + '100, 250 or 500 — from under the list itself, rather than only in Settings. '
@@ -104,7 +120,7 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
     ],
   },
   {
-    version: '0.70.2', date: '1 September 2026',
+    version: '0.70.2', date: '31 August 2026',
     notes: [
       'A certificate issue date can now be recorded as read off the scan by OCR. '
         + 'It stays flagged, like a filename date, until a person confirms it '
