@@ -7,6 +7,38 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.76.0 — 31 August 2026
+
+### Changed
+- **The Matter and Decision columns are off by default**, and are now
+  preferences rather than fixtures. On an AEWV the matter title is the client's
+  name and the case type over again — both of which sit in their own columns
+  beside it. Turned off, the row keeps the thing the title could not say: its
+  short description, under the reference.
+
+  Kept as switches rather than deleted, because the duplication is not
+  universal: on a Privacy Act request or a PPI response, the title is the only
+  thing on the row that says what the matter is. A practice that works mostly
+  in those wants the column.
+- **A decision's date sits under the status badge.** "Approved" over
+  "31 Aug 2026" needs no third word, where a column headed Decision had to
+  print "decided" on every row to explain itself. A matter still waiting shows
+  its due date there instead.
+- **The Clients page has no subtitle.** It read "Everyone the practice acts
+  for", which stopped being true when the register began holding employers,
+  sponsors, supporting partners, agents and stub records for people whose
+  documents arrived in someone else's folder. A heading that overstates what a
+  list contains is worse than none.
+
+### Added
+- **Clear**, on the case filters, appearing only when something is filtered.
+
+### Fixed
+- A `decided_at` carried over from a matter's earlier life — reopened, or
+  imported — printed a bare date under a "Lodged with INZ" badge, reading as a
+  decision that had not happened. Caught by looking at the rendered list, not
+  by a test; there is a test now.
+
 ## 0.75.0 — 31 August 2026
 
 ### Added
