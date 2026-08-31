@@ -13,7 +13,9 @@ import { all, count } from '../../core/db';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { page } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
-import { badge, card, caseSubline, emptyState, pageHeader, sparkline, statusTone, table } from '../../ui/components';
+import {
+  badge, card, caseSubline, emptyState, pageHeader, sparkline, stamp, statusTone, table,
+} from '../../ui/components';
 import { dateShort, isOverdue, money, relativeDays, truncate } from '../../ui/format';
 import {
   CASE_STATUS_LABELS, CLIENT_STATUS_LABELS, DEADLINE_CASE_STATUSES,
@@ -289,7 +291,7 @@ export const dashboardModule: AppModule = {
             ${card('New inquiries', newInquiries.length === 0 ? emptyState('Nothing new.') : html`
               <ul class="list">${newInquiries.map((i: any) => html`
                 <li><a href="/inquiries/${i.id}">${truncate(i.subject ?? i.contact_name ?? i.ref, 44)}</a>
-                    <div class="muted small">${i.source} · ${dateShort(i.received_at)}</div></li>`)}</ul>`)}
+                    <div class="muted small">${i.source} · ${stamp(i.received_at)}</div></li>`)}</ul>`)}
 
             ${pendingInbox > 0 && can(user, 'ingest:triage')
               ? card('Inbox', html`<p>${pendingInbox} captured message(s) awaiting triage.</p>

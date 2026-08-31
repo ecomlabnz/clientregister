@@ -16,7 +16,9 @@ import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
-import { actionButton, badge, card, csrfField, emptyState, pageHeader, select, statusTone, table } from '../../ui/components';
+import {
+  actionButton, badge, card, csrfField, emptyState, pageHeader, select, stamp, statusTone, table,
+} from '../../ui/components';
 import { dateShort, dateTime, truncate } from '../../ui/format';
 import { processMessage } from '../../ingest/pipeline';
 import { isAiEnabled } from '../../ai/provider';
@@ -247,7 +249,7 @@ export const inboxModule: AppModule = {
                 ${row.trusted ? badge('allow-listed', 'green') : badge('unverified', 'amber')}
               </div></td>
             <td class="small col-sm-hide">${row.sender_display ?? row.sender ?? '—'}</td>
-            <td class="small">${dateTime(row.received_at)}
+            <td class="small">${stamp(row.received_at)}
               <div class="muted">${row.channel}</div></td>
             <td class="col-sm-hide">${row.trusted ? badge('allow-listed', 'green') : badge('unverified', 'amber')}</td>
             <td>${badge(row.status, statusTone(row.status === 'processed' ? 'approved' : row.status))}
@@ -314,7 +316,7 @@ export const inboxModule: AppModule = {
                 <td class="small col-sm-hide">${t.client_id
                   ? html`<a href="/clients/${t.client_id}">${t.client_name}</a>`
                   : html`<span class="muted">not linked</span>`}</td>
-                <td class="small">${t.last_message_at ? dateTime(t.last_message_at) : '—'}
+                <td class="small">${t.last_message_at ? stamp(t.last_message_at) : '—'}
                   ${t.waiting ? html`<div>${badge(`${t.waiting} waiting`, 'amber')}</div>` : ''}</td>
               </tr>`), { sticky: true, fixed: true, empty: 'No conversations.' })}
         </div>`);
@@ -431,7 +433,7 @@ export const inboxModule: AppModule = {
               : html`<div class="thread">
                   ${history.map((entry) => html`
                     <div class="${entry.direction === 'in' ? 'msg msg-in' : 'msg msg-out'}">
-                      <div class="msg-meta">${entry.who} · ${dateTime(entry.at)}
+                      <div class="msg-meta">${entry.who} · ${stamp(entry.at)}
                         ${entry.direction === 'out' && entry.status && entry.status !== 'sent'
                           ? badge(entry.status, entry.status === 'failed' ? 'red' : 'amber') : ''}</div>
                       ${'' /* Formatted where the sender formatted it, through
@@ -505,7 +507,7 @@ export const inboxModule: AppModule = {
                         <label><input type="checkbox" name="documents" value="${d.id}">
                           ${d.filename}
                           <span class="muted small">${Math.max(1, Math.round(d.size_bytes / 1024))} KB ·
-                            ${dateShort(d.uploaded_at)}</span></label>
+                            ${stamp(d.uploaded_at)}</span></label>
                       </div>`)}
                     <p class="hint">Documents already on this client or matter. Sending one records
                        that it went, and to whom — so which version they were sent, and when, stays
@@ -666,7 +668,7 @@ export const inboxModule: AppModule = {
                        { label: thread.peer_label ?? thread.peer_id, href: here },
                        { label: 'Forward' }])}
         ${pageHeader('Send this on',
-          `From ${found.entry.who} · ${dateTime(found.entry.at)}`)}
+          `From ${found.entry.who} · ${stamp(found.entry.at)}`)}
         ${card('Where it goes', html`
           <form method="post" action="${`${here}/forward/${found.entry.kind}/${found.entry.id}`}"
                 class="entry-form">
@@ -712,7 +714,7 @@ ${quote}</textarea>
                     <label><input type="checkbox" name="documents" value="${d.id}">
                       ${d.filename}
                       <span class="muted small">${Math.max(1, Math.round(d.size_bytes / 1024))} KB ·
-                        ${dateShort(d.uploaded_at)}</span></label>
+                        ${stamp(d.uploaded_at)}</span></label>
                   </div>`)}
                 <p class="hint">What arrived on the original is named in the quote above, but a file
                    is only sent on if it is on this client or matter and picked here.</p>
@@ -897,7 +899,7 @@ ${quote}</textarea>
       return page(c, { title: 'Inbox message', active: '/inquiries' }, html`
         ${breadcrumbs([{ href: '/inbox', label: 'Inbox' }, { label: msg.channel }])}
         ${pageHeader(msg.subject || '(no subject)',
-          `${msg.channel} · from ${msg.sender_display ?? msg.sender ?? 'unknown'} · ${dateTime(msg.received_at)}`)}
+          `${msg.channel} · from ${msg.sender_display ?? msg.sender ?? 'unknown'} · ${stamp(msg.received_at)}`)}
 
         ${msg.trusted
           ? ''
@@ -1030,7 +1032,7 @@ ${quote}</textarea>
                          <dd class="small"><a href="/inbox/threads/${msg.thread_id}">Both halves of it</a></dd>`
                   : ''}
                 <dt>External ID</dt><dd class="small">${msg.external_id ?? '—'}</dd>
-                <dt>Processed</dt><dd>${dateTime(msg.processed_at)}</dd>
+                <dt>Processed</dt><dd>${stamp(msg.processed_at)}</dd>
               </dl>
               ${msg.error ? html`<p class="alert alert-error">${msg.error}</p>` : ''}`)}
           </div>

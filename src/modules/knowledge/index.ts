@@ -33,7 +33,9 @@ import {
 } from '../../core/kb';
 import { breadcrumbs, page, redirectWith } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
-import { actionButton, badge, card, csrfField, emptyState, field, pageHeader, select, table } from '../../ui/components';
+import {
+  actionButton, badge, card, csrfField, emptyState, field, pageHeader, select, stamp, table,
+} from '../../ui/components';
 import { dateShort, dateTime, relativeDays, truncate } from '../../ui/format';
 
 const PAGE_SIZE = 25;
@@ -356,8 +358,8 @@ export const knowledgeModule: AppModule = {
                 ${message ? html`<dt>Arrived as</dt><dd>
                   <a href="/inbox/${message.id}">${message.channel} message</a>
                   ${message.sender ? html`<div class="muted small">${message.sender}</div>` : ''}</dd>` : ''}
-                <dt>Filed by</dt><dd>${author?.name ?? '—'} <span class="muted small">${dateTime(article.created_at)}</span></dd>
-                <dt>Last edit</dt><dd>${editor?.name ?? '—'} <span class="muted small">${dateTime(article.updated_at)}</span></dd>
+                <dt>Filed by</dt><dd>${author?.name ?? '—'} <span class="muted small">${stamp(article.created_at)}</span></dd>
+                <dt>Last edit</dt><dd>${editor?.name ?? '—'} <span class="muted small">${stamp(article.updated_at)}</span></dd>
                 <dt>Version</dt><dd>${article.version}</dd>
               </dl>`)}
           </div>
@@ -485,7 +487,7 @@ export const knowledgeModule: AppModule = {
                 <div class="timeline-meta">
                   <span class="strong">Version ${v.version}</span>
                   ${badge(KB_STATUS_LABELS[v.status as KbStatus] ?? v.status, 'grey')}
-                  <span class="muted small">${v.editor ?? 'someone'} · ${dateTime(v.edited_at)}</span>
+                  <span class="muted small">${v.editor ?? 'someone'} · ${stamp(v.edited_at)}</span>
                 </div>
                 ${v.change_note ? html`<p class="small strong">${v.change_note}</p>` : ''}
                 <details>

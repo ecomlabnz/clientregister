@@ -32,6 +32,21 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.82.0', date: '1 September 2026',
+    notes: [
+      'A file note can be corrected for five minutes after you save it, and only once. Press '
+        + '\u201cCorrect this note\u201d under the note itself. After five minutes it stands, and '
+        + 'a correction goes in as a new note \u2014 which is what makes the file worth something '
+        + 'in a complaint or an appeal. What the note said before is kept in the audit log either '
+        + 'way, so nothing is lost even inside the five minutes.',
+      'Notes can be recorded as a \u201cPreliminary consultation\u201d.',
+      'Wherever the register shows when something happened, it now shows the time as well as the '
+        + 'date, a size or two smaller than the words around it. A file with two notes written the '
+        + 'same afternoon has to be able to say which came first.',
+      '\u201cBrief\u201d is now one of the document categories.',
+    ],
+  },
+  {
     version: '0.81.0', date: '31 August 2026',
     notes: [
       'A person may now hold more than one nationality. The register held one, so a partnership '

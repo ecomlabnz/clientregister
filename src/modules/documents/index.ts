@@ -20,7 +20,9 @@ import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith } from '../../ui/layout';
 import { html } from '../../ui/html';
-import { card, csrfField, pageHeader, table } from '../../ui/components';
+import {
+  card, csrfField, pageHeader, stamp, table,
+} from '../../ui/components';
 import { dateShort, dateTime } from '../../ui/format';
 import { addEntry } from '../../core/timeline';
 import { safeReturn } from '../tasks';
@@ -219,7 +221,7 @@ export const documentsModule: AppModule = {
         ${pageHeader('Documents', 'Recently uploaded files.')}
         ${table(['Uploaded', 'File', 'Category', 'Attached to', 'Sent', 'Size', 'By'], recent.map((d) => html`
           <tr>
-            <td class="small">${dateTime(d.uploaded_at)}</td>
+            <td class="small">${stamp(d.uploaded_at)}</td>
             <td><a href="/documents/${d.id}" ${d.external_url ? 'target="_blank" rel="noopener"' : ''}>${d.filename}</a>
               ${d.external_url ? html` <span class="badge">on ${hostOf(d.external_url)}</span>` : ''}</td>
             <td class="small">${labelFor(categories, d.category)}</td>
@@ -424,7 +426,7 @@ export function filesPanel(opts: {
               : html` <span class="muted small">${Math.ceil(d.size_bytes / 1024)} KB</span>`}
             ${d.linked ? html` <span class="badge">from the client’s file</span>` : ''}
             ${d.description ? html`<div class="muted small">${d.description}</div>` : ''}
-            <div class="muted small">${dateShort(d.uploaded_at)}${d.uploader_name ? ` · ${d.uploader_name}` : ''}</div>
+            <div class="muted small">${stamp(d.uploaded_at)}${d.uploader_name ? ` · ${d.uploader_name}` : ''}</div>
           </div>
           <div class="file-row-actions">
             ${d.linked && opts.caseId

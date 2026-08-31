@@ -17,8 +17,7 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import {
-  actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select,
-  statusTone, table,
+  actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, stamp, statusTone, table,
 } from '../../ui/components';
 import { dateInputValue, dateShort, money } from '../../ui/format';
 import { QUOTE_STATUS_LABELS, QUOTE_STATUSES, type QuoteStatus } from '../../domain';
@@ -826,7 +825,7 @@ export const quotesModule: AppModule = {
             ${card('Timeline', entries.length === 0 ? emptyState('Nothing recorded yet.') : html`
               <ul class="timeline">${entries.map((e) => html`
                 <li class="timeline-item">
-                  <div class="timeline-meta"><span class="muted small">${dateShort(e.occurred_at)}${e.author_name ? ` · ${e.author_name}` : ''}</span></div>
+                  <div class="timeline-meta"><span class="muted small">${stamp(e.occurred_at)}${e.author_name ? ` · ${e.author_name}` : ''}</span></div>
                   <div class="timeline-body">${e.body}</div>
                 </li>`)}</ul>`)}
           </div>
@@ -852,8 +851,8 @@ export const quotesModule: AppModule = {
                   ? html`${dateShort(q.valid_until)}
                          <div class="muted small">${q.validity_days ?? qSettings.validityDays} days including the day of issue</div>`
                   : '—'}</dd>
-                <dt>Sent</dt><dd>${dateShort(q.sent_at)}</dd>
-                <dt>Answered</dt><dd>${dateShort(q.responded_at)}</dd>
+                <dt>Sent</dt><dd>${stamp(q.sent_at)}</dd>
+                <dt>Answered</dt><dd>${stamp(q.responded_at)}</dd>
               </dl>
               ${writable ? html`
                 <form method="post" action="/quotes/${q.id}/issue" class="mt">
