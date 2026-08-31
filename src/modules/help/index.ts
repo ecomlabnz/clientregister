@@ -32,6 +32,22 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.80.0', date: '31 August 2026',
+    notes: [
+      'The reader takes Word documents. Drop a .docx into \u201cOpen a matter from what you '
+        + 'already have\u201d and it is read like anything else \u2014 headings, paragraphs and '
+        + 'the rows of a table all come through. It was refused before because a .docx is not a '
+        + 'document in the way a PDF is: it is a zipped folder, and nothing here could open it. '
+        + 'Now it can.',
+      'Two things it still will not read, and will say so plainly: the older .doc format, which '
+        + 'Word has not written by default for twenty years, and a password-protected document.',
+      'A correction on that page. It said passport numbers are not extracted because the column '
+        + 'is encrypted. The reason is right and the explanation was out of date \u2014 that '
+        + 'column stopped being encrypted on 30 August, by the practice\u2019s own decision. '
+        + 'Passport numbers are still never extracted, and still stay out of exports.',
+    ],
+  },
+  {
     version: '0.79.0', date: '31 August 2026',
     notes: [
       'Every section on a matter now folds. Press a heading \u2014 Status, Parties, Tasks, '
