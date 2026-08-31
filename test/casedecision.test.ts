@@ -237,3 +237,89 @@ describe('filtering the case list by what kind of matter it is', () => {
     expect(refs.size).toBe(3);
   });
 });
+
+describe('what the case list shows, and what it keeps back', () => {
+  /**
+   * The practice read the list back on 31 August 2026 and found two columns
+   * saying what other columns already said: the matter title was the client's
+   * name and the type again, and a Decision column had to print "decided" on
+   * every row to explain a date the status badge beside it already accounted
+   * for.
+   *
+   * Both are preferences rather than deletions. On an AEWV the title really is
+   * pure repetition; on a Privacy Act request or a PPI response it is the only
+   * thing on the row that says what the matter is. Off by default, and back in
+   * one click.
+   */
+  const withPrefs = async (h: any, prefs: Record<string, string>) => {
+    for (const [key, value] of Object.entries(prefs)) {
+      h.db.prepare(`INSERT INTO user_preferences (user_id, key, value, updated_at)
+                    VALUES (?, ?, ?, ?)`).run(USER.id, key, value, AT);
+    }
+  };
+  const headings = (body: string) =>
+    [...body.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)]
+      // The sort arrow is inside the th, so strip it — left in, every
+      // `toContain` here would pass for the wrong reason and every
+      // `not.toContain` would pass vacuously.
+      .map((m) => m[1]!.replace(/<[^>]*>/g, '').replace(/[↕↑↓]/g, '').trim())
+      .filter(Boolean);
+
+  it('leaves both columns out unless they are asked for', async () => {
+    const h = mount();
+    seed(h);
+    const heads = headings(await (await h.request('/cases?scope=all')).text());
+    expect(heads).not.toContain('Matter');
+    expect(heads).not.toContain('Decision');
+    expect(heads).toContain('Client');
+    expect(heads).toContain('Type');
+  });
+
+  it('brings each back on its own when the preference is set', async () => {
+    const h = mount();
+    seed(h);
+    await withPrefs(h, { 'pref.cases_show_matter': 'true' });
+    const heads = headings(await (await h.request('/cases?scope=all')).text());
+    expect(heads).toContain('Matter');
+    // The other stays out: two switches, not one.
+    expect(heads).not.toContain('Decision');
+  });
+
+  it('keeps the row description when the Matter column is off', async () => {
+    // The title goes; what the matter is *about* must not go with it.
+    const h = mount();
+    h.db.prepare(`INSERT INTO users (id,email,name,password_hash,role,created_at,updated_at)
+                  VALUES (?,?,?,'x',?,?,?)`).run(USER.id, USER.email, USER.name, USER.role, AT, AT);
+    h.db.prepare(`INSERT INTO clients (id,ref,kind,full_name,status,created_at,updated_at)
+                  VALUES ('CL1','CL-0001','individual','A CLIENT','active',?,?)`).run(AT, AT);
+    h.db.prepare(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,
+                                     assigned_to,created_at,updated_at)
+                  VALUES ('K1','CASE-26-001','CL1','A title','Knife hand, Southland',
+                          'wv_aewv','lodged',?,?,?)`).run(USER.id, AT, AT);
+    const body = await (await h.request('/cases?scope=all')).text();
+    expect(body).toContain('Knife hand, Southland');
+    expect(body).toContain('CASE-26-001');
+  });
+
+  it('puts a decision date under the badge only when a decision was made', async () => {
+    // A matter can carry a decided_at from an earlier life — reopened, or
+    // imported — and a bare date under "Lodged with INZ" reads as a decision
+    // that has not happened.
+    const h = mount();
+    seed(h);
+    h.db.prepare(`UPDATE cases SET decided_at = '2026-01-01' WHERE id = 'K1'`).run();
+    const stillLodged = await (await h.request('/cases?scope=all')).text();
+    expect(stillLodged).not.toContain('01 Jan 2026');
+
+    await h.post('/cases/K1/status', { status: 'approved' });
+    const decided = await (await h.request('/cases?scope=all')).text();
+    expect(decided).toContain('01 Jan 2026');
+  });
+
+  it('offers Clear only when something is filtered', async () => {
+    const h = mount();
+    seed(h);
+    expect(await (await h.request('/cases?scope=all')).text()).not.toContain('>Clear</a>');
+    expect(await (await h.request('/cases?scope=all&status=lodged')).text()).toContain('>Clear</a>');
+  });
+});

@@ -166,6 +166,26 @@ export const PREFERENCE_GROUPS: PreferenceGroup[] = [
         ],
       },
       {
+        // Two columns the practice turned off on 31 August 2026 after reading
+        // the list back. Preferences rather than deletions: on most matters
+        // the title is the client's name and the type again, which the two
+        // columns beside it already say — but on a Privacy Act request or a
+        // PPI response the title is the only thing on the row that says what
+        // the matter is. Off by default, on in one click, and still here for a
+        // practice that wants them.
+        key: 'pref.cases_show_matter', type: 'boolean', default: 'false',
+        label: 'Show the Matter column on the case list',
+        help: 'The matter’s title. Off, the row shows its short description under the '
+          + 'reference instead — on most matters the title repeats the client and the type '
+          + 'already beside it.',
+      },
+      {
+        key: 'pref.cases_show_decision', type: 'boolean', default: 'false',
+        label: 'Show the Decision column on the case list',
+        help: 'Off, a decision’s date sits under the status badge, where the badge already '
+          + 'says whether it was approved or declined.',
+      },
+      {
         key: 'pref.tasks_mine', type: 'boolean', default: 'false', label: 'Show me only my own tasks first',
         help: 'Off, the task list opens on everybody’s tasks. On, it opens filtered to you. '
           + 'Either way you can switch with the dropdown above the list.',
