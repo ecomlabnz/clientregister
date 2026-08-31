@@ -22,7 +22,9 @@ import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
-import { badge, card, csrfField, field, optionsFrom, pageHeader, revealForm, select, table } from '../../ui/components';
+import {
+  badge, card, csrfField, field, optionsFrom, pageHeader, revealForm, select, stamp, table,
+} from '../../ui/components';
 import { dateShort, dateTime, timeShort, truncate } from '../../ui/format';
 import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../core/rbac';
 import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABELS, SPLIT_BASES } from '../../core/fees';
@@ -503,7 +505,7 @@ export const adminModule: AppModule = {
             <td class="col-sm-hide">${badge(u.status, u.status === 'active' ? 'green' : 'red')}
                 ${u.locked_until && new Date(u.locked_until) > new Date() ? badge('locked', 'amber') : ''}
                 <div>${u.totp_enabled ? badge('2FA on', 'green') : badge('2FA off', 'amber')}</div></td>
-            <td class="small col-sm-hide">${dateTime(u.last_login_at)}</td>
+            <td class="small col-sm-hide">${stamp(u.last_login_at)}</td>
             <td>
               <button class="btn btn-small btn-primary" type="submit" form="u_${u.id}">Save</button>
               <a class="btn btn-small btn-secondary" href="/admin/users">Cancel</a>
@@ -520,7 +522,7 @@ export const adminModule: AppModule = {
             <td class="col-sm-hide">${badge(u.status, u.status === 'active' ? 'green' : 'red')}
                 ${u.locked_until && new Date(u.locked_until) > new Date() ? badge('locked', 'amber') : ''}
                 ${u.totp_enabled ? badge('2FA on', 'green') : badge('2FA off', 'amber')}</td>
-            <td class="small col-sm-hide">${dateTime(u.last_login_at)}
+            <td class="small col-sm-hide">${stamp(u.last_login_at)}
                 <div><a class="small" href="/admin/audit?actor=${u.id}">Activity</a></div></td>
             <td class="nowrap">
               <a class="btn btn-small btn-secondary" href="${`/admin/users?edit=${u.id}`}">Edit</a>
@@ -859,7 +861,7 @@ export const adminModule: AppModule = {
           const email = split > 0 ? who.slice(split + 2).replace(/>$/, '') : '';
           return html`
           <tr>
-            <td class="small nowrap">${dateShort(row.at)}
+            <td class="small nowrap">${stamp(row.at)}
               <div class="muted nowrap">${timeShort(row.at)}</div></td>
             <td class="small col-sm-hide">${name}
               ${email ? html`<div class="muted clamp-1">${email}</div>` : ''}</td>

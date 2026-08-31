@@ -26,7 +26,7 @@ import { can } from '../../core/rbac';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import {
-  actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, table,
+  actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, stamp, table,
 } from '../../ui/components';
 import { dateShort, money } from '../../ui/format';
 import { FEE_KINDS, FEE_KIND_LABELS, GST_TREATMENTS, GST_TREATMENT_LABELS,
@@ -358,7 +358,7 @@ export const invoicesModule: AppModule = {
 
             ${card('Xero', html`
               ${invoice.xero_invoice_id
-                ? html`<p class="small">Pushed on ${dateShort(invoice.xero_pushed_at)} as
+                ? html`<p class="small">Pushed on ${stamp(invoice.xero_pushed_at)} as
                          <code>${invoice.xero_invoice_id}</code>.</p>`
                 : html`<p class="small muted">Not connected yet. When it is, an issued invoice can be
                           pushed from here and the Xero identifier recorded against it, so the two

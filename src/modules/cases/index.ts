@@ -19,8 +19,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
-  badge, foldingCard, csrfField, emptyState, errorList, field, optionsFrom,
-  pageHeader, select, statusTone, table,
+  badge, csrfField, emptyState, errorList, field, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
 } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate, dateOrDateTime, instantForDate } from '../../ui/format';
 import {
@@ -33,7 +32,9 @@ import { clientOptions, isAssignable, userOptions } from '../../core/lookups';
 import { threadsFor } from '../../core/channels';
 import { addParty, partiesForCase, removeParty } from '../../core/parties';
 import { findOrCreateTag, listTags, tagCase, tagsForCase, tagsForCases, untagCase } from '../../core/tags';
-import { addEntry, listEntries } from '../../core/timeline';
+import {
+  CORRECTION_WINDOW_MINUTES, addEntry, correctable, listEntries,
+} from '../../core/timeline';
 import { can } from '../../core/rbac';
 import { asPrefBoolean, preferencesFor } from '../../core/preferences';
 import { filesPanel, listCaseFiles, storeDocument } from '../documents';
@@ -667,7 +668,7 @@ export const casesModule: AppModule = {
                 <details><summary>Status history</summary>
                   <ul class="list small">
                     ${history.map((h: any) => html`<li>
-                      ${dateTime(h.at)} — ${h.from_status ? `${CASE_STATUS_LABELS[h.from_status as CaseStatus] ?? h.from_status} → ` : ''}
+                      ${stamp(h.at)} — ${h.from_status ? `${CASE_STATUS_LABELS[h.from_status as CaseStatus] ?? h.from_status} → ` : ''}
                       <strong>${CASE_STATUS_LABELS[h.to_status as CaseStatus] ?? h.to_status}</strong>
                       ${h.by_name ? ` · ${h.by_name}` : ''}${h.note ? ` · ${h.note}` : ''}</li>`)}
                   </ul>
@@ -809,7 +810,7 @@ export const casesModule: AppModule = {
                 ${brief.result.questions.length ? html`
                   <h4>What the file does not say</h4>
                   <ul class="list">${brief.result.questions.map((s) => html`<li>${s}</li>`)}</ul>` : ''}
-                <p class="hint">Drafted ${dateTime(brief.at)} from this file alone. A suggestion,
+                <p class="hint">Drafted ${stamp(brief.at)} from this file alone. A suggestion,
                    not advice, and nothing has been written to the matter.</p>` : ''}
               ${writable ? html`
                 <form method="post" action="/cases/${kase.id}/brief" class="mt">
@@ -864,7 +865,7 @@ export const casesModule: AppModule = {
                               t.last_direction === 'out' ? 'You: ' : ''}${t.last_body}</div>`
                           : ''}
                       </div>
-                      <div class="small muted">${dateShort(t.last_message_at)}</div>
+                      <div class="small muted">${stamp(t.last_message_at)}</div>
                     </li>`)}
                   </ul>`)
               : ''}
@@ -902,29 +903,26 @@ export const casesModule: AppModule = {
                              </div>`}
                   </div>
                   <button class="btn btn-primary" type="submit">Add the note</button>
-                  <p class="hint">A note cannot be edited or deleted once saved — the database
-                     refuses it, not just this screen. That is what makes the file worth something
-                     later. If you get something wrong, add a correction: both stand, in order.</p>
+                  <p class="hint">A note can be corrected for five minutes after it is saved, and
+                     only once. After that the database refuses it — not just this screen — and a
+                     correction goes in as a new note, both standing in order. That is what makes
+                     the file worth something later.</p>
                 </form>` : ''}
 
               ${entries.length === 0 ? emptyState('Nothing recorded yet.') : html`
                 <ul class="timeline">
-                  ${entries.map((e) => html`
-                    <li class="timeline-item">
-                      <div class="timeline-meta">
-                        ${badge(ENTRY_KIND_LABELS[e.kind] ?? e.kind, e.kind === 'system' ? 'grey' : 'neutral')}
-                        <span class="muted small">${dateOrDateTime(e.occurred_at)}${e.author_name ? ` · ${e.author_name}` : ''}</span>
-                        ${e.occurred_at.slice(0, 10) !== e.created_at.slice(0, 10)
-                          ? html`<span class="muted small">written up ${dateShort(e.created_at)}</span>`
-                          : ''}
-                      </div>
-                      <div class="timeline-body">${e.body}</div>
-                      ${e.document_id
-                        ? html`<p class="small mt">
-                                 <a href="/documents/${e.document_id}">${e.document_name ?? 'Attached file'}</a>
-                               </p>`
-                        : ''}
-                    </li>`)}
+                  ${entries.map((e) => timelineItem({
+                    entry: e,
+                    kindLabel: ENTRY_KIND_LABELS[e.kind] ?? e.kind,
+                    happened: stamp(e.occurred_at),
+                    written: stamp(e.created_at),
+                    correction: writable && correctable(e, c.get('user')?.id ?? null)
+                      ? { csrf, minutes: CORRECTION_WINDOW_MINUTES,
+                          kindOptions: optionsFrom(
+                            ENTRY_KINDS.filter((k) => k !== 'system') as any,
+                            ENTRY_KIND_LABELS as any) }
+                      : null,
+                  }))}
                 </ul>`}`)}
           </div>
 
@@ -977,7 +975,7 @@ export const casesModule: AppModule = {
                 <dt>Lodged</dt><dd>${dateShort(kase.lodged_at)}</dd>
                 <dt>Due</dt><dd>${dateShort(kase.decision_due_at)}</dd>
                 <dt>Decided</dt><dd>${dateShort(kase.decided_at)}</dd>
-                <dt>Opened</dt><dd>${dateShort(kase.created_at)}</dd>
+                <dt>Opened</dt><dd>${stamp(kase.created_at)}</dd>
               </dl>`)}
 
             ${foldingCard('Next action', html`

@@ -23,6 +23,80 @@ export interface Entry {
   /** An attached file, once R2 is enabled. */
   document_id?: string | null;
   document_name?: string | null;
+  /** Set when the note was corrected inside its window. See below. */
+  edited_at?: string | null;
+}
+
+/**
+ * How long a note may be corrected for after it is written.
+ *
+ * Notes are append-only and stay that way: a file note that can be edited
+ * months later is not a record of what happened, it is a record of what
+ * somebody now wishes had happened, and it is worth nothing in a complaint or
+ * a Tribunal appeal. What this admits is narrower — for the first few minutes a
+ * note is not yet a record anybody has relied on. It is the sentence just
+ * typed, with the wrong date in it, still on the screen. Refusing that
+ * correction does not protect the file; it puts a wrong date on it forever and
+ * a second note underneath explaining the first.
+ *
+ * The window is enforced by the database, not by this number: migration 0052
+ * carries the same five minutes in a trigger, so a correction from the D1
+ * console is refused too. This is what the screen uses to decide whether to
+ * offer the button.
+ */
+export const CORRECTION_WINDOW_MINUTES = 5;
+
+/** Whether this note may still be corrected, and by this person. */
+export function correctable(
+  entry: Pick<Entry, 'created_at' | 'created_by' | 'kind'> & { edited_at?: string | null },
+  byUserId: string | null,
+  now = Date.now(),
+): boolean {
+  // A note the register wrote about itself is not somebody's slip to fix.
+  if (entry.kind === 'system') return false;
+  // Once. A note that has been corrected stands as it is.
+  if (entry.edited_at) return false;
+  // The person who wrote it. Correcting somebody else's note is not a
+  // correction, it is a rewrite.
+  if (!byUserId || entry.created_by !== byUserId) return false;
+  const written = Date.parse(entry.created_at);
+  if (Number.isNaN(written)) return false;
+  const elapsed = now - written;
+  return elapsed >= 0 && elapsed <= CORRECTION_WINDOW_MINUTES * 60_000;
+}
+
+/**
+ * Correct a note inside its window.
+ *
+ * The previous text goes to the audit log, which is append-only without
+ * exception — so even a correction made within seconds leaves the original
+ * answerable. Returns what the note said before, for the audit record the
+ * caller writes, or null when the database refused.
+ */
+export async function correctEntry(
+  env: Env,
+  input: { id: string; body: string; kind: EntryKind; occurredAt: string; byUserId: string },
+): Promise<{ was: { body: string; kind: string; occurred_at: string } } | { error: string }> {
+  const before = await all<Entry>(
+    env.DB, 'SELECT * FROM entries WHERE id = ?', input.id,
+  );
+  const entry = before[0];
+  if (!entry) return { error: 'That note no longer exists.' };
+  if (!correctable(entry, input.byUserId)) {
+    return { error: `A note can be corrected only within ${CORRECTION_WINDOW_MINUTES} minutes of writing it, and only once.` };
+  }
+  try {
+    await run(
+      env.DB,
+      `UPDATE entries SET body = ?, kind = ?, occurred_at = ?, edited_at = ? WHERE id = ?`,
+      input.body, input.kind, input.occurredAt, nowIso(), input.id,
+    );
+  } catch {
+    // The trigger is the authority, and it has just disagreed with the check
+    // above — a clock that moved, or two people at once. Its answer stands.
+    return { error: `A note can be corrected only within ${CORRECTION_WINDOW_MINUTES} minutes of writing it, and only once.` };
+  }
+  return { was: { body: entry.body, kind: entry.kind, occurred_at: entry.occurred_at } };
 }
 
 export async function addEntry(

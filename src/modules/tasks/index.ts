@@ -17,7 +17,9 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
-import { actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, revealForm, select, statusTone, table } from '../../ui/components';
+import {
+  actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, revealForm, select, stamp, statusTone, table,
+} from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays } from '../../ui/format';
 import { PRIORITIES, PRIORITY_LABELS, TASK_STATUS_LABELS, TASK_STATUSES } from '../../domain';
 import { isAssignable, userOptions } from '../../core/lookups';
@@ -244,7 +246,7 @@ export const tasksModule: AppModule = {
                     ${t.details ? html`<div class="muted small prewrap clamp-2">${t.details}</div>` : ''}
                     ${t.completion_note
                       ? html`<div class="small prewrap clamp-2"><strong>Done${
-                          t.completion_note_at ? html` ${dateShort(t.completion_note_at)}` : ''}:</strong> ${t.completion_note}</div>`
+                          t.completion_note_at ? html` ${stamp(t.completion_note_at)}` : ''}:</strong> ${t.completion_note}</div>`
                       : ''}
                     <div class="row-meta show-sm">
                       ${link ? html`<a href="${link.href}">${link.label}</a>` : ''}
@@ -372,9 +374,9 @@ export const tasksModule: AppModule = {
                 : 'No date'}</dd>
               <dt>Owner</dt><dd>${assignee?.name ?? '—'}</dd>
               <dt>Raised</dt>
-              <dd>${dateTime(task.created_at)}${creator ? html` by ${creator.name}` : ''}</dd>
+              <dd>${stamp(task.created_at)}${creator ? html` by ${creator.name}` : ''}</dd>
               ${task.completed_at
-                ? html`<dt>Completed</dt><dd>${dateTime(task.completed_at)}</dd>`
+                ? html`<dt>Completed</dt><dd>${stamp(task.completed_at)}</dd>`
                 : ''}
             </dl>`)}
         </div>
@@ -386,7 +388,7 @@ export const tasksModule: AppModule = {
         ${task.completion_note
           ? card('What was done', html`
               <div class="prewrap">${task.completion_note}</div>
-              <p class="small muted note-stamp">Written ${dateTime(task.completion_note_at)}${
+              <p class="small muted note-stamp">Written ${stamp(task.completion_note_at)}${
                 noteAuthor ? html` by ${noteAuthor.name}` : ''}</p>`)
           : ''}
 

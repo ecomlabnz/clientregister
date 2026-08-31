@@ -16,7 +16,7 @@ import type { Env } from '../types';
 import { all, nowIso, one, run } from '../core/db';
 import { newId } from '../core/ids';
 import { sha256Hex } from '../core/crypto';
-import { dateShort } from '../ui/format';
+import { dateShort, dateTime } from '../ui/format';
 import { getProvider, type BriefResult } from './provider';
 import { labelFor, caseTypes, visaTypes } from '../core/vocabulary';
 import { countryName } from '../core/countries';
@@ -150,7 +150,7 @@ export async function caseFileText(env: Env, caseId: string): Promise<{ title: s
       // reading cites it as evidence. Marked, the model can see what it is.
       const isOwnDraft = e.body.startsWith(AI_BRIEF_NOTE_PREFIX);
       const mark = isOwnDraft ? ' (an earlier AI draft kept on the file — not a record of events)' : '';
-      lines.push(`- ${dateShort(e.occurred_at)} [${e.kind}]${e.author ? ` ${e.author}` : ''}${mark}: ${e.body}`);
+      lines.push(`- ${dateTime(e.occurred_at)} [${e.kind}]${e.author ? ` ${e.author}` : ''}${mark}: ${e.body}`);
     }
   }
 

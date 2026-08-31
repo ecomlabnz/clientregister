@@ -93,11 +93,24 @@ person here — documents do.
 
 ```
 kind, given_names, family_name, preferred_name, full_name (organisations only),
-email, phone, whatsapp, telegram_username, nationality, date_of_birth, address,
+email, phone, whatsapp, telegram_username, nationalities, date_of_birth, address,
 current_visa_type, current_visa_expiry, current_visa_expiry_rule,
 english_test_type, english_test_score, english_test_date, nzbn, company_number,
 notes
 ```
+
+**`nationalities` is a list, not a value.** This changed on 31 August 2026. A
+person may hold more than one, and dual nationality decides whether they need a
+visa at all, which police certificates are required, and which passport an
+application is made on. Write country names, in the order the documents name
+them — `["Vietnam", "New Zealand"]` — and put the one the practice would name
+first, first. A document saying "dual Vietnamese/New Zealand citizen" is naming
+two: return both. One nationality is still a list of one.
+
+**`current_visa_type` and `current_visa_expiry` apply to everybody**, not only
+to the person the matter is for. A supporting partner is on a visa too, and
+what visa they hold is often the point of the application. Record them for
+every person the documents say holds one.
 
 `current_visa_expiry_rule` is for an expiry the documents state as a rule
 rather than a date — "36 months after first arrival in New Zealand" appeared in

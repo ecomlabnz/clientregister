@@ -29,7 +29,9 @@ import { newId } from '../../core/ids';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
-import { badge, card, csrfField, emptyState, field, pageHeader, select, table } from '../../ui/components';
+import {
+  badge, card, csrfField, emptyState, field, pageHeader, select, stamp, table,
+} from '../../ui/components';
 import { dateTime } from '../../ui/format';
 import {
   ACTIONS, TEMPLATE_TOKENS, TRIGGERS, type ActionKind, type AutomationRow,
@@ -200,7 +202,7 @@ export const workflowsModule: AppModule = {
                     ${badge(row.status, STATUS_TONES[row.status] ?? 'neutral')}
                     <div class="small muted">${row.result ?? ''}</div>
                     <div class="small muted">${row.decided_by_name ?? 'system'}${
-                      row.decided_at ? ` · ${dateTime(row.decided_at)}` : ''}</div>`}
+                      row.decided_at ? ` · ${stamp(row.decided_at)}` : ''}</div>`}
                 </td>
               </tr>`), { sticky: true, fixed: true, empty: 'Nothing waiting.' })}
 
@@ -305,7 +307,7 @@ export const workflowsModule: AppModule = {
                   { label: 'Skipped', width: '14', align: 'right' },
                 ], runs.map((x: any) => html`
                   <tr>
-                    <td class="small">${dateTime(x.ran_at)}
+                    <td class="small">${stamp(x.ran_at)}
                       ${x.duplicates ? html`<div class="muted">${x.duplicates} already known</div>` : ''}
                       ${x.error ? html`<div class="muted clamp-2">${x.error}</div>` : ''}</td>
                     <td class="small muted col-sm-hide">${x.trigger}</td>

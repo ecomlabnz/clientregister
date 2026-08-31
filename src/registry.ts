@@ -19,6 +19,7 @@ import { quotesModule } from './modules/quotes';
 import { invoicesModule } from './modules/invoices';
 import { tasksModule } from './modules/tasks';
 import { documentsModule } from './modules/documents';
+import { notesModule } from './modules/notes';
 import { inboxModule } from './modules/inbox';
 import { adminModule } from './modules/admin';
 import { knowledgeModule } from './modules/knowledge';
@@ -44,6 +45,7 @@ export const registeredModules: AppModule[] = [
   invoicesModule,
   tasksModule,
   documentsModule,
+  notesModule,
   knowledgeModule,
   assistantModule,
   workflowsModule,

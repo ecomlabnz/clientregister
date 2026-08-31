@@ -28,7 +28,9 @@ import { rateLimit } from '../../core/ratelimit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
-import { card, csrfField, errorList, field, pageHeader, table, select } from '../../ui/components';
+import {
+  card, csrfField, errorList, field, pageHeader, select, stamp, table,
+} from '../../ui/components';
 import { dateTime } from '../../ui/format';
 import { ROLE_LABELS } from '../../core/rbac';
 import {
@@ -433,8 +435,8 @@ export const authModule: AppModule = {
         ${card('Active sessions', html`
           ${table(['Started', 'Last seen', 'IP', 'Device', ''], sessions.map((s) => html`
             <tr>
-              <td>${dateTime(s.created_at)}</td>
-              <td>${dateTime(s.last_seen_at)}</td>
+              <td>${stamp(s.created_at)}</td>
+              <td>${stamp(s.last_seen_at)}</td>
               <td>${s.ip ?? '—'}</td>
               <td class="ellipsis" title="${s.user_agent ?? ''}">${(s.user_agent ?? '—').slice(0, 60)}</td>
               <td>${s.id === session.sid
