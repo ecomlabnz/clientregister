@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.71.0', date: '1 September 2026',
+    notes: [
+      'Clients, Cases and Tasks now let you choose how many rows to show — 25, 50, '
+        + '100, 250 or 500 — from under the list itself, rather than only in Settings. '
+        + 'The list also says which rows you are looking at.',
+      'The task list was showing at most 200 tasks and giving no sign there were more. '
+        + 'It now pages properly, so nothing is hidden.',
+    ],
+  },
+  {
     version: '0.70.2', date: '1 September 2026',
     notes: [
       'A certificate issue date can now be recorded as read off the scan by OCR. '

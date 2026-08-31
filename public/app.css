@@ -827,7 +827,28 @@ details[open] > summary { margin-bottom: 12px; }
   border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px;
   background: var(--surface-2);
 }
-.pager { display: flex; gap: 8px; margin-top: 14px; }
+/* Previous/Next on the left, the range and the rows-per-page choice on the
+   right. On a narrow screen the row wraps rather than scrolling sideways, so
+   the size links stay reachable with a thumb. */
+.pager {
+  display: flex; gap: 8px 14px; margin-top: 14px;
+  align-items: center; flex-wrap: wrap;
+}
+.pager-steps { display: flex; gap: 8px; }
+.pager-range { margin-left: auto; }
+.pager-size { display: flex; gap: 8px; align-items: baseline; }
+.pager-size a, .pager-size .pager-size-current {
+  font-size: 0.85rem; padding: 2px 7px; border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.pager-size a { color: var(--accent); text-decoration: none; }
+.pager-size a:hover { background: var(--surface-2); text-decoration: underline; }
+.pager-size .pager-size-current {
+  background: var(--surface-2); border: 1px solid var(--border); font-weight: 600;
+}
+/* With no range shown (an empty list) the size choice still sits to the
+   right rather than against the buttons. */
+.pager-steps + .pager-size { margin-left: auto; }
 /* While a live search is in flight the old results stay put and simply fade,
    so the page does not jump about between keystrokes. */
 [data-live-results][aria-busy="true"] { opacity: 0.55; transition: opacity 120ms linear; }

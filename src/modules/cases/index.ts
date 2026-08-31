@@ -17,6 +17,7 @@ import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
+import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
   badge, card, csrfField, emptyState, errorList, field, optionsFrom,
   pageHeader, select, statusTone, table,
@@ -34,7 +35,7 @@ import { addParty, partiesForCase, removeParty } from '../../core/parties';
 import { findOrCreateTag, listTags, tagCase, tagsForCase, tagsForCases, untagCase } from '../../core/tags';
 import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
-import { asPrefInteger, preferencesFor } from '../../core/preferences';
+import { preferencesFor } from '../../core/preferences';
 import { filesPanel, listCaseFiles, storeDocument } from '../documents';
 import {
   DECISION_SETTINGS, caseForSync, decisionPolicy, expectedDecisionDate, syncCaseFollowUps,
@@ -61,7 +62,6 @@ export interface CaseRow {
   created_by: string | null; closed_at: string | null;
 }
 
-const DEFAULT_PAGE_SIZE = 25;
 
 /**
  * What a column heading may sort by.
@@ -234,13 +234,13 @@ export const casesModule: AppModule = {
     r.get('/', requirePermission('register:read'), async (c) => {
       const types = await caseTypes(c.env);
       const prefs = await preferencesFor(c.env, c.get('user')!.id);
-      const PAGE_SIZE = asPrefInteger(prefs['pref.page_size'], DEFAULT_PAGE_SIZE);
+      const PAGE_SIZE = pageSizeFor(c.req.query('size'), prefs['pref.page_size']);
       const q = (c.req.query('q') ?? '').trim();
       const status = c.req.query('status') ?? '';
       const assigned = c.req.query('assigned') ?? '';
       // A view the person asked for wins; otherwise where they said they like to start.
       const scope = c.req.query('scope') ?? prefs['pref.cases_scope'] ?? 'open';
-      const pageNum = Math.max(1, Number(c.req.query('page') ?? '1') || 1);
+      const pageNum = pageNumberFor(c.req.query('page'));
 
       const where: string[] = [];
       const params: unknown[] = [];
@@ -270,7 +270,7 @@ export const casesModule: AppModule = {
                              WHERE ct.case_id = k.id AND t.name = ${p()})`);
       }
       const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-      params.push(PAGE_SIZE + 1, (pageNum - 1) * PAGE_SIZE);
+      params.push(limitFor(PAGE_SIZE), (pageNum - 1) * PAGE_SIZE);
 
       const asked = c.req.query('sort') ?? '';
       const sortCols = CASE_SORTS[asked];
@@ -302,12 +302,13 @@ export const casesModule: AppModule = {
       ]);
 
       const qs = (over: Record<string, string | number>) =>
-        new URLSearchParams({ q, status, assigned, scope, tag: tagFilter, sort: sortKey, dir: sortDir, page: String(pageNum), ...Object.fromEntries(Object.entries(over).map(([k2, v]) => [k2, String(v)])) }).toString();
+        new URLSearchParams({ q, status, assigned, scope, tag: tagFilter, sort: sortKey, dir: sortDir, page: String(pageNum), size: String(PAGE_SIZE), ...Object.fromEntries(Object.entries(over).map(([k2, v]) => [k2, String(v)])) }).toString();
 
       return page(c, { title: 'Cases', active: '/cases' }, html`
         ${pageHeader('Cases', 'Every matter the practice is running.',
           can(c.get('user'), 'register:write') ? html`<a class="btn btn-primary" href="/cases/new">New case</a>` : undefined)}
         <form method="get" action="/cases" class="filters" data-live-search>
+          <input type="hidden" name="size" value="${String(PAGE_SIZE)}">
           <input type="search" name="q" value="${q}" placeholder="Search matter, client, reference or INZ number">
           <select name="status">
             <option value="">${scope === 'all' ? 'All statuses' : 'Open statuses'}</option>
@@ -383,10 +384,8 @@ export const casesModule: AppModule = {
               // number would land somewhere arbitrary.
               sort: { key: sortKey, dir: sortDir,
                       href: (key, dir) => `/cases?${qs({ sort: key, dir, page: 1 })}` } })}
-        <div class="pager">
-          ${pageNum > 1 ? html`<a class="btn btn-secondary" href="/cases?${raw(qs({ page: pageNum - 1 }))}">Previous</a>` : ''}
-          ${hasMore ? html`<a class="btn btn-secondary" href="/cases?${raw(qs({ page: pageNum + 1 }))}">Next</a>` : ''}
-        </div>
+        ${pager({ page: pageNum, size: PAGE_SIZE, hasMore, shown: shown.length,
+                  href: (over) => `/cases?${qs(over)}` })}
         </div>`);
     });
 
