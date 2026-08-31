@@ -277,8 +277,6 @@ export const quotesModule: AppModule = {
       const accepted = rows.filter((q) => q.status === 'accepted');
       const outstanding = rows.filter((q) => q.status === 'sent');
 
-      const invoiceCount = await count(c.env.DB,
-        `SELECT COUNT(*) AS n FROM invoices WHERE status IN ('issued','part_paid')`);
       const counts = await one<{ live: number; accepted: number; closed: number; total: number }>(
         c.env.DB,
         `SELECT SUM(status IN ('draft','sent')) AS live,
@@ -305,7 +303,6 @@ export const quotesModule: AppModule = {
           ${views.map((v) => html`
             <a class="${v.id === view && !status ? 'tab current' : 'tab'}"
                href="/quotes?view=${v.id}">${v.label} <span class="muted">${v.count}</span></a>`)}
-          <a class="tab" href="/invoices">Invoices <span class="muted">${invoiceCount}</span></a>
         </nav>
         <form method="get" action="/quotes" class="filters" data-live-search>
           <input type="hidden" name="view" value="${view}">

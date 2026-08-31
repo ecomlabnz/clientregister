@@ -56,6 +56,13 @@ export const invoicesModule: AppModule = {
   name: 'invoices',
   title: 'Invoices',
   basePaths: ['/invoices'],
+  // In the run under Money, between Quotes and Fees, which is the order the
+  // work happens in: a quote before it, an invoice after it, the fee ledger
+  // underneath both. The page has existed since 0.66.0 and was reachable only
+  // through a tab on the quotes list — which is to say, only if you already
+  // knew it was there. "What are we owed" is a question the practice asks of
+  // the register directly, not by way of quotes.
+  nav: [{ href: '/invoices', label: 'Invoices', permission: 'register:read', order: 50, group: 'Money' }],
 
   register(app) {
     const r = new Hono<AppContext>();
@@ -125,7 +132,10 @@ export const invoicesModule: AppModule = {
         </div>
 
         <nav class="tabs">
-          <a class="tab" href="/quotes">Quotes</a>
+          ${'' /* The tabs on this row are views of this list — owing, draft,
+                   paid. A link sideways to another list used to sit among them
+                   because invoices had no place in the menu; they do now, so it
+                   would only be navigation pretending to be a filter. */}
           ${views.map((v) => html`
             <a class="${v.id === view ? 'tab current' : 'tab'}"
                href="${`/invoices?view=${v.id}`}">${v.label} <span class="muted">${v.count}</span></a>`)}
