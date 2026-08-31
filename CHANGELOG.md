@@ -7,6 +7,37 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.79.0 — 31 August 2026
+
+### Changed
+- **Every section on a matter folds.** A matter page runs to a dozen sections
+  — status, parties, tasks, files, notes, tags, key details, next action,
+  quotes, summary — and which of them matter depends on what the file was
+  opened for. Each heading is a handle now.
+
+  They open on load, all but one: a section you cannot see is a section you
+  forget to read, so the default is everything visible and folding is
+  something the reader chooses. The fold is not remembered between page loads,
+  and that is deliberate — a section missing because of something you did on
+  another matter last week is worse than one you close again.
+
+- **Fees is the exception**, and still starts closed for the reason it always
+  has: it is the one thing on the page a client leaning over the desk should
+  not read by accident. Worth repeating what that is and is not — a screen to
+  click past, not access control. Who may see money is a question of roles.
+
+- **"Fees and split" is now just "Fees".** The section was named after two of
+  the things inside it rather than after the one thing it is.
+
+### How it is built
+- `foldingCard` beside the existing `card` and `collapsibleCard` in
+  `ui/components.ts` — `<details open>`, like every other disclosure here,
+  because the content policy forbids an inline script and a fold that stops
+  working when script is blocked is a section nobody can reach.
+- `test/casefolds.test.ts` pins the rule rather than the arrangement: every
+  section on a matter folds, exactly one starts folded, and it is Fees. Both
+  halves proven by breaking them and watching the tests fail.
+
 ## 0.78.1 — 31 August 2026
 
 ### Fixed
