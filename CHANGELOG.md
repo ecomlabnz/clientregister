@@ -7,6 +7,35 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.72.0 — 1 September 2026
+
+Three faults on one card, all found by the practice approving a real matter
+(CASE-26-051) and finding the screen confusing afterwards.
+
+### Added
+- **The decision date shows beside the status.** For an approved or declined
+  matter, the date the decision arrived now sits next to the badge. It was
+  always recorded — `decided_at`, written by the register the moment the status
+  changes, never typed — but only shown in Key details further down, so the
+  page read as though nothing had been kept.
+
+### Fixed
+- **"Response / decision due" is no longer offered on a decided matter.** It
+  was rendered on every status move, pre-filled, with a hint that mentioned
+  RFI, PPI and appeal but did not say what the field is *not* for. Approving a
+  matter and typing the approval date into the box that is sitting there is
+  the obvious reading, and it is the wrong field. It now appears only while
+  something is genuinely awaited, and a submitted value is ignored when the
+  matter is being decided. A date already recorded is left alone — an expected
+  date beside the date a decision actually arrived is how the practice sees
+  what INZ took.
+- **"Approved / Granted." said the same thing twice.** Every status carries a
+  line explaining what the badge cannot — "Lodged / Filed with Immigration New
+  Zealand", "Declined / Refused — consider appeal, reconsideration or a fresh
+  application". Approved's line was the bare synonym "Granted." It now says
+  what to do next. A test refuses any status whose explanation is its own
+  label, or is under three words.
+
 ## 0.71.0 — 1 September 2026
 
 ### Added

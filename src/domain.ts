@@ -57,7 +57,9 @@ export const CASE_STATUS_HELP: Record<CaseStatus, string> = {
   ppi: 'Potentially prejudicial information letter — response deadline applies.',
   interim_visa: 'Onshore application pending; client may hold an interim visa.',
   decision_pending: 'All information provided; awaiting the decision.',
-  approved: 'Granted.',
+  // Every line here has to earn its place by saying something the badge above
+  // it does not. "Granted." said the same word twice.
+  approved: 'Check the conditions and record the visa dates, then tell the client.',
   declined: 'Refused — consider appeal, reconsideration or a fresh application.',
   appeal: 'Appeal, reconsideration or s.61 request under way.',
   on_hold: 'Paused at the client’s request or pending an external event.',
@@ -85,6 +87,22 @@ export const DEADLINE_CASE_STATUSES: CaseStatus[] = ['inz_rfi', 'ppi', 'appeal']
 export const LODGED_CASE_STATUSES: CaseStatus[] = [
   'lodged', 'inz_rfi', 'ppi', 'interim_visa', 'decision_pending',
 ];
+
+/**
+ * Statuses where something is still being waited for, so a date to watch means
+ * something.
+ *
+ * A decided matter is waiting for nothing, and offering it a box labelled
+ * "response / decision due" invites recording the decision's own date in a
+ * field that means the opposite — which is exactly what happened on
+ * CASE-26-051. The date a decision arrived is `decided_at`, and the register
+ * writes that itself.
+ */
+export const AWAITING_CASE_STATUSES: CaseStatus[] = [...LODGED_CASE_STATUSES, 'appeal'];
+
+export function isAwaitingStatus(status: string): boolean {
+  return (AWAITING_CASE_STATUSES as string[]).includes(status);
+}
 
 export function isOpenStatus(status: string): boolean {
   return (OPEN_CASE_STATUSES as string[]).includes(status);

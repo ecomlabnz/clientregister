@@ -26,7 +26,7 @@ import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate,
 import {
   canTransition, CASE_STATUS_HELP, CASE_STATUS_LABELS, CASE_STATUSES, CASE_TRANSITIONS,
   DEADLINE_CASE_STATUSES, ENTRY_KIND_LABELS, ENTRY_KINDS,
-  isOpenStatus, isPartyRole, OPEN_CASE_STATUSES, PARTY_ROLE_LABELS, PARTY_ROLES, PRIORITIES,
+  isAwaitingStatus, isOpenStatus, isPartyRole, OPEN_CASE_STATUSES, PARTY_ROLE_LABELS, PARTY_ROLES, PRIORITIES,
   PRIORITY_LABELS, TASK_STATUS_LABELS, type CaseStatus,
 } from '../../domain';
 import { clientOptions, isAssignable, userOptions } from '../../core/lookups';
@@ -540,6 +540,9 @@ export const casesModule: AppModule = {
           <div class="col-main">
             ${card('Status', html`
               <p class="status-now">${badge(CASE_STATUS_LABELS[kase.status], statusTone(kase.status))}
+                 ${kase.decided_at && (kase.status === 'approved' || kase.status === 'declined')
+                   ? html`<strong>${dateShort(kase.decided_at)}</strong>`
+                   : ''}
                  <span class="muted">${CASE_STATUS_HELP[kase.status]}</span></p>
               ${writable && nextStatuses.length > 0 ? html`
                 <form method="post" action="/cases/${kase.id}/status" class="row-form">
@@ -548,9 +551,13 @@ export const casesModule: AppModule = {
                              options: nextStatuses.map((s) => ({ value: s, label: CASE_STATUS_LABELS[s] })) })}
                   ${field({ label: 'Note (recorded on the file)', name: 'note', maxlength: 500,
                             placeholder: 'e.g. Lodged online, receipt 12345' })}
-                  ${field({ label: 'Response / decision due', name: 'decision_due_at', type: 'date',
-                            value: dateInputValue(kase.decision_due_at),
-                            hint: 'Set this when moving to an RFI, PPI or appeal status.' })}
+                  ${nextStatuses.some(isAwaitingStatus)
+                    ? field({ label: 'Response / decision due', name: 'decision_due_at', type: 'date',
+                              value: dateInputValue(kase.decision_due_at),
+                              hint: 'A date still being waited for — an RFI or PPI response, or when '
+                                  + 'INZ is expected to decide. Not the date a decision arrived: the '
+                                  + 'register records that itself when you move to Approved or Declined.' })
+                    : ''}
                   <button class="btn btn-primary" type="submit">Update status</button>
                 </form>` : ''}
               ${history.length > 0 ? html`
@@ -968,10 +975,18 @@ export const casesModule: AppModule = {
 
       // Lodging is the moment an expected decision date becomes meaningful, so
       // it is filled in here when nobody has supplied one.
+      //
+      // And it stops being meaningful the moment the matter is decided: a
+      // status that is waiting for nothing may neither take a new date nor
+      // have one computed for it. What is already recorded stays — an expected
+      // date beside the date a decision actually arrived is how the practice
+      // can see what INZ took — but nothing writes a fresh one.
       const policy = await decisionPolicy(c.env);
-      const expected = decisionDue
-        ?? kase.decision_due_at
-        ?? expectedDecisionDate(lodgedAt ? lodgedAt.slice(0, 10) : null, policy.expectedMonths);
+      const expected = isAwaitingStatus(status)
+        ? (decisionDue
+            ?? kase.decision_due_at
+            ?? expectedDecisionDate(lodgedAt ? lodgedAt.slice(0, 10) : null, policy.expectedMonths))
+        : kase.decision_due_at;
 
       await run(
         c.env.DB,
