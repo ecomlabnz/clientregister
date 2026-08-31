@@ -241,7 +241,7 @@ export const quotesModule: AppModule = {
   name: 'quotes',
   title: 'Quotes',
   basePaths: ['/quotes'],
-  nav: [{ href: '/quotes', label: 'Quotes', permission: 'register:read', order: 60 }],
+  nav: [{ href: '/quotes', label: 'Quotes', permission: 'register:read', order: 60, group: 'Money' }],
   settings: [QUOTE_SETTINGS],
 
   register(app) {

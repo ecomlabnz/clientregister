@@ -269,6 +269,30 @@ p:last-child { margin-bottom: 0; }
 }
 .nav-link:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
 .nav-link.current { background: var(--blue-bg); color: var(--accent); }
+/* A run of nav items under one heading.
+   The summary is the nav link; the items drop beneath it as a panel, which is
+   why the bar itself is the positioning context. Absolute, so opening a group
+   does not push the page down or make the bar taller. */
+.nav-group { position: relative; }
+.nav-group > summary { list-style: none; cursor: pointer; display: inline-block; }
+.nav-group > summary::-webkit-details-marker { display: none; }
+.nav-group > summary::marker { content: ''; }
+.nav-group > summary::after { content: ' \25be'; opacity: 0.6; }
+.nav-group > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nav-group-items {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 20;
+  display: flex; flex-direction: column; gap: 2px; min-width: 160px;
+  padding: 6px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+
+/* Settings and Help: reached occasionally, so out of the run and in the
+   corner. Quieter than a nav link, because they are not part of the scan. */
+.nav-corner { color: var(--muted); font-size: 0.82rem; }
+.nav-corner:hover { color: var(--text); }
+.nav-corner.current { color: var(--accent); font-weight: 600; }
+
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 .signout { display: flex; }
 .whoami { display: flex; align-items: center; gap: 8px; color: var(--text); }

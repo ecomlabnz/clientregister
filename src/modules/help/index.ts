@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.77.0', date: '31 August 2026',
+    notes: [
+      'The menu across the top fits on one line again. Quotes and Fees sit under '
+        + '\u201cMoney\u201d, Knowledge and the Assistant under \u201cTools\u201d, and Settings and '
+        + 'Help have moved to the top right beside your name. Nothing has gone \u2014 the '
+        + 'headings open when you press them.',
+    ],
+  },
+  {
     version: '0.76.0', date: '31 August 2026',
     notes: [
       'The case list drops the Matter and Decision columns. On most matters the title '
@@ -1956,7 +1965,7 @@ export const helpModule: AppModule = {
   name: 'help',
   title: 'Help',
   basePaths: ['/help'],
-  nav: [{ href: '/help', label: 'Help', permission: 'register:read', order: 5 }],
+  nav: [{ href: '/help', label: 'Help', permission: 'register:read', order: 5, corner: true }],
 
   register(app) {
     const r = new Hono<AppContext>();
