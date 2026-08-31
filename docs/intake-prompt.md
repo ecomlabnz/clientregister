@@ -8,9 +8,10 @@ files, that does two jobs at once:
 2. **Report** what it found that the register has nowhere to put — so the
    register can grow towards the practice rather than the other way round.
 
-This prompt has been through one real batch (23 clients, 24 matters, loaded
-30 August 2026). The rules below that cite that batch are not hypothetical:
-each one exists because the first run needed it.
+This prompt has been through two real batches — 23 clients and 24 matters on
+30 August 2026, and a second on 31 August. The rules below that cite either run
+are not hypothetical: each one exists because a run needed it, and several exist
+because a run was refused mid-load without it.
 
 ---
 
@@ -33,7 +34,11 @@ after the first is an increment, not a fresh start. Before running, export two
 small lists from the register and put them in the working directory:
 
 - `existing-clients.txt` — one line per client: ref, family name, given names,
-  date of birth, passport number(s), INZ client number if known.
+  date of birth, INZ client number if known. **No passport numbers.** They stay
+  out of bulk exports by a standing rule of the practice, and they are not
+  needed here: the extractor records the passport numbers it reads from the
+  folders, and the loader matches them against the register at load time, where
+  the numbers never leave the database. Batch 02 worked exactly that way.
 - `case-type-keys.txt` — the current case-type keys from Settings (the
   vocabulary is editable there, so a pasted list in this file goes stale;
   export it fresh each time).
@@ -77,11 +82,18 @@ out the fields listed below. Then write three files into the working directory
 
 ### The register already holds clients
 
-Before creating a person, check them against `existing-clients.txt` — by
-passport number first, then INZ client number, then family name with date of
-birth. A match is not a new client: set `"matches_existing": "<their ref>"` on
-the object and still record everything you found, so the register's copy can be
-checked and completed. Say in `findings.md` how many matched and on what.
+Before creating a person, check them against `existing-clients.txt` — by INZ
+client number first, then family name with date of birth. A match is not a new
+client: set `"matches_existing": "<their ref>"` on the object and still record
+everything you found, so the register's copy can be checked and completed. Say
+in `findings.md` how many matched and on what — counts, not names.
+
+**Passport matching happens at load, not here.** `existing-clients.txt` carries
+no passport numbers, because they stay out of bulk exports. Record the passport
+numbers you read from the folders in `clients.jsonl` as usual; the loader
+matches them against the register directly, where the numbers never leave the
+database. So a person you could not match on name and date of birth may still
+be matched at load — say so rather than asserting they are new.
 
 The first batch found the same person appearing in two places under differently
 ordered names; the passport number is what settled it. Names do not identify a
@@ -127,8 +139,14 @@ batch produced four of these.
 `passports`:
 
 ```
-country, number, issued_on, expires_on, status (held | with_inz | expired | lost)
+country, number, issued_on, expires_on, status (held | replaced | lost | cancelled)
 ```
+
+Those four are the register's own words and the only ones it accepts — batch 02
+sent `expired` and was refused mid-load. **An out-of-date passport is still
+`held`**: the expiry date carries that fact, and `replaced` means a newer
+passport has taken over from it. `cancelled` is a passport an authority has
+cancelled.
 
 Passport numbers are recorded exactly as written. They identify people across
 folders — see matching above.
@@ -137,19 +155,22 @@ folders — see matching above.
 
 ```
 kind (police | medical | chest_xray), subtype, country, reference,
-issued_on, issued_on_source, submitted_on, notes
+issued_on, issued_on_provenance, submitted_on, notes
 ```
 
-`issued_on_source` is one of:
+`issued_on_provenance` says where the issue date came from, and it is one of
+exactly these four — the register's own words, and the only ones it accepts:
 
-- `document` — you read the date off the certificate itself;
-- `filename` — the date exists only in the practice's file or folder name;
-- `other` — anywhere else (a covering letter, a checklist, an email).
+- `verified` — you read the date off the certificate itself;
+- `from_filename` — the date exists only in the practice's file or folder name;
+- `from_ocr` — a machine read it off a scan and no person has confirmed it;
+- `unverified` — anywhere else, or you cannot tell.
 
-This is a standing decision of the practice (30 August 2026): a date that did
-not come from the document itself must be verified by a person before it is
-relied on, and the register flags it until someone does. So a filename date is
-still worth extracting — just never dress it up as read from the document.
+This is a standing decision of the practice (30 August 2026): a police
+certificate's expiry is *worked out* from its issue date, so a date nobody read
+off the paper must never look like one somebody did. Anything but `verified` is
+flagged in the register until a person checks it. A filename date is still worth
+extracting — just never dress it up as read from the document.
 
 Do **not** compute a certificate expiry. The register works it out from the
 issue date and whether it was submitted, using INZ's rule. If a folder states an
@@ -163,8 +184,12 @@ client (how you are identifying the client — the same string you used for them
         in clients.jsonl), descriptor, case_type, status, priority,
 inz_application_number, inz_client_number, lodged_at, decision_due_at,
 decided_at, outcome, next_action, next_action_due, summary,
-fee_quoted, fee_agreed, currency, opened_on, closed_on
+opened_on, closed_on
 ```
+
+No fee fields. The practice enters fees by hand, by its own decision — see rule
+12 — and a spec that lists ledger columns invites them to be filled in. A fee
+you find in a folder still travels, as a note: the nested `fees` list below.
 
 **`descriptor` is the matter's name, and there is no `title`.** This changed on
 31 August 2026 and it is the field the first two batches got wrong, so read
@@ -309,10 +334,13 @@ the practice, not a number in a ledger.
     fee written in a name — record it as a note on the matter saying what the
     document said, and create no fee, invoice or quote row. The second batch
     carried 35 fee facts across this way and it is the settled arrangement.
-13. **Every matter has an owner.** The register refuses an ownerless matter,
-    so `assigned_to` is required on every case. Where the folder does not say,
-    use the practice's default owner rather than leaving it out — a matter
-    that will not load helps nobody.
+13. **The owner is the loader's to supply, not yours.** The register refuses an
+    ownerless matter — that is a database trigger, not a form check — but you
+    have no way of knowing the practice's user accounts, so do not invent one
+    and do not leave a name you guessed at. Record `assigned_to` only when a
+    folder actually names who is running the matter, in the words it uses; the
+    loader maps that to a user, and supplies the practice's default owner for
+    every matter that does not name one.
 14. **A person the register cannot name is a note, not a record.** A client
     row needs a name. Where a folder shows a person with no name recorded —
     "the applicant's daughter, about eleven, in Viet Nam" — put what is known

@@ -18,9 +18,14 @@ points in it are the ones batches 01 and 02 both turned on:
 - **Run it outside this repository**, in a working directory of its own, over a
   *copy* of the folders. Real client data never enters the repo.
 - **Export the register's current state fresh.** `existing-clients.txt` and
-  `case-type-keys.txt` both go stale between batches, and the register now
-  holds 59 clients and 44 matters — a great deal more than when batch 01 ran
-  against an empty one. Nearly everything in this batch will match something.
+  `case-type-keys.txt` both go stale between batches, and the register held 61
+  clients and 45 matters when this was written — a great deal more than when
+  batch 01 ran against an empty one, and stale by the time you read it. Nearly
+  everything in this batch will match something.
+- **`existing-clients.txt` carries no passport numbers.** They stay out of bulk
+  exports by a standing rule, and they are not needed in the export: the
+  extractor reads passport numbers from the folders and the loader matches them
+  against the register at load time, where they never leave the database.
 
 Then do five or six folders, read the output against the originals line by
 line, and only let it walk the tree once that has been checked. Both previous
@@ -31,9 +36,10 @@ the whole run.
 
 ## What changed in the register since batch 02
 
-Four things, and each one changes what to extract. All four are already written
-into the standing prompt; they are repeated here because they are the parts a
-session that has seen the old prompt will get wrong from memory.
+Five things, and each one changes what to extract. All five are written into the
+standing prompt too; they are repeated here because they are the parts a session
+that has seen the old prompt will get wrong from memory — and two of them are
+what refused batch 02 mid-load.
 
 ### 1. A matter is named by what it is about
 
@@ -59,7 +65,18 @@ entries, not zero.
 documents say holds a visa — the supporting partner, the dependent child, not
 only the applicant.
 
-### 4. The statuses changed
+### 4. Passport status and certificate provenance use the register's own words
+
+A passport is `held`, `replaced`, `lost` or `cancelled` — nothing else. Batch 02
+sent `expired` and was refused mid-load. An out-of-date passport is still
+`held`; the expiry date carries that fact.
+
+A certificate's issue date carries `issued_on_provenance`, one of `verified`,
+`from_filename`, `from_ocr`, `unverified`. There is one field and one
+vocabulary; batch 02 used a different pair of words and the loader had to guess
+the mapping.
+
+### 5. The statuses changed
 
 `inz_rfi` is gone: a request for further information and a PPI letter are both
 `ppi`. `appeal` split into `ipt_appeal` (with the Tribunal) and
@@ -81,27 +98,39 @@ For this batch:
 - Keep using `issued_on_source` honestly. `filename` is a perfectly good answer
   and is *better* than a date dressed up as `document`.
 - Where this batch's folders contain the actual certificate for a person already
-  in the register, say so in `findings.md` under a heading of its own: that is
-  the list the practice can work through to clear the existing 45.
+  in the register, write that list to **`verify-certificates.md`**, beside the
+  JSONL files — not to `findings.md`. It names people and cites documents, so it
+  belongs with the client data, not in the report. `findings.md` gets the count
+  only.
 
 ---
 
 ## What to report, on top of the standing list
 
-`findings.md` should also answer:
+**`findings.md` holds no client data.** It is the report the practice reads
+about the *run* — counts, patterns, things the register cannot hold. Names,
+dates of birth, passport numbers, convictions and quotes from documents belong
+in `clients.jsonl`, `cases.jsonl` and `verify-certificates.md`, which are the
+files that carry client material and are handled as such.
 
-1. **How many matched an existing client, and on what** — passport, INZ client
-   number, or name and date of birth. With 59 clients already held, this is now
-   the most important number in the report.
-2. **Every dual or multiple nationality found**, listed. This is the first batch
-   that can record them, and it is worth knowing how many the earlier two lost.
-3. **Every descriptor you were unsure about.** A matter whose folder does not
-   say what it is about is a matter to ask about, not one to name from its type.
-4. **Anything that looks like a warning** — an assault reported to Police, a
-   conviction, a previous refusal, an overstay, a health condition. Do not
-   invent a category for it; quote what the document says and where it says it.
-   The practice is deciding how the register should carry these, and the answer
-   depends on what is actually in the files.
+With that, `findings.md` should also answer:
+
+1. **How many matched an existing client, and on what** — INZ client number, or
+   name and date of birth. With 61 clients already held, this is now the most
+   important number in the report. Counts, not names.
+2. **How many people hold more than one nationality, and which country pairs.**
+   This is the first batch that can record them, and it is worth knowing how
+   many the earlier two lost. Pairs, not names.
+3. **How many descriptors you were unsure about**, and what made them unclear.
+   A matter whose folder does not say what it is about is a matter to ask about,
+   not one to name from its type. Put the uncertainty on the matter itself in
+   `cases.jsonl`; put the count and the pattern here.
+4. **How many warnings you found, by kind** — an assault reported to Police, a
+   conviction, a previous refusal, an overstay, a health condition. The words
+   themselves go on the matter, as a note in `cases.jsonl`, quoting what the
+   document says and where it says it. Only the tally comes here. The practice is
+   deciding how the register should carry these, and the answer depends on how
+   many there are and of what kinds.
 
 ---
 
@@ -117,4 +146,8 @@ been tried:
 - **Never invent a deadline.** A matter with no stated decision date has none.
 - **Never guess a nationality from a name or a language.**
 - **Do not extract passport numbers into anything but `clients.jsonl`** — not
-  into `findings.md`, not into a summary, not into a filename.
+  into `findings.md`, not into `verify-certificates.md`, not into a summary, not
+  into a filename.
+- **Do not put a person's name, date of birth, conviction or quoted document
+  text into `findings.md`.** That file is the report on the run; the client
+  material goes in the JSONL files and in `verify-certificates.md`.
