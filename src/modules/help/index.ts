@@ -32,6 +32,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.72.0', date: '1 September 2026',
+    notes: [
+      'When a matter is approved or declined, the date the decision arrived now shows '
+        + 'beside the status. It was always recorded — it was just further down the page.',
+      'The “Response / decision due” box no longer appears when a matter is decided. '
+        + 'It is for a date you are still waiting for, not the date a decision came, '
+        + 'and offering it on an approval invited exactly that mix-up.',
+      'The line beside Approved said “Granted.”, which is the same word twice. It now '
+        + 'says what to do next, like every other status.',
+    ],
+  },
+  {
     version: '0.71.0', date: '1 September 2026',
     notes: [
       'Clients, Cases and Tasks now let you choose how many rows to show — 25, 50, '
