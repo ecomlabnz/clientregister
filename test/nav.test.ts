@@ -116,6 +116,15 @@ describe('the menus in the bar', () => {
     expect(link![1]).toContain('height: var(--nav-item-h)');
   });
 
+  it('does not move the heading itself when its menu opens', () => {
+    // The bar held still and the heading rose six pixels inside it. Same
+    // twelve-pixel box, different consequence: it sits beside the summary as a
+    // flex item, and centring measures itself against the pair rather than
+    // against the stated height. Pinned to the top of its box instead.
+    const group = css.match(/\.nav-group \{([^}]*)\}/);
+    expect(group![1]).toContain('align-items: flex-start');
+  });
+
   it('drops its panel out of the flow, so the page below does not move', () => {
     const panel = css.match(/\.nav-group-items \{([^}]*)\}/);
     expect(panel, 'no .nav-group-items rule').not.toBeNull();
