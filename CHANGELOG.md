@@ -7,6 +7,40 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.74.0 — 1 September 2026
+
+### Added
+- **Filing something that arrived onto the record it belongs to.** Incoming
+  grew and never shrank, so the lists stopped being read. What was missing was
+  not a delete button but the other half of triage: saying which matter this
+  belongs to, and having it leave the queue once said. All three surfaces —
+  the inbox, inquiries, conversations — now file onto a case or a client.
+- **A "Filed" tab on each of the three.** A filed item leaves the working list
+  and is not deleted: these rows are the register's record that a message
+  arrived at all and on what date, which is evidence of the practice's own
+  diligence. Unfiling is one press and puts it back.
+
+### How it holds together
+- **One fact, one owner.** The arriving message is the source and is never
+  rewritten, edited or deleted. The file note on the case or client is the
+  readable copy — the thing somebody finds months later. `filed_entry_id` ties
+  the two together so neither has to be inferred from a timestamp. The note
+  states its own provenance in its first line, because provenance kept only in
+  a database column is provenance lost the first time the file is read as a
+  PDF.
+- **Unfiling does not remove the note.** File notes are append-only: a note
+  that was written is a thing that happened. Unfiling says "this went to the
+  wrong place", not "nobody ever put it there".
+
+### Migration
+- **`0047_filing_something_that_arrived.sql`** adds the filing columns and the
+  triggers that make a filing whole-or-nothing. A half-filed row — gone from
+  the working list, pointing at nothing — is the shape that loses things, so
+  the database refuses it rather than the route that happens to be writing.
+  Rehearsed at production's row counts (38 inbox messages, 15 inquiries, 18
+  conversations): every row present and byte-for-byte unchanged afterwards,
+  nothing arrives already filed, and the guards are live immediately.
+
 ## 0.73.1 — 1 September 2026
 
 Three items, two of them from the audit session's review of 0.71.0–0.72.0.
