@@ -360,6 +360,51 @@ export const feesModule: AppModule = {
         </form>`);
     });
 
+    // Registered before `/cases/:caseId/fees/:feeId`, and it has to stay there.
+    // A parameter matches any single segment, so the router would read
+    // "shares" as a fee's id, find no such fee and answer "Not found" —
+    // which is exactly what pressing "Save split" did until 31 August 2026.
+    r.post('/cases/:caseId/fees/shares', requirePermission('register:write'), async (c) => {
+      const caseId = c.req.param('caseId')!;
+      const shares = await ensureShares(c.env, caseId);
+      const form = await c.req.formData();
+      const f = new FormReader(form);
+
+      const statements: D1PreparedStatement[] = [];
+      for (const s of shares) {
+        if (form.get(`remove_${s.id}`)) {
+          statements.push(c.env.DB.prepare('DELETE FROM fee_shares WHERE id = ?').bind(s.id));
+          continue;
+        }
+        const label = f.text(`label_${s.id}`, { max: 80 }) || s.label;
+        const bp = parsePercentToBp(String(form.get(`percent_${s.id}`) ?? ''));
+        if (bp === null) return redirectWith(c, `/cases/${caseId}`, `"${s.label}" needs a percentage between 0 and 100.`, 'err');
+        statements.push(
+          c.env.DB.prepare('UPDATE fee_shares SET label = ?, percent_bp = ?, updated_at = ? WHERE id = ?')
+            .bind(label, bp, nowIso(), s.id),
+        );
+      }
+
+      const newLabel = f.optional('new_label', { max: 80 });
+      if (newLabel) {
+        const rawKey = f.optional('new_key', { max: 40 }) ?? newLabel;
+        const key = rawKey.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'party';
+        const bp = parsePercentToBp(String(form.get('new_percent') ?? '0')) ?? 0;
+        if (shares.some((s) => s.party_key === key)) {
+          return redirectWith(c, `/cases/${caseId}`, `A party with key "${key}" already exists on this case.`, 'err');
+        }
+        statements.push(
+          c.env.DB.prepare(
+            `INSERT INTO fee_shares (id, case_id, party_key, label, percent_bp, position, created_at, updated_at)
+             VALUES (?,?,?,?,?,?,?,?)`,
+          ).bind(newId('shr'), caseId, key, newLabel, bp, shares.length, nowIso(), nowIso()),
+        );
+      }
+
+      if (statements.length > 0) await c.env.DB.batch(statements);
+      await auditFrom(c, { action: 'fee.split_updated', entityType: 'case', entityId: caseId });
+      return redirectWith(c, `/cases/${caseId}`, 'Split updated.');
+
     r.post('/cases/:caseId/fees/:feeId', requirePermission('register:write'), async (c) => {
       const caseId = c.req.param('caseId')!;
       const feeId = c.req.param('feeId')!;
@@ -439,46 +484,6 @@ export const feesModule: AppModule = {
       return redirectWith(c, `/cases/${caseId}`, 'Fee line deleted.');
     });
 
-    r.post('/cases/:caseId/fees/shares', requirePermission('register:write'), async (c) => {
-      const caseId = c.req.param('caseId')!;
-      const shares = await ensureShares(c.env, caseId);
-      const form = await c.req.formData();
-      const f = new FormReader(form);
-
-      const statements: D1PreparedStatement[] = [];
-      for (const s of shares) {
-        if (form.get(`remove_${s.id}`)) {
-          statements.push(c.env.DB.prepare('DELETE FROM fee_shares WHERE id = ?').bind(s.id));
-          continue;
-        }
-        const label = f.text(`label_${s.id}`, { max: 80 }) || s.label;
-        const bp = parsePercentToBp(String(form.get(`percent_${s.id}`) ?? ''));
-        if (bp === null) return redirectWith(c, `/cases/${caseId}`, `"${s.label}" needs a percentage between 0 and 100.`, 'err');
-        statements.push(
-          c.env.DB.prepare('UPDATE fee_shares SET label = ?, percent_bp = ?, updated_at = ? WHERE id = ?')
-            .bind(label, bp, nowIso(), s.id),
-        );
-      }
-
-      const newLabel = f.optional('new_label', { max: 80 });
-      if (newLabel) {
-        const rawKey = f.optional('new_key', { max: 40 }) ?? newLabel;
-        const key = rawKey.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'party';
-        const bp = parsePercentToBp(String(form.get('new_percent') ?? '0')) ?? 0;
-        if (shares.some((s) => s.party_key === key)) {
-          return redirectWith(c, `/cases/${caseId}`, `A party with key "${key}" already exists on this case.`, 'err');
-        }
-        statements.push(
-          c.env.DB.prepare(
-            `INSERT INTO fee_shares (id, case_id, party_key, label, percent_bp, position, created_at, updated_at)
-             VALUES (?,?,?,?,?,?,?,?)`,
-          ).bind(newId('shr'), caseId, key, newLabel, bp, shares.length, nowIso(), nowIso()),
-        );
-      }
-
-      if (statements.length > 0) await c.env.DB.batch(statements);
-      await auditFrom(c, { action: 'fee.split_updated', entityType: 'case', entityId: caseId });
-      return redirectWith(c, `/cases/${caseId}`, 'Split updated.');
     });
 
     r.get('/fees', requirePermission('register:read'), async (c) => {
