@@ -16,6 +16,7 @@ import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
+import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import { actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, statusTone, table } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays } from '../../ui/format';
 import { PRIORITIES, PRIORITY_LABELS, TASK_STATUS_LABELS, TASK_STATUSES } from '../../domain';
@@ -74,6 +75,16 @@ export const tasksModule: AppModule = {
       // Whose tasks, defaulting to the person's own preference. An explicit
       // choice in the address always wins over it.
       const who = c.req.query('who') ?? (asPrefBoolean(prefs['pref.tasks_mine'], true) ? 'me' : '');
+      const pageNum = pageNumberFor(c.req.query('page'));
+      const PAGE_SIZE = pageSizeFor(c.req.query('size'), prefs['pref.page_size']);
+
+      // One spelling of this list's address, so changing the page or the page
+      // size keeps the view and whose tasks are being shown.
+      const listHref = (over: Record<string, string | number> = {}) =>
+        `/tasks?${new URLSearchParams({
+          scope, who, page: String(pageNum), size: String(PAGE_SIZE),
+          ...Object.fromEntries(Object.entries(over).map(([k, v]) => [k, String(v)])),
+        }).toString()}`;
 
       const conds: string[] = [];
       const params: unknown[] = [];
@@ -85,16 +96,25 @@ export const tasksModule: AppModule = {
       if (who === 'me') { conds.push('t.assigned_to = ?'); params.push(user.id); }
       const whereSql = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
-      const rows = await all<any>(
+      // The id tie-breaker keeps paging stable: two tasks sharing a priority,
+      // a due date and a created_at have nothing else to order them by, and a
+      // row that swaps places between page one and page two is a row shown
+      // twice and another shown never. Defensive rather than load-bearing
+      // today — SQLite's plan for this query is deterministic, so removing it
+      // breaks no test — and kept because the day a plan changes is not a day
+      // anybody would connect to a task quietly missing from a list.
+      const found = await all<any>(
         c.env.DB,
         `SELECT t.*, u.name AS assignee_name FROM tasks t
            LEFT JOIN users u ON u.id = t.assigned_to
            ${whereSql}
           ORDER BY CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
-                   COALESCE(t.due_at, '9999'), t.created_at DESC
-          LIMIT 200`,
-        ...params,
+                   COALESCE(t.due_at, '9999'), t.created_at DESC, t.id
+          LIMIT ? OFFSET ?`,
+        ...params, limitFor(PAGE_SIZE), (pageNum - 1) * PAGE_SIZE,
       );
+      const hasMore = found.length > PAGE_SIZE;
+      const rows = found.slice(0, PAGE_SIZE);
 
       // Counts for the tabs, so a person can see where the work is without
       // clicking through each view.
@@ -125,10 +145,11 @@ export const tasksModule: AppModule = {
         <nav class="tabs">
           ${views.map((v) => html`
             <a class="${v.id === scope ? 'tab current' : 'tab'}"
-               href="${`/tasks?scope=${v.id}${who ? `&who=${who}` : ''}`}">${v.label} <span class="muted">${v.count}</span></a>`)}
+               href="${listHref({ scope: v.id, page: 1 })}">${v.label} <span class="muted">${v.count}</span></a>`)}
         </nav>
         <form method="get" action="/tasks" class="filters" data-live-search>
           <input type="hidden" name="scope" value="${scope}">
+          <input type="hidden" name="size" value="${String(PAGE_SIZE)}">
           <select name="who">
             <option value="">Anyone</option>
             <option value="me" ${who === 'me' ? raw('selected') : ''}>Mine</option>
@@ -174,6 +195,7 @@ export const tasksModule: AppModule = {
                   </form>
                   <a class="btn btn-small btn-secondary" href="/tasks/${t.id}/edit">Edit</a>` : ''}</td>
               </tr>`), { sticky: true, fixed: true, empty: 'Nothing here.' })}
+        ${pager({ page: pageNum, size: PAGE_SIZE, hasMore, shown: rows.length, href: listHref })}
         </div>
 
         ${writable ? card('New task', html`

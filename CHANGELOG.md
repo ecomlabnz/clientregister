@@ -7,6 +7,33 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.71.0 — 1 September 2026
+
+### Added
+- **How many rows to show, chosen from under the list.** Clients, Cases and
+  Tasks now offer 25, 50, 100, 250 or 500 in the pager, and say which rows are
+  on screen ("Showing 26–50"). The choice already existed as a preference but
+  only in Settings, three clicks from the list where the question is actually
+  asked; the preference still sets where every list starts, and the control
+  under a list overrides it for that list. Changing the size returns to page
+  one, for the same reason sorting already does — page 3 of 25 and page 3 of
+  100 hold different rows.
+
+### Fixed
+- **The task list was hiding work.** It ran one query with a fixed ceiling of
+  200 rows and no pager at all, so past 200 tasks the rest simply were not
+  shown and nothing on the page said so — in a list whose whole purpose is
+  knowing what is outstanding. It now pages like the others. Pinned by a test
+  that walks the pages and asserts every task appears exactly once, which
+  fails if the offset, the limit or the slice disagree.
+
+### Security
+- The page size arrives in the address, so it is checked against the sizes on
+  offer rather than parsed as a number: `?size=1000000` falls back instead of
+  asking the database for a million rows and the browser to lay them out. The
+  page number is bounded for the same reason. Both proven by reintroducing the
+  bug each guards.
+
 ## 0.70.2 — 1 September 2026
 
 ### Added
