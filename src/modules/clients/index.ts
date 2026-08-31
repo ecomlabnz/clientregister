@@ -1109,6 +1109,8 @@ export const clientsModule: AppModule = {
                                       ${badge('issue date unverified', 'amber')}
                                       ${cert.issued_on_provenance === 'from_filename'
                                         ? 'Taken from a document’s filename, never confirmed against the certificate.'
+                                        : cert.issued_on_provenance === 'from_ocr'
+                                        ? 'Read off the scanned certificate by a machine, never confirmed by a person.'
                                         : 'Never confirmed against the certificate itself.'}
                                       ${expiryIsDerived(kind) ? 'The expiry shown is worked out from it.' : ''}
                                       ${writable ? html`

@@ -141,3 +141,31 @@ describe('a visa expiry that waits on an event shows as not yet fixed', () => {
     expect(body).not.toContain('not yet fixed');
   });
 });
+
+describe('a date read by a machine (0045)', () => {
+  async function withOcrCertificate() {
+    const h = mountModule(clientsModule);
+    client(h.db, 'cl_1');
+    const res = await h.post('/clients/cl_1/certificates', {
+      kind: 'police', country: 'NZ', issued_on: issuedRecently(),
+      issued_on_provenance: 'from_ocr',
+    });
+    expect(res.status).toBe(303);
+    return h;
+  }
+
+  it('from_ocr is accepted by the database and keeps the derived expiry', async () => {
+    const h = await withOcrCertificate();
+    const row = h.get<{ issued_on_provenance: string; expires_on: string }>(
+      'SELECT issued_on_provenance, expires_on FROM client_certificates')!;
+    expect(row.issued_on_provenance).toBe('from_ocr');
+    expect(row.expires_on).not.toBeNull();
+  });
+
+  it('shows the machine-read caution and stays flagged until a person confirms', async () => {
+    const h = await withOcrCertificate();
+    const body = await (await h.request('/clients/cl_1')).text();
+    expect(body).toContain('Read off the scanned certificate by a machine');
+    expect(body).toContain('I have checked it against the certificate');
+  });
+});
