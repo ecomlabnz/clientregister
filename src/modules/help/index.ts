@@ -32,6 +32,24 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.84.0', date: '1 September 2026',
+    notes: [
+      'A file can carry a warning. Press \u201cRaise a warning\u201d on a client or a matter, say '
+        + 'in a sentence what somebody needs to know \u2014 \u201cassaulted by a former partner, '
+        + 'reported to Police\u201d \u2014 and it shows in an amber band at the very top of that '
+        + 'record, above everything.',
+      'A warning on a client shows on all of their matters, because the fact is about the person. '
+        + 'One you had to raise again on every new file is one that stops being raised.',
+      'Choose how long it stands: until you take it down, or 30 days, three months, six months or '
+        + 'a year for something true only for a season. One past its date stops showing on its own.',
+      'Taking one down asks why, and keeps it. A warning that stood on a file for six months is '
+        + 'part of how that file was handled \u2014 the ones no longer showing are listed under '
+        + '\u201cWarnings taken down\u201d and any of them can be put back.',
+      'The kinds \u2014 safety, character, health, immigration history, contact, money \u2014 are '
+        + 'yours to change in Settings, like every other list.',
+    ],
+  },
+  {
     version: '0.83.0', date: '1 September 2026',
     notes: [
       'A matter opened from a document now has a description, like every other matter. That form '
@@ -1397,13 +1415,17 @@ function sections(origin: string): Section[] {
       body: html`
         <p>Every case has <strong>File notes</strong>: what the client said on the telephone, what
            was advised, what was decided and when. This is where the story of a matter is told.</p>
-        <p><strong>A note cannot be edited or deleted once saved.</strong> The database refuses it —
+        <p><strong>You have five minutes to fix a slip.</strong> Under a note you have just
+           written there is a <strong>Correct this note</strong> link, for five minutes and once
+           only. Use it for the wrong date or a mistyped word — what the note said before is kept
+           either way, so nothing is lost by correcting it.</p>
+        <p><strong>After that a note cannot be edited or deleted.</strong> The database refuses it —
            not merely this screen, so it holds however the record is reached. That is what makes the
            file worth something later: a note that can be tidied up months afterwards is not a
            record of what happened, it is a record of what somebody now wishes had happened, and it
            is worth nothing in a complaint, a standards inquiry or a Tribunal appeal.</p>
-        <p>If you get something wrong, <strong>add a correction as a new note</strong>. Both stand,
-           in order, which is exactly what an honest file looks like.</p>
+        <p>So if you find something wrong later, <strong>add a correction as a new note</strong>.
+           Both stand, in order, which is exactly what an honest file looks like.</p>
         <h4>Backdating</h4>
         <p>Set <strong>It happened on</strong> to the day of the call or meeting; the note is filed
            under that date while the file still records the day you wrote it up, and the timeline
@@ -1417,6 +1439,40 @@ function sections(origin: string): Section[] {
            it.</p>
         <p>If a file cannot be stored for any reason, the note is still saved and you are told —
            what you typed is never lost because an upload failed.</p>`,
+    },
+    {
+      id: 'flags',
+      title: 'Warnings on a file',
+      body: html`
+        <p>Some facts change how a matter is handled and have no box of their own — a client
+           assaulted by a former partner and reported to Police, a conviction, a previous refusal,
+           an address you must not write to. Buried in a file note three screens down, that is
+           something you find <em>after</em> you needed it.</p>
+        <p>So put it in a <strong>warning</strong>. Press <strong>Raise a warning</strong> on a
+           client or a matter, choose what kind it is, and say in a sentence what somebody needs to
+           know. It then shows in an amber band at the very top of that record, before anything
+           else on the page.</p>
+        <h4>A warning on a client shows on all of their matters</h4>
+        <p>Because the fact is about the person, not about one application. A warning you had to
+           raise again on every new file is a warning that stops being raised. It is taken down from
+           the client&rsquo;s own page, and the band says so.</p>
+        <h4>How long it stands</h4>
+        <p>Choose <strong>Until it is taken down</strong> for something permanent, or a period —
+           30 days, three months, six months, a year — for something true only for a season
+           (&ldquo;overseas until March&rdquo;, &ldquo;do not telephone&rdquo;). A warning past its
+           date stops showing on its own, without anybody having to remember.</p>
+        <h4>Taking one down</h4>
+        <p><strong>Take it down</strong> under the warning itself, and say why. It is not deleted:
+           a warning that stood on a file for six months is part of how that file was handled, and
+           why it came down is the useful half. Warnings no longer showing are listed under
+           <strong>Warnings taken down</strong>, and any of them can be put back.</p>
+        <h4>The kinds</h4>
+        <p>Safety, character, health, immigration history, contact, money and other &mdash; and like
+           every other list in the register, an administrator can change them under
+           <a href="/settings">Settings</a> without a deployment.</p>
+        <p>A warning is not a file note and not an alert. A note records what was said at the time
+           and stands forever; an alert answers &ldquo;what falls due&rdquo;. A warning answers
+           &ldquo;what should I know before I open my mouth&rdquo;.</p>`,
     },
     {
       id: 'files',

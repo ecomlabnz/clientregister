@@ -1531,3 +1531,29 @@ body.site { background: var(--bg); }
 }
 .file-row:last-of-type { border-bottom: none; }
 .file-row-actions { flex-shrink: 0; }
+
+/* --- Warnings on a file --------------------------------------------------- */
+
+/* Above everything on the record, and only there when there is something to
+   say. No severity scale and no icons: one band, loud, and absent otherwise —
+   a warning that appears on every file teaches people to look past it.
+   Amber rather than red, because red on this page means a deadline missed and
+   two urgent colours compete instead of ranking. */
+.flags {
+  display: flex; flex-direction: column; gap: 8px;
+  margin: 0 0 16px; padding: 12px 14px;
+  background: var(--amber-bg); border: 1px solid var(--amber);
+  border-left: 4px solid var(--amber); border-radius: 6px;
+}
+.flag { display: flex; flex-direction: column; gap: 3px; }
+.flag + .flag { padding-top: 8px; border-top: 1px solid var(--amber); }
+.flag-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.flag-kind {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--amber); white-space: nowrap;
+}
+.flag-body { color: var(--text); font-weight: 500; }
+.flag-meta {
+  display: flex; flex-wrap: wrap; gap: 4px 12px;
+  font-size: 0.8rem; color: var(--muted);
+}
