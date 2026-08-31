@@ -9,6 +9,20 @@ The user-facing version of this list, one line per release, is in the app under
 
 ## 0.83.0 — 1 September 2026
 
+### Fixed
+- **A matter opened from a document arrived with no description.** Found on the
+  live register, one matter in. Migration 0049 made the description the name of
+  a matter and took the title field off the matter form; the form that opens a
+  matter from a read document was not changed with it, so it still asked for a
+  title, wrote that to `title`, and left `descriptor` empty — the column the
+  case list, the client's file and the AI brief all now read.
+
+  The form now asks the one question the rest of the register asks — "What this
+  matter is about" — and the title is derived from it, written from one place.
+  Migration 0056 repairs the one matter already written that way, taking its
+  title as its description exactly as 0049 did for the matter it found in the
+  same state.
+
 ### Changed
 - **Passports and certificates are on the file, not in the margin.** Both sat
   in the narrow right-hand column with their forms folded behind a line of
