@@ -7,6 +7,38 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.73.0 — 1 September 2026
+
+### Changed
+- **The New task button moved to the top of the list, beside the filter.** The
+  form it opens now drops as a panel over the top of the list instead of
+  pushing it down, so pressing the button does not move the rows somebody was
+  reading. New `.list-bar` in the stylesheet for the filter-plus-action row.
+- **Clients, Cases and Tasks open unfiltered.** Tasks opened filtered to your
+  own; Cases opened on open matters only. A list that narrows itself before
+  anybody has asked it to is how work goes unnoticed — the rows that are
+  missing are exactly the ones nobody sees. The filter is one click away
+  either way.
+
+### Migration
+- **`0046_a_list_opens_showing_everything.sql`** clears the three stored
+  `pref.*` rows whose default moved. Changing the shipped default is not
+  enough on its own: a preference already written wins over it, so the owner's
+  stored values would have gone on filtering his lists while the code claimed
+  otherwise — a setting that looks changed and is not. The rows are cleared
+  rather than rewritten, so "where does a list start" has one answer instead
+  of two that can disagree. Other preferences (landing page, rows per page,
+  notifications) are untouched. Rehearsed on a scratch database seeded to
+  production's shape, with the counts stated before the run and checked after
+  (11 rows → 8, three targeted rows gone, the rest intact), and confirmed
+  harmless to re-run.
+
+### Fixed
+- A specificity tie between two `margin-bottom` rules on an open `<summary>`
+  shifted the whole task list 12px every time the New task form opened. Caught
+  in Chromium by measuring the first row's position before and after, not by
+  looking at it. Pinned by a stylesheet test.
+
 ## 0.72.1 — 1 September 2026
 
 ### Changed

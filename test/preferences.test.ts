@@ -88,3 +88,32 @@ describe('a group of preferences is saved on its own', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 });
+
+describe('a list opens showing everything', () => {
+  /**
+   * The practice's decision of 1 September 2026: no list narrows itself before
+   * anybody has asked it to.
+   *
+   * This is a guard against a quiet regression rather than a statement of
+   * taste. A default that hides part of a list is invisible by construction —
+   * the rows that are missing are exactly the ones nobody sees — so it can be
+   * reintroduced in a refactor and go unnoticed for months. The filter is one
+   * click away; choosing to narrow is safe, being narrowed without knowing is
+   * not.
+   */
+  const defaultOf = (key: string) =>
+    PREFERENCE_GROUPS.flatMap((g) => g.preferences).find((p) => p.key === key)?.default;
+
+  it('opens Clients on everyone', () => {
+    expect(defaultOf('pref.clients_view')).toBe('all');
+  });
+
+  it('opens Cases on every matter, not only the open ones', () => {
+    expect(defaultOf('pref.cases_scope')).toBe('all');
+  });
+
+  it('opens Tasks on everybody’s tasks, not only mine', () => {
+    // Stored as a boolean meaning "only mine", so unfiltered is false.
+    expect(defaultOf('pref.tasks_mine')).toBe('false');
+  });
+});

@@ -32,6 +32,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.73.0', date: '1 September 2026',
+    notes: [
+      'The New task button now sits at the top of the task list, beside the filter. '
+        + 'The form drops down over the list rather than pushing it out of the way.',
+      'Clients, Cases and Tasks now open showing everything, not filtered. Tasks used '
+        + 'to open on your own only, and Cases on open matters only — both now start '
+        + 'with the lot, and the filter is still there when you want to narrow it. '
+        + 'If you had set either of those yourself, that setting has been cleared so '
+        + 'the new starting point applies; set it again in Settings if you prefer.',
+    ],
+  },
+  {
     version: '0.72.1', date: '1 September 2026',
     notes: [
       'The task list ends with the list again: the New task form is now behind a '

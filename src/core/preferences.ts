@@ -145,7 +145,12 @@ export const PREFERENCE_GROUPS: PreferenceGroup[] = [
         ],
       },
       {
-        key: 'pref.clients_view', type: 'enum', default: 'individuals', label: 'Clients opens on',
+        // The three "opens on" preferences below all default to the unfiltered
+        // view, by the practice's decision of 1 September 2026. A list that
+        // hides part of itself before anybody has asked it to is how work goes
+        // unnoticed: the filter is one click away, and choosing to narrow is
+        // safer than being narrowed by default and not realising.
+        key: 'pref.clients_view', type: 'enum', default: 'all', label: 'Clients opens on',
         options: [
           { value: 'leads', label: 'Leads' },
           { value: 'individuals', label: 'Individuals' },
@@ -154,15 +159,16 @@ export const PREFERENCE_GROUPS: PreferenceGroup[] = [
         ],
       },
       {
-        key: 'pref.cases_scope', type: 'enum', default: 'open', label: 'Cases opens on',
+        key: 'pref.cases_scope', type: 'enum', default: 'all', label: 'Cases opens on',
         options: [
           { value: 'open', label: 'Open matters only' },
           { value: 'all', label: 'Everything, including closed' },
         ],
       },
       {
-        key: 'pref.tasks_mine', type: 'boolean', default: 'true', label: 'Show me only my own tasks first',
-        help: 'The task list opens filtered to you. You can still switch to everyone.',
+        key: 'pref.tasks_mine', type: 'boolean', default: 'false', label: 'Show me only my own tasks first',
+        help: 'Off, the task list opens on everybody’s tasks. On, it opens filtered to you. '
+          + 'Either way you can switch with the dropdown above the list.',
       },
       {
         key: 'pref.assign_to_me', type: 'boolean', default: 'true', label: 'Assign new tasks to me by default',
