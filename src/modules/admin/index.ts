@@ -146,7 +146,7 @@ export const adminModule: AppModule = {
   title: 'Settings',
   basePaths: ['/admin'],
   settings: [PRACTICE_SETTINGS],
-  nav: [{ href: '/admin', label: 'Settings', permission: 'admin:settings', order: 10 }],
+  nav: [{ href: '/admin', label: 'Settings', permission: 'admin:settings', order: 10, corner: true }],
 
   register(app) {
     const r = new Hono<AppContext>();

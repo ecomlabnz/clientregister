@@ -20,6 +20,46 @@ export interface NavItem {
   permission?: Permission;
   /** Highest first; ties break on declaration order. */
   order?: number;
+  /**
+   * A heading this item sits under, rather than in the bar on its own.
+   *
+   * The bar had twelve items and wrapped onto a second line, which is the
+   * point at which a navigation stops being scannable — you read it instead of
+   * glancing at it. Grouping is the same answer the pages already use for
+   * themselves: tabs when it runs past one screen.
+   *
+   * Declared by the module rather than listed centrally, so a module still
+   * owns its own entry and adding one is still a line in that module.
+   */
+  group?: string;
+  /**
+   * Kept out of the main run and shown in the corner with the account
+   * controls. For the things you reach for occasionally and never scan past.
+   */
+  corner?: boolean;
+}
+
+/** A run of nav items under one heading, or a single item on its own. */
+export type NavEntry =
+  | { kind: 'item'; item: NavItem }
+  | { kind: 'group'; label: string; items: NavItem[] };
+
+/**
+ * The bar as it is rendered: items in order, with grouped ones collected under
+ * their heading at the position of the first of them.
+ */
+export function navEntries(items: NavItem[]): NavEntry[] {
+  const out: NavEntry[] = [];
+  const groups = new Map<string, { kind: 'group'; label: string; items: NavItem[] }>();
+  for (const item of items) {
+    if (!item.group) { out.push({ kind: 'item', item }); continue; }
+    const existing = groups.get(item.group);
+    if (existing) { existing.items.push(item); continue; }
+    const fresh = { kind: 'group' as const, label: item.group, items: [item] };
+    groups.set(item.group, fresh);
+    out.push(fresh);
+  }
+  return out;
 }
 
 export interface AppModule {

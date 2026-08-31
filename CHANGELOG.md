@@ -7,6 +7,37 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.77.0 — 31 August 2026
+
+### Changed
+- **The top bar is one line again.** It had reached twelve items and wrapped,
+  which is the point at which a navigation stops being scannable — you read it
+  instead of glancing at it. Quotes and Fees group under **Money**, Knowledge
+  and the Assistant under **Tools**, and Settings and Help move to the corner
+  beside the account controls. Eight entries in the run, down from twelve.
+
+  Weighed against a collapsible sidebar, which the practice had asked about. A
+  sidebar costs 56px of width collapsed and ~220px open, permanently, on pages
+  whose defining feature is wide tables — to save about 70px of vertical space
+  once. Collapsed to icons it also asks twelve immigration-practice concepts to
+  become twelve glyphs, where "Incoming", "Inbox" and "Alerts" are a guessing
+  game. Grouping was the cheaper answer to the actual problem, which was item
+  count rather than layout.
+
+### How it is built
+- `NavItem` gains `group` and `corner`, so a module still declares its own
+  entry and adding one is still a line in that module — grouping is not a list
+  kept somewhere central that a new module has to be added to.
+- The groups are `<details>`, like every other disclosure here: no script, and
+  they close on navigation because each link is a real link. A group whose page
+  you are on renders open, so the bar shows where you are without being pressed.
+
+### Guarded
+- A test caps the run at eight entries, refuses a group holding only one item
+  (a heading hiding a single link behind a press), and — the one that matters —
+  asserts every declared destination is still reachable, in the run or in the
+  corner. Grouping that loses a page is the failure worth catching.
+
 ## 0.76.0 — 31 August 2026
 
 ### Changed

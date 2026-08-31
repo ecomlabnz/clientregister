@@ -267,7 +267,7 @@ export const feesModule: AppModule = {
   title: 'Fees',
   settings: [FEE_SETTINGS],
   basePaths: ['/cases/:id/fees', '/fees'],
-  nav: [{ href: '/fees', label: 'Fees', permission: 'register:read', order: 40 }],
+  nav: [{ href: '/fees', label: 'Fees', permission: 'register:read', order: 40, group: 'Money' }],
 
   register(app) {
     const r = new Hono<AppContext>();
