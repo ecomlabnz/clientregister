@@ -31,11 +31,19 @@
   });
 
 
-  // Choosing a standard item on a quote fills the rest of the line in. The
-  // values ride on the option's data attributes, so this costs no request and
-  // works the moment the page is painted. Without scripting the dropdown still
-  // records which catalogue item was meant; the typist just fills the rest in.
+  // Choosing a standard item fills the rest of the line in — on a quote, on an
+  // invoice, and on a matter's fee line, which all bill from the same price
+  // list. The values ride on the option's data attributes, so this costs no
+  // request and works the moment the page is painted.
+  //
+  // Without scripting the dropdown still records which item was meant and the
+  // handler applies the same row to whatever was left empty, so the choice
+  // works either way and the two cannot disagree.
+  //
+  // The amount box is named differently on a quote line and on a fee line, so
+  // the form says which it has rather than this knowing about either.
   Array.prototype.forEach.call(document.querySelectorAll('.js-quote-line'), function (form) {
+    var amountField = form.getAttribute('data-amount-field') || 'unit_amount';
     var picker = form.querySelector('.js-catalogue');
     if (!picker) return;
     picker.addEventListener('change', function () {
@@ -58,8 +66,8 @@
       force('unit_label', option.getAttribute('data-unit') || 'item');
       force('gst_treatment', option.getAttribute('data-gst') || 'exclusive');
       var amount = option.getAttribute('data-amount');
-      if (amount && amount !== '0.00') force('unit_amount', amount);
-      else set('unit_amount', '');
+      if (amount && amount !== '0.00') force(amountField, amount);
+      else set(amountField, '');
     });
   });
 

@@ -15,6 +15,7 @@ import { all, getSetting, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
+import { catalogue } from '../quotes';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
@@ -112,6 +113,7 @@ export async function loadFees(env: Env, caseId: string) {
 /** The fees panel embedded in the case page. */
 export async function feesSection(c: any, caseId: string, currency: string, canWrite: boolean): Promise<Raw> {
   const { items, shares, settings, totals, allocation } = await loadFees(c.env, caseId);
+  const priceList = canWrite ? await catalogue(c.env) : [];
   const csrf = c.get('session').csrf;
   const bpTotal = sumBp(shares);
   const unallocated = totals.splitBaseCents - allocation.reduce((s, a) => s + a.amount_cents, 0);
@@ -170,11 +172,41 @@ export async function feesSection(c: any, caseId: string, currency: string, canW
     ${canWrite ? html`
     <details class="add-block">
       <summary>Add a fee line</summary>
-      <form method="post" action="/cases/${caseId}/fees" class="row-form">
+      <form method="post" action="/cases/${caseId}/fees" class="row-form js-quote-line" data-amount-field="amount">
         ${csrfField(csrf)}
-        ${field({ label: 'Description', name: 'description', required: true, maxlength: 200,
+        ${'' /* The same price list quotes and invoices already work from, not a
+                 second one. The practice bills roughly the same dozen things,
+                 and re-typing "INZ lodgement fee", its amount and the fact that
+                 it carries no GST is how a fee ledger ends up disagreeing with
+                 itself.
+
+                 It fills the boxes rather than replacing them: the amount on a
+                 particular matter is often not the amount on the list, and a
+                 form that will not let you change it is a form you work around.
+                 With scripting off nothing is filled in on the screen — so the
+                 handler applies the chosen item to whatever was left empty, and
+                 picking one still works.
+
+                 The same script that fills a quote line fills this one; the
+                 form says which box holds the amount, because a quote calls it
+                 `unit_amount` and a fee calls it `amount`. */}
+        ${priceList.length > 0 ? html`
+          <div class="field">
+            <label for="f_service_item">From the price list</label>
+            <select id="f_service_item" name="service_item" class="js-catalogue">
+              <option value="">— type it in below —</option>
+              ${priceList.map((item) => html`
+                <option value="${item.id}"
+                        data-description="${item.name}"
+                        data-amount="${(item.unit_amount_cents / 100).toFixed(2)}"
+                        data-kind="${item.kind}"
+                        data-gst="${item.gst_treatment}">${item.name} · ${money(item.unit_amount_cents, currency)}</option>`)}
+            </select>
+            <p class="hint">Fills the boxes below. Change anything you like before adding it.</p>
+          </div>` : ''}
+        ${field({ label: 'Description', name: 'description', maxlength: 200,
                   placeholder: 'e.g. AEWV application — professional fee' })}
-        ${field({ label: 'Amount', name: 'amount', required: true, placeholder: '2500.00' })}
+        ${field({ label: 'Amount', name: 'amount', placeholder: '2500.00' })}
         ${select({ label: 'Type', name: 'kind', value: 'professional', includeBlank: false,
                    options: optionsFrom(FEE_KINDS, FEE_KIND_LABELS) })}
         ${select({ label: 'GST', name: 'gst_treatment', value: settings.gstRegistered ? settings.defaultTreatment : 'none',
@@ -284,14 +316,37 @@ export const feesModule: AppModule = {
 
       const settings = await feeSettings(c.env);
       const f = new FormReader(await c.req.formData());
-      const description = f.text('description', { required: true, label: 'Description', max: 200 });
-      const amount = f.money('amount', { required: true, label: 'Amount' });
-      const kind = f.enum('kind', FEE_KINDS, { fallback: 'professional' })!;
-      const treatment = f.enum('gst_treatment', GST_TREATMENTS, { fallback: settings.defaultTreatment })!;
+
+      // A line chosen from the price list, if one was. The screen fills the
+      // boxes from it when scripting is on; this is what makes the choice work
+      // when it is off — and what makes the two agree, because both take the
+      // same values from the same row.
+      const pickedId = f.optional('service_item', { max: 60 });
+      const picked = pickedId
+        ? (await catalogue(c.env, true)).find((item) => item.id === pickedId) ?? null
+        : null;
+
+      const typedDescription = f.optional('description', { max: 200 });
+      const typedAmount = f.money('amount', { label: 'Amount' });
+      const description = typedDescription || picked?.name || '';
+      // A price list entry at zero has no price yet — most of this practice's
+      // do. Treating that as "the fee is nothing" would put a $0.00 line on a
+      // matter and call it done, so it is treated as "not said", which is what
+      // it means. The script on the page does the same, so the two agree.
+      const listedAmount = picked?.unit_amount_cents ? picked.unit_amount_cents : null;
+      const amount = typedAmount ?? listedAmount;
+      const kind = f.enum('kind', FEE_KINDS, { fallback: (picked?.kind as FeeKind) ?? 'professional' })!;
+      const treatment = f.enum('gst_treatment', GST_TREATMENTS,
+        { fallback: (picked?.gst_treatment as GstTreatment) ?? settings.defaultTreatment })!;
       const status = f.enum('status', FEE_STATUSES, { fallback: 'quoted' })!;
       const includeInSplit = f.bool('include_in_split');
+      if (!description) {
+        return redirectWith(c, `/cases/${caseId}`,
+          'A fee line needs a description — type one or choose from the price list.', 'err');
+      }
       if (!f.valid || amount === null) {
-        return redirectWith(c, `/cases/${caseId}`, Object.values(f.errors)[0] ?? 'Invalid fee line.', 'err');
+        return redirectWith(c, `/cases/${caseId}`,
+          Object.values(f.errors)[0] ?? 'A fee line needs an amount.', 'err');
       }
 
       const rateBp = settings.gstRegistered ? settings.gstRateBp : 0;

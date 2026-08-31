@@ -32,6 +32,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.86.0', date: '1 September 2026',
+    notes: [
+      'A fee line can be billed from the price list. \u201cAdd a fee line\u201d on a matter now '
+        + 'offers the same list quotes and invoices bill from \u2014 pick one and it fills in the '
+        + 'description, what type of charge it is and how GST is treated, and the amount if the '
+        + 'list has one. Change anything you like before adding it.',
+      'Most of the price list is still at $0.00, which the register reads as \u201cno price set '
+        + 'yet\u201d rather than \u201cfree\u201d \u2014 so it asks you for the amount. Put your '
+        + 'standard prices in under Quotes \u2192 Price list and they will fill in from then on.',
+    ],
+  },
+  {
     version: '0.85.0', date: '1 September 2026',
     notes: [
       'Invoices has its own place in the Money menu, between Quotes and Fees \u2014 the order the '
