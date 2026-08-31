@@ -7,6 +7,17 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.72.1 — 1 September 2026
+
+### Changed
+- **The New task form on the task list is behind a button.** An always-open
+  form put an empty box between the rows people came to read and the pager —
+  the occasional errand competing with the constant one. It is now a "New
+  task" button that opens the form when pressed. Built on `<details>`, so it
+  needs no script: the content policy forbids an inline one, and a disclosure
+  that stops working when script is blocked is a form nobody can reach. New
+  `revealForm` in `ui/components.ts` for the next list that wants the same.
+
 ## 0.72.0 — 1 September 2026
 
 Three faults on one card, all found by the practice approving a real matter

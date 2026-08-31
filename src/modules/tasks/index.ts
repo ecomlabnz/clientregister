@@ -17,7 +17,7 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
-import { actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, statusTone, table } from '../../ui/components';
+import { actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, revealForm, select, statusTone, table } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays } from '../../ui/format';
 import { PRIORITIES, PRIORITY_LABELS, TASK_STATUS_LABELS, TASK_STATUSES } from '../../domain';
 import { isAssignable, userOptions } from '../../core/lookups';
@@ -198,7 +198,7 @@ export const tasksModule: AppModule = {
         ${pager({ page: pageNum, size: PAGE_SIZE, hasMore, shown: rows.length, href: listHref })}
         </div>
 
-        ${writable ? card('New task', html`
+        ${writable ? revealForm('New task', html`
           <form method="post" action="/tasks" class="row-form">
             ${csrfField(csrf)}
             ${field({ label: 'Task', name: 'title', required: true, maxlength: 200 })}

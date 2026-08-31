@@ -32,6 +32,13 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.72.1', date: '1 September 2026',
+    notes: [
+      'The task list ends with the list again: the New task form is now behind a '
+        + '“New task” button, and opens only when you press it.',
+    ],
+  },
+  {
     version: '0.72.0', date: '1 September 2026',
     notes: [
       'When a matter is approved or declined, the date the decision arrived now shows '
