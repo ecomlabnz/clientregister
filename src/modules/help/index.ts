@@ -32,6 +32,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.70.2', date: '1 September 2026',
+    notes: [
+      'A certificate issue date can now be recorded as read off the scan by OCR. '
+        + 'It stays flagged, like a filename date, until a person confirms it '
+        + 'against the certificate.',
+    ],
+  },
+  {
     version: '0.70.1', date: '31 August 2026',
     notes: [
       'The Files release is now actually live: its first version was stopped at the door '
