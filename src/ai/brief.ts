@@ -45,7 +45,9 @@ export const AI_BRIEF_NOTE_PREFIX = 'Brief drafted by the AI layer from this fil
 export async function caseFileText(env: Env, caseId: string): Promise<{ title: string; file: string } | null> {
   const kase = await one<any>(
     env.DB,
-    `SELECT k.*, cl.full_name AS client_name, cl.nationality, cl.current_visa_type,
+    `SELECT k.*, cl.full_name AS client_name, cl.current_visa_type,
+            (SELECT GROUP_CONCAT(code, ' ') FROM client_nationalities
+              WHERE client_id = cl.id) AS nationality_codes,
             cl.current_visa_expiry, u.name AS assignee_name
        FROM cases k
        JOIN clients cl ON cl.id = k.client_id
@@ -90,7 +92,8 @@ export async function caseFileText(env: Env, caseId: string): Promise<{ title: s
     `Owner: ${kase.assignee_name ?? 'unassigned'}`,
     // The country's name, not its code: the model is being asked to reason
     // about a person, and "VN" is a fact about our database.
-    `Client: ${kase.client_name}${kase.nationality ? ` (${countryName(kase.nationality)})` : ''}`,
+    `Client: ${kase.client_name}${kase.nationality_codes
+      ? ` (${String(kase.nationality_codes).split(' ').map(countryName).join(', ')})` : ''}`,
   ];
   if (kase.current_visa_type) {
     lines.push(`Client's current visa: ${labelFor(visas, kase.current_visa_type)}${
