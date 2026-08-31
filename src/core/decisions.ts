@@ -25,13 +25,24 @@ import { all, nowIso, one, run } from './db';
 import { newId } from './ids';
 import { readSettings } from './settings';
 import { addMonths } from './kb';
+import { LODGED_CASE_STATUSES } from '../domain';
 
 /**
  * Statuses that mean "with INZ, waiting". A matter that has been decided,
  * withdrawn or closed is not chased, and one still being prepared has not been
  * lodged to chase about.
+ *
+ * Derived from `LODGED_CASE_STATUSES` rather than retyped, because two
+ * hand-maintained copies of the same list are two lists that will one day
+ * disagree and nobody will notice which is right.
+ *
+ * `appeal` is deliberately *not* here, and that is the one real difference
+ * from `AWAITING_CASE_STATUSES` in `domain.ts`: a matter under appeal is with
+ * the Tribunal, and the practice does not chase INZ about it. That set governs
+ * whether a response date may be recorded; this one governs whether the
+ * register chases for it.
  */
-export const AWAITING_DECISION_STATUSES = ['lodged', 'inz_rfi', 'ppi', 'interim_visa', 'decision_pending'];
+export const AWAITING_DECISION_STATUSES: string[] = [...LODGED_CASE_STATUSES];
 
 export interface DecisionPolicy {
   /** Months after lodgement at which a decision is expected. */
