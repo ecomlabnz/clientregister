@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.74.0', date: '1 September 2026',
+    notes: [
+      'Anything in Incoming \u2014 an inbox message, an inquiry, a conversation \u2014 can now be '
+        + 'filed onto a matter or a client. A note appears on that record with the date, '
+        + 'who it was from and the text, and the item leaves the working list.',
+      'Filed things are never deleted. They move to a \u201cFiled\u201d tab, and one press puts '
+        + 'them back. The note written when you filed it stays on the file either way.',
+    ],
+  },
+  {
     version: '0.73.1', date: '1 September 2026',
     notes: [
       'Previous and Next now also sit above each list, so you can turn the page without '
