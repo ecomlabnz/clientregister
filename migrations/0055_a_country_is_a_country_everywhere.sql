@@ -31,11 +31,61 @@
 -- issued by Niger instead of Nigeria. `countryCodeFor` in the application
 -- resolves the same two, so the register and the database agree.
 --
--- What cannot be converted is left as it is and caught by the check at the end,
--- which aborts the migration rather than leaving a column half in codes and
--- half in names.
+-- Anything that is neither is caught *before* the first change is made, and
+-- aborts the run. A migration runs statement by statement with no transaction
+-- around it, so a check after the conversion would abort having already
+-- committed half of it — which is the column half in codes and half in names
+-- that this file is written to prevent.
 
 PRAGMA foreign_keys = ON;
+
+-- Nothing is converted until everything *can* be.
+--
+-- The check comes first, and that ordering is the whole of it. A migration runs
+-- statement by statement on the D1 query path, with no transaction around it,
+-- so a check placed after the conversion would abort having already committed
+-- half of it — leaving exactly the column half in codes and half in names that
+-- this file calls worse than either. Checked first, an abort leaves every value
+-- exactly as it was.
+--
+-- The list is built by the same rules the conversion uses, so the two cannot
+-- disagree: a name in the register's own `countries` table, or one of the two
+-- ISO long forms named below, or already a code.
+CREATE TABLE unconvertible AS
+  WITH known(value) AS (
+    SELECT name FROM countries
+    UNION ALL SELECT code FROM countries
+    UNION ALL SELECT 'Viet Nam'
+    UNION ALL SELECT 'Russian Federation'
+  )
+  SELECT 'clients.passport_country' AS col, passport_country AS value FROM clients
+   WHERE passport_country IS NOT NULL AND TRIM(passport_country) <> ''
+     AND passport_country NOT IN (SELECT value FROM known)
+  UNION ALL
+  SELECT 'clients.police_certificate_country', police_certificate_country FROM clients
+   WHERE police_certificate_country IS NOT NULL AND TRIM(police_certificate_country) <> ''
+     AND police_certificate_country NOT IN (SELECT value FROM known)
+  UNION ALL
+  SELECT 'client_passports.country', country FROM client_passports
+   WHERE country IS NOT NULL AND TRIM(country) <> ''
+     AND country NOT IN (SELECT value FROM known)
+  UNION ALL
+  SELECT 'client_certificates.country', country FROM client_certificates
+   WHERE country IS NOT NULL AND TRIM(country) <> ''
+     AND country NOT IN (SELECT value FROM known);
+
+-- A real table rather than a temporary one: a trigger resolves names in `main`,
+-- so a TEMP table is invisible to the check below.
+CREATE TRIGGER abort_if_any_country_is_unconvertible
+BEFORE INSERT ON counters
+WHEN (SELECT COUNT(*) FROM unconvertible) > 0
+BEGIN
+  SELECT RAISE(ABORT, 'a country in the register is not on the list and cannot be converted to an ISO code — migration 0055 stopped before changing anything');
+END;
+INSERT INTO counters (name, value) VALUES ('migration_0055_check', 0);
+DROP TRIGGER abort_if_any_country_is_unconvertible;
+DELETE FROM counters WHERE name = 'migration_0055_check';
+DROP TABLE unconvertible;
 
 -- The names first, straight from the register's own list of countries, so the
 -- conversion cannot disagree with the dropdown that will offer them.
@@ -66,40 +116,6 @@ UPDATE clients SET passport_country = 'RU' WHERE passport_country = 'Russian Fed
 UPDATE clients SET police_certificate_country = 'RU' WHERE police_certificate_country = 'Russian Federation';
 UPDATE client_passports SET country = 'RU' WHERE country = 'Russian Federation';
 UPDATE client_certificates SET country = 'RU' WHERE country = 'Russian Federation';
-
--- Anything still not a code aborts the migration. A column half in codes and
--- half in names is worse than either, and this is the only moment it can be
--- caught: after this runs, the triggers below refuse new ones but say nothing
--- about what is already stored.
--- A real table rather than a temporary one: a trigger resolves names in `main`,
--- so a TEMP table is invisible to the check below.
-CREATE TABLE unconverted AS
-  SELECT 'clients.passport_country' AS col, passport_country AS value FROM clients
-   WHERE passport_country IS NOT NULL AND TRIM(passport_country) <> ''
-     AND passport_country NOT IN (SELECT code FROM countries)
-  UNION ALL
-  SELECT 'clients.police_certificate_country', police_certificate_country FROM clients
-   WHERE police_certificate_country IS NOT NULL AND TRIM(police_certificate_country) <> ''
-     AND police_certificate_country NOT IN (SELECT code FROM countries)
-  UNION ALL
-  SELECT 'client_passports.country', country FROM client_passports
-   WHERE country IS NOT NULL AND TRIM(country) <> ''
-     AND country NOT IN (SELECT code FROM countries)
-  UNION ALL
-  SELECT 'client_certificates.country', country FROM client_certificates
-   WHERE country IS NOT NULL AND TRIM(country) <> ''
-     AND country NOT IN (SELECT code FROM countries);
-
-CREATE TRIGGER abort_if_any_country_is_unconverted
-BEFORE INSERT ON counters
-WHEN (SELECT COUNT(*) FROM unconverted) > 0
-BEGIN
-  SELECT RAISE(ABORT, 'a country could not be converted to an ISO code — migration 0055 stopped');
-END;
-INSERT INTO counters (name, value) VALUES ('migration_0055_check', 0);
-DROP TRIGGER abort_if_any_country_is_unconverted;
-DELETE FROM counters WHERE name = 'migration_0055_check';
-DROP TABLE unconverted;
 
 -- The guarantee, in the database, on each column that now holds a code. Written
 -- out four times rather than shared, because SQLite triggers are per table and

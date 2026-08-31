@@ -10,6 +10,37 @@ The user-facing version of this list, one line per release, is in the app under
 ## 0.83.0 — 1 September 2026
 
 ### Fixed
+- **The third form that opens a matter did not name it either.** Found in
+  review, on this branch: converting an inquiry to a matter still asked for a
+  title and wrote no description — the same fault as the one below, in the last
+  of the three places that create a matter. All three now ask the one question
+  and derive the title from the answer.
+
+### Security
+- **The five-minute correction window uses the database's own clock.**
+  Migration 0052 measured the window from `created_at` to the `edited_at` the
+  caller supplied. That is sound for the handler that exists and is not a
+  guarantee: a future handler stamping `edited_at = created_at + 1 second`
+  could correct a note years afterwards and pass every check. The whole reason
+  the rule lives in a trigger is that a second handler must not be able to
+  disagree with it, so migration 0057 has the trigger read the clock itself, and
+  requires the claimed moment to be the real one.
+
+  Two more gaps closed with it, both of which the route covered alone: a note
+  the register wrote about itself can no longer be corrected at all, and the
+  text as it stood is now written to the audit log **by the database**, in the
+  same statement as the correction. The route keeps its own record of who made
+  the correction and from where; the database owns what the note said.
+
+- **Migration 0055 checks before it converts.** A migration runs statement by
+  statement with no transaction around it, so the original convert-then-verify
+  order would have aborted with half the conversion already committed — exactly
+  the column half in codes and half in names the migration's own header calls
+  worse than either. The check is built from the pre-state and aborts before the
+  first change. Rehearsed: on an unconvertible country the run stops and every
+  value is left exactly as it was.
+
+
 - **A matter opened from a document arrived with no description.** Found on the
   live register, one matter in. Migration 0049 made the description the name of
   a matter and took the title field off the matter form; the form that opens a

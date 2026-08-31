@@ -16,6 +16,7 @@
 import { describe, expect, it } from 'vitest';
 import { mountModule, fakeUser } from './support/d1';
 import { assistantModule } from '../src/modules/assistant';
+import { inquiriesModule } from '../src/modules/inquiries';
 
 const AT = '2026-08-31T00:00:00Z';
 const USER = fakeUser();
@@ -150,5 +151,52 @@ describe('opening the matter', () => {
     const notes = rows(h,
       "SELECT body FROM entries WHERE entity_type = 'case' AND kind = 'note'") as any[];
     expect(notes).toHaveLength(0);
+  });
+});
+
+
+/**
+ * The three places a matter can be created must agree about its name.
+ *
+ * Migration 0049 made the description the name of a matter and took the title
+ * field off the matter form. The other two creators were missed — the assistant
+ * intake form, found on the live register with one matter already written that
+ * way, and the inquiry conversion, found in review on the same branch. A rule
+ * changed in one of three places is a rule that does not hold.
+ */
+describe('converting an inquiry to a matter', () => {
+  const mount = () => mountModule(inquiriesModule, { user: USER });
+  const seedInquiry = (h: any) => {
+    h.db.prepare(`INSERT INTO users (id,email,name,password_hash,role,created_at,updated_at)
+                  VALUES (?,?,?,'x',?,?,?)`).run(USER.id, USER.email, USER.name, USER.role, AT, AT);
+    h.db.prepare(`INSERT INTO inquiries (id, ref, source, subject, body, contact_name,
+                                         contact_email, status, received_at, created_at, updated_at)
+                  VALUES ('inq1','INQ-1','web','A subject','A body','A PERSON','a@b.c','new',?,?,?)`)
+      .run(AT, AT, AT);
+  };
+  const convert = (h: any) => h.post('/inquiries/inq1/convert', {
+    kind: 'individual', family_name: 'TESTER', given_names: 'A',
+    descriptor: 'Partner of a New Zealand citizen, living together since 2024',
+    case_type: 'wv_aewv', assigned_to: USER.id, nationality: 'NZ',
+  });
+
+  it('names the matter by what it is about, and derives the title from it', async () => {
+    const h = mount();
+    seedInquiry(h);
+    await convert(h);
+    const kase = (h.db.prepare('SELECT title, descriptor FROM cases').all() as any[])[0];
+    expect(kase.descriptor).toBe('Partner of a New Zealand citizen, living together since 2024');
+    expect(kase.title).toBe(kase.descriptor);
+  });
+
+  it('writes the nationality to the table, not to a column that no longer exists', async () => {
+    // The column went in migration 0050. A writer missed by that change would
+    // now fail loudly, but a *reader* missed by it would quietly show nothing,
+    // so this pins the write.
+    const h = mount();
+    seedInquiry(h);
+    await convert(h);
+    const held = h.db.prepare('SELECT code FROM client_nationalities').all() as any[];
+    expect(held.map((r: any) => r.code)).toEqual(['NZ']);
   });
 });

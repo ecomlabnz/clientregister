@@ -68,10 +68,10 @@ export function correctable(
 /**
  * Correct a note inside its window.
  *
- * The previous text goes to the audit log, which is append-only without
- * exception — so even a correction made within seconds leaves the original
- * answerable. Returns what the note said before, for the audit record the
- * caller writes, or null when the database refused.
+ * The previous text goes to the audit log, written by the database in the same
+ * statement as the correction (migration 0057) — so it is kept however the
+ * change was made, not only when it comes through here. What is returned is for
+ * the caller's own record of who did it.
  */
 export async function correctEntry(
   env: Env,
