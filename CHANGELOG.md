@@ -7,6 +7,37 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.86.0 — 1 September 2026
+
+### Added
+- **A fee line can be billed from the price list.** The practice bills roughly
+  the same dozen things, and re-typing a lodgement fee, its amount and the fact
+  that it carries no GST is how a fee ledger ends up disagreeing with itself:
+  two spellings of one charge that can never be counted as one.
+
+  The list is not a new one. `service_items` is what quotes and invoices already
+  bill from, and a matter's fee line now bills from the same rows — a second
+  list would have been a second answer to the same question.
+
+  It fills rather than replaces. The amount on a particular matter is often not
+  the amount on the list, and a form that will not let you change it is a form
+  people work around. The type of charge and the GST treatment always come from
+  the list, because those are facts about what is being charged rather than
+  preferences — and a disbursement left marked as a professional fee goes into
+  the revenue split.
+
+  **A price of zero means "not set", not "free".** Most of the practice's list
+  is at zero today; taking that as the fee would put a $0.00 line on a matter
+  and call it done.
+
+### How it is built
+- The script that fills a quote line fills this one — generalised rather than
+  copied, because the two forms name the amount box differently and that was the
+  only difference between them. The form declares which box it has.
+- The handler applies the same row to whatever was left empty, so choosing from
+  the list works with scripting switched off, and the page and the handler take
+  their values from the same place and cannot disagree.
+
 ## 0.85.0 — 1 September 2026
 
 ### Changed
