@@ -56,3 +56,30 @@ describe('the manual keeps up with the application', () => {
     expect(undocumented, `no manual section: ${undocumented.join(', ')}`).toEqual([]);
   });
 });
+
+describe('what the manual claims about passport numbers', () => {
+  /**
+   * The manual told the practice its clients' passport numbers were stored
+   * encrypted for two days after migration 0042 made that false.
+   *
+   * A wrong claim about how sensitive data is held is worse than no claim: it
+   * is relied on. This pins the correction, and it is written as "the manual
+   * must not say the thing that is no longer true" rather than as a phrase
+   * match, so a rewrite that reintroduces the claim in other words still has
+   * to face the question.
+   */
+  const manual = readFileSync('src/modules/help/index.ts', 'utf8');
+  // Only the guidance sections; release notes are history and stay as written.
+  const sections = manual.slice(manual.indexOf('function sections('));
+
+  it('does not claim the number is encrypted or sealed at rest', () => {
+    expect(sections).not.toMatch(/passport number is stored encrypted/i);
+    expect(sections).not.toMatch(/passport[^.]{0,80}\b(encrypted|sealed)\b/i);
+    expect(sections).not.toMatch(/\b(encrypts|encrypted|sealed)\b[^.]{0,80}passport/i);
+  });
+
+  it('still says the number stays out of bulk exports, which did not change', () => {
+    // The one part of the old arrangement the practice kept.
+    expect(sections).toMatch(/Passport numbers are in none of them/);
+  });
+});

@@ -32,6 +32,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.74.1', date: '1 September 2026',
+    notes: [
+      'Help was telling you passport numbers are stored encrypted. They have not been since '
+        + '30 August, when the practice decided otherwise \u2014 corrected in the four places it '
+        + 'said so.',
+      'Help now covers the Files section on clients and matters, filing things out of Incoming, '
+        + 'and the rows-per-page choice.',
+    ],
+  },
+  {
     version: '0.74.0', date: '1 September 2026',
     notes: [
       'Anything in Incoming \u2014 an inbox message, an inquiry, a conversation \u2014 can now be '
@@ -851,6 +861,9 @@ function sections(origin: string): Section[] {
            inbox, and the channel conversations, as three tabs of one page.</p>
         <p>Press <kbd>/</kbd> anywhere to jump to the search box on the page. Your name at the top
            right opens your account; <strong>Sign out</strong> sits beside it.</p>
+        <p>Long lists show <strong>Previous</strong> and <strong>Next</strong> above and below, and a
+           <strong>Rows</strong> choice underneath — 25, 50, 100, 250 or 500. That is a per-list
+           choice; the number every list <em>starts</em> on is under your account.</p>
         <p>You will only see the parts your role allows. If a colleague can see something you
            cannot, that is their role, not a fault.</p>`,
     },
@@ -867,8 +880,12 @@ function sections(origin: string): Section[] {
         <p>Record the passport, visa, police certificate, medical and chest x-ray dates when you
            have them. Those dates drive the Alerts page — a certificate that ages out before
            lodgement is the sort of thing that stalls a matter, and this is what catches it.</p>
-        <p>A passport number is stored encrypted. Viewing one takes a deliberate click and is
-           written to the audit log, so there is a record of who looked and when.</p>
+        <p>A passport number is stored as written, like the expiry date beside it — the practice
+           decided on 30 August 2026 that it is working data read all day, and the ceremony around
+           it cost more in friction than it bought. What guards it is what guards the rest of the
+           register: sign-in, roles, two-factor and an audited session. One thing did not change —
+           passport numbers stay out of the bulk exports, because a spreadsheet in a downloads
+           folder is the copy that actually escapes.</p>
         <h4>More than one passport</h4>
         <p>A client may hold several. A dual national holds two at once and neither replaces the
            other; someone who has just renewed holds the new one and the old one carrying a live
@@ -1099,7 +1116,19 @@ function sections(origin: string): Section[] {
            behind it at all. Only the menu is shared.</p>
         <p>From an inquiry, <strong>Create client and case</strong> does both in one step and links
            them, carrying the original message across as the case summary. If the contact details
-           match someone already on file, the page says so rather than making a duplicate.</p>`,
+           match someone already on file, the page says so rather than making a duplicate.</p>
+        <h4>Filing it where it belongs</h4>
+        <p>Incoming used to only grow. Anything on any of the three tabs can now be filed onto a
+           matter or a client: choose it from <strong>File on</strong> and press <strong>File
+           it</strong>. A note appears on that record carrying the date, who it was from, the
+           subject and the text, and the item leaves the working list for the <strong>Filed</strong>
+           tab.</p>
+        <p><strong>Nothing is deleted by filing.</strong> The message stays exactly as it arrived —
+           it is the register's record that something came in, and on what day, which is worth
+           having whatever you later decide about it. One press puts it back.</p>
+        <p>Putting it back does not remove the note it wrote. File notes are append-only here: a
+           note that was written is a thing that happened, and unfiling says "this went to the
+           wrong place", not "nobody ever put it there".</p>`,
     },
     {
       id: 'assistant',
@@ -1143,8 +1172,8 @@ function sections(origin: string): Section[] {
         <p>It is given the file, not the keys. When you ask for a brief, the register assembles the
            statuses, dates, parties, notes, tasks and fees and hands that text over. It does not
            query the database itself and cannot reach anything you could not already see on the
-           page. Passport numbers are never included: they are encrypted at rest precisely so they
-           are not casually handled, and no brief needs one.</p>
+           page. Passport numbers are never included: no brief needs one, and the fewer places a
+           number is copied to the better.</p>
         <p>You can change a brief before saving it. The box holds the note exactly as it will be
            written, so what you read before pressing save is what the file gets. Edit a word of it
            and the note records that you edited it rather than claiming to be the model's words —
@@ -1187,8 +1216,8 @@ function sections(origin: string): Section[] {
               nowhere to keep it until R2 is switched on, and pretending otherwise would lose
               somebody's document. Attach it to the matter afterwards if it belongs on the file.</li>
           <li><strong>It will not extract a passport number</strong>, even when the document shows
-              one. That column is encrypted, and pulling numbers out here would write them in the
-              clear into the run log on the way past. It is one field, typed once.</li>
+              one. Pulling it out here would write it into the run log on the way past, which is a
+              copy nobody asked for. It is one field, typed once.</li>
           <li><strong>It will not invent a date.</strong> If the document gives no decision due
               date, the box comes back empty and the omission is listed under "it could not find
               these" — a made-up deadline in a system that raises alerts is worse than no
@@ -1230,6 +1259,26 @@ function sections(origin: string): Section[] {
            it.</p>
         <p>If a file cannot be stored for any reason, the note is still saved and you are told —
            what you typed is never lost because an upload failed.</p>`,
+    },
+    {
+      id: 'files',
+      title: 'Files on a client or a matter',
+      body: html`
+        <p>Every client and matter page has a <strong>Files</strong> section, grouped under headings
+           — Identity, Health, Character, English, Relationship and so on. The headings are a list an
+           administrator edits in Settings, like the other dropdowns, so they can follow how this
+           practice actually sorts a file.</p>
+        <p>A file can be an <strong>upload</strong> or a <strong>link</strong> to something in a
+           drive such as Google Drive. The difference matters: for a link, the register controls who
+           sees the link and the drive controls who can open the file, and that caution is shown
+           wherever a linked file appears. If the drive's sharing is loose, the register cannot
+           tighten it.</p>
+        <p>A client's document can be <strong>shown on a matter</strong> without being copied. One
+           file has one owner — the record it was uploaded to — and showing it elsewhere is a
+           reference. Removing it from the matter removes the reference, not the file.</p>
+        <p>Uploading needs file storage switched on. Until it is, the register keeps a document's
+           name, type and size but not its contents, and says so rather than appearing to have kept
+           something it did not.</p>`,
     },
     {
       id: 'tasks',
@@ -1402,11 +1451,10 @@ function sections(origin: string): Section[] {
            whatever its intentions, so there is no queue, no email and no "we will prepare your
            export".</p>
         <h4>Two things worth knowing</h4>
-        <p><strong>Passport numbers are in none of them.</strong> They are the one field the register
-           encrypts, and writing them in the clear into a file that lands in a downloads folder
-           would undo that in a single click. The client export says only whether a passport is
-           held; the number is revealed one at a time on the client's page, and every reveal is
-           recorded.</p>
+        <p><strong>Passport numbers are in none of them.</strong> They are readable on the client's
+           own page, where you are signed in and the page is behind your role — but a spreadsheet
+           in a downloads folder travels, gets emailed on and outlives the reason it was made. The
+           client export says only whether a passport is held.</p>
         <p><strong>Every download is recorded</strong> in the audit log — what was taken, by whom,
            and when. An export is a copy of the practice's files leaving the building, and that is
            worth a line.</p>
