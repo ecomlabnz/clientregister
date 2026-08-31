@@ -43,6 +43,10 @@ import { preferencesFor } from '../../core/preferences';
 import { caseTypes, docCategories, englishTests, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
 import { filesPanel, listDocuments } from '../documents';
 import { countryCodeFor, countryName, countryOptions } from '../../core/countries';
+import {
+  MAX_NATIONALITIES, nationalitiesByClient, nationalitiesFor, nationalityFieldNames,
+  normaliseCodes, setNationalityStatements,
+} from '../../core/nationalities';
 import { threadsFor } from '../../core/channels';
 import {
   CERTIFICATE_KINDS, CERTIFICATE_LABELS, MEDICAL_TYPES, type CertificateKind,
@@ -69,7 +73,7 @@ export interface ClientRow {
   primary_contact_id: string | null;
   email: string | null; phone: string | null; whatsapp: string | null;
   telegram_username: string | null; telegram_user_id: string | null;
-  nationality: string | null; date_of_birth: string | null; passport_number: string | null;
+  date_of_birth: string | null; passport_number: string | null;
   passport_country: string | null; passport_expiry: string | null;
   police_certificate_date: string | null; police_certificate_expiry: string | null;
   police_certificate_country: string | null;
@@ -102,7 +106,15 @@ function expiryCell(value: string | null, warnDays = 90): Raw {
  * onto the client row. The issue date is read from the passport itself and
  * passed in alongside.
  */
-type ClientFormValues = Partial<ClientRow> & { passport_issued?: string | null };
+/**
+ * A client's nationalities are not a column on the row, so they travel beside
+ * it — into the form, and out of it — rather than being folded into the row
+ * type and looking like one. See `core/nationalities.ts`.
+ */
+type ClientFormValues = Partial<ClientRow> & {
+  passport_issued?: string | null;
+  nationalities?: string[];
+};
 
 function clientForm(
   c: any,
@@ -174,9 +186,28 @@ function clientForm(
           ${field({ label: 'Family name', name: 'family_name', value: familyName, required: true, maxlength: 120 })}
           ${field({ label: 'Preferred name', name: 'preferred_name', value: values.preferred_name, maxlength: 120,
                     hint: 'What to call them in conversation, if different.' })}
-          ${select({ label: 'Nationality', name: 'nationality', value: values.nationality ?? '',
-                     options: countryOptions(), includeBlank: 'Not recorded',
-                     hint: 'Held as an ISO 3166-1 country code, so it can be counted and filtered.' })}
+          ${'' /* One box per nationality held, and always one spare. Dual and
+                   triple nationality are ordinary in immigration work — they
+                   decide whether somebody needs a visa at all, which police
+                   certificates are required, and which passport the
+                   application is made on — so a register that holds one holds
+                   the wrong thing.
+
+                   Boxes rather than a multi-select: picking several from one
+                   list means ctrl-clicking, which is a developer's gesture. A
+                   spare box rather than an "add another" button: the content
+                   policy forbids an inline script, and a control that stops
+                   working when script is blocked is a field nobody can reach.
+                   Fill the spare, save, and the next one appears. */}
+          ${nationalityFieldNames(values.nationalities?.length ?? 0).map((name, i) => select({
+            label: i === 0 ? 'Nationality' : `Nationality ${i + 1}`,
+            name, value: values.nationalities?.[i] ?? '', options: countryOptions(),
+            includeBlank: i === 0 ? 'Not recorded' : 'None',
+            hint: i === 0
+              ? 'Held as an ISO 3166-1 country code, so it can be counted and filtered.'
+              : (i === (values.nationalities?.length ?? 0)
+                  ? 'Fill this in and save to add another.' : undefined),
+          }))}
           ${field({ label: 'Date of birth', name: 'date_of_birth', type: 'date', value: dateInputValue(values.date_of_birth) })}
 
           ${'' /* These two are one fact in two boxes: which company, and what
@@ -351,10 +382,11 @@ function readClientForm(f: FormReader) {
     whatsapp: f.optional('whatsapp', { max: 60 }),
     telegram_username: f.optional('telegram_username', { max: 60 }),
     telegram_user_id: f.optional('telegram_user_id', { max: 40, pattern: /^\d+$/, patternMessage: 'Telegram user ID must be numeric.' }),
-    // The form is a dropdown, so this is already a code. Passed through the
-    // resolver anyway: a request built by hand carrying "Vietnam" then lands as
-    // VN rather than as a 500 from the trigger that guards the column.
-    nationality: countryCodeFor(f.optional('nationality', { max: 100 })),
+    // The form is two dropdowns, so these are already codes. Passed through
+    // the resolver anyway: a request built by hand carrying "Vietnam" then
+    // lands as VN rather than as a 500 from the trigger that guards the table.
+    nationalities: normaliseCodes(nationalityFieldNames(MAX_NATIONALITIES)
+      .map((name) => countryCodeFor(f.optional(name, { max: 100 })))),
     date_of_birth: f.date('date_of_birth'),
     passport_country: f.optional('passport_country', { max: 100 }),
     passport_expiry: f.date('passport_expiry'),
@@ -489,6 +521,9 @@ export const clientsModule: AppModule = {
       );
       const hasMore = rows.length > PAGE_SIZE;
       const shown = rows.slice(0, PAGE_SIZE);
+      // One query for the whole page. A list of two hundred clients must not
+      // become two hundred queries to say where they are from.
+      const nationalities = await nationalitiesByClient(c.env, shown.map((r) => r.id));
       const writable = can(c.get('user'), 'register:write');
 
       const counts = await one<{ leads: number; individuals: number; organisations: number; total: number }>(
@@ -552,7 +587,7 @@ export const clientsModule: AppModule = {
                 <div class="muted small">
                   ${row.kind === 'organisation'
                     ? html`Organisation${row.nzbn ? html` · NZBN ${row.nzbn}` : ''}`
-                    : countryName(row.nationality)}
+                    : (nationalities.get(row.id) ?? []).map(countryName).join(' · ')}
                 </div>
                 <div class="row-meta show-sm">
                   <code>${row.ref}</code>
@@ -585,13 +620,13 @@ export const clientsModule: AppModule = {
       // limits here are about length rather than trust — nothing is stored
       // until the ordinary create route validates it.
       const prefill = (name: string, max = 200) => (c.req.query(name) ?? '').slice(0, max) || undefined;
-      const proposed: Partial<ClientRow> = {
+      const proposed: ClientFormValues = {
         kind,
         given_names: prefill('given_names', 120),
         family_name: prefill('family_name', 120),
         email: prefill('email', 320),
         phone: prefill('phone', 60),
-        nationality: prefill('nationality', 100),
+        nationalities: normaliseCodes([countryCodeFor(prefill('nationality', 100))]),
       };
 
       return page(c, { title: 'New client', active: '/clients' }, html`
@@ -725,7 +760,7 @@ export const clientsModule: AppModule = {
       const englishTestOptions = termOptions(tests);
       const visaTypeOptions = termOptions(await visaTypes(c.env));
         return page(c, { title: 'New client', active: '/clients', status: 400 }, html`
-          ${pageHeader('New client')}${clientForm(c, v as Partial<ClientRow>, users, organisations, englishTestOptions, visaTypeOptions, f.errors)}`);
+          ${pageHeader('New client')}${clientForm(c, v as ClientFormValues, users, organisations, englishTestOptions, visaTypeOptions, f.errors)}`);
       }
 
       const id = newId('cli');
@@ -740,20 +775,25 @@ export const clientsModule: AppModule = {
         `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name, preferred_name,
             nzbn, company_number, organisation_id, organisation_role,
             email, phone, whatsapp, telegram_username, telegram_user_id,
-            nationality, date_of_birth,
+            date_of_birth,
             english_test_type, english_test_score, english_test_date,
             current_visa_type, current_visa_expiry, current_visa_expiry_rule,
             address, status, assigned_to, notes,
             created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, ref, v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
         v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
-        v.nationality, v.date_of_birth,
+        v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
         v.current_visa_type, v.current_visa_expiry, v.current_visa_expiry_rule,
         v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), nowIso(), user.id,
       );
+      // Written straight after the row rather than in the same batch, because
+      // the row has to exist for the foreign key to hold. Failing here leaves a
+      // client with no nationality, which is the state every client without one
+      // is already in — not a half-written record.
+      await c.env.DB.batch(setNationalityStatements(c.env, id, v.nationalities));
 
       if (v.passport_number || v.passport_country || v.passport_expiry || v.passport_issued) {
         await addPassport(c.env, {
@@ -782,6 +822,7 @@ export const clientsModule: AppModule = {
         id,
       );
       if (!client) return c.notFound();
+      const clientNationalities = await nationalitiesFor(c.env, id);
 
       const [cases, quotes, inquiries, entries, tasks, partyCases, related, employer, people,
              feesByCase, englishTestTerms, visaTerms, certificates, passports, threads,
@@ -990,7 +1031,11 @@ export const clientsModule: AppModule = {
                       <dt>Works for</dt><dd><a href="/clients/${employer.id}">${employer.full_name}</a>
                         ${client.organisation_role ? html`<div class="muted small">${client.organisation_role}</div>` : ''}
                         ${employer.primary_contact_id === client.id ? badge('Primary contact', 'green') : ''}</dd>` : ''}
-                    <dt>Nationality</dt><dd>${countryName(client.nationality) || '—'}</dd>
+                    ${'' /* Plural, because a person may be. Listed in the
+                             order the practice entered them: the first is the
+                             passport an application is likely to be made on. */}
+                    <dt>${clientNationalities.length > 1 ? 'Nationalities' : 'Nationality'}</dt>
+                    <dd>${clientNationalities.map(countryName).join(' · ') || '—'}</dd>
                     <dt>Date of birth</dt><dd>${dateShort(client.date_of_birth)}</dd>
                     <dt>Passport</dt><dd>${passports.length === 0
                       ? html`<span class="muted">—</span>`
@@ -1262,10 +1307,11 @@ export const clientsModule: AppModule = {
       const englishTestOptions = termOptions(tests);
       const visaTypeOptions = termOptions(await visaTypes(c.env));
       const primary = passports.find((row) => row.is_primary === 1) ?? null;
+      const nationalities = await nationalitiesFor(c.env, client.id);
       return page(c, { title: `Edit ${client.full_name}`, active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { href: `/clients/${client.id}`, label: client.ref }, { label: 'Edit' }])}
         ${pageHeader(`Edit ${client.full_name}`)}
-        ${clientForm(c, { ...client, passport_issued: primary?.issued_on ?? null },
+        ${clientForm(c, { ...client, passport_issued: primary?.issued_on ?? null, nationalities },
                      users, organisations, englishTestOptions, visaTypeOptions)}`);
     });
 
@@ -1494,7 +1540,7 @@ export const clientsModule: AppModule = {
       const visaTypeOptions = termOptions(await visaTypes(c.env));
         return page(c, { title: 'Edit client', active: '/clients', status: 400 }, html`
           ${pageHeader(`Edit ${existing.full_name}`)}
-          ${clientForm(c, { ...existing, ...v } as Partial<ClientRow>, users, organisations, englishTestOptions, visaTypeOptions, f.errors)}`);
+          ${clientForm(c, { ...existing, ...v } as ClientFormValues, users, organisations, englishTestOptions, visaTypeOptions, f.errors)}`);
       }
 
       // Three outcomes, and the contradictory one is refused rather than
@@ -1509,7 +1555,7 @@ export const clientsModule: AppModule = {
         c.env.DB,
         `UPDATE clients SET kind=?, full_name=?, given_names=?, family_name=?, preferred_name=?,
            nzbn=?, company_number=?, organisation_id=?, organisation_role=?, email=?, phone=?, whatsapp=?, telegram_username=?, telegram_user_id=?,
-           nationality=?, date_of_birth=?,
+           date_of_birth=?,
            english_test_type=?, english_test_score=?, english_test_date=?,
            current_visa_type=?, current_visa_expiry=?, current_visa_expiry_rule=?,
            address=?, status=?, assigned_to=?, notes=?, updated_at=?
@@ -1517,12 +1563,13 @@ export const clientsModule: AppModule = {
         v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
         v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role,
         v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
-        v.nationality, v.date_of_birth,
+        v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
         v.current_visa_type, v.current_visa_expiry, v.current_visa_expiry_rule,
         v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), id,
       );
+      await c.env.DB.batch(setNationalityStatements(c.env, id, v.nationalities));
 
       // This form owns the primary passport and nothing else about the
       // passports table. A client with none yet gets one made; a client with

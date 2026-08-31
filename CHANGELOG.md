@@ -7,6 +7,64 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.81.0 — 31 August 2026
+
+### Changed
+- **A person may hold more than one nationality.** Reported from a real
+  partnership file: the supporting partner is a national of Vietnam and of New
+  Zealand, the document says so plainly, and the register recorded neither —
+  the form had one dropdown, the phrase resolved to no single country, and the
+  box came back "Not recorded".
+
+  That is not a display fault. Dual nationality decides whether somebody needs
+  a visa at all, which police certificates are required and which passport an
+  application is made on. A field that cannot hold the answer is worse than no
+  field, because it looks answered.
+
+  `clients.nationality` becomes `client_nationalities` in migration 0050 — a
+  table, not a second column and not a comma-separated string. `position` keeps
+  the order, because the first answers "which passport" and the rest do not.
+  The country-code trigger from migration 0030 moves across intact rather than
+  being dropped for convenience. Measured first: 59 clients, 39 carrying a
+  nationality, every one of them moved to a single row. Rehearsed on a scratch
+  database at that shape before it ran.
+
+  The form shows one box per nationality held and always one spare, so a third
+  is added by filling it in and saving. Boxes rather than a multi-select
+  (ctrl-clicking is a developer's gesture) and a spare rather than an "add
+  another" button (the content policy forbids an inline script, and a control
+  that stops working when script is blocked is a field nobody can reach).
+
+- **The reading form has the boxes it was missing.** Current visa, visa expiry
+  and nationalities, for the client and for everybody else the document names.
+  These were columns the register already had — they were missing from that one
+  form, which is the worse of the two: the reading found the answers, there was
+  nowhere on the screen to put them, and they were lost at the last step.
+
+- **What the reading says is kept as a file note.** Most of what a partnership
+  summary carries has no column to go in — a relationship history, two previous
+  marriages and their dates, where a child lives, an address, an assault
+  reported to Police — and it was read once, shown on a form and dropped. The
+  matter's summary field is a working description somebody edits; a file note
+  is the record of what a document stated on the day it arrived, and file notes
+  are append-only. The summary box is twelve rows and eight thousand characters
+  rather than four and two thousand, which had been cutting a three-page
+  document off mid-sentence.
+
+- **Choosing an existing client fills only its empty boxes.** A document is
+  evidence of what somebody wrote on a form once; the record is what the
+  practice knows now. A reading that quietly replaced a corrected visa expiry
+  with an older one would be worse than one that filled nothing in.
+
+### How it is built
+- `core/nationalities.ts` is the single owner. Nothing outside it writes the
+  table, and nothing anywhere assembles the list from a column — the column is
+  gone. `codesFromText` splits what a document actually writes: "Vietnam and
+  New Zealand", "dual Vietnamese/New Zealand citizen".
+- The invariant tests moved to the new table rather than being deleted with the
+  old column, and gained the case that started this: one person, two
+  nationalities, in order.
+
 ## 0.80.0 — 31 August 2026
 
 ### Added

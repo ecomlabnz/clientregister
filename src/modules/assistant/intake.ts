@@ -26,8 +26,12 @@ import { newId } from '../../core/ids';
 import { FormReader } from '../../core/validate';
 import { composeFullName, familyNameFor, plainAscii } from '../../core/names';
 import { addEntry } from '../../core/timeline';
-import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
+import { caseTypes, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
 import { countryCodeFor, countryOptions } from '../../core/countries';
+import {
+  MAX_NATIONALITIES, nationalitiesFor, nationalityFieldNames, normaliseCodes,
+  setNationalityStatements,
+} from '../../core/nationalities';
 import { CASE_STATUSES, CASE_STATUS_LABELS, PARTY_ROLES, PARTY_ROLE_LABELS,
          type PartyRole } from '../../domain';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
@@ -57,8 +61,17 @@ function notConfigured(): ReturnType<typeof html> {
     </div>`;
 }
 
-/** A person the reading proposed, as form fields somebody can correct. */
-function personFields(prefix: string, person: IntakePerson, roleFixed: PartyRole | null): ReturnType<typeof html> {
+/**
+ * A person the reading proposed, as form fields somebody can correct.
+ *
+ * Every box here is a column the register already had. They were missing from
+ * this form rather than from the database, which is the worse of the two: a
+ * document arrives saying what visa somebody is on and what countries they are
+ * a national of, the reading pulls it out, and then there is nowhere on the
+ * screen to put it — so it is lost at the last step, on the way in.
+ */
+function personFields(prefix: string, person: IntakePerson, roleFixed: PartyRole | null,
+                      visaTypeOptions: Array<{ value: string; label: string }>): ReturnType<typeof html> {
   return html`
     <div class="settings-cell">${field({ label: 'Given names', name: `${prefix}given_names`,
       value: person.given_names ?? '', maxlength: 120 })}</div>
@@ -67,13 +80,27 @@ function personFields(prefix: string, person: IntakePerson, roleFixed: PartyRole
     <div class="settings-cell">${field({ label: 'Known as', name: `${prefix}preferred_name`,
       value: person.preferred_name ?? '', maxlength: 80 })}</div>
     ${'' /* The model returns whatever the document said — "Vietnamese", "Viet
-             Nam", "SRV". `countryCodeFor` turns the ones it can into a code and
-             the rest into nothing, and the person confirming the extraction
-             picks from the list. A wrong nationality confidently pre-filled is
-             worse than an empty box. */}
-    <div class="settings-cell">${select({ label: 'Nationality', name: `${prefix}nationality`,
-      value: countryCodeFor(person.nationality) ?? '', options: countryOptions(),
-      includeBlank: 'Not recorded' })}</div>
+             Nam", "Vietnam and New Zealand". Those are resolved to codes on
+             the way in, and anything that will not resolve arrives empty for
+             the person confirming to pick: a wrong nationality confidently
+             pre-filled is worse than an empty box.
+
+             One box per nationality the reading found, and always one spare,
+             so a third can be added by filling it in. Until 31 August a second
+             was simply unrecordable — a dual Vietnamese and New Zealand
+             partner came back "Not recorded", which is the one answer that was
+             certainly wrong. */}
+    ${nationalityFieldNames(person.nationalities.length, prefix).map((name, i) => html`
+      <div class="settings-cell">${select({
+        label: i === 0 ? 'Nationality' : `Nationality ${i + 1}`,
+        name, value: person.nationalities[i] ?? '', options: countryOptions(),
+        includeBlank: i === 0 ? 'Not recorded' : 'None' })}</div>`)}
+    <div class="settings-cell">${select({ label: 'Current visa', name: `${prefix}current_visa_type`,
+      value: visaTypeOptions.some((o) => o.value === person.current_visa_type)
+        ? person.current_visa_type! : '',
+      options: visaTypeOptions, includeBlank: 'Not recorded' })}</div>
+    <div class="settings-cell">${field({ label: 'Current visa expiry', name: `${prefix}current_visa_expiry`,
+      type: 'date', value: person.current_visa_expiry ?? '' })}</div>
     <div class="settings-cell">${field({ label: 'Email', name: `${prefix}email`, type: 'email',
       value: person.email ?? '', maxlength: 320 })}</div>
     <div class="settings-cell">${field({ label: 'Phone', name: `${prefix}phone`,
@@ -151,6 +178,9 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     }
 
     // --- The form, filled in ------------------------------------------------
+    // The practice's own visa list, not one baked in here: what a person may
+    // be recorded as holding is vocabulary, editable in Settings.
+    const visaTypeOptions = termOptions(await visaTypes(c.env));
     const applicant = reading.applicant;
     const parties = reading.other_parties;
     const [users, existing] = await Promise.all([
@@ -198,7 +228,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
                  ignored, and nothing about ${existing.full_name} is overwritten by this reading.</p>
             </div>` : ''}
           <div class="settings-form">
-            ${personFields('a_', applicant, 'principal_applicant')}
+            ${personFields('a_', applicant, 'principal_applicant', visaTypeOptions)}
           </div>`)}
 
         ${parties.length ? card('Other people named', html`
@@ -208,7 +238,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
               <label class="checkbox-field"><input type="checkbox" name="p${i}_create" value="1" checked>
                 Add them to the register and link them to this matter</label>
               <div class="settings-form">
-                ${personFields(`p${i}_`, person, null)}
+                ${personFields(`p${i}_`, person, null, visaTypeOptions)}
               </div>
             </fieldset>`)}
           <input type="hidden" name="party_count" value="${parties.length}">`) : ''}
@@ -235,8 +265,15 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
             <div class="settings-cell">${select({ label: 'Owner', name: 'assigned_to',
               value: c.get('user')!.id, includeBlank: 'Nobody yet',
               options: users.map((u) => ({ value: u.id, label: u.name })) })}</div>
+            ${'' /* Twelve rows and eight thousand characters, because this is
+                     now the whole of what the document said and it is saved
+                     twice over: to the matter's summary, which somebody edits,
+                     and to a file note, which nobody does. Four rows on a
+                     three-page partnership history was a box you had to scroll
+                     to read before you could check it. */}
             <div class="settings-cell-wide">${field({ label: 'Summary', name: 'summary', type: 'textarea',
-              rows: 4, value: reading.summary, maxlength: 4000 })}</div>
+              rows: 12, value: reading.summary, maxlength: 8000,
+              hint: 'Saved to the matter, and kept as a file note exactly as it reads here.' })}</div>
           </div>`)}
 
         <div class="form-actions">
@@ -307,6 +344,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       if (!row) return redirectWith(c, '/assistant/intake', 'That client no longer exists.', 'err');
       clientId = row.id;
       clientRef = row.ref;
+      await fillEmptyFields(c, f, 'a_', row.id);
     } else {
       const made = await createPerson(c, f, 'a_', stamp);
       if (!made) return redirectWith(c, '/assistant/intake', 'The client needs a name.', 'err');
@@ -327,7 +365,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       f.optional('inz_application_number', { max: 40 }),
       f.optional('inz_client_number', { max: 40 }),
       f.date('lodged_at'), f.date('decision_due_at'),
-      f.optional('summary', { max: 4000 }),
+      f.optional('summary', { max: 8000 }),
       stamp, stamp, user.id,
     );
 
@@ -368,6 +406,25 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
         + (added.length ? ` Parties added: ${added.join('; ')}.` : ''),
       createdBy: user.id,
     });
+
+    // The whole of what the document said, as a file note.
+    //
+    // The matter's summary field is a working description somebody edits; a
+    // file note is the record of what a document stated on the day it arrived,
+    // and file notes are append-only. Most of what these summaries carry has
+    // no column to go in — a relationship history, two previous marriages and
+    // their dates, where a child lives, an assault reported to Police — and
+    // without this it was read once, shown on a form, and lost the moment the
+    // matter was opened.
+    const note = f.optional('summary', { max: 8000 });
+    if (note) {
+      await addEntry(c.env, {
+        entityType: 'case', entityId: caseId, kind: 'note',
+        body: `From the document read by the assistant on ${stamp.slice(0, 10)}, `
+          + 'checked before saving:\n\n' + note,
+        createdBy: user.id,
+      });
+    }
     await auditFrom(c, {
       action: 'case.created_from_intake', entityType: 'case', entityId: caseId,
       meta: { ref: caseRef, client: clientRef, run: f.optional('run', { max: 80 }), parties: added.length },
@@ -378,6 +435,54 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       + (added.length ? ` ${added.length} other ${added.length === 1 ? 'party' : 'parties'} linked.` : ''),
     );
   });
+}
+
+/**
+ * Put what the document said into the boxes an existing record has left empty.
+ *
+ * Never over the top of something already there. A document is evidence of
+ * what somebody wrote on a form once; the record is what the practice knows
+ * now, and a reading that quietly replaced a corrected visa expiry with an
+ * older one would be worse than a reading that filled nothing in.
+ */
+async function fillEmptyFields(
+  c: Parameters<typeof auditFrom>[0], f: FormReader, prefix: string, clientId: string,
+): Promise<void> {
+  const visaType = f.optional(`${prefix}current_visa_type`, { max: 120 });
+  const visaExpiry = f.date(`${prefix}current_visa_expiry`);
+  if (visaType || visaExpiry) {
+    await run(
+      c.env.DB,
+      `UPDATE clients
+          SET current_visa_type = COALESCE(NULLIF(current_visa_type, ''), ?),
+              current_visa_expiry = COALESCE(NULLIF(current_visa_expiry, ''), ?),
+              updated_at = ?
+        WHERE id = ?`,
+      visaType, visaExpiry, nowIso(), clientId,
+    );
+  }
+  // Nationalities are all-or-nothing rather than merged: a person who holds
+  // two and is recorded as holding one is recorded wrongly, and merging a list
+  // has no obvious right answer. So they are written only when the record has
+  // none at all.
+  const proposed = nationalitiesFromForm(f, prefix);
+  if (proposed.length === 0) return;
+  const held = await nationalitiesFor(c.env as any, clientId);
+  if (held.length === 0) {
+    await c.env.DB.batch(setNationalityStatements(c.env as any, clientId, proposed));
+  }
+}
+
+/**
+ * The nationalities from one person's two boxes.
+ *
+ * Resolved rather than trusted: the boxes are dropdowns, so these are already
+ * codes, but a request built by hand carrying "Vietnam" lands as VN here
+ * instead of as a 500 from the trigger that guards the table.
+ */
+function nationalitiesFromForm(f: FormReader, prefix: string): string[] {
+  return normaliseCodes(nationalityFieldNames(MAX_NATIONALITIES, prefix)
+    .map((name) => countryCodeFor(f.optional(name, { max: 80 }))));
 }
 
 /** Create one person from the prefixed fields, or nothing if they have no name. */
@@ -396,16 +501,19 @@ async function createPerson(
   await run(
     c.env.DB,
     `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name, preferred_name,
-        email, phone, nationality, date_of_birth, status, assigned_to, created_at, updated_at, created_by)
-     VALUES (?,?, 'individual', ?,?,?,?,?,?,?,?, 'active', ?,?,?,?)`,
+        email, phone, date_of_birth, current_visa_type, current_visa_expiry,
+        status, assigned_to, created_at, updated_at, created_by)
+     VALUES (?,?, 'individual', ?,?,?,?,?,?,?,?,?, 'active', ?,?,?,?)`,
     id, ref, fullName, given, family,
     f.optional(`${prefix}preferred_name`, { max: 80 }),
     f.email(`${prefix}email`),
     f.optional(`${prefix}phone`, { max: 40 }),
-    countryCodeFor(f.optional(`${prefix}nationality`, { max: 80 })),
     f.date(`${prefix}date_of_birth`),
+    f.optional(`${prefix}current_visa_type`, { max: 120 }),
+    f.date(`${prefix}current_visa_expiry`),
     c.get('user')!.id, stamp, stamp, c.get('user')!.id,
   );
+  await c.env.DB.batch(setNationalityStatements(c.env, id, nationalitiesFromForm(f, prefix)));
   await addEntry(c.env, {
     entityType: 'client', entityId: id, kind: 'system',
     body: `Client ${ref} created from a document read by the assistant, and checked before saving.`,
