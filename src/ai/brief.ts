@@ -39,8 +39,8 @@ export const AI_BRIEF_NOTE_PREFIX = 'Brief drafted by the AI layer from this fil
  *
  * Written out rather than passed as JSON because a model reads a file note the
  * way a person does. Passport numbers are deliberately never included: they are
- * encrypted at rest precisely so they are not casually handled, and nothing in
- * a brief needs one.
+ * kept out of exports and out of anything that travels, and nothing in a brief
+ * needs one.
  */
 export async function caseFileText(env: Env, caseId: string): Promise<{ title: string; file: string } | null> {
   const kase = await one<any>(
