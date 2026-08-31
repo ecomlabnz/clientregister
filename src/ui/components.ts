@@ -43,6 +43,28 @@ export function collapsibleCard(title: string, body: Raw, note?: string): Raw {
 }
 
 /**
+ * A form that stays out of the way until it is wanted.
+ *
+ * A list page ends with the list, not with a form. An always-open "New task"
+ * box pushed the rows people came to read up the page and put an empty form
+ * between them and the pager — the occasional errand competing with the
+ * constant one.
+ *
+ * Built on `<details>` for the same reason everything else here is: the
+ * content policy forbids an inline script, and a disclosure that stops
+ * working when script is blocked is a form nobody can reach. The `<summary>`
+ * wears the button classes, so it reads and focuses as the button it is,
+ * while keeping the native disclosure semantics a screen reader announces.
+ */
+export function revealForm(label: string, body: Raw): Raw {
+  return html`
+    <details class="reveal">
+      <summary class="btn btn-primary reveal-open">${label}</summary>
+      <section class="card"><div class="card-body">${body}</div></section>
+    </details>`;
+}
+
+/**
  * A twelve-month trend, as one shape.
  *
  * The only place on the dashboard where a picture beats a figure: a count tells
