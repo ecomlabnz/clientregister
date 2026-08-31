@@ -268,7 +268,11 @@ function clientForm(
             <p class="hint">For one entered against the wrong person. Leaving the box above
                blank keeps what is stored; this is the only way to take it out.</p>
           </div>` : ''}
-        ${field({ label: 'Passport country', name: 'passport_country', value: values.passport_country, maxlength: 100 })}
+        ${select({ label: 'Passport country', name: 'passport_country',
+                   value: values.passport_country ?? '', options: countryOptions(),
+                   includeBlank: 'Not recorded',
+                   hint: 'The country that issued it. Held as a country code, like nationality, '
+                     + 'so passports can be counted and matched.' })}
         ${field({ label: 'Passport issued', name: 'passport_issued', type: 'date',
                   value: dateInputValue(values.passport_issued ?? null) })}
         ${field({ label: 'Passport expiry', name: 'passport_expiry', type: 'date', value: dateInputValue(values.passport_expiry),
@@ -310,13 +314,25 @@ function clientForm(
 
           <p class="settings-head subhead">Character and health</p>
           <div class="settings-cell-wide">
-            <p class="hint">Police certificates, medicals and x-rays are kept on the client's own
-               page, each as a record with its own dates${values.id
-                 ? html` — <a href="/clients/${values.id}#certificates">add one there</a>` : ''}.
-               A new certificate does not overwrite the old one: a matter lodged in March relied on
-               what was held in March, and that has to stay answerable. A client may hold police
-               certificates from several countries at once, which a single set of boxes here could
-               never represent.</p>
+            ${'' /* A way through, not a paragraph explaining where to go. These
+                     are the documents a file turns on, and pointing at them in
+                     small grey text was treating them as a footnote. They are
+                     still records rather than boxes, and that is the part that
+                     cannot change: a client may hold police certificates from
+                     three countries at once, and a new medical must not
+                     overwrite the one a March application relied on — that has
+                     to stay answerable. A single set of dates here could
+                     represent neither. */}
+            ${values.id
+              ? html`<p><a class="btn btn-secondary" href="/clients/${values.id}#certificates">Add
+                       a police certificate, medical or x-ray</a></p>
+                     <p class="hint">Each one is recorded with its own country and dates, and a new
+                        one never overwrites the old: a matter lodged in March relied on what was
+                        held in March.</p>`
+              : html`<p class="hint">Police certificates, medicals and x-rays are added on the
+                       client's own page once this record exists — each with its own country and
+                       dates, because a client may hold several at once and a new one must never
+                       overwrite the one an application relied on.</p>`}
           </div>
 
           <p class="settings-head subhead">English</p>
@@ -391,7 +407,10 @@ function readClientForm(f: FormReader) {
     nationalities: normaliseCodes(nationalityFieldNames(MAX_NATIONALITIES)
       .map((name) => countryCodeFor(f.optional(name, { max: 100 })))),
     date_of_birth: f.date('date_of_birth'),
-    passport_country: f.optional('passport_country', { max: 100 }),
+    // A dropdown, so this is already a code. Resolved anyway: a request built
+    // by hand carrying "Vietnam" then lands as VN rather than as a 500 from the
+    // trigger that guards the column.
+    passport_country: countryCodeFor(f.optional('passport_country', { max: 100 })),
     passport_expiry: f.date('passport_expiry'),
     passport_issued: f.date('passport_issued'),
     english_test_type: f.optional('english_test_type', { max: 60 }),
@@ -957,120 +976,6 @@ export const clientsModule: AppModule = {
               files: clientFiles as any, categories: docCats,
               canDelete: can(c.get('user'), 'register:delete'),
             }))}
-          </div>
-
-          <div class="col-side">
-            ${'' /* Fees are recorded per matter, which is right, but "what does
-                     this person owe us" is a question about the person. This
-                     answers it without opening every file, and each line leads
-                     back to the matter it came from. */}
-            ${feesByCase.length > 0 && can(c.get('user'), 'register:read') ? card('Fees', html`
-              <dl class="kv">
-                <dt>Recorded</dt><dd>${money(feeTotals.gross)}</dd>
-                <dt>Invoiced</dt><dd>${money(feeTotals.billed)}</dd>
-                <dt>Paid</dt><dd>${money(feeTotals.paid)}</dd>
-                <dt>Outstanding</dt>
-                <dd class="${feeTotals.owing ? 'warn strong' : ''}">${money(feeTotals.owing)}</dd>
-              </dl>
-              <ul class="list small mt">
-                ${feesByCase.map((row) => html`
-                  <li class="list-row">
-                    <div><a href="/cases/${row.case_id}"><code>${row.case_ref}</code></a>
-                      <div class="muted clamp-1">${row.case_title}</div></div>
-                    <div class="num">${money(row.gross)}
-                      ${row.gross - row.paid > 0
-                        ? html`<div class="muted">${money(row.gross - row.paid)} owing</div>` : ''}</div>
-                  </li>`)}
-              </ul>`) : ''}
-
-            ${card('Contact', html`
-              <dl class="kv">
-                ${isOrg ? '' : html`
-                  <dt>Given names</dt><dd>${client.given_names ?? '—'}</dd>
-                  <dt>Family name</dt><dd>${client.family_name ?? '—'}</dd>
-                  <dt>Preferred</dt><dd>${client.preferred_name ?? '—'}</dd>`}
-                <dt>Email</dt><dd>${client.email ? html`<a href="mailto:${client.email}">${client.email}</a>` : '—'}</dd>
-                <dt>Phone</dt><dd>${client.phone ?? '—'}</dd>
-                <dt>WhatsApp</dt><dd>${client.whatsapp ?? '—'}</dd>
-                <dt>Telegram</dt><dd>${client.telegram_username ?? client.telegram_user_id ?? '—'}</dd>
-                <dt>Address</dt><dd>${client.address ?? '—'}</dd>
-              </dl>`)}
-
-            ${isOrg
-              ? html`
-                ${card('Registration', html`
-                  <dl class="kv">
-                    <dt>NZBN</dt><dd>${client.nzbn ?? '—'}</dd>
-                    <dt>Company no.</dt><dd>${client.company_number ?? '—'}</dd>
-                    <dt>Primary contact</dt><dd>${(() => {
-                      const primary = people.find((person) => person.id === client.primary_contact_id);
-                      return primary
-                        ? html`<a href="/clients/${primary.id}">${primary.full_name}</a>`
-                        : html`<span class="muted">Not set</span>`;
-                    })()}</dd>
-                  </dl>`)}
-
-                ${card('People at this organisation', people.length === 0
-                  ? emptyState('Nobody linked yet. Open a person’s record and set “Works for”.')
-                  : html`
-                    <ul class="party-list">
-                      ${people.map((person) => html`
-                        <li>
-                          <div>
-                            <a href="/clients/${person.id}">${person.full_name}</a>
-                            ${person.id === client.primary_contact_id ? badge('Primary contact', 'green') : ''}
-                            <div class="muted small">${person.organisation_role ?? 'Role not recorded'}
-                              · <code>${person.ref}</code></div>
-                          </div>
-                          ${writable && person.id !== client.primary_contact_id
-                            ? actionButton(`/clients/${client.id}/primary-contact`, csrf, 'Make primary',
-                                { className: 'btn btn-small btn-secondary', fields: { contact_id: person.id } })
-                            : ''}
-                        </li>`)}
-                    </ul>
-                    ${writable && client.primary_contact_id
-                      ? actionButton(`/clients/${client.id}/primary-contact`, csrf, 'Clear primary contact',
-                          { className: 'btn btn-small btn-link-danger', fields: { contact_id: '' } })
-                      : ''}`)}`
-              : card('Identity and compliance', html`
-                  <dl class="kv">
-                    ${employer ? html`
-                      <dt>Works for</dt><dd><a href="/clients/${employer.id}">${employer.full_name}</a>
-                        ${client.organisation_role ? html`<div class="muted small">${client.organisation_role}</div>` : ''}
-                        ${employer.primary_contact_id === client.id ? badge('Primary contact', 'green') : ''}</dd>` : ''}
-                    ${'' /* Plural, because a person may be. Listed in the
-                             order the practice entered them: the first is the
-                             passport an application is likely to be made on. */}
-                    <dt>${clientNationalities.length > 1 ? 'Nationalities' : 'Nationality'}</dt>
-                    <dd>${clientNationalities.map(countryName).join(' · ') || '—'}</dd>
-                    <dt>Date of birth</dt><dd>${dateShort(client.date_of_birth)}</dd>
-                    <dt>Passport</dt><dd>${passports.length === 0
-                      ? html`<span class="muted">—</span>`
-                      : html`${client.passport_country ?? 'Primary'}${
-                          client.passport_expiry ? html` · ${expiryCell(client.passport_expiry, 180)}` : ''}
-                             ${passports.length > 1
-                               ? html`<div class="muted small"><a href="#passports">${passports.length} passports on file</a></div>`
-                               : html`<div class="muted small"><a href="#passports">Details</a></div>`}`}</dd>
-                    <dt>Current visa</dt><dd>${labelFor(visaTerms, client.current_visa_type) || '—'}</dd>
-                    <dt>Visa expiry</dt><dd>${!client.current_visa_expiry && client.current_visa_expiry_rule
-                      ? html`${badge('not yet fixed', 'amber')}
-                             <div class="muted small">${client.current_visa_expiry_rule}</div>`
-                      : expiryCell(client.current_visa_expiry)}</dd>
-                    <dt>Police cert.</dt><dd>${client.police_certificate_country
-                      ? html`${client.police_certificate_country}<br>` : ''}${expiryCell(client.police_certificate_expiry)}
-                      ${certificateDateUnverified(certificates, 'police', client.police_certificate_expiry)
-                        ? badge('unverified date', 'amber') : ''}</dd>
-                    <dt>Medical</dt><dd>${expiryCell(client.medical_certificate_expiry)}
-                      ${certificateDateUnverified(certificates, 'medical', client.medical_certificate_expiry)
-                        ? badge('unverified date', 'amber') : ''}</dd>
-                    <dt>Chest x-ray</dt><dd>${expiryCell(client.chest_xray_expiry)}</dd>
-                    <dt>English</dt><dd>${client.english_test_type
-                      ? html`${labelFor(englishTestTerms, client.english_test_type)}${
-                          client.english_test_score ? html` · <strong>${client.english_test_score}</strong>` : ''}
-                          ${client.english_test_date
-                            ? html`<div class="muted small">Taken ${dateShort(client.english_test_date)}</div>` : ''}`
-                      : html`<span class="muted">—</span>`}</dd>
-                  </dl>`)}
 
             ${isOrg ? '' : html`
               <section class="card" id="passports">
@@ -1110,12 +1015,13 @@ export const clientsModule: AppModule = {
                       </ul>`}
 
                   ${writable ? html`
-                    <details class="mt">
-                      <summary>Add another passport</summary>
+                    <details class="reveal mt">
+                      <summary class="btn btn-primary reveal-open">Add another passport</summary>
                       <form method="post" action="/clients/${client.id}/passports" class="row-form">
                         ${csrfField(csrf)}
-                        ${field({ label: 'Country', name: 'country', maxlength: 100,
-                                  hint: 'The country that issued it.' })}
+                        ${select({ label: 'Country', name: 'country', value: '',
+                                   options: countryOptions(), includeBlank: 'Not recorded',
+                                   hint: 'The country that issued it.' })}
                         ${field({ label: 'Number', name: 'number', maxlength: 60,
                                 })}
                         ${field({ label: 'Issued', name: 'issued_on', type: 'date' })}
@@ -1209,15 +1115,16 @@ export const clientsModule: AppModule = {
                       })}`}
 
                   ${writable ? html`
-                    <details class="mt">
-                      <summary>Record a certificate</summary>
+                    <details class="reveal mt">
+                      <summary class="btn btn-primary reveal-open">Add a police certificate, medical or x-ray</summary>
                       <form method="post" action="/clients/${client.id}/certificates" class="row-form">
                         ${csrfField(csrf)}
                         ${select({ label: 'What', name: 'kind', required: true, includeBlank: false,
                                    value: 'police',
                                    options: CERTIFICATE_KINDS.map((k) => ({ value: k, label: CERTIFICATE_LABELS[k] })) })}
-                        ${field({ label: 'Country', name: 'country', maxlength: 100,
-                                  hint: 'Police certificates only — one per country lived in for 12 months or more.' })}
+                        ${select({ label: 'Country', name: 'country', value: '',
+                                   options: countryOptions(), includeBlank: 'Not recorded',
+                                   hint: 'Police certificates only — one per country lived in for 12 months or more.' })}
                         ${select({ label: 'Medical type', name: 'subtype', includeBlank: 'Not a medical',
                                    options: MEDICAL_TYPES })}
                         ${field({ label: 'Issued', name: 'issued_on', type: 'date',
@@ -1248,6 +1155,121 @@ export const clientsModule: AppModule = {
                     </details>` : ''}
                 </div>
               </section>`}
+          </div>
+
+          <div class="col-side">
+            ${'' /* Fees are recorded per matter, which is right, but "what does
+                     this person owe us" is a question about the person. This
+                     answers it without opening every file, and each line leads
+                     back to the matter it came from. */}
+            ${feesByCase.length > 0 && can(c.get('user'), 'register:read') ? card('Fees', html`
+              <dl class="kv">
+                <dt>Recorded</dt><dd>${money(feeTotals.gross)}</dd>
+                <dt>Invoiced</dt><dd>${money(feeTotals.billed)}</dd>
+                <dt>Paid</dt><dd>${money(feeTotals.paid)}</dd>
+                <dt>Outstanding</dt>
+                <dd class="${feeTotals.owing ? 'warn strong' : ''}">${money(feeTotals.owing)}</dd>
+              </dl>
+              <ul class="list small mt">
+                ${feesByCase.map((row) => html`
+                  <li class="list-row">
+                    <div><a href="/cases/${row.case_id}"><code>${row.case_ref}</code></a>
+                      <div class="muted clamp-1">${row.case_title}</div></div>
+                    <div class="num">${money(row.gross)}
+                      ${row.gross - row.paid > 0
+                        ? html`<div class="muted">${money(row.gross - row.paid)} owing</div>` : ''}</div>
+                  </li>`)}
+              </ul>`) : ''}
+
+            ${card('Contact', html`
+              <dl class="kv">
+                ${isOrg ? '' : html`
+                  <dt>Given names</dt><dd>${client.given_names ?? '—'}</dd>
+                  <dt>Family name</dt><dd>${client.family_name ?? '—'}</dd>
+                  <dt>Preferred</dt><dd>${client.preferred_name ?? '—'}</dd>`}
+                <dt>Email</dt><dd>${client.email ? html`<a href="mailto:${client.email}">${client.email}</a>` : '—'}</dd>
+                <dt>Phone</dt><dd>${client.phone ?? '—'}</dd>
+                <dt>WhatsApp</dt><dd>${client.whatsapp ?? '—'}</dd>
+                <dt>Telegram</dt><dd>${client.telegram_username ?? client.telegram_user_id ?? '—'}</dd>
+                <dt>Address</dt><dd>${client.address ?? '—'}</dd>
+              </dl>`)}
+
+            ${isOrg
+              ? html`
+                ${card('Registration', html`
+                  <dl class="kv">
+                    <dt>NZBN</dt><dd>${client.nzbn ?? '—'}</dd>
+                    <dt>Company no.</dt><dd>${client.company_number ?? '—'}</dd>
+                    <dt>Primary contact</dt><dd>${(() => {
+                      const primary = people.find((person) => person.id === client.primary_contact_id);
+                      return primary
+                        ? html`<a href="/clients/${primary.id}">${primary.full_name}</a>`
+                        : html`<span class="muted">Not set</span>`;
+                    })()}</dd>
+                  </dl>`)}
+
+                ${card('People at this organisation', people.length === 0
+                  ? emptyState('Nobody linked yet. Open a person’s record and set “Works for”.')
+                  : html`
+                    <ul class="party-list">
+                      ${people.map((person) => html`
+                        <li>
+                          <div>
+                            <a href="/clients/${person.id}">${person.full_name}</a>
+                            ${person.id === client.primary_contact_id ? badge('Primary contact', 'green') : ''}
+                            <div class="muted small">${person.organisation_role ?? 'Role not recorded'}
+                              · <code>${person.ref}</code></div>
+                          </div>
+                          ${writable && person.id !== client.primary_contact_id
+                            ? actionButton(`/clients/${client.id}/primary-contact`, csrf, 'Make primary',
+                                { className: 'btn btn-small btn-secondary', fields: { contact_id: person.id } })
+                            : ''}
+                        </li>`)}
+                    </ul>
+                    ${writable && client.primary_contact_id
+                      ? actionButton(`/clients/${client.id}/primary-contact`, csrf, 'Clear primary contact',
+                          { className: 'btn btn-small btn-link-danger', fields: { contact_id: '' } })
+                      : ''}`)}`
+              : card('Identity and compliance', html`
+                  <dl class="kv">
+                    ${employer ? html`
+                      <dt>Works for</dt><dd><a href="/clients/${employer.id}">${employer.full_name}</a>
+                        ${client.organisation_role ? html`<div class="muted small">${client.organisation_role}</div>` : ''}
+                        ${employer.primary_contact_id === client.id ? badge('Primary contact', 'green') : ''}</dd>` : ''}
+                    ${'' /* Plural, because a person may be. Listed in the
+                             order the practice entered them: the first is the
+                             passport an application is likely to be made on. */}
+                    <dt>${clientNationalities.length > 1 ? 'Nationalities' : 'Nationality'}</dt>
+                    <dd>${clientNationalities.map(countryName).join(' · ') || '—'}</dd>
+                    <dt>Date of birth</dt><dd>${dateShort(client.date_of_birth)}</dd>
+                    <dt>Passport</dt><dd>${passports.length === 0
+                      ? html`<span class="muted">—</span>`
+                      : html`${countryName(client.passport_country) || 'Primary'}${
+                          client.passport_expiry ? html` · ${expiryCell(client.passport_expiry, 180)}` : ''}
+                             ${passports.length > 1
+                               ? html`<div class="muted small"><a href="#passports">${passports.length} passports on file</a></div>`
+                               : html`<div class="muted small"><a href="#passports">Details</a></div>`}`}</dd>
+                    <dt>Current visa</dt><dd>${labelFor(visaTerms, client.current_visa_type) || '—'}</dd>
+                    <dt>Visa expiry</dt><dd>${!client.current_visa_expiry && client.current_visa_expiry_rule
+                      ? html`${badge('not yet fixed', 'amber')}
+                             <div class="muted small">${client.current_visa_expiry_rule}</div>`
+                      : expiryCell(client.current_visa_expiry)}</dd>
+                    <dt>Police cert.</dt><dd>${client.police_certificate_country
+                      ? html`${countryName(client.police_certificate_country)}<br>` : ''}${expiryCell(client.police_certificate_expiry)}
+                      ${certificateDateUnverified(certificates, 'police', client.police_certificate_expiry)
+                        ? badge('unverified date', 'amber') : ''}</dd>
+                    <dt>Medical</dt><dd>${expiryCell(client.medical_certificate_expiry)}
+                      ${certificateDateUnverified(certificates, 'medical', client.medical_certificate_expiry)
+                        ? badge('unverified date', 'amber') : ''}</dd>
+                    <dt>Chest x-ray</dt><dd>${expiryCell(client.chest_xray_expiry)}</dd>
+                    <dt>English</dt><dd>${client.english_test_type
+                      ? html`${labelFor(englishTestTerms, client.english_test_type)}${
+                          client.english_test_score ? html` · <strong>${client.english_test_score}</strong>` : ''}
+                          ${client.english_test_date
+                            ? html`<div class="muted small">Taken ${dateShort(client.english_test_date)}</div>` : ''}`
+                      : html`<span class="muted">—</span>`}</dd>
+                  </dl>`)}
+
 
             ${'' /* Correspondence, read from where it lives rather than copied
                      onto a timeline. A message with two owners disagrees with
