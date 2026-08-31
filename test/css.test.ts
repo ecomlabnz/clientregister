@@ -179,3 +179,35 @@ describe('class names that exist', () => {
     expect(missing, `used in markup but never defined: ${missing.join(', ')}`).toEqual([]);
   });
 });
+
+describe('the new-thing button on a filter bar', () => {
+  /**
+   * Two rules set `margin-bottom` on the same open summary with identical
+   * specificity, so the one written later wins. That cost a 12px shift of the
+   * whole list every time the form opened — small enough to miss in a diff,
+   * obvious the moment you press the button with rows on screen.
+   *
+   * The fix is the extra class on the bar's rule. This pins it, because the
+   * natural "tidy up" is to drop the class again.
+   */
+  it('overrides the standalone summary margin with a more specific selector', () => {
+    const barRule = /\.list-bar > \.reveal\[open\] > summary([^{]*)\{([^}]*)\}/.exec(css);
+    expect(barRule, 'the bar rule for an open summary is missing').not.toBeNull();
+    // Carries the class, so it outranks `.reveal[open] > summary.reveal-open`
+    // rather than merely tying with it and losing on source order.
+    expect(barRule![1]).toContain('.reveal-open');
+    expect(barRule![2]).toContain('margin-bottom: 0');
+  });
+
+  it('opens the form as a panel rather than pushing the list down', () => {
+    // Absolutely positioned inside the bar, which is why the rows do not move.
+    const panel = /\.list-bar > \.reveal\[open\] > \.card \{([^}]*)\}/.exec(css);
+    expect(panel, 'the opened panel rule is missing').not.toBeNull();
+    expect(panel![1]).toContain('position: absolute');
+    expect(css).toMatch(/\.list-bar \{[^}]*position: relative/);
+  });
+
+  it('lets the bar wrap on a phone instead of running off the side', () => {
+    expect(css).toMatch(/\.list-bar \{[^}]*flex-wrap: wrap/);
+  });
+});

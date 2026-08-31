@@ -68,6 +68,21 @@ describe('the task list', () => {
     expect(body).not.toMatch(/<details class="reveal"[^>]*\bopen\b/);
   });
 
+  it('puts the button on the filter bar above the list, not at the foot', async () => {
+    const h = mountModule(tasksModule, { user: USER });
+    seed(h);
+    const body = await (await h.request('/tasks')).text();
+
+    // Inside the bar the filter sits on, so the two controls share a line.
+    const bar = /<div class="list-bar">[\s\S]*?<\/div>\s*\n\s*<div data-live-results>/.exec(body)?.[0] ?? '';
+    expect(bar).toContain('New task</summary>');
+    expect(bar).toContain('name="who"');
+
+    // And only once — the old copy below the table is gone, not duplicated.
+    expect(body.match(/New task<\/summary>/g)?.length).toBe(1);
+    expect(body.indexOf('New task</summary>')).toBeLessThan(body.indexOf('data-live-results'));
+  });
+
   it('keeps the form itself intact inside it', async () => {
     // A hidden form that lost a field is worse than a visible one.
     const h = mountModule(tasksModule, { user: USER });

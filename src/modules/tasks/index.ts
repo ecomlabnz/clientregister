@@ -147,15 +147,31 @@ export const tasksModule: AppModule = {
             <a class="${v.id === scope ? 'tab current' : 'tab'}"
                href="${listHref({ scope: v.id, page: 1 })}">${v.label} <span class="muted">${v.count}</span></a>`)}
         </nav>
-        <form method="get" action="/tasks" class="filters" data-live-search>
-          <input type="hidden" name="scope" value="${scope}">
-          <input type="hidden" name="size" value="${String(PAGE_SIZE)}">
-          <select name="who">
-            <option value="">Anyone</option>
-            <option value="me" ${who === 'me' ? raw('selected') : ''}>Mine</option>
-          </select>
-          <button class="btn btn-secondary js-hide" type="submit">Filter</button>
-        </form>
+        <div class="list-bar">
+          <form method="get" action="/tasks" class="filters" data-live-search>
+            <input type="hidden" name="scope" value="${scope}">
+            <input type="hidden" name="size" value="${String(PAGE_SIZE)}">
+            <select name="who">
+              <option value="">Anyone</option>
+              <option value="me" ${who === 'me' ? raw('selected') : ''}>Mine</option>
+            </select>
+            <button class="btn btn-secondary js-hide" type="submit">Filter</button>
+          </form>
+          ${writable ? revealForm('New task', html`
+            <form method="post" action="/tasks" class="row-form">
+              ${csrfField(csrf)}
+              ${field({ label: 'Task', name: 'title', required: true, maxlength: 200 })}
+              ${field({ label: 'Due', name: 'due_at', type: 'date' })}
+              ${select({ label: 'Priority', name: 'priority', value: 'normal', includeBlank: false,
+                         options: optionsFrom(PRIORITIES, PRIORITY_LABELS) })}
+              ${select({ label: 'Assign to', name: 'assigned_to', value: user.id, required: true,
+                         options: users, includeBlank: false })}
+              ${field({ label: 'Details', name: 'details', type: 'textarea', rows: 2, maxlength: 2000 })}
+              <p class="hint">Every task has an owner — it defaults to you. Attaching it to a case or
+                 client is optional: add it from that record’s page to do so.</p>
+              <button class="btn btn-primary" type="submit">Add task</button>
+            </form>`) : ''}
+        </div>
 
         <div data-live-results>
         ${rows.length === 0
@@ -196,22 +212,7 @@ export const tasksModule: AppModule = {
                   <a class="btn btn-small btn-secondary" href="/tasks/${t.id}/edit">Edit</a>` : ''}</td>
               </tr>`), { sticky: true, fixed: true, empty: 'Nothing here.' })}
         ${pager({ page: pageNum, size: PAGE_SIZE, hasMore, shown: rows.length, href: listHref })}
-        </div>
-
-        ${writable ? revealForm('New task', html`
-          <form method="post" action="/tasks" class="row-form">
-            ${csrfField(csrf)}
-            ${field({ label: 'Task', name: 'title', required: true, maxlength: 200 })}
-            ${field({ label: 'Due', name: 'due_at', type: 'date' })}
-            ${select({ label: 'Priority', name: 'priority', value: 'normal', includeBlank: false,
-                       options: optionsFrom(PRIORITIES, PRIORITY_LABELS) })}
-            ${select({ label: 'Assign to', name: 'assigned_to', value: user.id, required: true,
-                       options: users, includeBlank: false })}
-            ${field({ label: 'Details', name: 'details', type: 'textarea', rows: 2, maxlength: 2000 })}
-            <p class="hint">Every task has an owner — it defaults to you. Attaching it to a case or
-               client is optional: add it from that record’s page to do so.</p>
-            <button class="btn btn-primary" type="submit">Add task</button>
-          </form>`) : ''}`);
+        </div>`);
     });
 
     r.post('/', requirePermission('register:write'), async (c) => {
