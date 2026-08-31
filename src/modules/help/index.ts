@@ -32,6 +32,26 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.83.0', date: '1 September 2026',
+    notes: [
+      'Passports and certificates have moved out of the narrow column and into the main one, with '
+        + 'proper buttons \u2014 \u201cAdd another passport\u201d and \u201cAdd a police '
+        + 'certificate, medical or x-ray\u201d. A passport is the document a file works from; it '
+        + 'does not belong in the margin.',
+      'Every country is now chosen from the same list, never typed. The register held 30 passports '
+        + 'issued by \u201cViet Nam\u201d and 9 by \u201cVietnam\u201d \u2014 the same country, '
+        + 'which could never be counted or matched as one. They are now one country, and the '
+        + 'database refuses anything that is not on the list.',
+      'The Immigration tab of a client\u2019s form has a button through to their certificates. '
+        + 'They stay separate records rather than one set of dates, because a client may hold '
+        + 'police certificates from three countries at once and a new medical must never overwrite '
+        + 'the one a March application relied on.',
+      'Knowledge base articles carry their year: KB-26-001 rather than KB-0001, like a matter\u2019s '
+        + 'reference. Immigration instructions date quickly, so when an article is from is part of '
+        + 'what it is. The one article already filed has been renumbered.',
+    ],
+  },
+  {
     version: '0.82.0', date: '1 September 2026',
     notes: [
       'A file note can be corrected for five minutes after you save it, and only once. Press '

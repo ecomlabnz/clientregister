@@ -20,7 +20,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
-import { all, count, nextRef, nowIso, one, run } from '../../core/db';
+import { all, count, nextYearlyRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
@@ -230,7 +230,9 @@ export const knowledgeModule: AppModule = {
 
       const now = nowIso();
       const id = newId('kb');
-      const ref = await nextRef(c.env.DB, 'kb', 'KB');
+      // Yearly, like a matter's reference. Immigration instructions date
+      // quickly, so when an article is from is part of what it is.
+      const ref = await nextYearlyRef(c.env.DB, 'kb', 'KB');
       const publishedAt = f.date('published_at');
       const source = from
         ? (await one<{ channel: string }>(c.env.DB, 'SELECT channel FROM ingest_messages WHERE id = ?', from))?.channel ?? 'other'

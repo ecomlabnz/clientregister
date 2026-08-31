@@ -7,6 +7,49 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.83.0 — 1 September 2026
+
+### Changed
+- **Passports and certificates are on the file, not in the margin.** Both sat
+  in the narrow right-hand column with their forms folded behind a line of
+  small text. A passport is the travel document a matter works from and a
+  police certificate decides whether an application can be made at all;
+  entering them on a sideline was the wrong shape for what they are. Both cards
+  move to the main column and their forms open from real buttons — "Add another
+  passport", "Add a police certificate, medical or x-ray".
+
+- **A country is chosen from a list, everywhere.** Passport country and
+  certificate country were free text, and free text produced exactly what it
+  always does: the live register held 30 passports issued by "Viet Nam" and 9
+  by "Vietnam", the same country, which could never be counted, filtered or
+  matched as one. Nationality has been a country code with a trigger behind it
+  since migration 0030; these are the same kind of fact and now hold the same
+  kind of value.
+
+  Migration 0055 converts what is stored. Four of the six names in the register
+  convert by a join against its own country list; the other two are the ISO long
+  forms ("Viet Nam", "Russian Federation") where the list holds the short ones,
+  and they are named one line each rather than resolved by a fuzzy match — a
+  fuzzy match over country names is how a passport ends up issued by Niger
+  instead of Nigeria. Anything that will not convert **aborts the migration**: a
+  column half in codes and half in names is worse than either, and that is the
+  only moment it can be caught. Rehearsed at the register's exact shape,
+  including the abort.
+
+- **The Immigration tab has a way through to certificates**, instead of a
+  paragraph in grey text explaining where they live. They stay separate records
+  rather than one set of dates on the form, and that part cannot change: a
+  client may hold police certificates from three countries at once, and a new
+  medical must not overwrite the one a March application relied on — that has to
+  stay answerable.
+
+- **A knowledge-base article carries its year**: KB-26-001, not KB-0001, on the
+  same pattern as a matter's reference and through the same counter. Immigration
+  instructions date quickly, so when an article is from is part of what it is.
+  Migration 0054 renumbers what is filed, taking each article's year from its
+  own creation date rather than assuming this one, and sets the yearly counter
+  so the next article follows on.
+
 ## 0.82.0 — 1 September 2026
 
 ### Added
