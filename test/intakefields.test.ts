@@ -89,7 +89,7 @@ describe('opening the matter', () => {
     run: RUN,
     a_given_names: 'Minh Duc', a_family_name: 'TRAN',
     a_nationality: 'VN', a_current_visa_expiry: '2028-05-22',
-    title: 'Partnership information', case_type: 'wv_aewv', status: 'engaged',
+    descriptor: 'Partnership information', case_type: 'wv_aewv', status: 'engaged',
     // A matter must be assigned to somebody — the database says so.
     assigned_to: USER.id,
     summary: READING.summary,
@@ -129,6 +129,18 @@ describe('opening the matter', () => {
     expect(notes).toHaveLength(1);
     expect(notes[0].body).toContain(READING.summary);
     expect(notes[0].body).toContain('read by the assistant');
+  });
+
+  it('names the matter by what it is about, and derives the title from it', async () => {
+    // This form was still asking for a title after the rest of the register
+    // stopped, so a matter opened from a document arrived with no description
+    // at all — found on the live register on 1 September 2026, one matter in.
+    const h = mount();
+    seed(h);
+    await apply(h);
+    const kase = (rows(h, 'SELECT title, descriptor FROM cases')[0] as any);
+    expect(kase.descriptor).toBe('Partnership information');
+    expect(kase.title).toBe(kase.descriptor);
   });
 
   it('writes no note when there is nothing to say', async () => {
