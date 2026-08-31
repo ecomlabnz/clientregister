@@ -32,6 +32,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.79.0', date: '31 August 2026',
+    notes: [
+      'Every section on a matter now folds. Press a heading \u2014 Status, Parties, Tasks, '
+        + 'Files, Key details, any of them \u2014 and that section closes, so a long file can be '
+        + 'put back to the parts you opened it for. They all start open, so nothing is hidden '
+        + 'from you; the fold is not remembered between visits.',
+      'Fees is the exception and still starts closed, for the reason it always has: it is the '
+        + 'one thing on the page a client leaning over the desk should not read by accident. It '
+        + 'is now called simply \u201cFees\u201d rather than \u201cFees and split\u201d.',
+    ],
+  },
+  {
     version: '0.78.1', date: '31 August 2026',
     notes: [
       'Saving a split on a matter works again. Pressing \u201cSave split\u201d \u2014 to change '

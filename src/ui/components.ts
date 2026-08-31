@@ -18,6 +18,32 @@ export function card(title: string, body: Raw, actions?: Raw): Raw {
 }
 
 /**
+ * A card whose heading folds it away.
+ *
+ * Open when the page loads — the section is there to be read — but every
+ * heading on a matter is a handle, so a long file can be put back to the parts
+ * that matter to whoever is looking at it. `<details>` again, for the reason
+ * everything here is: the content policy forbids an inline script, and a fold
+ * that stops working when script is blocked is a section nobody can reach.
+ *
+ * The fold is not remembered between page loads. It could be, and deliberately
+ * is not: a section that is missing because of something you did on another
+ * matter last week is worse than one you close again.
+ */
+export function foldingCard(title: string, body: Raw, actions?: Raw): Raw {
+  return html`
+    <section class="card">
+      <details class="card-fold" open>
+        <summary class="card-head">
+          <h2>${title}</h2>
+          ${actions ?? ''}
+        </summary>
+        <div class="card-body">${body}</div>
+      </details>
+    </section>`;
+}
+
+/**
  * A card that starts closed.
  *
  * Used where the contents are worth having on the page but not worth showing to

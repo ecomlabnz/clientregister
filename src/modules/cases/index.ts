@@ -19,7 +19,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
-  badge, card, csrfField, emptyState, errorList, field, optionsFrom,
+  badge, foldingCard, csrfField, emptyState, errorList, field, optionsFrom,
   pageHeader, select, statusTone, table,
 } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate, dateOrDateTime, instantForDate } from '../../ui/format';
@@ -641,7 +641,7 @@ export const casesModule: AppModule = {
 
         <div class="cols">
           <div class="col-main">
-            ${card('Status', html`
+            ${foldingCard('Status', html`
               <p class="status-now">${badge(CASE_STATUS_LABELS[kase.status], statusTone(kase.status))}
                  ${kase.decided_at && (kase.status === 'approved' || kase.status === 'declined')
                    ? html`<strong>${dateShort(kase.decided_at)}</strong>`
@@ -673,7 +673,7 @@ export const casesModule: AppModule = {
                   </ul>
                 </details>` : ''}`)}
 
-            ${card('Parties', html`
+            ${foldingCard('Parties', html`
               ${parties.length === 0 ? emptyState('No parties recorded.') : html`
                 <ul class="party-list">
                   ${parties.map((party) => html`
@@ -750,7 +750,7 @@ export const casesModule: AppModule = {
 
             ${fees}
 
-            ${card('Tasks', html`
+            ${foldingCard('Tasks', html`
               ${tasks.length === 0 ? emptyState('No tasks on this case yet.') : html`
                 <ul class="tasklist">
                   ${tasks.map((t: any) => html`
@@ -797,7 +797,7 @@ export const casesModule: AppModule = {
                   </form>
                 </details>` : ''}`)}
 
-            ${aiAvailable ? card('Brief me on this matter', html`
+            ${aiAvailable ? foldingCard('Brief me on this matter', html`
               ${brief ? html`
                 <p class="lede-sm">${brief.result.summary}</p>
                 ${brief.result.next_steps.length ? html`
@@ -852,7 +852,7 @@ export const casesModule: AppModule = {
                      timeline. A file note is what somebody decided to write
                      down; this is what was actually said. */}
             ${threads.length > 0
-              ? card('Correspondence', html`
+              ? foldingCard('Correspondence', html`
                   <ul class="list">${threads.map((t) => html`
                     <li class="list-row">
                       <div>
@@ -869,13 +869,13 @@ export const casesModule: AppModule = {
                   </ul>`)
               : ''}
 
-            ${card('Files', filesPanel({
+            ${foldingCard('Files', filesPanel({
               csrf, entityType: 'case', entityId: kase.id, returnTo: `/cases/${kase.id}`,
               files: caseFiles, categories: docCats, canDelete: can(viewer, 'register:delete'),
               caseId: kase.id, linkable: writable ? linkableDocs : [],
             }))}
 
-            ${card('File notes', html`
+            ${foldingCard('File notes', html`
               ${writable ? html`
                 <form method="post" action="/cases/${kase.id}/entries" class="entry-form"
                       enctype="multipart/form-data">
@@ -929,7 +929,7 @@ export const casesModule: AppModule = {
           </div>
 
           <div class="col-side">
-            ${card('Tags', html`
+            ${foldingCard('Tags', html`
               ${/* Each tag and its remove button are one chip, so the × can
                     never wrap onto the next line away from the tag it removes —
                     which is what made a row of three tags read as four. */ ''}
@@ -963,7 +963,7 @@ export const casesModule: AppModule = {
                   </form>
                 </details>` : ''}`)}
 
-            ${card('Key details', html`
+            ${foldingCard('Key details', html`
               <dl class="kv">
                 <dt>Client</dt><dd><a href="/clients/${kase.client_id}">${kase.client_name}</a> <code>${kase.client_ref}</code></dd>
                 <dt>Type</dt><dd>${labelFor(types, kase.case_type)}</dd>
@@ -980,20 +980,20 @@ export const casesModule: AppModule = {
                 <dt>Opened</dt><dd>${dateShort(kase.created_at)}</dd>
               </dl>`)}
 
-            ${card('Next action', html`
+            ${foldingCard('Next action', html`
               <p>${kase.next_action ?? '—'}</p>
               ${kase.next_action_due
                 ? html`<p class="${isOverdue(kase.next_action_due) ? 'warn' : 'muted'}">
                         Due ${dateShort(kase.next_action_due)} (${relativeDays(kase.next_action_due)})</p>`
                 : ''}`)}
 
-            ${card('Quotes', quotes.length === 0
+            ${foldingCard('Quotes', quotes.length === 0
               ? emptyState('No quotes on this case.')
               : html`<ul class="list">${quotes.map((qt: any) => html`
                   <li><a href="/quotes/${qt.id}"><code>${qt.ref}</code></a> — ${truncate(qt.description, 40)}
                       <span class="muted small">${qt.status}</span></li>`)}</ul>`)}
 
-            ${card('Summary', html`<p class="prewrap">${kase.summary || '—'}</p>`)}
+            ${foldingCard('Summary', html`<p class="prewrap">${kase.summary || '—'}</p>`)}
           </div>
         </div>`);
     });

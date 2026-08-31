@@ -153,7 +153,7 @@ export async function feesSection(c: any, caseId: string, currency: string, canW
 
   // Closed by default. Fees are the one thing on a case page that a client
   // leaning over the desk should not read by accident.
-  return collapsibleCard('Fees and split', html`
+  return collapsibleCard('Fees', html`
     <div class="fee-summary">
       <div class="stat"><span class="stat-label">Total (incl. GST)</span><span class="stat-value">${money(totals.totalGross, currency)}</span></div>
       <div class="stat"><span class="stat-label">GST</span><span class="stat-value">${money(totals.totalGst, currency)}</span></div>
