@@ -25,6 +25,7 @@ import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
+import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
   actionButton, badge, card, csrfField, emptyState, errorList, field, optionsFrom,
   pageHeader, select, statusTone, table,
@@ -38,7 +39,7 @@ import { organisationOptions, userOptions } from '../../core/lookups';
 import { addEntry, listEntries } from '../../core/timeline';
 import { casesForClient, relatedClients } from '../../core/parties';
 import { can } from '../../core/rbac';
-import { asPrefInteger, preferencesFor } from '../../core/preferences';
+import { preferencesFor } from '../../core/preferences';
 import { caseTypes, docCategories, englishTests, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
 import { filesPanel, listDocuments } from '../documents';
 import { countryCodeFor, countryName, countryOptions } from '../../core/countries';
@@ -83,7 +84,6 @@ export interface ClientRow {
   created_at: string; updated_at: string; created_by: string | null;
 }
 
-const DEFAULT_PAGE_SIZE = 25;
 
 /** Show a date with a warning when it has passed or is close. */
 function expiryCell(value: string | null, warnDays = 90): Raw {
@@ -430,11 +430,11 @@ export const clientsModule: AppModule = {
     r.get('/', requirePermission('register:read'), async (c) => {
       const q = (c.req.query('q') ?? '').trim();
       const status = c.req.query('status') ?? '';
-      const pageNum = Math.max(1, Number(c.req.query('page') ?? '1') || 1);
+      const pageNum = pageNumberFor(c.req.query('page'));
 
       const prefs = await preferencesFor(c.env, c.get('user')!.id);
 
-      const PAGE_SIZE = asPrefInteger(prefs['pref.page_size'], DEFAULT_PAGE_SIZE);
+      const PAGE_SIZE = pageSizeFor(c.req.query('size'), prefs['pref.page_size']);
       const offset = (pageNum - 1) * PAGE_SIZE;
 
       // Four ways of looking at one list rather than four lists. Leads cuts by
@@ -465,6 +465,15 @@ export const clientsModule: AppModule = {
       const sortKey = sortCols ? asked : '';
       const sortDir = c.req.query('dir') === 'desc' ? 'desc' : 'asc';
       const dirSql = sortDir === 'desc' ? 'DESC' : 'ASC';
+
+      // One spelling of this list's address, so a link that changes the page
+      // or the page size keeps the view, the search and the sort.
+      const listHref = (over: Record<string, string | number> = {}) =>
+        `/clients?${new URLSearchParams({
+          view, q, status, sort: sortKey, dir: sortDir,
+          page: String(pageNum), size: String(PAGE_SIZE),
+          ...Object.fromEntries(Object.entries(over).map(([k, v]) => [k, String(v)])),
+        }).toString()}`;
       // The ref tie-breaker keeps paging stable: two rows with the same status
       // must not swap places between page one and page two.
       const orderSql = sortCols
@@ -512,6 +521,7 @@ export const clientsModule: AppModule = {
 
         <form method="get" action="/clients" class="filters" data-live-search>
           <input type="hidden" name="view" value="${view}">
+          <input type="hidden" name="size" value="${String(PAGE_SIZE)}">
           <input type="search" name="q" value="${q}" placeholder="Search name, email, phone, reference or NZBN">
           <select name="status">
             <option value="">All statuses</option>
@@ -549,12 +559,8 @@ export const clientsModule: AppModule = {
             // Sorting resets to page one: the second page of one order holds
             // different rows from the second page of another.
             sort: { key: sortKey, dir: sortDir,
-                    href: (key, dir) => `/clients?${new URLSearchParams({
-                      view, q, status, sort: key, dir, page: '1' }).toString()}` } })}
-        <div class="pager">
-          ${pageNum > 1 ? html`<a class="btn btn-secondary" href="${`/clients?${new URLSearchParams({ view, q, status, sort: sortKey, dir: sortDir, page: String(pageNum - 1) }).toString()}`}">Previous</a>` : ''}
-          ${hasMore ? html`<a class="btn btn-secondary" href="${`/clients?${new URLSearchParams({ view, q, status, sort: sortKey, dir: sortDir, page: String(pageNum + 1) }).toString()}`}">Next</a>` : ''}
-        </div>
+                    href: (key, dir) => listHref({ sort: key, dir, page: 1 }) } })}
+        ${pager({ page: pageNum, size: PAGE_SIZE, hasMore, shown: shown.length, href: listHref })}
         </div>`);
     });
 

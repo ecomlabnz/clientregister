@@ -133,9 +133,15 @@ export const PREFERENCE_GROUPS: PreferenceGroup[] = [
       },
       {
         key: 'pref.page_size', type: 'enum', default: '25', label: 'Rows per page',
-        help: 'Longer pages mean less clicking and a slower first paint.',
+        help: 'Where lists start. Each list also offers the choice under it, '
+            + 'for when one list wants a different length from the rest. '
+            + 'Longer pages mean less clicking and a slower first paint.',
+        // Kept in step with PAGE_SIZES in ui/pager.ts, which is what actually
+        // decides what a list will accept — a value only offered here would be
+        // ignored the moment it reached a list.
         options: [
           { value: '25', label: '25' }, { value: '50', label: '50' }, { value: '100', label: '100' },
+          { value: '250', label: '250' }, { value: '500', label: '500' },
         ],
       },
       {
