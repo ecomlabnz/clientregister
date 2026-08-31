@@ -7,6 +7,21 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.87.0 — 1 September 2026
+
+### Added
+- **"Under INZ investigation" is a case status.** Batch 03 turned up a matter
+  whose entire file is one audio recording of a voluntary INZ Investigations
+  interview, and the extraction had invented a case *type* for it. The
+  practice's answer was better: what INZ is doing there is not a kind of work
+  the practice takes on, it is a state a file is in, and a file can be in it
+  whatever the application underneath was.
+
+  So it is a status, it counts as live work, it can be entered from anywhere
+  the file is still live — an investigation does not wait for a convenient
+  moment — and it leads back to everywhere the file was going, because it
+  interrupts an application rather than replacing it.
+
 ## 0.86.0 — 1 September 2026
 
 ### Added

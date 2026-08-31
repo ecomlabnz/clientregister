@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.87.0', date: '1 September 2026',
+    notes: [
+      'A matter can be \u201cUnder INZ investigation\u201d. It is a status rather than a kind of '
+        + 'work, because that is what it is \u2014 something that happens to a file, whatever the '
+        + 'application underneath it was. A matter can go into it from anywhere it is still live, '
+        + 'and come back out to anywhere it was going.',
+    ],
+  },
+  {
     version: '0.86.0', date: '1 September 2026',
     notes: [
       'A fee line can be billed from the price list. \u201cAdd a fee line\u201d on a matter now '
