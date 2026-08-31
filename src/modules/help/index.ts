@@ -32,6 +32,24 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.78.0', date: '31 August 2026',
+    notes: [
+      'A matter is now named by what it is about. The new-matter form asks one question '
+        + '\u2014 \u201cWhat this matter is about\u201d \u2014 and that sentence is the '
+        + 'matter\u2019s name everywhere: \u201cFresh application, chef role with her current '
+        + 'employer\u201d rather than \u201cNGUYEN, Ngoc Bich \u2014 Accredited Employer Work '
+        + 'Visa\u201d, which was the client column and the type column read back. Every '
+        + 'existing matter has been renamed to its description; the one matter that had no '
+        + 'description kept its title as one, so nothing was lost.',
+      'The Matter column is back on the case list, because it now says the one thing no '
+        + 'other column says. You can still switch it off in your account settings.',
+      'The menus in the top bar behave. The bar no longer grows taller when you open one, '
+        + 'only one opens at a time, and a menu closes when you click anywhere else or '
+        + 'press Escape. On a phone there are no menus at all \u2014 every section sits in '
+        + 'the strip you swipe.',
+    ],
+  },
+  {
     version: '0.77.0', date: '31 August 2026',
     notes: [
       'The menu across the top fits on one line again. Quotes and Fees sit under '

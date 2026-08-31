@@ -447,54 +447,18 @@
     window.setInterval(check, Math.max(15, every) * 1000);
   })();
 
-  // Suggesting a matter title.
+  // The matter-title suggestion lived here.
   //
-  // The house convention is the visa type, then the client, formally: for
-  // instance "AEWV. RUBEZHANSKII, Aleksei". Every list that shows a title also
-  // shows the client in its own column, so the title carries what the column
-  // does not.
+  // It filled a "Matter title" box from the client and the type as you chose
+  // them — "AEWV. RUBEZHANSKII, Aleksei" — and it worked exactly as designed,
+  // which turned out to be the problem. A box that arrives plausibly filled in
+  // is never replaced: the practice reached 44 matters every one of which was
+  // named after the two columns already beside it on the row. The field is
+  // gone (31 August 2026); a matter is named by what it is about, and the
+  // title column is derived from that on the server.
   //
-  // It only ever fills a box the typist has not touched. A title somebody wrote
-  // is theirs, and a form that overwrites what you typed because you changed a
-  // dropdown afterwards is worse than one that suggests nothing.
-  Array.prototype.forEach.call(document.querySelectorAll('.js-case-form'), function (form) {
-    var clientSelect = form.querySelector('.js-case-client');
-    var typeSelect = form.querySelector('.js-case-type');
-    var title = form.querySelector('[name="title"]');
-    if (!clientSelect || !typeSelect || !title) return;
-
-    var suggest = function () {
-      var client = clientSelect.options[clientSelect.selectedIndex];
-      var type = typeSelect.options[typeSelect.selectedIndex];
-      if (!client || !type || !client.value || !type.value) return '';
-      var formal = client.getAttribute('data-formal') || '';
-      // The type's label reads "WV. AEWV"; the grouping prefix is dropped so
-      // the title does not say the same thing twice. Except where what is left
-      // is a filler — "SV. General" would strip to "General", which names
-      // nothing — and there the group is the whole meaning. Kept in step with
-      // caseTypeShort in core/vocabulary.ts, which does this on the server.
-      var label = (type.textContent || '').trim();
-      var dot = label.indexOf('. ');
-      var group = dot === -1 ? '' : label.slice(0, dot).trim();
-      var specific = dot === -1 ? label : label.slice(dot + 2).trim();
-      if (specific === 'General' || specific === 'Other') specific = group;
-      if (!specific) return formal;
-      return formal ? specific + '. ' + formal : specific;
-    };
-
-    var apply = function () {
-      if (title.value && title.dataset.suggested !== '1') return;
-      var next = suggest();
-      if (!next) return;
-      title.value = next;
-      title.dataset.suggested = '1';
-    };
-
-    // Typing in the box takes it out of the machine's hands for good.
-    title.addEventListener('input', function () { delete title.dataset.suggested; });
-    clientSelect.addEventListener('change', apply);
-    typeSelect.addEventListener('change', apply);
-  });
+  // Removed rather than left dormant: script that fills a field nothing
+  // renders is a thing the next person has to read and rule out.
 
   // A file input that also accepts a drop.
   //
@@ -559,6 +523,43 @@
     };
     chooser.addEventListener('change', sync);
     sync();
+  })();
+
+  // A top-bar menu closes when you go elsewhere.
+  //
+  // The menus are <details>, which the browser opens and closes on its own,
+  // and name="topnav" already keeps only one of them open at a time. What
+  // plain HTML has no way to say is "and close when the person's attention
+  // has moved on", so that part is here.
+  //
+  // Closing on mouse-out was the obvious reading and is the wrong rule: a
+  // phone has no hover, so the menu would open on a tap and then never close,
+  // and on a desktop a menu that vanishes when the pointer strays a few pixels
+  // is worse than one that stays. Clicking or tapping anywhere else closes it,
+  // on both, and Escape closes it from the keyboard. Choosing an item
+  // navigates, which closes it by loading a new page.
+  //
+  // With scripting off the menus still open and close on click, one at a time;
+  // they just stay open until something else is clicked.
+  (function topbarMenus() {
+    var closeAll = function (except) {
+      var open = document.querySelectorAll('details.nav-group[open]');
+      for (var i = 0; i < open.length; i++) {
+        if (open[i] !== except) open[i].open = false;
+      }
+    };
+    document.addEventListener('click', function (event) {
+      var inside = event.target.closest ? event.target.closest('details.nav-group') : null;
+      closeAll(inside);
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key !== 'Escape') return;
+      var open = document.querySelector('details.nav-group[open]');
+      if (!open) return;
+      var summary = open.querySelector('summary');
+      closeAll(null);
+      if (summary) summary.focus();
+    });
   })();
 
   // "/" focuses the first search box on the page.
