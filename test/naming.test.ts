@@ -49,15 +49,25 @@ describe('a matter number carries its year', () => {
   });
 });
 
-describe('the suggestion never overwrites what somebody typed', () => {
+describe('the matter-title suggestion, which is gone', () => {
   const js = readFileSync('public/app.js', 'utf8');
+  const cases = readFileSync('src/modules/cases/index.ts', 'utf8');
 
-  it('only fills a box it filled itself, or an empty one', () => {
-    expect(js).toContain("if (title.value && title.dataset.suggested !== '1') return;");
-  });
-
-  it('lets go the moment the box is typed in', () => {
-    expect(js).toContain("title.addEventListener('input', function () { delete title.dataset.suggested; });");
+  /**
+   * It filled the title box from the client and the type as they were chosen,
+   * and it never overwrote anything typed — it worked exactly as designed,
+   * which was the fault. A box that arrives plausibly filled in is never
+   * replaced, so the register reached 44 matters each named after the two
+   * columns already beside it on the row.
+   *
+   * Pinned as *absent* rather than deleted quietly, because script that fills
+   * a field nothing renders is dead weight the next reader has to rule out.
+   */
+  it('leaves no script behind filling a field that no longer exists', () => {
+    expect(js).not.toContain("title.dataset.suggested");
+    expect(js).not.toContain('js-case-client');
+    expect(cases).not.toContain('js-case-form');
+    expect(cases).not.toContain('data-formal');
   });
 });
 
@@ -136,11 +146,25 @@ describe('a matter has a name and a thing it is about', () => {
     expect(alerts).not.toContain('title: `${k.title} — ${k.client_name}`');
   });
 
-  it('lets a case be saved with no descriptor at all', () => {
-    // Plenty of matters need none: one student visa for one client is not
-    // ambiguous with anything.
-    expect(cases).toContain("descriptor: f.optional('descriptor', { max: 160 })");
+  it('asks for the description, and asks for nothing else by way of a name', () => {
+    // Reversed by the practice on 31 August 2026. The description used to be
+    // optional and a "Matter title" was required beside it — pre-filled from
+    // the client and the type, which is exactly the two columns already on the
+    // row. Pre-filled, it arrived looking complete and was never replaced, so
+    // every matter was named after itself. One field now, and it is the one
+    // that says something.
+    expect(cases).toContain("f.text('descriptor', { required: true");
+    expect(cases).not.toContain("f.text('title'");
+    // Still nullable in the database: the rows loaded before this decision
+    // keep whatever they have, and a column is not made NOT NULL to enforce a
+    // rule the form already enforces.
     expect(migration).not.toMatch(/descriptor[^;]*NOT NULL/);
+  });
+
+  it('feeds the title from the description, from one place', () => {
+    // `title` is NOT NULL and pages still read it. Derived rather than typed,
+    // so the two cannot drift into being two different names for one matter.
+    expect(cases).toContain('title: descriptor,');
   });
 });
 
@@ -170,12 +194,13 @@ describe('the short form of a case type', () => {
     expect(caseTypeShort('')).toBe('');
   });
 
-  it('is what the browser does too, so the two never disagree', () => {
-    // app.js repeats this rule for the live suggestion. If one changes and the
-    // other does not, a title proposed as you type differs from one the server
-    // would propose, which is the sort of difference nobody notices for months.
+  it('is now the server rule alone, with no browser copy to disagree with it', () => {
+    // app.js used to repeat this rule for the live title suggestion, and the
+    // risk was the two drifting apart unnoticed. The suggestion is gone, so
+    // the duplication is gone with it — which is the better answer to "keep
+    // two copies in step" than keeping them in step.
     const appjs = readFileSync('public/app.js', 'utf8');
-    expect(appjs).toContain("if (specific === 'General' || specific === 'Other') specific = group;");
+    expect(appjs).not.toContain("specific = group;");
   });
 });
 

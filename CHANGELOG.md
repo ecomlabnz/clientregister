@@ -7,6 +7,90 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.78.0 — 31 August 2026
+
+### Changed
+- **A matter is named by what it is about.** Every matter was called
+  "SURNAME, Given — Type": the client column and the type column, read back.
+  That was not carelessness — the form pre-filled the title from the client and
+  the type as they were chosen, and a field that arrives looking plausibly
+  complete is never replaced. It buys the appearance of being answered at the
+  cost of the answer. So the title field is gone from the form and the
+  description is the one name a matter has: "Fresh application, chef role with
+  her current employer".
+
+  `title` stays as a column, NOT NULL, still read by the matter's own heading,
+  the client's case list and the AI brief — but it is *derived* now, written
+  from the description and nowhere else. One fact, one owner. The column is
+  kept rather than dropped because a practice may one day want a matter named
+  something other than its description, and this decision is hours old;
+  nothing is lost by leaving it, and the form can offer it again without a
+  migration.
+
+  Migration 0049 renames the existing matters. Measured against the live
+  register first: 43 of 44 carried a description and one did not, so that one
+  takes its title (which was genuinely informative — "Privacy Act request for
+  INZ file", not the generated pattern) as its description, and then every
+  title follows its description. No heuristic tries to tell a generated title
+  from a written one; it does not need to, because where a description exists
+  the title was redundant and where it does not the title is all there is.
+  Rehearsed on a scratch database at the register's exact shape before it ran.
+
+- **The Matter column is back on the case list, and shows only the
+  description.** It was switched off in 0.76.0 because it repeated the two
+  columns beside it. Naming a matter by what it is about fixed the cause, so
+  the column now carries the one thing no other column says. It is still a
+  preference, and the description still appears under the reference when the
+  column is off — but never in both places at once, which is what made it look
+  redundant.
+
+- **The intake prompt asks for the description, not a title.** The more urgent
+  half: without it the next batch would have loaded thirty more generated
+  names.
+
+### Fixed
+- **The menus in the top bar.** Three faults reported together, with three
+  different causes.
+
+  The bar grew twelve pixels taller whenever a menu opened. An open
+  `<details>` is not just its summary and its panel: the browser wraps what
+  follows the summary in a box of its own, and in Chrome that box is twelve
+  pixels tall even when it holds nothing but an absolutely positioned panel
+  that needs no room — and it ignores every attempt to style it (`height`,
+  `padding`, `line-height` on `::details-content` all land on nothing;
+  measured, not assumed). So the height is stated instead: one variable,
+  `--nav-item-h`, sets the height of a link and of a menu heading alike, and
+  an open menu cannot change it.
+
+  Two menus could be open at once. `name="topnav"` makes the set exclusive in
+  the browser itself, so this holds with scripting switched off.
+
+  A menu stayed open after you had moved on. Plain HTML has no way to say
+  "close when attention moves elsewhere", so that part is scripted: clicking
+  anywhere else closes it, Escape closes it, and choosing an item navigates.
+  Deliberately *not* on mouse-out — a phone has no hover, so a menu opened by
+  a tap would never close, and on a desktop a menu that vanishes when the
+  pointer strays a few pixels is worse than one that stays.
+
+- **The menus were unreachable on a phone**, which the same look found. The
+  navigation is a strip you swipe sideways, and a box that scrolls sideways
+  clips what overflows it downwards too — so a menu opened inside it dropped
+  behind the bar. On a phone the groups now open out into the strip: Quotes,
+  Fees, Knowledge and the Assistant sit in the run like everything else, one
+  swipe away. Grouping is a wide-screen answer to a bar that has to fit one
+  line; the strip never had that problem.
+
+### How it is built
+- The form has one naming field. `title` is assigned from it in the values
+  builder, so there is one place that writes it and no second handler can
+  disagree. The title-suggestion script in `public/app.js` is deleted rather
+  than left switched off.
+- `test/nav.test.ts` pins each menu rule separately, because each has its own
+  cause: the stated height, the absolute panel, `name=`, the closing script,
+  and the phone flattening. `test/casedecision.test.ts` pins that the
+  description appears once and not twice — proven by putting the duplicate
+  back and watching it fail.
+
 ## 0.77.0 — 31 August 2026
 
 ### Changed

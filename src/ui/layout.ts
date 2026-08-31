@@ -90,7 +90,10 @@ ${opts.landing
       ? html`<a href="${entry.item.href}"
           class="${opts.active === entry.item.href ? 'nav-link current' : 'nav-link'}">${entry.item.label}</a>`
       : html`
-        <details class="nav-group" ${entry.items.some((i) => i.href === opts.active) ? raw('open') : ''}>
+        ${'' /* name="topnav" makes the menus an exclusive set: opening one
+                 closes the other, in the browser, with no script. */}
+        <details class="nav-group" name="topnav"
+                 ${entry.items.some((i) => i.href === opts.active) ? raw('open') : ''}>
           <summary class="${entry.items.some((i) => i.href === opts.active) ? 'nav-link current' : 'nav-link'}">
             ${entry.label}
           </summary>

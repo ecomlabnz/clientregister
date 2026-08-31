@@ -166,20 +166,22 @@ export const PREFERENCE_GROUPS: PreferenceGroup[] = [
         ],
       },
       {
-        // Two columns the practice turned off on 31 August 2026 after reading
-        // the list back. Preferences rather than deletions: on most matters
-        // the title is the client's name and the type again, which the two
-        // columns beside it already say — but on a Privacy Act request or a
-        // PPI response the title is the only thing on the row that says what
-        // the matter is. Off by default, on in one click, and still here for a
-        // practice that wants them.
-        key: 'pref.cases_show_matter', type: 'boolean', default: 'false',
+        // Turned off on 31 August 2026, and back on the same day. It was
+        // turned off because every matter was named "SURNAME, Given — Type",
+        // which the two columns beside it already said. Naming a matter by
+        // what it is about fixed the cause, so the column now carries the one
+        // thing no other column says. Still a preference, because a practice
+        // that wants a narrower list should not have to ask for code.
+        key: 'pref.cases_show_matter', type: 'boolean', default: 'true',
         label: 'Show the Matter column on the case list',
-        help: 'The matter’s title. Off, the row shows its short description under the '
-          + 'reference instead — on most matters the title repeats the client and the type '
-          + 'already beside it.',
+        help: 'What each matter is about, in its own column. Off, that description sits '
+          + 'under the reference instead and the list is one column narrower.',
       },
       {
+        // Off by default, and a preference rather than a deletion: the date a
+        // decision arrived sits under the status badge, which already says
+        // which decision it was. Still here for a practice that wants the
+        // column back.
         key: 'pref.cases_show_decision', type: 'boolean', default: 'false',
         label: 'Show the Decision column on the case list',
         help: 'Off, a decision’s date sits under the status badge, where the badge already '

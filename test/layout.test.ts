@@ -205,10 +205,18 @@ describe('the navigation fits the width it is given', () => {
   const css = readFileSync('public/app.css', 'utf8');
 
   it('tightens the links with the viewport rather than at a breakpoint', () => {
-    // clamp() and not a media query, because the width at which twelve links
-    // stop fitting depends on their labels, and those are configuration.
-    expect(css).toMatch(/\.nav-link\s*\{[^}]*padding:\s*4px clamp\(/);
+    // clamp() and not a media query, because the width at which the links stop
+    // fitting depends on their labels, and those are configuration.
+    expect(css).toMatch(/\.nav-link\s*\{[^}]*padding:\s*0 clamp\(/);
     expect(css).toMatch(/\.topnav\s*\{[^}]*gap:\s*clamp\(/);
+  });
+
+  it('gives a link a stated height rather than one grown from its padding', () => {
+    // The width tightens; the height must not move at all. A menu heading is a
+    // <details>, and an open <details> is taller than its summary by a dozen
+    // pixels the browser will not let anyone style away — so both the link and
+    // the menu are told the same height, and an open menu cannot push the bar.
+    expect(css).toMatch(/\.nav-link\s*\{[^}]*height:\s*var\(--nav-item-h\)/);
   });
 
   it('gives the navigation its own row before it would wrap raggedly', () => {

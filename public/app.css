@@ -120,6 +120,8 @@
      rounded up: overshooting leaves an invisible gap, undershooting hides the
      heading behind the bar. */
   --topbar-h: 48px;
+  /* The height of one item in the top-bar run. See .nav-group. */
+  --nav-item-h: 29px;
 
   --radius: 6px;
   /* No web fonts: the CSP allows only self-hosted ones, and shipping a font
@@ -263,21 +265,36 @@ p:last-child { margin-bottom: 0; }
    shrink with the viewport — enough to keep the whole set on one line down to
    around a thousand pixels, which is where a laptop half-screen sits. */
 .topnav { display: flex; gap: clamp(2px, 0.35vw, 4px); flex-wrap: wrap; flex: 1; }
+/* Every item in the run is exactly --nav-item-h tall, anchors and menu
+   headings alike. One variable owns that height, which is what lets the menu
+   below be pinned to the same number instead of guessing at it. */
 .nav-link {
-  padding: 4px clamp(6px, 0.7vw, 9px); border-radius: 5px;
+  display: inline-flex; align-items: center; height: var(--nav-item-h);
+  padding: 0 clamp(6px, 0.7vw, 9px); border-radius: 5px;
   color: var(--muted); font-size: 0.86rem; font-weight: 500;
 }
 .nav-link:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
 .nav-link.current { background: var(--blue-bg); color: var(--accent); }
 /* A run of nav items under one heading.
    The summary is the nav link; the items drop beneath it as a panel, which is
-   why the bar itself is the positioning context. Absolute, so opening a group
-   does not push the page down or make the bar taller. */
-.nav-group { position: relative; }
-.nav-group > summary { list-style: none; cursor: pointer; display: inline-block; }
+   why the group is the positioning context. The panel is absolute, so it does
+   not push the page down.
+
+   The height is stated rather than left to the contents, and that is not
+   fussiness. An open <details> is more than its summary and its panel: the
+   browser puts everything after the summary inside a box of its own, and in
+   Chrome that box is twelve pixels tall even when it holds nothing but an
+   absolutely positioned panel that needs no room at all. It also refuses to be
+   styled — padding, height, line-height on ::details-content all land on
+   nothing — so the twelve pixels cannot be argued away, only made
+   irrelevant. Both the group and every item in the run are --nav-item-h tall,
+   so an open menu cannot change the height of the bar. */
+.nav-group { position: relative; display: flex; align-items: center; height: var(--nav-item-h); }
+.nav-group > summary { list-style: none; cursor: pointer; }
 .nav-group > summary::-webkit-details-marker { display: none; }
 .nav-group > summary::marker { content: ''; }
-.nav-group > summary::after { content: ' \25be'; opacity: 0.6; }
+/* The space has to be a margin: a flex line collapses leading whitespace. */
+.nav-group > summary::after { content: '\25be'; margin-left: 4px; opacity: 0.6; }
 .nav-group > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .nav-group-items {
   position: absolute; top: calc(100% + 4px); left: 0; z-index: 20;
@@ -1378,7 +1395,18 @@ body.site { background: var(--bg); }
     margin: 0 -12px; padding: 2px 12px 3px;
   }
   .topnav::-webkit-scrollbar { display: none; }
-  .nav-link { white-space: nowrap; padding: 6px 11px; }
+  .nav-link { white-space: nowrap; padding: 0 11px; }
+  /* No menus on a phone. Grouping exists to keep the bar to one line on a
+     wide screen; the strip already holds any number of sections, and a box
+     that scrolls sideways clips what overflows it downwards too, so a menu
+     opened inside one drops behind the bar and cannot be read. So the groups
+     open out into the strip: Quotes, Fees, Knowledge and the Assistant sit in
+     the run like everything else, one swipe away. */
+  .nav-group { display: contents; }
+  .nav-group > summary { display: none; }
+  .nav-group-items {
+    display: contents;
+  }
   .whoami-name { display: none; }
 
   .main { padding: 16px 12px 48px; }

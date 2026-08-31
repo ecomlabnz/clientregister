@@ -13,6 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { navEntries, type NavItem } from '../src/core/module';
 import { registeredModules } from '../src/registry';
 import { collectNav } from '../src/core/module';
@@ -87,3 +88,65 @@ describe('the bar the register actually ships', () => {
     }
   });
 });
+
+/**
+ * How the menus behave, as opposed to what is in them.
+ *
+ * Reported on 31 August 2026, all three at once: the bar grew taller when a
+ * menu opened, two menus could be open together, and a menu stayed open after
+ * you had moved on. Each has its own cause and its own fix, so each gets its
+ * own assertion.
+ */
+describe('the menus in the bar', () => {
+  const css = readFileSync('public/app.css', 'utf8');
+  const script = readFileSync('public/app.js', 'utf8');
+
+  it('cannot change the height of the bar when it opens', () => {
+    // An open <details> is more than its summary and its panel: the browser
+    // wraps what follows the summary in a box of its own, and in Chrome that
+    // box is twelve pixels tall even when it holds nothing but an absolutely
+    // positioned panel. It also ignores every attempt to style it. So the
+    // height is stated instead — the same figure for a menu heading as for a
+    // plain link, which is what makes an open menu cost nothing.
+    expect(css).toContain('--nav-item-h:');
+    const group = css.match(/\.nav-group \{([^}]*)\}/);
+    expect(group, 'no .nav-group rule').not.toBeNull();
+    expect(group![1]).toContain('height: var(--nav-item-h)');
+    const link = css.match(/\.nav-link \{([^}]*)\}/);
+    expect(link![1]).toContain('height: var(--nav-item-h)');
+  });
+
+  it('drops its panel out of the flow, so the page below does not move', () => {
+    const panel = css.match(/\.nav-group-items \{([^}]*)\}/);
+    expect(panel, 'no .nav-group-items rule').not.toBeNull();
+    expect(panel![1]).toContain('position: absolute');
+  });
+
+  it('opens one at a time, without a script', () => {
+    // name= makes the set exclusive in the browser itself. With scripting off
+    // this is the only thing keeping two menus from being open together.
+    expect(layoutSource()).toContain('name="topnav"');
+  });
+
+  it('closes when the person goes elsewhere', () => {
+    // Plain HTML has no way to say "and close when attention moves on", so
+    // that part is scripted. Not on mouse-out: a phone has no hover, and a
+    // menu that closes when the pointer strays is worse than one that stays.
+    expect(script).toContain('details.nav-group[open]');
+    expect(script).toContain("'Escape'");
+    expect(script).not.toMatch(/mouseout|mouseleave/);
+  });
+
+  it('has no menus at all on a phone', () => {
+    // A box that scrolls sideways clips what overflows it downwards too, so a
+    // menu opened inside the swipeable strip drops behind the bar and cannot
+    // be read. The groups open out into the strip instead.
+    const phone = css.slice(css.indexOf('@media (max-width: 720px)'));
+    expect(phone).toContain('.nav-group { display: contents; }');
+    expect(phone).toContain('.nav-group > summary { display: none; }');
+  });
+});
+
+function layoutSource(): string {
+  return readFileSync('src/ui/layout.ts', 'utf8');
+}
