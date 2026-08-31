@@ -70,6 +70,132 @@ export function collapsibleCard(title: string, body: Raw, note?: string): Raw {
 }
 
 /**
+ * The warnings standing on a file, at the top of it.
+ *
+ * Above everything, because that is the whole point: a fact that changes how a
+ * matter is handled has to be read before anything is said, not found three
+ * screens down after it mattered. The practice asked for this on reading a
+ * partnership summary recording an assault reported to Police.
+ *
+ * Deliberately plain and deliberately loud. No icons, no colour scale, no
+ * severity — one band, and if there is nothing to warn about there is no band
+ * at all. A warning that appears on every file teaches people to look past it.
+ */
+export function flagBand(opts: {
+  flags: Array<{
+    id: string; kind: string; body: string; raised_at: string; expires_on: string | null;
+    raised_by_name?: string | null; from_client?: boolean;
+  }>;
+  label: (kind: string) => string;
+  /** Null when the reader may not take one down. */
+  clear: { csrf: string } | null;
+  /** Where a flag on the client is taken down, when this is a matter. */
+  clientHref?: string;
+}): Raw {
+  if (opts.flags.length === 0) return raw('');
+  return html`
+    <section class="flags" role="note" aria-label="Warnings on this file">
+      ${opts.flags.map((f) => html`
+        <div class="flag">
+          <div class="flag-main">
+            <span class="flag-kind">${opts.label(f.kind)}</span>
+            <span class="flag-body">${f.body}</span>
+          </div>
+          <div class="flag-meta">
+            ${f.from_client
+              ? html`<span>On the client${opts.clientHref
+                  ? html` · <a href="${opts.clientHref}">their page</a>` : ''}</span>`
+              : ''}
+            ${f.raised_by_name ? html`<span>Raised by ${f.raised_by_name}</span>` : ''}
+            ${f.expires_on ? html`<span>Until ${f.expires_on}</span>` : ''}
+            ${opts.clear && !f.from_client ? html`
+              <details class="reveal-inline">
+                <summary class="small">Take it down</summary>
+                <form method="post" action="/flags/${f.id}/clear" class="row-form">
+                  <input type="hidden" name="_csrf" value="${opts.clear.csrf}">
+                  ${field({ label: 'Why', name: 'note', maxlength: 300,
+                            placeholder: 'e.g. Conviction disclosed to INZ and accepted' })}
+                  <button class="btn btn-secondary btn-small" type="submit">Take it down</button>
+                </form>
+              </details>` : ''}
+          </div>
+        </div>`)}
+    </section>`;
+}
+
+/**
+ * Raising a warning, and the ones already taken down.
+ *
+ * The raiser is a reveal rather than an open form: raising a warning is an
+ * occasional act and an empty form sitting on every client page competes with
+ * the record itself. The history below it is there because a warning that stood
+ * on a file for six months is part of how that file was handled, and why it came
+ * down is the useful half.
+ */
+export function flagRaiser(opts: {
+  entityType: 'client' | 'case';
+  entityId: string;
+  csrf: string;
+  kinds: Array<{ value: string; label: string }>;
+  lives: Array<{ value: string; label: string }>;
+}): Raw {
+  return html`
+    <details class="reveal mt">
+      <summary class="btn btn-secondary reveal-open">Raise a warning</summary>
+      <section class="card"><div class="card-body">
+        <form method="post" action="/flags" class="row-form">
+          <input type="hidden" name="_csrf" value="${opts.csrf}">
+          <input type="hidden" name="entity_type" value="${opts.entityType}">
+          <input type="hidden" name="entity_id" value="${opts.entityId}">
+          ${select({ label: 'What kind', name: 'kind', value: '', required: true,
+                     includeBlank: '— choose —', options: opts.kinds })}
+          ${field({ label: 'What somebody needs to know', name: 'body', required: true,
+                    maxlength: 500,
+                    placeholder: 'e.g. Assaulted by a former husband, reported to Police' })}
+          ${select({ label: 'How long it stands', name: 'life', value: 'standing',
+                     includeBlank: false, options: opts.lives })}
+          <button class="btn btn-primary" type="submit">Raise it</button>
+        </form>
+        <p class="hint">It shows at the top of this record until it is taken down, or until the
+           date you choose. A warning on a client also shows on all of their matters, because the
+           fact is about the person.</p>
+      </div></section>
+    </details>`;
+}
+
+/** Warnings no longer showing — taken down, or past their date. */
+export function flagHistory(opts: {
+  flags: Array<{
+    id: string; kind: string; body: string; expires_on: string | null;
+    cleared_at: string | null; cleared_note: string | null;
+  }>;
+  label: (kind: string) => string;
+  csrf: string | null;
+}): Raw {
+  if (opts.flags.length === 0) return raw('');
+  return html`
+    <ul class="list">
+      ${opts.flags.map((f) => html`
+        <li class="list-row">
+          <div>
+            <strong>${opts.label(f.kind)}</strong>
+            <div class="small">${f.body}</div>
+            <div class="small muted">
+              ${f.cleared_at
+                ? html`Taken down${f.cleared_note ? html` — ${f.cleared_note}` : ''}`
+                : html`Lapsed on ${f.expires_on ?? ''}`}
+            </div>
+          </div>
+          ${opts.csrf ? html`
+            <form method="post" action="/flags/${f.id}/raise-again" class="inline-form">
+              <input type="hidden" name="_csrf" value="${opts.csrf}">
+              <button class="btn btn-secondary btn-small" type="submit">Put it back</button>
+            </form>` : ''}
+        </li>`)}
+    </ul>`;
+}
+
+/**
  * A moment the register recorded, as date and time.
  *
  * The practice's decision, 1 September 2026: wherever the register shows when
