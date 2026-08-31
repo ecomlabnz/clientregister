@@ -7,6 +7,28 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.74.1 — 1 September 2026
+
+### Fixed
+- **Help said passport numbers are stored encrypted, in four places.** That
+  stopped being true on 30 August with migration 0042, by the practice's own
+  decision — so for two days the manual made the most sensitive claim in it,
+  wrongly. Corrected: the number is stored as written, guarded by sign-in,
+  roles, two-factor and an audited session, and still kept out of bulk exports.
+  Release notes are left alone: they record what a past release did and remain
+  true of it.
+
+### Added
+- **Help now covers what shipped last week**: the Files section on clients and
+  matters (uploads, drive links, showing a client's document on a matter, and
+  what happens with storage switched off), filing things out of Incoming, and
+  the rows-per-page choice.
+
+### Known and not fixed here
+- `sealField` / `unsealField` in `src/core/crypto.ts` are now dead — nothing
+  outside that file references them. Raised for the audit session rather than
+  removed here, since deleting crypto is its call.
+
 ## 0.74.0 — 1 September 2026
 
 ### Added
