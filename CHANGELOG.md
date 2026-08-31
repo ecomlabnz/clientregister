@@ -7,7 +7,59 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
-## 0.74.1 — 1 September 2026
+## 0.75.0 — 31 August 2026
+
+### Added
+- **Filter the case list by matter type**, and two new columns: **Type** and
+  **Lodged** (the date it went to INZ). Both sortable. The types come from the
+  vocabulary the practice edits in Settings, so the filter offers whatever is
+  configured rather than a list baked into the page.
+
+### Changed
+- **"Key date" is now "Decision", and says which date it is showing.** It was
+  showing the expected-decision date whatever the status, so an approved matter
+  displayed a deadline that had already passed — which is what prompted this.
+  A decided matter now shows when the decision arrived, labelled "decided"; one
+  still waiting shows what it is waiting for; otherwise the next action.
+- **The status list, on the practice's reading of it.** "INZ — further
+  information requested" is removed and "PPI letter received" becomes **"PPI /
+  RFI letter received"**: both described one working state — a letter from INZ
+  with a clock on it — so the register was asking which of two words to use for
+  one thing. Conversely **"Appeal / reconsideration" splits** into **"IPT
+  appeal"** and **"Reconsideration"**: two places with two clocks under one
+  name could not answer "who is holding this file".
+
+### Fixed
+- **A case-type filter that matched nothing.** Its first draft asked for the
+  SQL placeholder before pushing the parameter, so it numbered one slot back.
+  Typecheck was clean and the page rendered; the only symptom was an empty
+  list, which looks exactly like "no matters of that type". Found in the
+  browser, not by a test — so there is now a test that fails on the off-by-one.
+- **Filing something twice.** The form is hidden once an item is filed, but a
+  double-submit or a second tab went straight through, writing a second note —
+  permanent, since notes are append-only — and orphaning the first. All three
+  file routes now refuse. Found by the audit session.
+- **The note and the mark are now one write.** Written separately, a failure
+  between them left a note on the file with the item still in the queue, and
+  refiling duplicated it. Row triggers cannot see across two tables, so the
+  atomicity comes from `batch()`. Found by the audit session.
+- **Unfiling now records which note it orphaned**, in the audit meta, before
+  clearing the link. Found by the audit session.
+- **Dates.** Last week's releases were written up as 1 September; they shipped
+  on 31 August New Zealand time. Corrected across the changelog, the help
+  notes, three migration comments and two code comments. Found by the audit
+  session.
+
+### Migration
+- **`0048_one_letter_two_names.sql`** moves the one matter on the removed
+  status to `ppi`. Nothing else changes: `cases.status` carries no database
+  constraint, and the status history is left exactly as written — a row saying
+  a matter moved to "inz_rfi" in August is true, and is not made false by the
+  status being renamed afterwards. Rehearsed at production's spread (44
+  matters): every reference unchanged, the one row moved, every other status
+  untouched, history intact.
+
+## 0.74.1 — 31 August 2026
 
 ### Fixed
 - **Help said passport numbers are stored encrypted, in four places.** That
@@ -29,7 +81,7 @@ The user-facing version of this list, one line per release, is in the app under
   outside that file references them. Raised for the audit session rather than
   removed here, since deleting crypto is its call.
 
-## 0.74.0 — 1 September 2026
+## 0.74.0 — 31 August 2026
 
 ### Added
 - **Filing something that arrived onto the record it belongs to.** Incoming
@@ -63,7 +115,7 @@ The user-facing version of this list, one line per release, is in the app under
   conversations): every row present and byte-for-byte unchanged afterwards,
   nothing arrives already filed, and the guards are live immediately.
 
-## 0.73.1 — 1 September 2026
+## 0.73.1 — 31 August 2026
 
 Three items, two of them from the audit session's review of 0.71.0–0.72.0.
 
@@ -98,7 +150,7 @@ Three items, two of them from the audit session's review of 0.71.0–0.72.0.
   something is awaited, and the date the decision actually arrived is given
   alongside. Found by the audit session.
 
-## 0.73.0 — 1 September 2026
+## 0.73.0 — 31 August 2026
 
 ### Changed
 - **The New task button moved to the top of the list, beside the filter.** The
@@ -130,7 +182,7 @@ Three items, two of them from the audit session's review of 0.71.0–0.72.0.
   in Chromium by measuring the first row's position before and after, not by
   looking at it. Pinned by a stylesheet test.
 
-## 0.72.1 — 1 September 2026
+## 0.72.1 — 31 August 2026
 
 ### Changed
 - **The New task form on the task list is behind a button.** An always-open
@@ -141,7 +193,7 @@ Three items, two of them from the audit session's review of 0.71.0–0.72.0.
   that stops working when script is blocked is a form nobody can reach. New
   `revealForm` in `ui/components.ts` for the next list that wants the same.
 
-## 0.72.0 — 1 September 2026
+## 0.72.0 — 31 August 2026
 
 Three faults on one card, all found by the practice approving a real matter
 (CASE-26-051) and finding the screen confusing afterwards.
@@ -170,7 +222,7 @@ Three faults on one card, all found by the practice approving a real matter
   what to do next. A test refuses any status whose explanation is its own
   label, or is under three words.
 
-## 0.71.0 — 1 September 2026
+## 0.71.0 — 31 August 2026
 
 ### Added
 - **How many rows to show, chosen from under the list.** Clients, Cases and
@@ -197,7 +249,7 @@ Three faults on one card, all found by the practice approving a real matter
   page number is bounded for the same reason. Both proven by reintroducing the
   bug each guards.
 
-## 0.70.2 — 1 September 2026
+## 0.70.2 — 31 August 2026
 
 ### Added
 - **A fourth answer to "where did this issue date come from": read off the

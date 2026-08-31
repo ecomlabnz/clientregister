@@ -6,7 +6,7 @@
 -- missing was not a delete button but the other half of triage: saying *which
 -- matter this belongs to* and having it leave the queue once said.
 --
--- Three decisions, taken by the practice on 1 September 2026.
+-- Three decisions, taken by the practice on 31 August 2026.
 --
 -- **One fact, one owner.** Filing writes a file note onto the case or client —
 -- that note is the readable copy, the thing you find when you open the matter.

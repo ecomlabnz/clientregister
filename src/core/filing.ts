@@ -23,8 +23,8 @@
  */
 
 import type { Env } from '../types';
-import { all, one, run } from './db';
-import { addEntry } from './timeline';
+import { all, nowIso, one, run } from './db';
+import { newId } from './ids';
 
 export type FilingTarget = 'case' | 'client';
 
@@ -44,7 +44,7 @@ export interface FilingRequest {
   userId: string | null;
 }
 
-export interface FilingResult { entryId: string; label: string }
+export interface FilingResult { entryId: string; label: string; at: string }
 
 /** How much of a message goes onto the file. */
 const BODY_LIMIT = 20_000;
@@ -94,41 +94,58 @@ export function filingNote(source: FilingRequest['source'], origin: string): str
 }
 
 /**
- * Write the note. Does not touch the arriving record — the caller does that,
- * because only the caller knows which table it came from, and doing it here
- * would mean this module knowing about all three.
+ * Write the note and mark the item filed, as one write.
+ *
+ * These two have to happen together or not at all. Written as a note first and
+ * a mark second, a failure between them leaves a note on the file — permanent,
+ * because notes are append-only — with the item still sitting in the queue, so
+ * filing it again writes a second copy of the same note. Row-level triggers
+ * cannot see across two tables, so the atomicity has to come from the write
+ * itself: `batch()` is one statement group, and either both land or neither
+ * does.
+ *
+ * The caller supplies the statement that marks its own row, because only the
+ * caller knows which of the three tables it came from.
  */
-export async function fileOntoRecord(env: Env, req: FilingRequest): Promise<FilingResult | null> {
+export async function fileOntoRecord(
+  env: Env,
+  req: FilingRequest,
+  markFiled: (entryId: string, at: string) => D1PreparedStatement,
+): Promise<FilingResult | null> {
   const label = await filingTargetLabel(env, req.target, req.targetId);
   if (!label) return null;
 
-  const entryId = await addEntry(env, {
-    entityType: req.target,
-    entityId: req.targetId,
-    // A message somebody received is correspondence, not a system event and not
-    // the practice's own note. The timeline already distinguishes these, and a
-    // filed message read back as a system event would look like the register
-    // saying it, rather than a client.
-    kind: 'message',
-    body: filingNote(req.source, req.origin),
-    occurredAt: req.source.receivedAt ?? undefined,
-    createdBy: req.userId,
-  });
-  return { entryId, label };
+  const entryId = newId('ent');
+  const at = nowIso();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO entries (id, entity_type, entity_id, kind, body, occurred_at, pinned, created_at, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    ).bind(
+      entryId, req.target, req.targetId,
+      // A message somebody received is correspondence, not a system event and
+      // not the practice's own note. A filed message read back as a system
+      // event would look like the register saying it, rather than a client.
+      'message',
+      filingNote(req.source, req.origin),
+      req.source.receivedAt ?? at,
+      at,
+      req.userId ?? null,
+    ),
+    markFiled(entryId, at),
+  ]);
+  return { entryId, label, at };
 }
 
 /** Mark an inbox message filed. The message itself is untouched. */
-export async function markIngestFiled(
-  env: Env, id: string, target: FilingTarget, targetId: string,
-  entryId: string, userId: string | null, at: string,
-): Promise<void> {
-  await run(
-    env.DB,
+export function markIngestFiled(
+  env: Env, id: string, target: FilingTarget, targetId: string, userId: string | null,
+): (entryId: string, at: string) => D1PreparedStatement {
+  return (entryId, at) => env.DB.prepare(
     `UPDATE ingest_messages
         SET filed_to_type = ?, filed_to_id = ?, filed_at = ?, filed_by = ?, filed_entry_id = ?
       WHERE id = ?`,
-    target, targetId, at, userId, entryId, id,
-  );
+  ).bind(target, targetId, at, userId, entryId, id);
 }
 
 /**
@@ -138,19 +155,16 @@ export async function markIngestFiled(
  * the destination is and leaves the other alone — an inquiry filed onto a
  * matter keeps the client it was already linked to.
  */
-export async function markLinkedFiled(
+export function markLinkedFiled(
   env: Env, table: 'inquiries' | 'channel_threads', id: string,
-  target: FilingTarget, targetId: string,
-  entryId: string, userId: string | null, at: string,
-): Promise<void> {
+  target: FilingTarget, targetId: string, userId: string | null,
+): (entryId: string, at: string) => D1PreparedStatement {
   const column = target === 'case' ? 'case_id' : 'client_id';
-  await run(
-    env.DB,
+  return (entryId, at) => env.DB.prepare(
     `UPDATE ${table}
         SET ${column} = ?, filed_at = ?, filed_by = ?, filed_entry_id = ?
       WHERE id = ?`,
-    targetId, at, userId, entryId, id,
-  );
+  ).bind(targetId, at, userId, entryId, id);
 }
 
 /**
@@ -207,11 +221,19 @@ export function parseFilingChoice(
  */
 export async function unfile(
   env: Env, table: 'ingest_messages' | 'inquiries' | 'channel_threads', id: string,
-): Promise<void> {
+): Promise<{ orphanedEntryId: string | null }> {
+  // Read the link before clearing it, and hand it back so the audit entry can
+  // name the note that is now on a file with nothing pointing at it. Without
+  // this the log says only "unfiled" — and the note, which cannot be removed,
+  // becomes untraceable to what it came from. This feature exists to keep an
+  // evidence chain; dropping the last link in it on the way out would be odd.
+  const before = await one<{ filed_entry_id: string | null }>(
+    env.DB, `SELECT filed_entry_id FROM ${table} WHERE id = ?`, id);
   const extra = table === 'ingest_messages' ? ', filed_to_type = NULL, filed_to_id = NULL' : '';
   await run(
     env.DB,
     `UPDATE ${table} SET filed_at = NULL, filed_by = NULL, filed_entry_id = NULL${extra} WHERE id = ?`,
     id,
   );
+  return { orphanedEntryId: before?.filed_entry_id ?? null };
 }
