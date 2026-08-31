@@ -1,6 +1,6 @@
 -- A list opens showing everything.
 --
--- The practice's decision of 1 September 2026: Clients, Cases and Tasks all
+-- The practice's decision of 31 August 2026: Clients, Cases and Tasks all
 -- open unfiltered. A list that narrows itself before anybody has asked it to
 -- is how work goes unnoticed — the rows that are missing are exactly the ones
 -- nobody sees — and the filter is one click away either way.

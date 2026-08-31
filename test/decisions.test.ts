@@ -56,7 +56,7 @@ describe('the chase schedule is what somebody typed, made safe', () => {
 describe('only a matter actually waiting on INZ is chased', () => {
   it('lists the statuses that mean "with them, waiting"', () => {
     expect(AWAITING_DECISION_STATUSES).toEqual(
-      ['lodged', 'inz_rfi', 'ppi', 'interim_visa', 'decision_pending']);
+      ['lodged', 'ppi', 'interim_visa', 'decision_pending']);
   });
 
   it('excludes everything decided, withdrawn or not yet lodged', () => {

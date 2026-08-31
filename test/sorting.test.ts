@@ -32,7 +32,7 @@ function schema() {
 describe('sort keys are looked up, not interpolated', () => {
   it('offers the headings both lists actually show', () => {
     // If a map is emptied the injection tests below would pass vacuously.
-    expect(Object.keys(CASE_SORTS).sort()).toEqual(['client', 'due', 'owner', 'ref', 'status', 'title']);
+    expect(Object.keys(CASE_SORTS).sort()).toEqual(['client', 'due', 'lodged', 'owner', 'ref', 'status', 'title', 'type']);
     expect(Object.keys(CLIENT_SORTS).sort()).toEqual(['cases', 'contact', 'name', 'ref', 'status', 'updated']);
   });
 
