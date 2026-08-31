@@ -27,7 +27,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
-  actionButton, badge, card, csrfField, emptyState, errorList, field, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
+  actionButton, badge, card, csrfField, emptyState, errorList, field, flagBand, flagHistory, flagRaiser, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
 } from '../../ui/components';
 import {
   dateInputValue, dateOrDateTime, dateShort, dateTime, isOverdue, money, relativeDays, truncate,
@@ -46,6 +46,7 @@ import { preferencesFor } from '../../core/preferences';
 import { caseTypes, docCategories, englishTests, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
 import { filesPanel, listDocuments } from '../documents';
 import { countryCodeFor, countryName, countryOptions } from '../../core/countries';
+import { FLAG_LIVES, flagKinds, flagsForClient, isShowing } from '../../core/flags';
 import {
   MAX_NATIONALITIES, nationalitiesByClient, nationalitiesFor, nationalityFieldNames,
   normaliseCodes, setNationalityStatements,
@@ -845,6 +846,9 @@ export const clientsModule: AppModule = {
       );
       if (!client) return c.notFound();
       const clientNationalities = await nationalitiesFor(c.env, id);
+      const [clientFlags, flagKindTerms] = await Promise.all([
+        flagsForClient(c.env, id), flagKinds(c.env),
+      ]);
 
       const [cases, quotes, inquiries, entries, tasks, partyCases, related, employer, people,
              feesByCase, englishTestTerms, visaTerms, certificates, passports, threads,
@@ -925,6 +929,21 @@ export const clientsModule: AppModule = {
                href="/cases/new?client_id=${client.id}">New case</a>
             <a class="btn btn-secondary" href="/quotes/new?client_id=${client.id}">New quote</a>` : undefined)}
 
+        ${'' /* Above everything on the record, because that is the point of
+                 it: a fact that changes how a matter is handled has to be read
+                 before anything is said, not found three screens down after it
+                 mattered. Nothing at all when there is nothing to warn about —
+                 a band on every file teaches people to look past it. */}
+        ${flagBand({
+          flags: clientFlags.filter((f) => isShowing(f)),
+          label: (kind) => labelFor(flagKindTerms, kind),
+          clear: writable ? { csrf } : null,
+        })}
+        ${writable ? flagRaiser({
+          entityType: 'client', entityId: client.id, csrf,
+          kinds: termOptions(flagKindTerms), lives: FLAG_LIVES,
+        }) : ''}
+
         <div class="cols">
           <div class="col-main">
             ${card('Cases', table(['Reference', 'Matter', 'Type', 'Status', 'Next action'], cases.map((k: any) => html`
@@ -970,6 +989,13 @@ export const clientsModule: AppModule = {
                       : null,
                   }))}
                 </ul>`}`)}
+
+            ${(() => {
+              const past = clientFlags.filter((f) => !isShowing(f));
+              return past.length === 0 ? '' : foldingCard('Warnings taken down',
+                flagHistory({ flags: past, label: (k) => labelFor(flagKindTerms, k),
+                              csrf: writable ? csrf : null }));
+            })()}
 
             ${card('Files', filesPanel({
               csrf, entityType: 'client', entityId: client.id, returnTo: `/clients/${client.id}`,

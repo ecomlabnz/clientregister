@@ -268,7 +268,28 @@ brief | Brief
 other | Other`,
 };
 
-export const VOCABULARIES: VocabularyDef[] = [CASE_TYPE_VOCAB, VISA_TYPE_VOCAB, ENGLISH_TEST_VOCAB, DOC_CATEGORY_VOCAB];
+/**
+ * The kinds of warning. Vocabulary, so the practice adds one without a
+ * deployment — the standing rule for every dropdown the register uses.
+ */
+export const FLAG_KIND_VOCAB: VocabularyDef = {
+  key: 'vocab.flag_kinds',
+  label: 'Warning kinds',
+  help: 'One per line, written as “key | Label”. Offered when raising a warning on a client or '
+    + 'a matter. Relabelling is free; removing a key leaves existing warnings showing the raw '
+    + 'key. Blank lines and lines starting with # are ignored.',
+  defaults: `safety | Safety
+character | Character or conviction
+health | Health
+immigration | Immigration history
+contact | How to make contact
+money | Money
+other | Other`,
+};
+
+export const VOCABULARIES: VocabularyDef[] = [
+  CASE_TYPE_VOCAB, VISA_TYPE_VOCAB, ENGLISH_TEST_VOCAB, DOC_CATEGORY_VOCAB, FLAG_KIND_VOCAB,
+];
 
 export const VOCABULARY_SETTINGS: SettingsGroup = {
   id: 'vocabulary',

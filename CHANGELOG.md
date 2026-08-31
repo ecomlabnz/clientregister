@@ -7,6 +7,50 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.84.0 — 1 September 2026
+
+### Added
+- **A file can carry a warning.** Asked for on reading a partnership summary
+  that recorded an assault reported to Police: a fact that changes how a matter
+  is handled, with no column of its own, three screens down in a file note —
+  something you find *after* you needed it.
+
+  A flag is a short standing statement about a client or a matter, shown in an
+  amber band above everything else on the record. Raised deliberately by a
+  person, cleared deliberately by a person; nothing computes one.
+
+  **A warning on a person follows them onto their matters.** The fact is about
+  the person, not about one application, and one that has to be raised again on
+  every new file is one that stops being raised. The band says whose it is and
+  links to where it is taken down.
+
+  **A warning can be given a life.** Some are permanent — a conviction, a
+  history. Some are true for a season: "overseas until March", "do not
+  telephone". So the choice is "until it is taken down" or a period, and one
+  past its date stops showing without anybody remembering.
+
+  **Taking one down asks why, and keeps it.** A warning that stood on a file for
+  six months is part of how that file was handled, and why it came down is the
+  useful half. Cleared and lapsed warnings sit under "Warnings taken down" and
+  any of them can be put back.
+
+  The kinds are vocabulary, editable in Settings without a deployment, like
+  every other list the practice uses.
+
+### How it is built
+- Migration 0058 gives `flags` its own table and four triggers: a warning must
+  say something, it must be on a client or a matter, it cannot be cleared before
+  it was raised, and it goes with the record it is about — left behind it would
+  warn about nothing, and the next record given that id would inherit it.
+- `core/flags.ts` owns what a flag is; `modules/flags` owns raising and taking
+  down, in one place, because a warning means the same thing on both pages.
+- Deliberately one band and one colour. No severity scale and no icons, and
+  nothing at all when there is nothing to warn about: a band on every file
+  teaches people to look past it. Amber rather than red, because red on these
+  pages already means a deadline missed and two urgent colours rank nothing.
+- The manual gains a section, and the file-notes section is brought up to date
+  with the five-minute correction window from 0.82.0.
+
 ## 0.83.0 — 1 September 2026
 
 ### Fixed

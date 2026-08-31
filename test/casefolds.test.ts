@@ -79,9 +79,12 @@ describe('the sections on a matter', () => {
     // The content policy forbids an inline script; a fold that depends on one
     // is a section nobody can reach when scripting is off.
     const body = await page(mountSeeded());
-    const cards = /<section class="card">[\s\S]*?<\/section>/.exec(body)?.[0] ?? '';
-    expect(cards).toContain('<details class="card-fold"');
-    expect(cards).not.toMatch(/onclick|<script/);
+    // The first *folding* card, not the first card: a matter page also carries
+    // cards that are not sections of the file, such as the one inside the
+    // "Raise a warning" reveal.
+    const card = /<section class="card">\s*<details class="card-fold"[\s\S]*?<\/section>/.exec(body)?.[0] ?? '';
+    expect(card).toContain('<details class="card-fold"');
+    expect(card).not.toMatch(/onclick|<script/);
   });
 });
 

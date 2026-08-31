@@ -19,7 +19,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
-  badge, csrfField, emptyState, errorList, field, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
+  badge, csrfField, emptyState, errorList, field, flagBand, flagRaiser, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
 } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate, dateOrDateTime, instantForDate } from '../../ui/format';
 import {
@@ -35,6 +35,7 @@ import { findOrCreateTag, listTags, tagCase, tagsForCase, tagsForCases, untagCas
 import {
   CORRECTION_WINDOW_MINUTES, addEntry, correctable, listEntries,
 } from '../../core/timeline';
+import { FLAG_LIVES, flagKinds, flagsForCase, isShowing } from '../../core/flags';
 import { can } from '../../core/rbac';
 import { asPrefBoolean, preferencesFor } from '../../core/preferences';
 import { filesPanel, listCaseFiles, storeDocument } from '../documents';
@@ -583,7 +584,8 @@ export const casesModule: AppModule = {
       const writable = can(c.get('user'), 'register:write');
       const csrf = c.get('session')!.csrf;
 
-      const [entries, history, tasks, quotes, users, fees, parties, caseTags, allTags, clients,
+      const [entries, history, tasks, quotes, users, fees, caseFlags, flagKindTerms,
+             parties, caseTags, allTags, clients,
              threads, caseFiles, docCats, linkableDocs] = await Promise.all([
         listEntries(c.env, 'case', id),
         all<any>(c.env.DB, `SELECT h.*, u.name AS by_name FROM case_status_history h
@@ -598,6 +600,8 @@ export const casesModule: AppModule = {
                               FROM quotes WHERE case_id = ? ORDER BY created_at DESC`, id),
         userOptions(c.env),
         feesSection(c, id, kase.currency, writable),
+        flagsForCase(c.env, id, kase.client_id),
+        flagKinds(c.env),
         partiesForCase(c.env, id),
         tagsForCase(c.env, id),
         listTags(c.env),
@@ -632,6 +636,20 @@ export const casesModule: AppModule = {
             + `${labelFor(types, kase.case_type)} · ${kase.client_name}`,
           writable ? html`<a class="btn btn-secondary" href="/cases/${kase.id}/edit">Edit</a>
                           <a class="btn btn-secondary" href="/quotes/new?case_id=${kase.id}&client_id=${kase.client_id}">New quote</a>` : undefined)}
+
+        ${'' /* Above everything, and the client's warnings show here too: a
+                 fact about the person is a fact on their matter, and one that
+                 has to be raised again on every new file stops being raised. */}
+        ${flagBand({
+          flags: caseFlags.filter((f) => isShowing(f)),
+          label: (kind) => labelFor(flagKindTerms, kind),
+          clear: writable ? { csrf } : null,
+          clientHref: `/clients/${kase.client_id}`,
+        })}
+        ${writable ? flagRaiser({
+          entityType: 'case', entityId: kase.id, csrf,
+          kinds: termOptions(flagKindTerms), lives: FLAG_LIVES,
+        }) : ''}
 
         ${deadlineWarning
           ? html`<div class="alert ${isOverdue(kase.decision_due_at) ? 'alert-error' : 'alert-warn'}">
