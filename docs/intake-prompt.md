@@ -212,39 +212,72 @@ the practice, not a number in a ledger.
    documents write day-first; American forms write month-first. Where a date is
    ambiguous (`03/04/2024`) and the document does not settle it, use `null` and
    flag it. A date read from a filename or folder name rather than a document
-   is usable but must say so (see `issued_on_source`); this applies to any
-   dated field, not only certificates — when the only source is a name, note
-   it.
-5. **Names as written.** Record given names and family name separately, exactly
+   is usable but must say so; this applies to any dated field, not only
+   certificates — when the only source is a name, note it.
+
+   For a certificate the register stores this as `issued_on_provenance`, and it
+   takes exactly one of four values. Use these words, so the loader does not
+   have to guess what a fifth one meant:
+
+   - `verified` — read off the certificate itself, by eye.
+   - `from_ocr` — read off a scan by machine (see rule 5).
+   - `from_filename` — taken from a file or folder name, never confirmed.
+   - `unverified` — source unknown, or otherwise not confirmed.
+
+   The register computes police and medical expiry from the issue date, and
+   shows a caveat everywhere a date is anything but `verified`. That caveat is
+   the whole point: a wrong date that looks confident is worse than a blank,
+   because a blank prompts somebody to check.
+5. **OCR is allowed, and must say it was OCR.** The second batch machine-read
+   12 certificate dates off scans with no text layer, which is better evidence
+   than a filename and worse than a person's eye. Never record an OCR reading
+   as `verified`. Where the scan is poor enough that the reading is a guess,
+   use `null` and raise a task rather than recording a number the register will
+   then compute a legal deadline from.
+6. **Names as written.** Record given names and family name separately, exactly
    as the passport or application form has them. Do not restyle, transliterate
    or reorder — the register does its own capitalisation. Where an application
    reverses the names against the passport, record both and flag it: the first
    batch found one, and it became a letter to INZ.
-6. **Money in dollars, with the currency named.** Say whether a figure includes
+7. **Money in dollars, with the currency named.** Say whether a figure includes
    GST, and if the document does not say, record that it does not say.
-7. **Do not resolve contradictions.** Where two documents disagree — two
+8. **Do not resolve contradictions.** Where two documents disagree — two
    spellings, two birthdates, two addresses, two versions of an invoice —
    record both and flag it. That disagreement is a finding, and often the most
    useful one in the folder.
-8. **Do not summarise a file note into nothing.** A note is the record of what
+9. **Do not summarise a file note into nothing.** A note is the record of what
    was said at the time. Carry it across in its own words.
-9. **The folder names are the practice's own status lines.** Read them as
-   deliberate records, at `medium` confidence, citing the folder name as the
-   source. Conventions the first batch established:
-   - a leading `z ` on a sub-folder marks it superseded or parked;
-   - `v1`, `v2` mark versions — the unprefixed highest version is current;
-   - `PAID`, `INZ fee not paid yet` and similar are fee status;
-   - `NEED TRANSL` marks a document awaiting translation (make it a task);
-   - dates and reminders in names (`18y.o.inMar26`) are working notes — carry
-     them, source them to the name, never promote them to document-read facts.
-10. **A document about a different person is a client, not clutter.** A file
+10. **The folder names are the practice's own status lines.** Read them as
+    deliberate records, at `medium` confidence, citing the folder name as the
+    source. Conventions the first batch established:
+    - a leading `z ` on a sub-folder marks it superseded or parked;
+    - `v1`, `v2` mark versions — the unprefixed highest version is current;
+    - `PAID`, `INZ fee not paid yet` and similar are fee status;
+    - `NEED TRANSL` marks a document awaiting translation (make it a task);
+    - dates and reminders in names (`18y.o.inMar26`) are working notes — carry
+    them, source them to the name, never promote them to document-read facts.
+11. **A document about a different person is a client, not clutter.** A file
     belonging to someone else sitting in this client's folder — a copied
     precedent, a misfiled letter — gets three things: a note on this matter
     saying it is there, a client stub for the person it belongs to (matched
     against `existing-clients.txt` first), and a task to complete their record
     from the original. The first batch found one such letter, and it was a real
     client.
-11. **Record the presence of sensitive material without interpreting it.**
+12. **Fees are facts on the timeline, not fee records.** The practice enters
+    fees by hand. Where a folder shows an amount — an invoice, a receipt, a
+    fee written in a name — record it as a note on the matter saying what the
+    document said, and create no fee, invoice or quote row. The second batch
+    carried 35 fee facts across this way and it is the settled arrangement.
+13. **Every matter has an owner.** The register refuses an ownerless matter,
+    so `assigned_to` is required on every case. Where the folder does not say,
+    use the practice's default owner rather than leaving it out — a matter
+    that will not load helps nobody.
+14. **A person the register cannot name is a note, not a record.** A client
+    row needs a name. Where a folder shows a person with no name recorded —
+    "the applicant's daughter, about eleven, in Viet Nam" — put what is known
+    in a note on the matter and raise a task to get the name, rather than
+    inventing a placeholder that later reads as a real person.
+15. **Record the presence of sensitive material without interpreting it.**
     Redacted risk-alert pages, ministerial or privacy-release bundles: note
     that they exist and where, and read nothing into the redactions.
 
