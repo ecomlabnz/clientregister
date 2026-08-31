@@ -7,6 +7,23 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.85.0 — 1 September 2026
+
+### Changed
+- **Invoices is in the Money menu.** The page has existed since 0.66.0 with its
+  views, its detail page, issuing, payments, voiding and a printable copy — and
+  it was reachable only through a tab on the quotes list, which is to say only
+  if you already knew it was there. "What are we owed" is a question the
+  practice asks of the register directly, not by way of quotes.
+
+  Placed between Quotes and Fees, which is the order the work happens in: a
+  quote before it, an invoice after it, the fee ledger underneath both.
+
+- **The sideways tabs between quotes and invoices are gone.** The tabs on those
+  rows are views of the list they sit on — owing, draft, paid. A link to another
+  list sat among them because invoices had no place in the menu; now that it
+  does, that tab would only be navigation pretending to be a filter.
+
 ## 0.84.0 — 1 September 2026
 
 ### Added

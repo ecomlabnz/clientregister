@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.85.0', date: '1 September 2026',
+    notes: [
+      'Invoices has its own place in the Money menu, between Quotes and Fees \u2014 the order the '
+        + 'work happens in. The page itself has been there since June; it could only be reached '
+        + 'through a tab on the quotes list, which is to say only if you already knew it was there. '
+        + '\u201cWhat are we owed\u201d is a question to ask the register directly.',
+    ],
+  },
+  {
     version: '0.84.0', date: '1 September 2026',
     notes: [
       'A file can carry a warning. Press \u201cRaise a warning\u201d on a client or a matter, say '
