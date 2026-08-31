@@ -506,7 +506,14 @@ export const clientsModule: AppModule = {
       ];
 
       return page(c, { title: 'Clients', active: '/clients' }, html`
-        ${pageHeader('Clients', 'Everyone the practice acts for.',
+        ${pageHeader('Clients',
+          // No subtitle. It read "Everyone the practice acts for", which stopped
+          // being true the moment the register started holding employers,
+          // sponsors, supporting partners, agents and the odd stub record for
+          // somebody whose document arrived in another client's folder. The
+          // practice does not act for most of them. A heading that overstates
+          // what a list contains is worse than no subtitle at all.
+          undefined,
           writable
             ? html`<a class="btn btn-primary" href="/clients/new">New client</a>
                    ${nzbnConfigured(c.env)

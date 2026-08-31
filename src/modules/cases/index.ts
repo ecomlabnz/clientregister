@@ -35,7 +35,7 @@ import { addParty, partiesForCase, removeParty } from '../../core/parties';
 import { findOrCreateTag, listTags, tagCase, tagsForCase, tagsForCases, untagCase } from '../../core/tags';
 import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
-import { preferencesFor } from '../../core/preferences';
+import { asPrefBoolean, preferencesFor } from '../../core/preferences';
 import { filesPanel, listCaseFiles, storeDocument } from '../documents';
 import {
   DECISION_SETTINGS, caseForSync, decisionPolicy, expectedDecisionDate, syncCaseFollowUps,
@@ -270,6 +270,8 @@ export const casesModule: AppModule = {
       // Filter by what kind of matter it is. The types are vocabulary — the
       // practice edits the list in Settings — so this offers whatever is
       // configured rather than a list baked in here.
+      const showMatter = asPrefBoolean(prefs['pref.cases_show_matter'], false);
+      const showDecision = asPrefBoolean(prefs['pref.cases_show_decision'], false);
       const typeFilter = c.req.query('type') ?? '';
       if (typeFilter && types.some((t) => t.key === typeFilter)) {
         // Push first, then ask for the placeholder: `p()` numbers from
@@ -346,6 +348,12 @@ export const casesModule: AppModule = {
             ${allTags.map((tag) => html`<option value="${tag.name}" ${tag.name === tagFilter ? raw('selected') : ''}>${tag.name} (${tag.uses})</option>`)}
           </select>
           <button class="btn btn-secondary" type="submit">Filter</button>
+          ${'' /* Only when there is something to clear: a permanent Clear on an
+                   unfiltered list is a button that does nothing, and the reader
+                   has to work out which it is. */}
+          ${q || status || assigned || typeFilter || tagFilter
+            ? html`<a class="btn btn-link" href="/cases?scope=${scope}&size=${String(PAGE_SIZE)}">Clear</a>`
+            : ''}
         </form>
         <div data-live-results>
         ${pager({ page: pageNum, size: PAGE_SIZE, hasMore, shown: shown.length,
@@ -358,56 +366,88 @@ export const casesModule: AppModule = {
           * layouts, so there is one list to maintain, not two.
           */ ''}
         ${table([
-          { label: 'Reference', width: '16', hideOn: 'sm', sort: 'ref' },
-          { label: 'Matter', width: '30', sort: 'title' },
-          { label: 'Client', width: '18', hideOn: 'sm', sort: 'client' },
-          { label: 'Type', width: '14', hideOn: 'sm', sort: 'type' },
-          { label: 'Status', width: '14', hideOn: 'sm', sort: 'status' },
-          { label: 'Lodged', width: '10', hideOn: 'sm', sort: 'lodged' },
-          { label: 'Decision', width: '14', sort: 'due' },
-          { label: 'Owner', width: '10', hideOn: 'sm', sort: 'owner' },
+          { label: 'Reference', width: showMatter ? '16' : '26', sort: 'ref' },
+          ...(showMatter ? [{ label: 'Matter', width: '26', sort: 'title' }] : []),
+          { label: 'Client', width: '18', hideOn: 'sm' as const, sort: 'client' },
+          { label: 'Type', width: '14', hideOn: 'sm' as const, sort: 'type' },
+          { label: 'Status', width: '16', sort: 'status' },
+          { label: 'Lodged', width: '10', hideOn: 'sm' as const, sort: 'lodged' },
+          ...(showDecision ? [{ label: 'Decision', width: '12', sort: 'due' }] : []),
+          { label: 'Owner', width: '10', hideOn: 'sm' as const, sort: 'owner' },
         ], shown.map((row) => {
           const overdue = isOverdue(row.decision_due_at) && isOpenStatus(row.status);
           return html`
           <tr class="${row.priority === 'urgent' ? 'row-urgent' : ''}">
-            <td class="col-sm-hide"><a href="/cases/${row.id}"><code>${row.ref}</code></a>
-                ${row.priority !== 'normal' ? badge(PRIORITY_LABELS[row.priority as keyof typeof PRIORITY_LABELS], row.priority === 'urgent' ? 'red' : 'amber') : ''}</td>
-            <td>
-              <a class="clamp-2" href="/cases/${row.id}">${row.title}</a>
-              ${/* The type used to sit here. With the title naming the matter
-                    by its type and client, repeating the type says nothing —
-                    what it is *about* does. Types with no descriptor yet keep
-                    the old line rather than losing one. */ ''}
-              <div class="muted small clamp-1">${row.descriptor || labelFor(types, row.case_type)}</div>
-              <div class="row-meta show-sm">
-                <code>${row.ref}</code>
-                <a href="/clients/${row.client_id}">${row.client_name}</a>
-                ${badge(CASE_STATUS_LABELS[row.status] ?? row.status, statusTone(row.status))}
-                ${row.priority !== 'normal'
-                  ? badge(PRIORITY_LABELS[row.priority as keyof typeof PRIORITY_LABELS], row.priority === 'urgent' ? 'red' : 'amber')
-                  : ''}
-              </div>
-              ${(tagsByCase.get(row.id) ?? []).length > 0
+            ${'' /* Whichever cell comes first carries the row on a phone,
+                     where the other columns are dropped and their content is
+                     folded in here as a sentence. With the Matter column off
+                     that is the reference cell, so the fold lives in a helper
+                     rather than being written twice and drifting apart. */}
+            ${(() => {
+              const priorityBadge = row.priority !== 'normal'
+                ? badge(PRIORITY_LABELS[row.priority as keyof typeof PRIORITY_LABELS],
+                        row.priority === 'urgent' ? 'red' : 'amber')
+                : '';
+              const onAPhone = html`
+                <div class="row-meta show-sm">
+                  <code>${row.ref}</code>
+                  <a href="/clients/${row.client_id}">${row.client_name}</a>
+                  ${badge(CASE_STATUS_LABELS[row.status] ?? row.status, statusTone(row.status))}
+                  ${priorityBadge}
+                </div>`;
+              // What the matter is *about*. The type sits in its own column, so
+              // this line says the thing no other column does; matters with no
+              // descriptor fall back to the type rather than showing nothing.
+              const descriptor = html`
+                <div class="muted small clamp-1">${row.descriptor || labelFor(types, row.case_type)}</div>`;
+              const tags = (tagsByCase.get(row.id) ?? []).length > 0
                 ? html`<div class="tag-row hide-sm">${(tagsByCase.get(row.id) ?? []).map((tag) => badge(tag.name, tag.colour))}</div>`
-                : ''}
-            </td>
+                : '';
+              return showMatter
+                ? html`
+                  <td class="col-sm-hide"><a href="/cases/${row.id}"><code>${row.ref}</code></a> ${priorityBadge}</td>
+                  <td>
+                    <a class="clamp-2" href="/cases/${row.id}">${row.title}</a>
+                    ${descriptor}${onAPhone}${tags}
+                  </td>`
+                : html`
+                  <td>
+                    <a href="/cases/${row.id}"><code>${row.ref}</code></a> ${priorityBadge}
+                    ${descriptor}${onAPhone}${tags}
+                  </td>`;
+            })()}
             <td class="small col-sm-hide"><a href="/clients/${row.client_id}">${row.client_name}</a></td>
             <td class="small col-sm-hide">${labelFor(types, row.case_type)}</td>
-            <td class="col-sm-hide">${badge(CASE_STATUS_LABELS[row.status] ?? row.status, statusTone(row.status))}</td>
+            ${'' /* The date a decision arrived belongs under the badge that
+                     says which decision it was: "Approved" over "31 Aug 2026"
+                     needs no third word, where a column headed Decision had to
+                     print "decided" on every row to explain itself. A matter
+                     still waiting keeps its date in the Decision column, for
+                     anyone who turns that column on. */}
+            <td class="col-sm-hide">
+              ${badge(CASE_STATUS_LABELS[row.status] ?? row.status, statusTone(row.status))}
+              ${'' /* Only where the badge above it says a decision was made.
+                       Some matters carry a decided_at from an earlier life —
+                       a reopened file, an imported one — and a bare date under
+                       "Lodged with INZ" reads as a decision that has not
+                       happened. */}
+              ${row.decided_at && (row.status === 'approved' || row.status === 'declined')
+                ? html`<div class="small muted">${dateShort(row.decided_at)}</div>`
+                : !showDecision && row.decision_due_at
+                  ? html`<div class="small ${overdue ? 'warn' : 'muted'}">due ${dateShort(row.decision_due_at)}</div>`
+                  : ''}
+            </td>
             <td class="small col-sm-hide">${row.lodged_at ? dateShort(row.lodged_at) : '—'}</td>
-            ${'' /* One column, three different facts, each labelled for what it
-                     is. A decided matter shows the date the decision came — it
-                     was showing the old expected date, which on an approval
-                     read as a deadline that had passed. Only a matter still
-                     waiting can be overdue. */}
-            <td class="small ${overdue ? 'warn' : ''}">
-              ${row.decided_at
-                ? html`${dateShort(row.decided_at)}<div class="muted">decided</div>`
-                : row.decision_due_at
-                  ? html`${dateShort(row.decision_due_at)}<div class="muted">${relativeDays(row.decision_due_at)}</div>`
-                  : row.next_action_due
-                    ? html`${dateShort(row.next_action_due)}<div class="muted">next action</div>`
-                    : '—'}</td>
+            ${showDecision
+              ? html`<td class="small ${overdue ? 'warn' : ''}">
+                  ${row.decided_at
+                    ? html`${dateShort(row.decided_at)}<div class="muted">decided</div>`
+                    : row.decision_due_at
+                      ? html`${dateShort(row.decision_due_at)}<div class="muted">${relativeDays(row.decision_due_at)}</div>`
+                      : row.next_action_due
+                        ? html`${dateShort(row.next_action_due)}<div class="muted">next action</div>`
+                        : '—'}</td>`
+              : ''}
             <td class="small col-sm-hide">${row.assignee_name ?? '—'}</td>
           </tr>`;
         }), { sticky: true, fixed: true, empty: 'No cases match that.',

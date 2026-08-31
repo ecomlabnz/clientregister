@@ -32,6 +32,19 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.76.0', date: '31 August 2026',
+    notes: [
+      'The case list drops the Matter and Decision columns. On most matters the title '
+        + 'was the client\u2019s name and the type over again, which the columns beside it '
+        + 'already say, and a decision\u2019s date now sits under the status badge that says '
+        + 'which decision it was. Both can be switched back on in your account settings.',
+      'A Clear button on the case filters, shown only when something is filtered.',
+      'The Clients page no longer says \u201cEveryone the practice acts for\u201d. The list '
+        + 'holds employers, sponsors, supporting partners and agents too, and the practice '
+        + 'does not act for them.',
+    ],
+  },
+  {
     version: '0.75.0', date: '31 August 2026',
     notes: [
       'Cases can now be filtered by type \u2014 AEWV, partner residence, visitor visa and the '
