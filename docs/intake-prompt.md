@@ -147,17 +147,45 @@ so — that disagreement is itself worth knowing about.
 
 ```
 client (how you are identifying the client — the same string you used for them
-        in clients.jsonl), title, descriptor, case_type, status, priority,
+        in clients.jsonl), descriptor, case_type, status, priority,
 inz_application_number, inz_client_number, lodged_at, decision_due_at,
 decided_at, outcome, next_action, next_action_due, summary,
 fee_quoted, fee_agreed, currency, opened_on, closed_on
 ```
 
+**`descriptor` is the matter's name, and there is no `title`.** This changed on
+31 August 2026 and it is the field the first two batches got wrong, so read
+this twice.
+
+A matter is already shown beside its reference, its client and its type — three
+columns that say who and what kind. The descriptor is the one thing they cannot
+say: **what this particular matter is about.** "Fresh application, chef's role
+with her current employer." "Partner of an AEWV holder, de facto basis."
+"Reply to a PPI letter about the relationship evidence."
+
+Do **not** write "NGUYEN, Ngoc Bich - Accredited Employer Work Visa". That is
+the client column and the type column read back, and producing it for every
+matter is exactly what made the earlier batches unreadable. If the only thing
+you can honestly say is the client and the type, the folder has told you
+nothing — say so in `findings.md` rather than filling the field with the two
+facts already recorded elsewhere.
+
+Keep it to one line, under 160 characters, and take it from what the folder
+actually shows — the role and the employer, the ground of the request, which
+application this is among several for the same person.
+
 Statuses, in order: `lead`, `engaged`, `gathering_documents`, `preparing`,
-`ready_to_lodge`, `lodged`, `inz_rfi`, `ppi`, `interim_visa`,
-`decision_pending`, `approved`, `declined`, `appeal`, `on_hold`, `withdrawn`,
-`closed`. Map the folder's own words (`Granted`, `SUBMITTED`) to one of these,
-and keep the original wording in `summary` or a note.
+`ready_to_lodge`, `lodged`, `ppi`, `interim_visa`, `decision_pending`,
+`approved`, `declined`, `ipt_appeal`, `reconsideration`, `on_hold`,
+`withdrawn`, `closed`. Map the folder's own words (`Granted`, `SUBMITTED`) to
+one of these, and keep the original wording in `summary` or a note.
+
+Two of these changed on 31 August 2026: `inz_rfi` is gone — a request for
+further information and a PPI letter are both `ppi`, "PPI / RFI letter
+received", and which kind it was belongs in the note recording the letter. And
+`appeal` split into `ipt_appeal` (with the Tribunal) and `reconsideration`
+(asking INZ again, or a s.61 request), because they are different places with
+different clocks.
 
 Use the keys in `case-type-keys.txt`. Do not force a matter into a type that
 does not fit: invent a key, say what it means, and list every invented key in

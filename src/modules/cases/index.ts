@@ -116,7 +116,7 @@ function caseForm(
   const action = values.id ? `/cases/${values.id}` : '/cases';
   return html`
     ${errorList(errors)}
-    <form method="post" action="${action}" class="form-grid js-case-form">
+    <form method="post" action="${action}" class="form-grid">
       ${csrfField(csrf)}
       <div class="form-section">
         <h3>Matter</h3>
@@ -126,24 +126,34 @@ function caseForm(
                  and the title is typed, as it always was. */}
         <div class="field">
           <label for="f_client_id">Client<span class="req"> *</span></label>
-          <select id="f_client_id" name="client_id" required class="js-case-client">
+          <select id="f_client_id" name="client_id" required>
             <option value="">Choose a client</option>
-            ${clients.map((cl) => html`<option value="${cl.value}" data-formal="${cl.formal ?? ''}"
+            ${clients.map((cl) => html`<option value="${cl.value}"
               ${cl.value === (values.client_id ?? '') ? raw('selected') : ''}>${cl.label}</option>`)}
           </select>
         </div>
-        ${field({ label: 'Matter title', name: 'title', value: values.title, required: true, maxlength: 200,
-                  placeholder: 'e.g. AEWV. RUBEZHANSKII, Aleksei',
-                  hint: 'The name of the matter. Filled in from the type and the client as you '
-                    + 'choose them; change it freely.' })}
-        ${field({ label: 'What it is about', name: 'descriptor', value: values.descriptor, maxlength: 160,
-                  placeholder: 'e.g. Orchard worker, Kiwi Orchards',
-                  hint: 'The line under the title in every list. What distinguishes this matter '
-                    + 'from the next one of the same kind for the same person — the role and the '
-                    + 'employer, the ground of the request. Optional.' })}
+        ${'' /* One naming field, not two.
+                 There used to be a "Matter title" here as well, pre-filled from
+                 the client and the type as you chose them. Pre-filling was the
+                 fault: it arrived looking complete, so nobody ever replaced it,
+                 and every matter ended up named "SURNAME, Given — Type" — which
+                 is the client column and the type column read back. A field
+                 that arrives plausibly filled in never gets corrected, and buys
+                 the appearance of being answered at the cost of the answer.
+                 `title` is still a column, still NOT NULL, and is now *derived*
+                 from this one: one fact, one owner. It is kept rather than
+                 dropped because a practice may one day want a name for a matter
+                 that is not its description. */}
+        ${field({ label: 'What this matter is about', name: 'descriptor', value: values.descriptor,
+                  required: true, maxlength: 160,
+                  placeholder: 'e.g. Fresh application, chef’s role with her current employer',
+                  hint: 'How this matter reads in every list. The reference, the client and the '
+                    + 'type are already columns of their own — this is the thing they cannot say. '
+                    + 'What distinguishes it from the next matter of the same kind for the same '
+                    + 'person: the role and the employer, the ground of the request.' })}
         <div class="field">
           <label for="f_case_type">Case type<span class="req"> *</span></label>
-          <select id="f_case_type" name="case_type" required class="js-case-type">
+          <select id="f_case_type" name="case_type" required>
             <option value="">Choose a type</option>
             ${termOptions(types).map((t) => html`<option value="${t.value}"
               ${t.value === (values.case_type ?? '') ? raw('selected') : ''}>${t.label}</option>`)}
@@ -205,10 +215,23 @@ function readCaseForm(f: FormReader, types: Term[]) {
   if (submittedType && !isTerm(types, submittedType)) {
     f.errors['case_type'] = 'That is not one of the case types you have configured.';
   }
+  const descriptor = f.text('descriptor', { required: true, label: 'What this matter is about', max: 160 });
   return {
     client_id: f.text('client_id', { required: true, label: 'Client', max: 60 }),
-    title: f.text('title', { required: true, label: 'Matter title', max: 200 }),
-    descriptor: f.optional('descriptor', { max: 160 }),
+    descriptor,
+    // Derived, not typed, and written from one place.
+    //
+    // `title` is NOT NULL and several pages still read it — the matter's own
+    // heading, the client's case list, the AI brief — so it is fed from the
+    // description rather than being a second name for the same thing that
+    // drifts away from it. The form no longer asks for a title at all: it used
+    // to arrive pre-filled from the client and the type, which is why every
+    // matter ended up named after two columns that were already on the row.
+    //
+    // The column stays because a practice may one day want a matter named
+    // something other than its description. On the day the form offers it
+    // again, this line is what to remove.
+    title: descriptor,
     case_type: submittedType,
     priority: f.enum('priority', PRIORITIES, { fallback: 'normal' })!,
     assigned_to: f.text('assigned_to', { required: true, label: 'Assigned to', max: 60 }),
@@ -267,11 +290,14 @@ export const casesModule: AppModule = {
         params.push(c.get('user')!.id);
         where.push(`k.assigned_to = ${p()}`);
       }
+      // The Matter column is on by default again. It was turned off on 31
+      // August because it repeated the client and the type; since a matter is
+      // named by what it is about, it is the column that says the most.
+      const showMatter = asPrefBoolean(prefs['pref.cases_show_matter'], true);
+      const showDecision = asPrefBoolean(prefs['pref.cases_show_decision'], false);
       // Filter by what kind of matter it is. The types are vocabulary — the
       // practice edits the list in Settings — so this offers whatever is
       // configured rather than a list baked in here.
-      const showMatter = asPrefBoolean(prefs['pref.cases_show_matter'], false);
-      const showDecision = asPrefBoolean(prefs['pref.cases_show_decision'], false);
       const typeFilter = c.req.query('type') ?? '';
       if (typeFilter && types.some((t) => t.key === typeFilter)) {
         // Push first, then ask for the placeholder: `p()` numbers from
@@ -406,9 +432,14 @@ export const casesModule: AppModule = {
               return showMatter
                 ? html`
                   <td class="col-sm-hide"><a href="/cases/${row.id}"><code>${row.ref}</code></a> ${priorityBadge}</td>
+                  ${'' /* Only the description. A matter is named by what it is
+                           about, so the name and the description are the same
+                           sentence — printing both put it on the screen
+                           twice, which is what made the column look
+                           redundant in the first place. */}
                   <td>
                     <a class="clamp-2" href="/cases/${row.id}">${row.title}</a>
-                    ${descriptor}${onAPhone}${tags}
+                    ${onAPhone}${tags}
                   </td>`
                 : html`
                   <td>

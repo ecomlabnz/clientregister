@@ -246,10 +246,14 @@ describe('what the case list shows, and what it keeps back', () => {
    * every row to explain a date the status badge beside it already accounted
    * for.
    *
-   * Both are preferences rather than deletions. On an AEWV the title really is
-   * pure repetition; on a Privacy Act request or a PPI response it is the only
-   * thing on the row that says what the matter is. Off by default, and back in
-   * one click.
+   * Both became preferences rather than deletions, and both went off. Later
+   * the same day the cause of the first was fixed rather than hidden: a matter
+   * is now named by what it is about, so the Matter column carries the one
+   * thing no other column says and is on again. The Decision column stays off.
+   *
+   * What is pinned here is that each switch works on its own, and that the
+   * description is on the row either way — under the reference when the column
+   * is off, in the column when it is on, and never in both places at once.
    */
   const withPrefs = async (h: any, prefs: Record<string, string>) => {
     for (const [key, value] of Object.entries(prefs)) {
@@ -265,29 +269,9 @@ describe('what the case list shows, and what it keeps back', () => {
       .map((m) => m[1]!.replace(/<[^>]*>/g, '').replace(/[↕↑↓]/g, '').trim())
       .filter(Boolean);
 
-  it('leaves both columns out unless they are asked for', async () => {
-    const h = mount();
-    seed(h);
-    const heads = headings(await (await h.request('/cases?scope=all')).text());
-    expect(heads).not.toContain('Matter');
-    expect(heads).not.toContain('Decision');
-    expect(heads).toContain('Client');
-    expect(heads).toContain('Type');
-  });
-
-  it('brings each back on its own when the preference is set', async () => {
-    const h = mount();
-    seed(h);
-    await withPrefs(h, { 'pref.cases_show_matter': 'true' });
-    const heads = headings(await (await h.request('/cases?scope=all')).text());
-    expect(heads).toContain('Matter');
-    // The other stays out: two switches, not one.
-    expect(heads).not.toContain('Decision');
-  });
-
-  it('keeps the row description when the Matter column is off', async () => {
-    // The title goes; what the matter is *about* must not go with it.
-    const h = mount();
+  /** One matter whose name and description differ, so the two can be told
+      apart on the page. */
+  const seedNamed = (h: any) => {
     h.db.prepare(`INSERT INTO users (id,email,name,password_hash,role,created_at,updated_at)
                   VALUES (?,?,?,'x',?,?,?)`).run(USER.id, USER.email, USER.name, USER.role, AT, AT);
     h.db.prepare(`INSERT INTO clients (id,ref,kind,full_name,status,created_at,updated_at)
@@ -296,9 +280,57 @@ describe('what the case list shows, and what it keeps back', () => {
                                      assigned_to,created_at,updated_at)
                   VALUES ('K1','CASE-26-001','CL1','A title','Knife hand, Southland',
                           'wv_aewv','lodged',?,?,?)`).run(USER.id, AT, AT);
+  };
+
+  it('opens with the Matter column in and the Decision column out', async () => {
+    const h = mount();
+    seed(h);
+    const heads = headings(await (await h.request('/cases?scope=all')).text());
+    expect(heads).toContain('Matter');
+    expect(heads).not.toContain('Decision');
+    expect(heads).toContain('Client');
+    expect(heads).toContain('Type');
+  });
+
+  it('turns each one on its own', async () => {
+    // Two switches, not one: asking for the Decision column must not drop the
+    // Matter column, and turning the Matter column off must not bring the
+    // Decision column in.
+    const on = mount();
+    seed(on);
+    await withPrefs(on, { 'pref.cases_show_decision': 'true' });
+    const withDecision = headings(await (await on.request('/cases?scope=all')).text());
+    expect(withDecision).toContain('Decision');
+    expect(withDecision).toContain('Matter');
+
+    const off = mount();
+    seed(off);
+    await withPrefs(off, { 'pref.cases_show_matter': 'false' });
+    const withoutMatter = headings(await (await off.request('/cases?scope=all')).text());
+    expect(withoutMatter).not.toContain('Matter');
+    expect(withoutMatter).not.toContain('Decision');
+  });
+
+  it('keeps the row description when the Matter column is off', async () => {
+    // The column goes; what the matter is *about* must not go with it.
+    const h = mount();
+    seedNamed(h);
+    await withPrefs(h, { 'pref.cases_show_matter': 'false' });
     const body = await (await h.request('/cases?scope=all')).text();
     expect(body).toContain('Knife hand, Southland');
     expect(body).toContain('CASE-26-001');
+  });
+
+  it('says what the matter is about once, not twice, when the column is on', async () => {
+    // The column and the line under the reference were both on the row for a
+    // few hours, printing the same sentence twice. That is what made the
+    // column look redundant in the first place.
+    const h = mount();
+    seedNamed(h);
+    const row = (await (await h.request('/cases?scope=all')).text())
+      .match(/<tbody>[\s\S]*?<\/tbody>/)![0];
+    expect(row).toContain('A title');
+    expect(row.match(/Knife hand, Southland/g) ?? []).toHaveLength(0);
   });
 
   it('puts a decision date under the badge only when a decision was made', async () => {
