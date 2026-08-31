@@ -53,7 +53,7 @@ export const assistantModule: AppModule = {
   name: 'assistant',
   title: 'Assistant',
   basePaths: ['/assistant'],
-  nav: [{ href: '/assistant', label: 'Assistant', permission: 'ai:run', order: 15 }],
+  nav: [{ href: '/assistant', label: 'Assistant', permission: 'ai:run', order: 15, group: 'Tools' }],
   settings: [AI_SETTINGS],
 
   register(app) {

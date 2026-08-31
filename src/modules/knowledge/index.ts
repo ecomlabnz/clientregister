@@ -50,7 +50,7 @@ export const knowledgeModule: AppModule = {
   name: 'knowledge',
   title: 'Knowledge base',
   basePaths: ['/knowledge'],
-  nav: [{ href: '/knowledge', label: 'Knowledge', permission: 'register:read', order: 25 }],
+  nav: [{ href: '/knowledge', label: 'Knowledge', permission: 'register:read', order: 25, group: 'Tools' }],
   settings: [KNOWLEDGE_SETTINGS],
 
   register(app) {

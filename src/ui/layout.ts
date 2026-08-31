@@ -4,6 +4,7 @@ import type { Context } from 'hono';
 import type { AppContext } from '../types';
 import { html, raw, type Raw } from './html';
 import { getNavItems } from './nav-store';
+import { navEntries } from '../core/module';
 import { visibleNav } from '../core/module';
 import { initials } from './format';
 import { APP_VERSION } from '../version';
@@ -78,13 +79,32 @@ ${opts.landing
     : html`
 <header class="topbar">
   <a class="brand" href="/">${appName}</a>
+  ${'' /* Grouped items collapse into a heading that opens on press. Built on
+           `<details>` like every other disclosure here, so it needs no script —
+           and it closes when the page navigates, because each link is a real
+           link and the page is rendered fresh. A group whose page you are on
+           renders open, so you can see where you are without pressing
+           anything. */}
   <nav class="topnav">
-    ${nav.map(
-      (item) => html`<a href="${item.href}"
-        class="${opts.active === item.href ? 'nav-link current' : 'nav-link'}">${item.label}</a>`,
-    )}
+    ${navEntries(nav.filter((item) => !item.corner)).map((entry) => (entry.kind === 'item'
+      ? html`<a href="${entry.item.href}"
+          class="${opts.active === entry.item.href ? 'nav-link current' : 'nav-link'}">${entry.item.label}</a>`
+      : html`
+        <details class="nav-group" ${entry.items.some((i) => i.href === opts.active) ? raw('open') : ''}>
+          <summary class="${entry.items.some((i) => i.href === opts.active) ? 'nav-link current' : 'nav-link'}">
+            ${entry.label}
+          </summary>
+          <div class="nav-group-items">
+            ${entry.items.map((item) => html`<a href="${item.href}"
+              class="${opts.active === item.href ? 'nav-link current' : 'nav-link'}">${item.label}</a>`)}
+          </div>
+        </details>`))}
   </nav>
   <div class="topbar-right">
+    ${'' /* Reached occasionally and never scanned past, so out of the run and
+             beside the account controls. */}
+    ${nav.filter((item) => item.corner).map((item) => html`<a href="${item.href}"
+      class="${opts.active === item.href ? 'nav-corner current' : 'nav-corner'}">${item.label}</a>`)}
     ${user
       ? html`${/* One box for the whole register, on every page. A plain GET
                    form: it needs no scripting to work, and the results page
