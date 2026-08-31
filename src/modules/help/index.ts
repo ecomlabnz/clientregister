@@ -34,6 +34,10 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
     version: '0.83.0', date: '1 September 2026',
     notes: [
+      'A matter opened from a document now has a description, like every other matter. That form '
+        + 'was still asking for a title after the rest of the register stopped, so the one matter '
+        + 'opened that way arrived with nothing in the column the case list and the file both read. '
+        + 'It has been repaired.',
       'Passports and certificates have moved out of the narrow column and into the main one, with '
         + 'proper buttons \u2014 \u201cAdd another passport\u201d and \u201cAdd a police '
         + 'certificate, medical or x-ray\u201d. A passport is the document a file works from; it '

@@ -245,8 +245,17 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
 
         ${card('The matter', html`
           <div class="settings-form">
-            <div class="settings-cell-wide">${field({ label: 'Title', name: 'title', required: true,
-              value: proposedTitle, maxlength: 200 })}</div>
+            ${'' /* One naming field, as everywhere else. A matter is named by
+                     what it is about — "Fresh application, chef role with her
+                     current employer" — not by its client and its type read
+                     back, which the columns beside it already say. This form
+                     was still asking for a title after the rest of the register
+                     stopped, so a matter opened from a document arrived with no
+                     description at all. */}
+            <div class="settings-cell-wide">${field({ label: 'What this matter is about',
+              name: 'descriptor', required: true, value: proposedTitle, maxlength: 200,
+              hint: 'A sentence a colleague could read instead of the file: what is being applied '
+                + 'for, for whom, and anything that makes this matter itself.' })}</div>
             <div class="settings-cell">${select({ label: 'Type', name: 'case_type', required: true,
               value: reading.case_type ?? '', includeBlank: '— choose —',
               options: termOptions(types) })}</div>
@@ -324,7 +333,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     const form = await c.req.formData();
     const f = new FormReader(form);
 
-    const title = f.text('title', { required: true, label: 'Title', max: 200 });
+    const descriptor = f.text('descriptor', { required: true, label: 'What this matter is about', max: 200 });
     const caseType = f.text('case_type', { required: true, label: 'Type', max: 60 });
     const status = f.enum('status', CASE_STATUSES, { fallback: 'engaged' })!;
     if (!f.valid) return redirectWith(c, '/assistant/intake', Object.values(f.errors)[0]!, 'err');
@@ -356,11 +365,13 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     const caseRef = await nextYearlyRef(c.env.DB, 'case', 'CASE');
     await run(
       c.env.DB,
-      `INSERT INTO cases (id, ref, client_id, title, case_type, status, priority, assigned_to,
+      `INSERT INTO cases (id, ref, client_id, title, descriptor, case_type, status, priority, assigned_to,
           inz_application_number, inz_client_number, lodged_at, decision_due_at, summary,
           currency, created_at, updated_at, created_by)
-       VALUES (?,?,?,?,?,?, 'normal', ?,?,?,?,?,?, 'NZD', ?,?,?)`,
-      caseId, caseRef, clientId, title, caseType, status,
+       VALUES (?,?,?,?,?,?,?, 'normal', ?,?,?,?,?,?, 'NZD', ?,?,?)`,
+      // Derived, not typed, and written from one place: the description is the
+      // name, and `title` follows it.
+      caseId, caseRef, clientId, descriptor, descriptor, caseType, status,
       f.optional('assigned_to', { max: 80 }),
       f.optional('inz_application_number', { max: 40 }),
       f.optional('inz_client_number', { max: 40 }),
