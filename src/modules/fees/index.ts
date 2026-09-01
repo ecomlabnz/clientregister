@@ -589,12 +589,11 @@ export const feesModule: AppModule = {
 
       return page(c, { title: 'Fees', active: '/fees' }, html`
         ${pageHeader('Fees', 'Billed work across the practice, and how it splits.')}
-        <form method="get" action="/fees" class="filters">
-          <label class="small">From <input type="date" name="from" value="${from}"></label>
-          <label class="small">To <input type="date" name="to" value="${to}"></label>
-          <button class="btn btn-secondary" type="submit">Apply</button>
-        </form>
 
+        ${'' /* The figures come before the controls that narrow them, as on
+                 every other list in the register. Reversed, the page opened on
+                 two empty date boxes and the reader had to look past them to
+                 find the number they came for. */}
         <div class="fee-summary">
           <div class="stat"><span class="stat-label">Net</span><span class="stat-value">${money(totals.totalNet)}</span></div>
           <div class="stat"><span class="stat-label">GST</span><span class="stat-value">${money(totals.totalGst)}</span></div>
@@ -603,6 +602,13 @@ export const feesModule: AppModule = {
           <div class="stat ${totals.outstandingGross > 0 ? 'stat-warn' : ''}">
             <span class="stat-label">Outstanding</span><span class="stat-value">${money(totals.outstandingGross)}</span></div>
         </div>
+
+        <form method="get" action="/fees" class="filters">
+          <label class="small">From <input type="date" name="from" value="${from}"></label>
+          <label class="small">To <input type="date" name="to" value="${to}"></label>
+          <button class="btn btn-secondary" type="submit">Apply</button>
+          ${from || to ? html`<a class="btn btn-link" href="/fees">Clear</a>` : ''}
+        </form>
 
         ${card('Split by party', table(['Party', 'Amount'],
           [...partyTotals.entries()].map(([key, v]) => html`

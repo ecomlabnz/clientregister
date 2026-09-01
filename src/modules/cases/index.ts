@@ -20,7 +20,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
-  badge, csrfField, emptyState, errorList, field, flagBand, flagRaiser, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
+  badge, csrfField, emptyState, errorList, field, flagBand, flagRaiser, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem, viewTabs,
 } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate, dateOrDateTime, instantForDate } from '../../ui/format';
 import {
@@ -267,9 +267,13 @@ export const casesModule: AppModule = {
       const PAGE_SIZE = pageSizeFor(c.req.query('size'), prefs['pref.page_size']);
       const q = (c.req.query('q') ?? '').trim();
       const status = c.req.query('status') ?? '';
-      const assigned = c.req.query('assigned') ?? '';
-      // A view the person asked for wins; otherwise where they said they like to start.
+      // A view the person asked for wins; otherwise where they said they like to
+      // start. "Open", "mine" and "all" are errands, not filters — which is why
+      // they are tabs across the top rather than two more dropdowns in a bar
+      // that already held six controls. `assigned` is still read from the query
+      // so an old bookmarked link keeps working; the tabs write `scope=mine`.
       const scope = c.req.query('scope') ?? prefs['pref.cases_scope'] ?? 'open';
+      const assigned = scope === 'mine' ? 'me' : (c.req.query('assigned') ?? '');
       const pageNum = pageNumberFor(c.req.query('page'));
 
       const where: string[] = [];
@@ -289,7 +293,7 @@ export const casesModule: AppModule = {
       if (status && (CASE_STATUSES as readonly string[]).includes(status)) {
         params.push(status);
         where.push(`k.status = ${p()}`);
-      } else if (scope === 'open') {
+      } else if (scope === 'open' || scope === 'mine') {
         where.push(`k.status IN (${OPEN_CASE_STATUSES.map(() => '?').join(',')})`);
         params.push(...OPEN_CASE_STATUSES);
       }
@@ -351,14 +355,33 @@ export const casesModule: AppModule = {
         listTags(c.env),
       ]);
 
+      // One query for the three counts. A tab bar that had to run three
+      // queries to say what it holds would not be worth the width.
+      const counts = await one<{ open: number; mine: number; total: number }>(
+        c.env.DB,
+        `SELECT SUM(status IN (${OPEN_CASE_STATUSES.map(() => '?').join(',')})) AS open,
+                SUM(status IN (${OPEN_CASE_STATUSES.map(() => '?').join(',')})
+                    AND assigned_to = ?) AS mine,
+                COUNT(*) AS total FROM cases`,
+        ...OPEN_CASE_STATUSES, ...OPEN_CASE_STATUSES, c.get('user')!.id,
+      );
+
       const qs = (over: Record<string, string | number>) =>
         new URLSearchParams({ q, status, assigned, scope, type: typeFilter, tag: tagFilter, sort: sortKey, dir: sortDir, page: String(pageNum), size: String(PAGE_SIZE), ...Object.fromEntries(Object.entries(over).map(([k2, v]) => [k2, String(v)])) }).toString();
 
       return page(c, { title: 'Cases', active: '/cases' }, html`
         ${pageHeader('Cases', 'Every matter the practice is running.',
           can(c.get('user'), 'register:write') ? html`<a class="btn btn-primary" href="/cases/new">New case</a>` : undefined)}
+        ${viewTabs([
+          { id: 'open', label: 'Open', count: counts?.open ?? 0 },
+          { id: 'mine', label: 'Mine', count: counts?.mine ?? 0 },
+          { id: 'all', label: 'All', count: counts?.total ?? 0 },
+        ].map((v) => ({ ...v, current: v.id === scope,
+                        href: `/cases?scope=${v.id}&size=${String(PAGE_SIZE)}` })))}
         <form method="get" action="/cases" class="filters" data-live-search>
           <input type="hidden" name="size" value="${String(PAGE_SIZE)}">
+          ${'' /* The view is carried, not restated: it is the tab bar above. */}
+          <input type="hidden" name="scope" value="${scope}">
           <input type="search" name="q" value="${q}" placeholder="Search matter, client, reference or INZ number">
           <select name="status">
             <option value="">${scope === 'all' ? 'All statuses' : 'Open statuses'}</option>
@@ -368,14 +391,6 @@ export const casesModule: AppModule = {
             <option value="">Any type</option>
             ${types.map((t) => html`<option value="${t.key}" ${t.key === typeFilter ? raw('selected') : ''}>${t.label}</option>`)}
           </select>
-          <select name="scope">
-            <option value="open" ${scope === 'open' ? raw('selected') : ''}>Open only</option>
-            <option value="all" ${scope === 'all' ? raw('selected') : ''}>Everything</option>
-          </select>
-          <select name="assigned">
-            <option value="">Anyone</option>
-            <option value="me" ${assigned === 'me' ? raw('selected') : ''}>Assigned to me</option>
-          </select>
           <select name="tag">
             <option value="">Any tag</option>
             ${allTags.map((tag) => html`<option value="${tag.name}" ${tag.name === tagFilter ? raw('selected') : ''}>${tag.name} (${tag.uses})</option>`)}
@@ -383,8 +398,9 @@ export const casesModule: AppModule = {
           <button class="btn btn-secondary" type="submit">Filter</button>
           ${'' /* Only when there is something to clear: a permanent Clear on an
                    unfiltered list is a button that does nothing, and the reader
-                   has to work out which it is. */}
-          ${q || status || assigned || typeFilter || tagFilter
+                   has to work out which it is. The view is not something to
+                   clear — it is a tab, and clearing it would move the reader. */}
+          ${q || status || typeFilter || tagFilter
             ? html`<a class="btn btn-link" href="/cases?scope=${scope}&size=${String(PAGE_SIZE)}">Clear</a>`
             : ''}
         </form>
