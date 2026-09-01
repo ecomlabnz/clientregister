@@ -25,7 +25,7 @@
 import type { Env } from '../types';
 import { all, nowIso, one, run } from './db';
 import { newId } from './ids';
-import { likeTerm, normaliseQuery } from './search';
+import { everyOtherTerm, likeTerm, normaliseQuery, otherTermPatterns, searchTerms } from './search';
 
 export type FilingTarget = 'case' | 'client';
 
@@ -228,8 +228,13 @@ export async function filingSearch(
   const q = normaliseQuery(rawQuery);
   // One character matches most of the register and answers nothing.
   if (q.length < 2) return [];
-  const like = likeTerm(q);
   const upper = q.toUpperCase();
+  // Every word, in any order — the same rule as everywhere else, and the reason
+  // "NGUYEN Minh Khuong" finds a client stored as "Minh Khuong NGUYEN". `like`
+  // is the first word; the phrase is only used for the exact-reference test.
+  const terms = searchTerms(q);
+  const like = likeTerm(terms[0] ?? q);
+  const rest = otherTermPatterns(terms);
 
   const [cases, clients] = await Promise.all([
     all<{ id: string; ref: string; title: string; descriptor: string | null; status: string;
@@ -238,24 +243,29 @@ export async function filingSearch(
       `SELECT k.id, k.ref, k.title, k.descriptor, k.status, k.inz_application_number,
               cl.full_name AS client_name
          FROM cases k LEFT JOIN clients cl ON cl.id = k.client_id
-        WHERE k.ref LIKE ?1 ESCAPE '\\' OR k.title LIKE ?1 ESCAPE '\\'
+        WHERE (k.ref LIKE ?1 ESCAPE '\\' OR k.title LIKE ?1 ESCAPE '\\'
            OR k.descriptor LIKE ?1 ESCAPE '\\' OR k.summary LIKE ?1 ESCAPE '\\'
            OR k.inz_application_number LIKE ?1 ESCAPE '\\'
            OR k.inz_client_number LIKE ?1 ESCAPE '\\'
-           OR cl.full_name LIKE ?1 ESCAPE '\\'
+           OR cl.full_name LIKE ?1 ESCAPE '\\')${
+             everyOtherTerm(['k.ref', 'k.title', 'k.descriptor', 'k.summary',
+                             'k.inz_application_number', 'k.inz_client_number',
+                             'cl.full_name'], terms, 4)}
         ORDER BY CASE WHEN k.ref = ?2 THEN 0 ELSE 1 END,
                  CASE WHEN k.status IN ('closed', 'withdrawn') THEN 1 ELSE 0 END,
                  k.updated_at DESC
-        LIMIT ?3`, like, upper, limit),
+        LIMIT ?3`, like, upper, limit, ...rest),
     all<{ id: string; ref: string; full_name: string; email: string | null; status: string }>(
       env.DB,
       `SELECT id, ref, full_name, email, status FROM clients
-        WHERE ref LIKE ?1 ESCAPE '\\' OR full_name LIKE ?1 ESCAPE '\\'
+        WHERE (ref LIKE ?1 ESCAPE '\\' OR full_name LIKE ?1 ESCAPE '\\'
            OR family_name LIKE ?1 ESCAPE '\\' OR given_names LIKE ?1 ESCAPE '\\'
            OR preferred_name LIKE ?1 ESCAPE '\\' OR email LIKE ?1 ESCAPE '\\'
-           OR phone LIKE ?1 ESCAPE '\\' OR nzbn LIKE ?1 ESCAPE '\\'
+           OR phone LIKE ?1 ESCAPE '\\' OR nzbn LIKE ?1 ESCAPE '\\')${
+             everyOtherTerm(['ref', 'full_name', 'family_name', 'given_names',
+                             'preferred_name', 'email', 'phone', 'nzbn'], terms, 4)}
         ORDER BY CASE WHEN ref = ?2 THEN 0 ELSE 1 END, full_name
-        LIMIT ?3`, like, upper, limit),
+        LIMIT ?3`, like, upper, limit, ...rest),
   ]);
 
   // Matters first: an email is about a matter more often than about a person,
