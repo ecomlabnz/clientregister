@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.90.0', date: '1 September 2026',
+    notes: [
+      'If a client or a matter is ever removed from the register, the register now records it '
+        + 'itself \u2014 which file, what it was called and when it went. Before this, a record '
+        + 'taken out from behind the scenes left no trace at all. Removing a client also records '
+        + 'each of their matters, so every file number is accounted for.',
+    ],
+  },
+  {
     version: '0.89.5', date: '1 September 2026',
     notes: [
       'Editing a fee line saves again. Saving, changing a status and deleting a fee all returned '

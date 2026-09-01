@@ -7,6 +7,41 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.90.0 — 1 September 2026
+
+### Added
+- **A client or matter that is removed from the register now says so, in the
+  register's own hand.** The database writes the audit entry itself, on an
+  `AFTER DELETE` trigger, recording the reference, the name and the moment.
+  Nothing can take a record out quietly — not the application, not a bulk load,
+  not somebody running a statement by hand at a console.
+
+  This came out of a real gap. On 1 September a client file was removed at the
+  practice's instruction with a `DELETE` run straight against production. There
+  is no route in the application that deletes a client, so there was no other
+  way to do it — and a statement run by hand writes nothing to the audit log.
+  The record left and nothing anywhere said so; it was found by counting, when
+  the reference sequence showed a gap the audit log could not explain. The
+  removal has now been written up in the audit log after the fact, saying which
+  file, why, on whose instruction, and that the entry was written late.
+
+  Deleting a client cascades to its matters, so a removal writes one entry for
+  the client and one for each matter that went with it. A cascade is precisely
+  the case a handler-written audit entry misses, because no handler runs.
+
+  This is the third time an audit entry has been found missing because a route
+  owned it rather than the database. Mutation-tested: with the trigger removed,
+  every one of the five tests fails.
+
+### Changed
+- The mistakes ledger gains its nineteenth entry — *a change made by hand writes
+  no audit row* — with both halves of the rule: write the entry yourself when
+  you change something by hand, and reconcile the reference count, because an
+  unexplained gap is the alarm.
+- The 0.84–0.89 progress report no longer prints a client's reference beside
+  their years of birth, and records that the practice reversed one identity
+  answer the same day it gave it.
+
 ## 0.89.5 — 1 September 2026
 
 ### Fixed
