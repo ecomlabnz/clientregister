@@ -37,6 +37,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.92.0', date: '1 September 2026',
+    notes: [
+      'Two new things under Admin \u2192 Export. Your client list now includes the INZ client '
+        + 'number, gathered from that person\u2019s matters, and there is a new download for the '
+        + 'dropdown lists you can edit \u2014 case types, visa types and the rest. Both are what '
+        + 'the folder-reading session needs before it starts, and neither could be produced before.',
+    ],
+  },
+  {
     version: '0.91.2', date: '1 September 2026',
     notes: [
       'The folder-reading instructions were corrected after a second opinion. One example in them '
