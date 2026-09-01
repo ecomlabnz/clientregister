@@ -160,8 +160,7 @@ Fable's other corrections — the "one real batch" header, and the register coun
 ## Four things worth a second pair of eyes
 
 **1. The intake form was missed by the 0.78.0 naming change.** Querying the live
-register for this report turned up one matter, `CASE-26-060`, with a title and
-no description. The matter form stopped asking for a title in 0.78.0; the form
+register for this report turned up one matter with a title and no description. The matter form stopped asking for a title in 0.78.0; the form
 that opens a matter from a read document did not, so it wrote `title` and left
 `descriptor` empty — the column the case list, the client's file and the AI
 brief all now read. Fixed and repaired by migration 0056 in the same PR.

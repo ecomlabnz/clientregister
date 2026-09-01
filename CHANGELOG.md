@@ -7,6 +7,47 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.91.1 — 1 September 2026
+
+### Added
+- **A test now holds the three edits of a release against each other** — the
+  version in `package.json`, the entry in `CHANGELOG.md`, and the line under
+  Help → Recent changes. The rule was written down and nothing enforced it, and
+  the one that drifts is always Help, because it is the one a developer never
+  sees while working.
+
+  It found a gap on its first run: **0.5.0 was on the Help page and missing from
+  the changelog entirely**, which jumped from 0.6.0 straight to 0.4.0. That entry
+  is now reconstructed from what Help recorded, and says that it was.
+
+### Documentation
+- **The intake prompt is rewritten, and there is only one of it now.** A second
+  document — a brief for one particular batch — had appeared the same day, and
+  within hours the two disagreed about how to identify a person. The standing
+  prompt still said *"the passport number is what settled it. Names do not
+  identify a person here"*, which is the opposite of the practice's decision of
+  1 September, and would have had the next extraction repeat the fault that
+  decision was made to prevent. The brief is folded in and deleted.
+
+  Four contradictions were cleared: identity by passport (three places), the
+  missing `inz_investigation` status, `opened_on` listed with no provenance and
+  no year rule, and a claim to have been through two batches when it has been
+  through three.
+
+  New in it: start from the `PREVIEW` PDF each folder holds; what not to read;
+  the three-answer identity rule; how a matter gets its year and where that year
+  may honestly come from; the warnings convention; what to do when a batch is a
+  closed archive, and when it is very large.
+
+- **Corrected the mistakes ledger's rule on client data**, which was stricter
+  than the practice and stricter than sense. It banned references outright — but
+  a bare reference discloses nothing, and pointing at a client by reference is
+  exactly how you write about a real record without naming somebody. What is not
+  allowed is a reference *carrying facts about that client*. Examples now use a
+  number outside the range the register has issued, so nobody has to work out
+  whether a snippet points at a real person. Four such references were replaced
+  in the process.
+
 ## 0.91.0 — 1 September 2026
 
 ### Changed
@@ -3433,6 +3474,19 @@ about. AI as the scout, rules as the guard.
 - Settings are typed and validated from their declarations. Only a declared key
   can be written, and a partial form post no longer blanks fields it did not
   mention.
+
+## 0.5.0 — 28 August 2026
+
+*Reconstructed on 1 September 2026 from Help → Recent changes, which recorded
+this release when the changelog did not. The list below is what that page says
+shipped; it is not a fuller account, because there is no fuller account to give.*
+
+### Added
+- Settings, with tabs for practice details, security, fees, alerts and channels.
+- Quotes can be printed, emailed and cancelled, and carry the terms of
+  engagement.
+- Two-factor authentication can be required of everyone.
+- The Help manual.
 
 ## 0.4.0 — 28 August 2026
 
