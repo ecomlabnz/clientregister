@@ -15,6 +15,40 @@ export async function all<T>(db: D1Database, sql: string, ...params: unknown[]):
   return res.results ?? [];
 }
 
+/**
+ * The most bound values one statement may carry.
+ *
+ * D1 refuses a statement with too many, and the refusal is a 500 rather than a
+ * short page: "too many SQL variables". The Cases list hit it the moment the
+ * register held enough matters to show 250 at once — 250 ids in one `IN`.
+ *
+ * Ninety rather than the hundred D1 allows, so a caller adding a parameter
+ * beside the list does not tip it over.
+ */
+export const MAX_BOUND_VALUES = 90;
+
+/**
+ * Run a query whose `IN (...)` list comes from the caller, in chunks.
+ *
+ * The list is the only thing bound, which is true of every caller: a page has
+ * some ids and wants the tags, nationalities or settings belonging to them. The
+ * SQL is built by the caller from the placeholders it is handed, so the shape
+ * of the query stays where it is read.
+ *
+ * A page of 250 becomes three statements instead of one that D1 will not run.
+ */
+export async function allByIds<T>(
+  db: D1Database, ids: readonly string[], sql: (placeholders: string) => string,
+): Promise<T[]> {
+  if (ids.length === 0) return [];
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += MAX_BOUND_VALUES) {
+    const chunk = ids.slice(i, i + MAX_BOUND_VALUES);
+    out.push(...await all<T>(db, sql(chunk.map(() => '?').join(',')), ...chunk));
+  }
+  return out;
+}
+
 export async function run(db: D1Database, sql: string, ...params: unknown[]): Promise<D1Result> {
   return db.prepare(sql).bind(...params).run();
 }

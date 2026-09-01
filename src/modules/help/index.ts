@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.89.4', date: '1 September 2026',
+    notes: [
+      'Showing 250 matters or 250 clients at once works again. Asking for a big page brought up '
+        + '\u201cSomething went wrong\u201d \u2014 the page was asking the database for too much '
+        + 'in one go, which only became possible once the register held enough records to fill a '
+        + 'page that size.',
+    ],
+  },
+  {
     version: '0.89.3', date: '1 September 2026',
     notes: [
       'A company can be saved again. \u201cCreate client\u201d did nothing at all when the record '
