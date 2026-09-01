@@ -143,9 +143,9 @@ describe('the compressed archive Word actually writes', () => {
     // index but not the decompressor. Word compresses, so this does too.
     const bytes = await deflated([
       { name: '[Content_Types].xml', body: '<Types/>' },
-      { name: 'word/document.xml', body: document(paragraph('BUI, Dac Dat — Partner Work Visa')) },
+      { name: 'word/document.xml', body: document(paragraph('TAWHAI, Hemi Rangi — Partner Work Visa')) },
     ]);
-    expect(await docxToText(bytes)).toEqual({ text: 'BUI, Dac Dat — Partner Work Visa' });
+    expect(await docxToText(bytes)).toEqual({ text: 'TAWHAI, Hemi Rangi — Partner Work Visa' });
   });
 
   it('refuses an archive that inflates to more than it should', async () => {
@@ -167,9 +167,9 @@ describe('markup to text', () => {
     const xml = document(
       '<w:p><w:r><w:t>One</w:t></w:r></w:p>'
       + '<w:p><w:r><w:t>Two</w:t><w:br/><w:t>and a half</w:t></w:r></w:p>'
-      + '<w:p><w:r><w:t>Name:</w:t><w:tab/><w:t>BUI, Dac Dat</w:t></w:r></w:p>',
+      + '<w:p><w:r><w:t>Name:</w:t><w:tab/><w:t>TAWHAI, Hemi Rangi</w:t></w:r></w:p>',
     );
-    expect(wordXmlToText(xml)).toBe('One\nTwo\nand a half\nName:\tBUI, Dac Dat');
+    expect(wordXmlToText(xml)).toBe('One\nTwo\nand a half\nName:\tTAWHAI, Hemi Rangi');
   });
 
   it('keeps a table row on one line and its cells apart', () => {

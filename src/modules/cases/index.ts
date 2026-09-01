@@ -279,7 +279,7 @@ export const casesModule: AppModule = {
       if (q) {
         // Every word, in any order. A matter is found by its client's name as
         // often as by its own, and a name is stored given-names-first, so one
-        // phrase against one column missed "NGUYEN Minh Khuong" entirely.
+        // phrase against one column missed "GARCIA Maria Luisa" entirely.
         const m = everyTermClause(
           ['k.title', 'k.ref', 'cl.full_name', 'k.descriptor',
            'k.inz_application_number', 'k.inz_client_number'],

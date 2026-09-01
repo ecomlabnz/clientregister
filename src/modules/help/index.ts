@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.89.3', date: '1 September 2026',
+    notes: [
+      'A company can be saved again. \u201cCreate client\u201d did nothing at all when the record '
+        + 'type was a company \u2014 the family name box, which belongs to a person and is hidden '
+        + 'for a company, was still being treated as compulsory by the browser. Nothing was wrong '
+        + 'with what you had typed.',
+    ],
+  },
+  {
     version: '0.89.2', date: '1 September 2026',
     notes: [
       'The rest of the register searches the same way. Cases, Quotes, Invoices, Knowledge, the '
@@ -45,8 +54,8 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
     notes: [
       'Searching a name now works whichever way round you type it. The register stores a name '
         + 'as it appears on the passport \u2014 given names first \u2014 so searching '
-        + '\u201cNGUYEN Minh Khuong\u201d, the way you and INZ write it, found nothing, while '
-        + '\u201cKhuong\u201d on its own worked. Every word now counts on its own and all of '
+        + '\u201cGARCIA Maria Luisa\u201d, the way you and INZ write it, found nothing, while '
+        + '\u201cLuisa\u201d on its own worked. Every word now counts on its own and all of '
         + 'them have to appear, so any order finds the person. It applies to the client list, '
         + 'the search box at the top, and the box for filing an email onto a matter.',
     ],
@@ -233,7 +242,7 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
       'A matter is now named by what it is about. The new-matter form asks one question '
         + '\u2014 \u201cWhat this matter is about\u201d \u2014 and that sentence is the '
         + 'matter\u2019s name everywhere: \u201cFresh application, chef role with her current '
-        + 'employer\u201d rather than \u201cNGUYEN, Ngoc Bich \u2014 Accredited Employer Work '
+        + 'employer\u201d rather than \u201cGARCIA, Maria Luisa \u2014 Accredited Employer Work '
         + 'Visa\u201d, which was the client column and the type column read back. Every '
         + 'existing matter has been renamed to its description; the one matter that had no '
         + 'description kept its title as one, so nothing was lost.',
@@ -1191,7 +1200,7 @@ function sections(origin: string): Section[] {
         <p>The name follows the practice's convention — the type, then the client with the surname
            in capitals:</p>
         <p class="prewrap"><code>AEWV. TAGATA, Sione</code><br>
-           <code>S.61. BUI, Dac Dat</code></p>
+           <code>S.61. TAWHAI, Hemi Rangi</code></p>
         <p>Capitals on the surname are not decoration. Many clients have names whose order is not
            the English one, and <em>TRUONG, Thi Thu Thuy</em> says which part is the family name
            where <em>Truong, Thi Thu Thuy</em> leaves it to be guessed — and guessing wrong on a

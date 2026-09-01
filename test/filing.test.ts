@@ -191,7 +191,7 @@ describe('finding the matter or client to file on', () => {
     d.exec(`UPDATE cases SET inz_application_number = 'WV01899056',
                              descriptor = 'Partner of an AEWV holder' WHERE id = 'K1'`);
     d.exec(`INSERT INTO clients (id,ref,kind,full_name,family_name,given_names,status,created_at,updated_at)
-            VALUES ('CL2','CL-0002','individual','Thi Ha Giang Bui','Bui','Thi Ha Giang','active','${AT}','${AT}')`);
+            VALUES ('CL2','CL-0002','individual','Chidi Amaka Okonkwo','Okonkwo','Chidi Amaka','active','${AT}','${AT}')`);
     d.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
             VALUES ('K2','CASE-26-002','CL2','Seasonal peak work visa','Seasonal peak work visa',
                     'wv_aewv','closed','U1','${AT}','${AT}')`);
@@ -211,7 +211,7 @@ describe('finding the matter or client to file on', () => {
   });
 
   it('finds a client by family name, and their matter too', async () => {
-    const hits = await find(seeded(), 'Bui');
+    const hits = await find(seeded(), 'Okonkwo');
     expect(hits.map((h) => h.value)).toEqual(expect.arrayContaining(['client:CL2', 'case:K2']));
   });
 
@@ -307,10 +307,10 @@ describe('when a filed item happened', () => {
 describe('finding a person whatever order the name is typed in', () => {
   /*
    * The register stores a name as it is written on the passport — given names
-   * first, "Minh Khuong NGUYEN". A lawyer, and INZ, write it the other way
+   * first, "Maria Luisa GARCIA". A lawyer, and INZ, write it the other way
    * round. One phrase compared against one column can only match the order it
-   * happens to be stored in, so "NGUYEN Minh Khuong" found nothing at all while
-   * "Khuong" on its own worked.
+   * happens to be stored in, so "GARCIA Maria Luisa" found nothing at all while
+   * "Luisa" on its own worked.
    *
    * Every word must appear somewhere; the order is not the register's business.
    */
@@ -324,9 +324,9 @@ describe('finding a person whatever order the name is typed in', () => {
   function seeded() {
     const d = db();
     d.exec(`INSERT INTO clients (id,ref,kind,full_name,family_name,given_names,status,created_at,updated_at)
-            VALUES ('N1','CL-0157','individual','Minh Khuong NGUYEN','NGUYEN','Minh Khuong','active','${AT}','${AT}'),
-                   ('N2','CL-0158','individual','Minh Khuong NGUYEN','NGUYEN','Minh Khuong','active','${AT}','${AT}'),
-                   ('N3','CL-0159','individual','Thi Ha Giang BUI','BUI','Thi Ha Giang','active','${AT}','${AT}')`);
+            VALUES ('N1','CL-9001','individual','Maria Luisa GARCIA','GARCIA','Maria Luisa','active','${AT}','${AT}'),
+                   ('N2','CL-9002','individual','Maria Luisa GARCIA','GARCIA','Maria Luisa','active','${AT}','${AT}'),
+                   ('N3','CL-9003','individual','Chidi Amaka OKONKWO','OKONKWO','Chidi Amaka','active','${AT}','${AT}')`);
     return d;
   }
   const find = async (d: any, q: string) => {
@@ -336,22 +336,22 @@ describe('finding a person whatever order the name is typed in', () => {
 
   it('finds them however the name is ordered or punctuated', async () => {
     const d = seeded();
-    for (const typed of ['Khuong', 'NGUYEN Minh Khuong', 'NGUYEN, Minh Khuong',
-                         'Minh Khuong NGUYEN', 'khuong nguyen', 'nguyen   minh']) {
-      expect(await find(d, typed), `typed: ${typed}`).toEqual(['CL-0157', 'CL-0158']);
+    for (const typed of ['Luisa', 'GARCIA Maria Luisa', 'GARCIA, Maria Luisa',
+                         'Maria Luisa GARCIA', 'luisa garcia', 'garcia   maria']) {
+      expect(await find(d, typed), `typed: ${typed}`).toEqual(['CL-9001', 'CL-9002']);
     }
   });
 
   it('still narrows — every word has to appear', async () => {
-    // Not an OR across words: "NGUYEN Giang" is nobody, and saying so is the
+    // Not an OR across words: "GARCIA Amaka" is nobody, and saying so is the
     // whole value of typing a second word.
-    expect(await find(seeded(), 'NGUYEN Giang')).toEqual([]);
-    expect(await find(seeded(), 'BUI Giang')).toEqual(['CL-0159']);
+    expect(await find(seeded(), 'GARCIA Amaka')).toEqual([]);
+    expect(await find(seeded(), 'OKONKWO Amaka')).toEqual(['CL-9003']);
   });
 
   it('matches across two different columns of the same record', async () => {
-    // "NGUYEN" is the family name, "CL-0157" is the reference. Neither column
+    // "NGUYEN" is the family name, "CL-9001" is the reference. Neither column
     // holds both, so this only works if each word is matched independently.
-    expect(await find(seeded(), 'NGUYEN CL-0157')).toEqual(['CL-0157']);
+    expect(await find(seeded(), 'GARCIA CL-9001')).toEqual(['CL-9001']);
   });
 });

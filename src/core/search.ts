@@ -73,15 +73,15 @@ export function likeTerm(q: string): string {
  * The words somebody typed, in the order they typed them — which is not the
  * order the register stores them in.
  *
- * A name is held as it is written on the passport: "Minh Khuong NGUYEN", given
- * names first. So a search for "NGUYEN Minh Khuong" — the order a lawyer writes
- * it, and the order INZ writes it — matched nothing at all, while "Khuong" on
+ * A name is held as it is written on the passport: "Maria Luisa GARCIA", given
+ * names first. So a search for "GARCIA Maria Luisa" — the order a lawyer writes
+ * it, and the order INZ writes it — matched nothing at all, while "Luisa" on
  * its own worked. One phrase compared against one column can only ever match
  * the order it happens to be stored in.
  *
  * Splitting on spaces and punctuation and requiring every word to appear
  * somewhere makes the order irrelevant, which is the behaviour a person
- * expects. "NGUYEN, Minh Khuong", "Minh Khuong Nguyen" and "khuong nguyen" all
+ * expects. "GARCIA, Maria Luisa", "Maria Luisa Garcia" and "luisa garcia" all
  * find the same person.
  */
 export function searchTerms(raw: string): string[] {
