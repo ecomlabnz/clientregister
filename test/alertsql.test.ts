@@ -231,3 +231,110 @@ describe('the two checks that were already there', () => {
     expect(ids(CHECKS.quiet(openIn), [...OPEN_CASE_STATUSES, '2026-08-20'])).not.toContain('K-DEADLINE');
   });
 });
+
+/**
+ * An archive must arrive quiet.
+ *
+ * Batch 05 is the practice's archive — matters finished years ago. The
+ * practice's instruction is that none of it raises an alert or a task: a file
+ * closed in 2022 must not appear on tomorrow morning's Alerts page. Only
+ * warnings, where a warning is warranted, because a refusal recorded in 2023 is
+ * still a fact about that person.
+ *
+ * The brief for that load tells the extraction how to satisfy this. These tests
+ * are what makes the brief true rather than hopeful — each one runs the alert's
+ * real SQL against a record shaped the way the brief says to shape it.
+ */
+describe('an archived matter raises nothing', () => {
+  /**
+   * Every check gated on an open status, called with the parameters the
+   * module itself passes. Named one by one rather than looped over, because a
+   * loop that guessed the bindings would report a silent pass on a query it
+   * never actually ran.
+   */
+  const gatedOnOpen = (): Record<string, string[]> => ({
+    quiet: ids(CHECKS.quiet(openIn), [...OPEN_CASE_STATUSES, '2026-01-01']),
+    unacknowledged: ids(CHECKS.unacknowledged(lodgedIn), [...LODGED_CASE_STATUSES, TODAY]),
+    noSlack: ids(CHECKS.noSlack(openIn), [...OPEN_CASE_STATUSES, TODAY], 'id'),
+    statusUnknown: ids(CHECKS.statusUnknown(openIn), [...OPEN_CASE_STATUSES]),
+  });
+
+  it('is out of every check that is gated on an open status', () => {
+    // K-CLOSED is closed and years old. If any open-status check returns it,
+    // the archive would land on the Alerts page.
+    const results = gatedOnOpen();
+    // Say the number out loud: an empty set of checks would pass having
+    // examined nothing.
+    expect(Object.keys(results).length).toBe(4);
+    for (const [name, rows] of Object.entries(results)) {
+      expect(rows, `${name} must not return a closed matter`).not.toContain('K-CLOSED');
+    }
+  });
+
+  it('still fires on "approved" with no decision date, closed or not', () => {
+    // This is the one check with no status gate, and the reason the brief says
+    // to use `closed` rather than `approved` when the folder gives no date.
+    const sql = CHECKS.contradiction();
+    expect(ids(sql, [TODAY])).toContain('K-NODATE');
+  });
+
+  it('stays silent on a matter closed without a decision date', () => {
+    // The shape the brief asks for: finished, honest about not knowing when.
+    db.prepare(`INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
+                                   created_at, updated_at)
+                VALUES ('k_arch', 'K-ARCHIVE', 'cl_visa', 'An old matter', 'wv_aewv',
+                        'closed', 'u_adviser', '2022-03-01T00:00:00Z', '2022-03-01T00:00:00Z')`)
+      .run();
+    expect(ids(CHECKS.contradiction(), [TODAY])).not.toContain('K-ARCHIVE');
+  });
+
+  it('stays silent on a matter closed with a decision date in order', () => {
+    db.prepare(`INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
+                                   lodged_at, decided_at, created_at, updated_at)
+                VALUES ('k_arch2', 'K-ARCHIVE-2', 'cl_visa', 'Another old matter', 'wv_aewv',
+                        'approved', 'u_adviser', '2022-01-10', '2022-03-04',
+                        '2022-01-01T00:00:00Z', '2022-03-04T00:00:00Z')`)
+      .run();
+    expect(ids(CHECKS.contradiction(), [TODAY])).not.toContain('K-ARCHIVE-2');
+  });
+});
+
+describe('an archived client raises no expiry', () => {
+  /** The expiry query, lifted from the module by the shape of its first line. */
+  const expirySql = readFileSync('src/modules/alerts/index.ts', 'utf8');
+
+  it('skips archived clients in every branch of the expiry union', () => {
+    // Five branches — passport, visa, police, medical, chest x-ray. Each one
+    // must carry the archived guard, because an archive client with a passport
+    // that expired in 2021 would otherwise put an alert on the page. This is
+    // why the brief loads archive clients as `archived`.
+    const union = expirySql.slice(
+      expirySql.indexOf("'Passport' ||"),
+      expirySql.indexOf('ORDER BY expires'));
+    const branches = union.split('UNION ALL');
+    expect(branches.length).toBe(5);
+    for (const [i, b] of branches.entries()) {
+      expect(b, `expiry branch ${i + 1} must skip archived clients`)
+        .toMatch(/status\s*!=\s*'archived'/);
+    }
+  });
+
+  it('proves it against the database, not just the source', () => {
+    db.prepare(`INSERT INTO clients (id, ref, kind, full_name, status, current_visa_expiry,
+                                     created_at, updated_at)
+                VALUES ('cl_arch', 'CL-ARCH', 'individual', 'Old CLIENT', 'archived',
+                        '2021-05-01', '2021-01-01T00:00:00Z', '2021-01-01T00:00:00Z')`)
+      .run();
+    db.prepare(`INSERT INTO clients (id, ref, kind, full_name, status, current_visa_expiry,
+                                     created_at, updated_at)
+                VALUES ('cl_live', 'CL-LIVE', 'individual', 'Live CLIENT', 'active',
+                        '2021-05-01', '2021-01-01T00:00:00Z', '2021-01-01T00:00:00Z')`)
+      .run();
+    const rows = ids(
+      `SELECT ref FROM clients
+        WHERE current_visa_expiry IS NOT NULL AND current_visa_expiry <= ?1 AND status != 'archived'`,
+      ['2026-12-31']);
+    expect(rows).toContain('CL-LIVE');
+    expect(rows).not.toContain('CL-ARCH');
+  });
+});

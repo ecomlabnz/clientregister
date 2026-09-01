@@ -110,6 +110,49 @@ Matters by year opened: 2021 — 4 | 2022 — 11 | 2023 — 26 | 2024 — 38
 
 ---
 
+## What to read, and what to leave alone
+
+The practice's instruction, 1 September 2026. Reading everything is not
+thoroughness — it is how a 25 GB archive takes a fortnight and produces the same
+answer.
+
+### Start with the PREVIEW
+
+**Almost every client folder holds a PDF whose name begins `PREVIEW`.** It is a
+snapshot of the application as it stood before lodgement, produced so the client
+could read it and confirm it was accurate. It is therefore the single richest
+document in the folder: the applicant's full name as lodged, date of birth,
+passport, nationality, address, the visa applied for, and the answers to INZ's
+questions — all in one place, and all checked by the client.
+
+**Base the extraction on it.** Where a PREVIEW exists, it is the source for the
+client's details, and the other documents fill in what it does not say — when
+the matter was opened, when it was lodged, and how it ended.
+
+Where a folder has no PREVIEW, work from the forms and correspondence as before.
+
+### Read these
+
+| | Why |
+|---|---|
+| The `PREVIEW` PDF | The application as lodged, confirmed by the client. Start here. |
+| Submissions and cover letters | What the matter was actually about, in the practice's own words |
+| The issued visa | The grant: type, conditions, dates. This is the outcome. |
+| Engagement letters, authorities, INZ receipts | What dates the matter |
+| Correspondence and file notes | Everything else — refusals, PPI letters, what went wrong |
+
+### Do not read these
+
+**Extraneous PDFs and pictures.** Scanned bundles, photographs, identity
+documents already summarised in the PREVIEW, duplicated email attachments,
+payslips, bank statements, employer packs. They will be most of the bytes and
+almost none of the information, and the register has nowhere to put them.
+
+**Say what you skipped** in `findings.md` — folder and rough size — so the
+practice knows what was passed over and can ask for a second look at any of it.
+
+---
+
 ## Identity: the rule the register now enforces
 
 The practice's decision, 1 September 2026:
@@ -261,6 +304,53 @@ duplicated email attachments will be most of the 25 GB and almost none of the
 information. Read folder names, correspondence, forms, letters and file notes.
 If a folder is 400 MB of scans and a two-page letter, the letter is the matter.
 Say in `findings.md` what you skipped, so the practice knows what was not read.
+
+### The archive arrives quiet
+
+**The practice's instruction: every matter in batch 05 is closed, and raises no
+alert and no task. Only flags, where a flag is warranted.**
+
+The archive is history. A matter finished in 2022 must not appear on the
+practice's Alerts page tomorrow morning, and must not put a task in anybody's
+list. What the archive *is* allowed to do is carry a warning on a client's file,
+because that is a fact about the person that is still true.
+
+Three things follow, and they were checked against the register's own alert
+queries rather than assumed:
+
+**1. Every matter carries a finished status.** `approved`, `declined`,
+`withdrawn` or `closed`. Never `lodged`, `preparing`, `on_hold` or any other
+working status — every deadline, gone-quiet and no-room-to-act alert is gated on
+those, so one archive matter left open puts a 2022 file on tomorrow's Alerts
+page.
+
+**2. A matter recorded as `approved` or `declined` must carry its decision
+date.** This is the one alert a *closed* matter can still raise: the register
+flags "does not add up" when a matter says approved or declined and has no
+`decided_at`, whatever its status, because that combination is usually a
+half-finished edit. **If the folder does not give a decision date, use `closed`
+and say in the note how it ended.** Do not write `approved` with no date — the
+register has seventeen of those already and each one is a standing alert.
+
+Also never give a decision date earlier than the lodgement date. That is the
+same alert, and in an archive it usually means two dates read off different
+documents.
+
+**3. Create no tasks and no follow-ups.** Not one. If something in an archived
+folder genuinely needs doing, it is not an archive matter — report it in
+`findings.md` and the practice will open it as a current file.
+
+**Clients from the archive are loaded `archived`** unless they are already in
+the register as a current client. Passport, visa and certificate expiry alerts
+are raised per *client*, not per matter, and the query skips archived clients —
+so an archive client loaded `active` with a passport that expired in 2021 puts
+an expiry alert on the practice's page. A client who is both — an old matter and
+a current one — stays `active`, because the current matter is why.
+
+**Warnings are the exception, and they are wanted.** The `Warning:` convention
+applies to the archive exactly as it does to current files: a refusal, a
+character issue, a condition breach recorded in 2023 is still a fact about that
+person in 2026. Cite the matter it came from.
 
 **And the honest possibility:** if the survey shows the archive is mostly
 material with no matter behind it — old drafts, precedents, copies of things
