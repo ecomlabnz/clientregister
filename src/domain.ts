@@ -106,9 +106,9 @@ export const LODGED_CASE_STATUSES: CaseStatus[] = [
  *
  * A decided matter is waiting for nothing, and offering it a box labelled
  * "response / decision due" invites recording the decision's own date in a
- * field that means the opposite — which is exactly what happened on
- * CASE-26-051. The date a decision arrived is `decided_at`, and the register
- * writes that itself.
+ * field that means the opposite — which is exactly what happened on a real
+ * matter. The date a decision arrived is `decided_at`, and the register writes
+ * that itself.
  */
 export const AWAITING_CASE_STATUSES: CaseStatus[] =
   [...LODGED_CASE_STATUSES, 'ipt_appeal', 'reconsideration'];

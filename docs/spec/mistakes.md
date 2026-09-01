@@ -47,7 +47,7 @@ SELECT 'pas_x', c.id, ...,
                           WHERE p.client_id = c.id AND p.is_primary = 1)
             THEN 0 ELSE 1 END, ...
   FROM clients c
- WHERE c.ref = 'CL-0041'
+ WHERE c.ref = 'CL-9001'
    AND NOT EXISTS (SELECT 1 FROM client_passports p
                     WHERE p.client_id = c.id AND p.number = '...');
 ```
@@ -113,8 +113,8 @@ thing actually happened. Ask the extraction for the opening date **and where tha
 date came from**, and let "unknown" be a real answer — a matter nothing dates
 honestly keeps the current year.
 
-**And never reuse a retired reference.** If a matter moves from `CASE-26-137` to
-`CASE-25-021`, its file records the old number. Reusing `CASE-26-137` later means
+**And never reuse a retired reference.** If a matter moves from `CASE-26-901` to
+`CASE-25-901`, its file records the old number. Reusing `CASE-26-901` later means
 one file saying it *was* that number and another that *is*. Gaps in a sequence
 cost nothing; a number meaning two things costs a great deal.
 
@@ -300,11 +300,25 @@ the search — in code comments, three test files, the changelog, the Help page 
 two commit messages. A second client's name had been in the codebase since a much
 earlier commit.
 
-**The rule.** No real name, reference, passport number or date of birth in the
-repository — not in tests, fixtures, seeds, commit messages or example text. Use
-invented names, and check them against the register before using them. Commit
-messages are the part that cannot easily be undone: a protected branch will
-refuse the force-push needed to rewrite them.
+**The rule.** No real name, passport number or date of birth in the repository —
+not in tests, fixtures, seeds, commit messages or example text. Use invented
+names, and **check them against the register before using them**.
+
+**A reference is the exception, and it is worth stating**, because the first
+version of this rule banned references too and was wrong. `CL-0082` on its own
+discloses nothing, and pointing at a client by reference is precisely how you
+write about a real record *without* naming somebody — the intake brief tells the
+extraction to do exactly that. What is not allowed is a reference **carrying
+facts about that client**: "`CASE-26-051`, approved on 31 August" names a matter
+and then says what happened on it, which is naming the client the long way round.
+
+So: a bare reference, yes. A reference with a story attached, no. And in an
+*example* — a snippet showing the shape of a query, a placeholder in a form —
+use a number outside the range the register has issued (`CL-9001`), so nobody
+reading it has to work out whether it points at somebody.
+
+Commit messages are the part that cannot easily be undone: a protected branch
+will refuse the force-push needed to rewrite them.
 
 ---
 
