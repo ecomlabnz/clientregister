@@ -11,11 +11,11 @@ fourth is the one that has to be written, and is the one to read first.
 | [`mistakes.md`](mistakes.md) | Every fault this register has actually suffered, and the rule that now prevents it | Written by hand, added to whenever something breaks |
 | [`invariants.md`](invariants.md) | The 39 things the database refuses to do, in its own words, and the 8 uniqueness rules | Extracted from the built schema |
 | [`data-model.md`](data-model.md) | 45 tables, every column | Extracted from the built schema |
-| [`routes.md`](routes.md) | 175 routes and the permission each requires | Extracted from the module registrations |
+| [`routes.md`](routes.md) | 175 routes and the permission each requires | Extracted from the module registrations, and checked against the built router by a test |
 
 ## Read them in this order
 
-**1. [`mistakes.md`](mistakes.md).** Sixteen faults, each with the rule that
+**1. [`mistakes.md`](mistakes.md).** Eighteen faults, each with the rule that
 replaced it. The other three documents tell you *what* to build; this one tells
 you what will go wrong while you build it. A rebuild that skips it will
 rediscover a primary-passport collision, a search that only works in one word
