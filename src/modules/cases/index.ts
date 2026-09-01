@@ -9,6 +9,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
+import { everyTermClause } from '../../core/search';
 import { all, nextRef, nextYearlyRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { composeFullName, familyNameFor, formalName, plainAscii } from '../../core/names';
@@ -276,10 +277,14 @@ export const casesModule: AppModule = {
       const p = () => `?${params.length}`;
 
       if (q) {
-        params.push(`%${q}%`);
-        const ph = p();
-        where.push(`(k.title LIKE ${ph} OR k.ref LIKE ${ph} OR cl.full_name LIKE ${ph}`
-          + ` OR k.inz_application_number LIKE ${ph} OR k.inz_client_number LIKE ${ph})`);
+        // Every word, in any order. A matter is found by its client's name as
+        // often as by its own, and a name is stored given-names-first, so one
+        // phrase against one column missed "NGUYEN Minh Khuong" entirely.
+        const m = everyTermClause(
+          ['k.title', 'k.ref', 'cl.full_name', 'k.descriptor',
+           'k.inz_application_number', 'k.inz_client_number'],
+          q, params.length + 1);
+        if (m.sql) { where.push(m.sql); params.push(...m.params); }
       }
       if (status && (CASE_STATUSES as readonly string[]).includes(status)) {
         params.push(status);
