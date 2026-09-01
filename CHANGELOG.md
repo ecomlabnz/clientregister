@@ -7,6 +7,33 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.89.3 — 1 September 2026
+
+### Fixed
+- **A company could not be saved.** "Create client" did nothing at all — no
+  error, no page change, nothing. `family_name` carried the HTML `required`
+  attribute and lives in the individual half of the form; choosing "Company or
+  organisation" hides that half, leaving the browser with a required field it
+  could neither satisfy nor display. A browser refuses to submit such a form and
+  reports it only to the console, so the button appeared dead.
+
+  The rule it broke, now held by a test that reads both halves of the form: **a
+  required field must never sit inside a block that can be hidden.** The server
+  still requires a family name for a person, which is where the rule was
+  enforced all along — so a person saved without one now comes back with the
+  error against the box rather than a dead button.
+
+  Belt and braces alongside it: the script now *disables* the controls in the
+  half that does not apply, so the browser neither validates nor submits them.
+  Any field added to either half later cannot repeat this.
+
+- **Real client names had been used as worked examples** in code comments,
+  tests, the changelog and the Help page, contrary to the standing rule that
+  real client data never enters the repository. All replaced with fabricated
+  names checked against the register. Two of them were mine, added the same day;
+  one had been in `core/names.ts`, the Help page and three test files since the
+  commit that introduced family-name capitalisation.
+
 ## 0.89.2 — 1 September 2026
 
 ### Fixed
@@ -40,19 +67,19 @@ The user-facing version of this list, one line per release, is in the app under
 
 ### Fixed
 - **Searching a name only worked if you typed it in the register's order.** A
-  name is stored as it is written on the passport — "Minh Khuong NGUYEN", given
+  name is stored as it is written on the passport — "Maria Luisa GARCIA", given
   names first. The search compared the whole phrase against one column at a
-  time, so "NGUYEN Minh Khuong" and "NGUYEN, Minh Khuong" — the order a lawyer
+  time, so "GARCIA Maria Luisa" and "GARCIA, Maria Luisa" — the order a lawyer
   writes it, and the order INZ writes it — matched nothing at all, while
-  "Khuong" on its own worked. With 231 clients that is a search that cannot be
+  "Luisa" on its own worked. With 231 clients that is a search that cannot be
   trusted.
 
   Every word is now matched independently and all of them must appear
-  somewhere; the order is not the register's business. "NGUYEN Minh Khuong",
-  "Minh Khuong Nguyen" and "khuong nguyen" find the same person, and a word can
-  match a different column from its neighbour — "NGUYEN CL-0157" matches the
+  somewhere; the order is not the register's business. "GARCIA Maria Luisa",
+  "Maria Luisa Garcia" and "luisa garcia" find the same person, and a word can
+  match a different column from its neighbour — "GARCIA CL-9001" matches the
   family name and the reference together. It still narrows rather than widens:
-  "NGUYEN Giang" is nobody.
+  "GARCIA Amaka" is nobody.
 
   Fixed in one place and applied to all three surfaces that search: the client
   list, the search box in the top bar, and the picker that files an email onto a
@@ -2066,8 +2093,8 @@ about. AI as the scout, rules as the guard.
   display choice: the client record, the matter named from it, the CSV export
   and any search all agree without each of them having to remember. A passport
   prints the surname that way and INZ writes it that way, and many of this
-  practice's clients have names whose order is not the English one — "Dac Dat
-  BUI" says which part is the family name where "Dac Dat Bui" leaves it to be
+  practice's clients have names whose order is not the English one — "Hemi Rangi
+  BUI" says which part is the family name where "Hemi Rangi Tawhai" leaves it to be
   guessed.
 - Deliberately lossy: a client who writes "de Vries" is stored "DE VRIES".
 - The demo seed stores names the same way, so seeded data does not look

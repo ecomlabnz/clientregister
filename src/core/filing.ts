@@ -230,7 +230,7 @@ export async function filingSearch(
   if (q.length < 2) return [];
   const upper = q.toUpperCase();
   // Every word, in any order — the same rule as everywhere else, and the reason
-  // "NGUYEN Minh Khuong" finds a client stored as "Minh Khuong NGUYEN". `like`
+  // "GARCIA Maria Luisa" finds a client stored as "Maria Luisa GARCIA". `like`
   // is the first word; the phrase is only used for the exact-reference test.
   const terms = searchTerms(q);
   const like = likeTerm(terms[0] ?? q);

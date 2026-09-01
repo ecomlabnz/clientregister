@@ -182,8 +182,8 @@ export const inboxModule: AppModule = {
       }
       if (['email', 'telegram', 'whatsapp', 'api'].includes(channel)) { conds.push('channel = ?'); params.push(channel); }
       if (q) {
-        // Every word, in any order — a sender is as often "NGUYEN Minh Khuong"
-        // as "Minh Khuong NGUYEN", and the phrase never matched both.
+        // Every word, in any order — a sender is as often "GARCIA Maria Luisa"
+        // as "Maria Luisa GARCIA", and the phrase never matched both.
         const m = everyTermClausePlain(
           ['subject', 'body_text', 'sender_display', 'sender'], q);
         if (m.sql) { conds.push(m.sql); params.push(...m.params); }

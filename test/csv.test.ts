@@ -4,12 +4,12 @@ import { DATASETS } from '../src/modules/admin/export';
 
 describe('a cell is quoted only when it must be', () => {
   it('leaves ordinary text alone', () => {
-    expect(csvCell('Dac Dat BUI')).toBe('Dac Dat BUI');
+    expect(csvCell('Hemi Rangi TAWHAI')).toBe('Hemi Rangi TAWHAI');
     expect(csvCell(1500)).toBe('1500');
   });
 
   it('quotes commas, quotes and newlines, doubling the quotes', () => {
-    expect(csvCell('BUI, Dac Dat')).toBe('"BUI, Dac Dat"');
+    expect(csvCell('TAWHAI, Hemi Rangi')).toBe('"TAWHAI, Hemi Rangi"');
     expect(csvCell('he said "no"')).toBe('"he said ""no"""');
     expect(csvCell('line one\nline two')).toBe('"line one\nline two"');
   });
