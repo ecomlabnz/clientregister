@@ -20,6 +20,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
+import { everyTermClausePlain } from '../../core/search';
 import { all, count, nextYearlyRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
@@ -71,8 +72,8 @@ export const knowledgeModule: AppModule = {
       const where: string[] = [];
       const params: unknown[] = [];
       if (q) {
-        where.push('(a.title LIKE ? OR a.summary LIKE ? OR a.body LIKE ? OR a.ref LIKE ?)');
-        params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+        const m = everyTermClausePlain(['a.title', 'a.summary', 'a.body', 'a.ref'], q);
+        if (m.sql) { where.push(m.sql); params.push(...m.params); }
       }
       if (kinds.some((k) => k.key === kind)) { where.push('a.kind = ?'); params.push(kind); }
       if ((KB_STATUSES as readonly string[]).includes(status)) { where.push('a.status = ?'); params.push(status); }

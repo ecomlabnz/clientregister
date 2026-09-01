@@ -68,3 +68,54 @@ describe('the queries behind the search box', () => {
     }
   });
 });
+
+/**
+ * No list page may go back to matching the whole phrase.
+ *
+ * The bug was reported on Clients and turned out to be on Cases, Quotes,
+ * Invoices, Knowledge and the dashboard lookup too — every filter had been
+ * written the same way, separately, and each one had to be found by hand. This
+ * reads the source and fails if a new one appears, which is cheaper than
+ * finding out from a search that quietly returns nothing.
+ */
+describe('every list filter matches word by word', () => {
+  const files = [
+    'src/modules/clients/index.ts',
+    'src/modules/cases/index.ts',
+    'src/modules/quotes/index.ts',
+    'src/modules/invoices/index.ts',
+    'src/modules/knowledge/index.ts',
+    'src/modules/dashboard/index.ts',
+    'src/modules/inbox/index.ts',
+    'src/modules/search/index.ts',
+    'src/core/filing.ts',
+    'src/core/search.ts',
+  ];
+
+  it('builds its LIKE pattern from words, never from the raw query', () => {
+    // `%${q}%` — the whole phrase, wrapped — is the shape of the bug.
+    const offenders: string[] = [];
+    for (const f of files) {
+      const src = readFileSync(f, 'utf8');
+      for (const [i, line] of src.split('\n').entries()) {
+        if (/`%\$\{\s*(q|q0|query|raw)\s*\}%`/.test(line)) offenders.push(`${f}:${i + 1}  ${line.trim()}`);
+      }
+    }
+    expect(offenders, `whole-phrase matching:\n${offenders.join('\n')}`).toEqual([]);
+  });
+
+  it('never mixes ? and ?1 placeholders in one statement', () => {
+    // Legal SQL, and a trap: the plain ones take the next free slot while the
+    // numbered ones count from the start, so two conditions can read the same
+    // value. Quotes did exactly that — status and text filtering collided.
+    const offenders: string[] = [];
+    for (const f of [...files, 'src/core/search.ts', 'src/core/filing.ts']) {
+      const src = readFileSync(f, 'utf8');
+      for (const m of src.matchAll(/`([^`]*\bLIKE\b[^`]*)`/g)) {
+        const sql = m[1]!;
+        if (/LIKE \? /.test(sql) && /\?\d/.test(sql)) offenders.push(`${f}: ${sql.slice(0, 90)}`);
+      }
+    }
+    expect(offenders, `mixed placeholders:\n${offenders.join('\n')}`).toEqual([]);
+  });
+});
