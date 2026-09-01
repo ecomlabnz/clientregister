@@ -10,7 +10,7 @@ describe('the house convention for a matter title', () => {
   });
 
   it('drops the grouping prefix so the title does not say it twice', () => {
-    expect(suggestCaseTitle('WV. Partner', 'BUI, Dac Dat')).toBe('Partner. BUI, Dac Dat');
+    expect(suggestCaseTitle('WV. Partner', 'TAWHAI, Hemi Rangi')).toBe('Partner. TAWHAI, Hemi Rangi');
     expect(suggestCaseTitle('RV. SMC', 'CHEN, Wei')).toBe('SMC. CHEN, Wei');
   });
 
@@ -21,7 +21,7 @@ describe('the house convention for a matter title', () => {
 
   it('gives whichever half it has when the other is missing', () => {
     expect(suggestCaseTitle('WV. AEWV', '')).toBe('AEWV');
-    expect(suggestCaseTitle('', 'BUI, Dac Dat')).toBe('BUI, Dac Dat');
+    expect(suggestCaseTitle('', 'TAWHAI, Hemi Rangi')).toBe('TAWHAI, Hemi Rangi');
   });
 
   it('composes the formal half the way a file is labelled', () => {

@@ -44,7 +44,7 @@ describe('formalName', () => {
       .toBe('TRUONG, Thi Thu Thuy');
     // Only the family name. Given names keep the capitalisation they were
     // entered with, because that is how the person writes them.
-    expect(formalName({ givenNames: 'Dac Dat', familyName: 'bui' })).toBe('BUI, Dac Dat');
+    expect(formalName({ givenNames: 'Hemi Rangi', familyName: 'tawhai' })).toBe('TAWHAI, Hemi Rangi');
   });
 });
 
@@ -88,8 +88,8 @@ describe('familyNameFor', () => {
   });
 
   it('is what composeFullName uses, so the two never disagree', () => {
-    expect(composeFullName('individual', { givenNames: 'Dac Dat', familyName: 'Bui' }))
-      .toBe('Dac Dat BUI');
+    expect(composeFullName('individual', { givenNames: 'Hemi Rangi', familyName: 'Tawhai' }))
+      .toBe('Hemi Rangi TAWHAI');
     // An organisation has a registered name, not a surname to capitalise.
     expect(composeFullName('organisation', {}, 'Kiwi Orchards Limited'))
       .toBe('Kiwi Orchards Limited');

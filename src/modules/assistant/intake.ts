@@ -150,7 +150,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
                 </div>
                 ${field({ label: 'Or type or paste what you know', name: 'text', type: 'textarea',
                           rows: 10, maxlength: 40000,
-                          placeholder: 'Submitted 20 August 2026. BUI, Dac Dat — Partner Work Visa '
+                          placeholder: 'Submitted 20 August 2026. TAWHAI, Hemi Rangi — Partner Work Visa '
                             + '(partner of TRUONG, Thi Thu Thuy aka Teera). A4374768' })}
                 <button class="btn btn-primary" type="submit" ${enabled ? '' : raw('disabled')}>
                   Read it

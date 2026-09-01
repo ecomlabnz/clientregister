@@ -258,7 +258,14 @@
     var render = function () {
       // Anything belonging to the other kind disappears first, wherever it sits.
       Array.prototype.forEach.call(kindBlocks, function (block) {
-        block.hidden = !applies(block);
+        var off = !applies(block);
+        block.hidden = off;
+        // And its fields stop taking part. A hidden control the browser still
+        // validates is one it can neither satisfy nor show, so the form refuses
+        // to submit and the button appears dead. Disabling also keeps the other
+        // kind's boxes out of what is sent, which the server ignores anyway.
+        Array.prototype.forEach.call(block.querySelectorAll('input, select, textarea'),
+          function (el) { el.disabled = off; });
       });
 
       // A tab whose section does not apply is not offered.

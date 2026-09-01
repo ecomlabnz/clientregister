@@ -36,7 +36,7 @@ function recordingEnv(d: any, rejected: string[]) {
 describe('the queries behind the search box', () => {
   // One word, two, and several: the number of words changes the SQL that is
   // built, so each shape has to be executed.
-  for (const q of ['Khuong', 'NGUYEN Khuong', 'NGUYEN, Minh Khuong', 'a b c d e']) {
+  for (const q of ['Luisa', 'GARCIA Luisa', 'GARCIA, Maria Luisa', 'a b c d e']) {
     it(`runs every query for “${q}”`, async () => {
       const rejected: string[] = [];
       await searchEverything(recordingEnv(schema(), rejected), q);
@@ -60,7 +60,7 @@ describe('the queries behind the search box', () => {
       seen.push({ sql, params: p.length });
       return { results: d.prepare(sql).all(...p) };
     } }) }) } } as any;
-    await searchEverything(env, 'NGUYEN Minh Khuong');
+    await searchEverything(env, 'GARCIA Maria Luisa');
     expect(seen.length).toBeGreaterThan(5);
     for (const { sql, params } of seen) {
       const highest = Math.max(...[...sql.matchAll(/\?(\d+)/g)].map((m) => Number(m[1])));

@@ -75,7 +75,7 @@ export function plainAscii(value: string | null | undefined): string {
  * client, on the matter, in the export and in a search, and nobody has to
  * remember. A passport prints the surname in capitals and INZ writes it that
  * way, and many of this practice's clients have names whose order is not the
- * English one: "Dac Dat BUI" says which part is the family name where "Dac Dat
+ * English one: "Hemi Rangi TAWHAI" says which part is the family name where "Hemi Rangi
  * Bui" leaves it to be guessed.
  *
  * It is deliberately lossy. The capitalisation somebody typed is not kept, so a

@@ -7,10 +7,10 @@ const file = (name: string, type: string, bytes: Uint8Array | string): File =>
 
 describe('what may be dropped in', () => {
   it('decodes a text file', async () => {
-    const read = await readUpload(file('notes.txt', 'text/plain', 'BUI, Dac Dat — partner WV'));
+    const read = await readUpload(file('notes.txt', 'text/plain', 'TAWHAI, Hemi Rangi — partner WV'));
     expect('error' in read).toBe(false);
     if ('error' in read) return;
-    expect(read.text).toBe('BUI, Dac Dat — partner WV');
+    expect(read.text).toBe('TAWHAI, Hemi Rangi — partner WV');
     expect(read.data).toBeUndefined();
   });
 
@@ -78,9 +78,9 @@ describe('a reading is normalised before it is shown', () => {
   });
 
   it('turns an empty string into nothing rather than an empty box', () => {
-    const out = normaliseIntake({ applicant: { given_names: '   ', family_name: 'BUI' } as never });
+    const out = normaliseIntake({ applicant: { given_names: '   ', family_name: 'TAWHAI' } as never });
     expect(out.applicant.given_names).toBeNull();
-    expect(out.applicant.family_name).toBe('BUI');
+    expect(out.applicant.family_name).toBe('TAWHAI');
   });
 
   it('survives a model that returns nothing useful at all', () => {

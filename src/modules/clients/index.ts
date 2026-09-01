@@ -188,7 +188,19 @@ function clientForm(
         <div data-kind="individual" ${kind === 'individual' ? '' : raw('hidden')}>
           ${field({ label: 'Given names', name: 'given_names', value: givenNames, maxlength: 120,
                     hint: 'As they appear in the passport.' })}
-          ${field({ label: 'Family name', name: 'family_name', value: familyName, required: true, maxlength: 120 })}
+          ${'' /* Not marked required in the HTML, deliberately. This box lives in
+                   the individual half of the form, and when the record type is a
+                   company that half is hidden. A hidden field the browser thinks
+                   is required can never be satisfied and can never be shown, so
+                   the browser silently refuses to submit and the Create button
+                   does nothing at all — which is exactly what it did.
+
+                   The rule it broke: a required field must never sit inside a
+                   block that can be hidden. The server still requires a family
+                   name for a person (readClientForm), so a person saved without
+                   one comes back with the error against the box rather than a
+                   dead button. */}
+          ${field({ label: 'Family name', name: 'family_name', value: familyName, maxlength: 120 })}
           ${field({ label: 'Preferred name', name: 'preferred_name', value: values.preferred_name, maxlength: 120,
                     hint: 'What to call them in conversation, if different.' })}
           ${'' /* One box per nationality held, and always one spare. Dual and
@@ -506,8 +518,8 @@ export const clientsModule: AppModule = {
       if (view !== 'all' && view !== 'leads') where.push(`status <> 'archived'`);
       if (q) {
         // Every word, in any order. A name is stored as it is written on the
-        // passport — "Minh Khuong NGUYEN" — so one phrase matched against one
-        // column found nothing for "NGUYEN Minh Khuong", which is how a lawyer
+        // passport — "Maria Luisa GARCIA" — so one phrase matched against one
+        // column found nothing for "GARCIA Maria Luisa", which is how a lawyer
         // and INZ both write it.
         const cols = ['full_name', 'family_name', 'given_names', 'email', 'phone', 'ref',
                       'preferred_name', 'nzbn', 'company_number'];
