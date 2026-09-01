@@ -7,6 +7,40 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.92.0 — 1 September 2026
+
+### Added
+- **The two exports the intake actually asks for.** The intake prompt tells the
+  practice to export two lists before running an extraction — the clients the
+  register already holds, and the case-type keys. Neither could be produced. A
+  document telling somebody to press a button that does not exist is worse than
+  one that says nothing.
+
+  **The clients export now carries the INZ client number.** It belongs to the
+  person but is recorded on their matters, which is where INZ writes it, so the
+  export gathers it from there. A person with two matters carrying the same
+  number gets it once; where two disagree, both come out, because that
+  disagreement is exactly what somebody needs to see. Passport numbers stay out,
+  as they are from every export.
+
+  **A new export, Dropdown lists**, gives every list an administrator can edit —
+  case types, visa types, document categories, English tests — as key and label,
+  with a column saying which list each belongs to. Sixty-seven case types, thirty
+  visa types. They live as editable text in Settings and change without a
+  deployment, so a list written down anywhere goes stale; exported, it cannot.
+
+  Three things about the splitting are easy to get wrong and are each held by a
+  test that fails without them: the carriage returns a textarea posts (a key
+  ending in an invisible one matches nothing, and nobody reading the CSV can see
+  why), the last term when the list does not end in a newline (which would be
+  the type most recently added), and blank lines.
+
+### Changed
+- The intake prompt now names the two buttons rather than describing files the
+  practice had to assemble by hand, and says to export both on the day of the
+  run — both change without a deployment, so a copy kept from last time is a copy
+  that is wrong.
+
 ## 0.91.2 — 1 September 2026
 
 ### Fixed

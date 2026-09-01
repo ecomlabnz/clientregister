@@ -61,14 +61,21 @@ synced drive you would not want an extraction log on.
 after the first is an increment, not a fresh start. Before running, export two
 small lists from the register and put them in the working directory:
 
-- `existing-clients.txt` — one line per client: ref, family name, given names,
-  date of birth, INZ client number if known. **No passport numbers.** They stay
-  out of bulk exports by a standing rule of the practice, and they are not
-  needed here — see **Identity** below, where a passport number is corroboration
-  and never the key.
-- `case-type-keys.txt` — the current case-type keys from Settings (the
-  vocabulary is editable there, so a pasted list in this file goes stale;
-  export it fresh each time).
+Both come from **Admin → Export**, and both are a button:
+
+- **Clients** → `existing-clients.txt`. Ref, family name, given names, date of
+  birth and INZ client number, which is what the identity check needs. **No
+  passport numbers** — they are excluded from every export by a standing rule of
+  the practice, and they are not needed here: see **Identity** below, where a
+  passport number is corroboration and never the key.
+- **Dropdown lists** → `case-type-keys.txt`. Every list an administrator can
+  edit, as key and label, with a `list` column saying which is which; the
+  case-type keys are the rows where `list` is `case_types`.
+
+**Export both on the day you run**, not from a previous batch. Both change
+without a deployment — an administrator edits the case types in Settings, and
+the client list grows with every load — so a copy kept from last time is a copy
+that is wrong.
 
 **Do a handful first.** Run it over five or six files, read the output line by
 line against the originals, and only then let it walk the whole tree. An
