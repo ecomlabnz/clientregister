@@ -7,6 +7,36 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.89.1 — 1 September 2026
+
+### Fixed
+- **Searching a name only worked if you typed it in the register's order.** A
+  name is stored as it is written on the passport — "Minh Khuong NGUYEN", given
+  names first. The search compared the whole phrase against one column at a
+  time, so "NGUYEN Minh Khuong" and "NGUYEN, Minh Khuong" — the order a lawyer
+  writes it, and the order INZ writes it — matched nothing at all, while
+  "Khuong" on its own worked. With 231 clients that is a search that cannot be
+  trusted.
+
+  Every word is now matched independently and all of them must appear
+  somewhere; the order is not the register's business. "NGUYEN Minh Khuong",
+  "Minh Khuong Nguyen" and "khuong nguyen" find the same person, and a word can
+  match a different column from its neighbour — "NGUYEN CL-0157" matches the
+  family name and the reference together. It still narrows rather than widens:
+  "NGUYEN Giang" is nobody.
+
+  Fixed in one place and applied to all three surfaces that search: the client
+  list, the search box in the top bar, and the picker that files an email onto a
+  matter.
+
+- **A stray parenthesis in the matters query took the whole Search page down**
+  with a 500 while the above was being written. `searchEverything` runs eleven
+  queries at once, so one bad query breaks all of them — and nothing executed
+  the SQL, so nothing caught it. There is now a test that runs every one of
+  those queries against the real schema, for one word, several words, and words
+  containing LIKE wildcards, and checks that each query binds a value for every
+  placeholder it writes.
+
 ## 0.89.0 — 1 September 2026
 
 ### Changed

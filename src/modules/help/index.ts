@@ -32,6 +32,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.89.1', date: '1 September 2026',
+    notes: [
+      'Searching a name now works whichever way round you type it. The register stores a name '
+        + 'as it appears on the passport \u2014 given names first \u2014 so searching '
+        + '\u201cNGUYEN Minh Khuong\u201d, the way you and INZ write it, found nothing, while '
+        + '\u201cKhuong\u201d on its own worked. Every word now counts on its own and all of '
+        + 'them have to appear, so any order finds the person. It applies to the client list, '
+        + 'the search box at the top, and the box for filing an email onto a matter.',
+    ],
+  },
+  {
     version: '0.89.0', date: '1 September 2026',
     notes: [
       'Filing an email searches instead of scrolling. \u201cFile it on a matter or client\u201d was '

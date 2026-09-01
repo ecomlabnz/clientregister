@@ -18,6 +18,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
+import { searchTerms } from '../../core/search';
 import { all, nextRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
@@ -504,10 +505,17 @@ export const clientsModule: AppModule = {
       else if (view === 'organisations') where.push(`kind = 'organisation'`);
       if (view !== 'all' && view !== 'leads') where.push(`status <> 'archived'`);
       if (q) {
-        where.push(`(full_name LIKE ?1 OR family_name LIKE ?1 OR given_names LIKE ?1
-                     OR email LIKE ?1 OR phone LIKE ?1 OR ref LIKE ?1
-                     OR preferred_name LIKE ?1 OR nzbn LIKE ?1 OR company_number LIKE ?1)`);
-        params.push(`%${q}%`);
+        // Every word, in any order. A name is stored as it is written on the
+        // passport — "Minh Khuong NGUYEN" — so one phrase matched against one
+        // column found nothing for "NGUYEN Minh Khuong", which is how a lawyer
+        // and INZ both write it.
+        const cols = ['full_name', 'family_name', 'given_names', 'email', 'phone', 'ref',
+                      'preferred_name', 'nzbn', 'company_number'];
+        for (const term of searchTerms(q)) {
+          params.push(`%${term.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`);
+          const n = params.length;
+          where.push(`(${cols.map((c) => `${c} LIKE ?${n} ESCAPE '\\'`).join(' OR ')})`);
+        }
       }
       if (status && (CLIENT_STATUSES as readonly string[]).includes(status)) {
         where.push(`status = ?${params.length + 1}`);
