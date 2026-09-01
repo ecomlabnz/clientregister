@@ -25,6 +25,7 @@
 import type { Env } from '../types';
 import { all, nowIso, one, run } from './db';
 import { newId } from './ids';
+import { likeTerm, normaliseQuery } from './search';
 
 export type FilingTarget = 'case' | 'client';
 
@@ -195,6 +196,85 @@ export async function filingOptions(env: Env): Promise<Array<{ value: string; la
   return [
     ...cases.map((k) => ({ value: `case:${k.id}`, label: `${k.ref} — ${k.title} (${k.client_name})` })),
     ...clients.map((cl) => ({ value: `client:${cl.id}`, label: `${cl.ref} — ${cl.full_name}` })),
+  ];
+}
+
+/**
+ * The matters and clients matching what somebody typed.
+ *
+ * `filingOptions` above puts the whole register in one dropdown, which was fine
+ * at sixty records and is not fine at four hundred: a list nobody can scan is a
+ * list people file into wrongly. This searches instead, over everything an
+ * email might be identified by — the matter's reference, description and
+ * summary, the client's name, and the INZ application and client numbers, which
+ * is how a letter from INZ names the file it is about.
+ *
+ * Closed and withdrawn matters are included and marked. The dropdown left them
+ * out because you rarely file onto a closed file; but a decision letter on a
+ * matter closed last week is exactly the thing you do file, and leaving it out
+ * means the search says "no such matter" about a matter that plainly exists.
+ */
+export interface FilingHit {
+  value: string;
+  ref: string;
+  title: string;
+  detail: string;
+  closed: boolean;
+}
+
+export async function filingSearch(
+  env: Env, rawQuery: string, limit = 12,
+): Promise<FilingHit[]> {
+  const q = normaliseQuery(rawQuery);
+  // One character matches most of the register and answers nothing.
+  if (q.length < 2) return [];
+  const like = likeTerm(q);
+  const upper = q.toUpperCase();
+
+  const [cases, clients] = await Promise.all([
+    all<{ id: string; ref: string; title: string; descriptor: string | null; status: string;
+          inz_application_number: string | null; client_name: string | null }>(
+      env.DB,
+      `SELECT k.id, k.ref, k.title, k.descriptor, k.status, k.inz_application_number,
+              cl.full_name AS client_name
+         FROM cases k LEFT JOIN clients cl ON cl.id = k.client_id
+        WHERE k.ref LIKE ?1 ESCAPE '\\' OR k.title LIKE ?1 ESCAPE '\\'
+           OR k.descriptor LIKE ?1 ESCAPE '\\' OR k.summary LIKE ?1 ESCAPE '\\'
+           OR k.inz_application_number LIKE ?1 ESCAPE '\\'
+           OR k.inz_client_number LIKE ?1 ESCAPE '\\'
+           OR cl.full_name LIKE ?1 ESCAPE '\\'
+        ORDER BY CASE WHEN k.ref = ?2 THEN 0 ELSE 1 END,
+                 CASE WHEN k.status IN ('closed', 'withdrawn') THEN 1 ELSE 0 END,
+                 k.updated_at DESC
+        LIMIT ?3`, like, upper, limit),
+    all<{ id: string; ref: string; full_name: string; email: string | null; status: string }>(
+      env.DB,
+      `SELECT id, ref, full_name, email, status FROM clients
+        WHERE ref LIKE ?1 ESCAPE '\\' OR full_name LIKE ?1 ESCAPE '\\'
+           OR family_name LIKE ?1 ESCAPE '\\' OR given_names LIKE ?1 ESCAPE '\\'
+           OR preferred_name LIKE ?1 ESCAPE '\\' OR email LIKE ?1 ESCAPE '\\'
+           OR phone LIKE ?1 ESCAPE '\\' OR nzbn LIKE ?1 ESCAPE '\\'
+        ORDER BY CASE WHEN ref = ?2 THEN 0 ELSE 1 END, full_name
+        LIMIT ?3`, like, upper, limit),
+  ]);
+
+  // Matters first: an email is about a matter more often than about a person,
+  // and when it is about a person their file is a short scroll further down.
+  return [
+    ...cases.map((k) => ({
+      value: `case:${k.id}`,
+      ref: k.ref,
+      title: k.descriptor || k.title,
+      detail: [k.client_name, k.inz_application_number].filter(Boolean).join(' · '),
+      closed: k.status === 'closed' || k.status === 'withdrawn',
+    })),
+    ...clients.map((cl) => ({
+      value: `client:${cl.id}`,
+      ref: cl.ref,
+      title: cl.full_name,
+      detail: cl.email ?? '',
+      closed: cl.status === 'archived',
+    })),
   ];
 }
 

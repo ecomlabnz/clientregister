@@ -32,6 +32,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.89.0', date: '1 September 2026',
+    notes: [
+      'Filing an email searches instead of scrolling. \u201cFile it on a matter or client\u201d was '
+        + 'one long list of everything in the register; it is now a search box. Type a family name, '
+        + 'a reference, or the INZ application number off the letter, and pick from what comes back. '
+        + 'Closed matters are included and marked as closed \u2014 a decision letter on a matter you '
+        + 'closed last week is exactly the thing you file.',
+      'A date in a page heading shows as a date. On the inbox and inquiry pages it had been '
+        + 'appearing as a line of tags instead.',
+    ],
+  },
+  {
     version: '0.88.0', date: '1 September 2026',
     notes: [
       'A warning can be changed or removed. \u201cChange it\u201d reworks the wording or the '

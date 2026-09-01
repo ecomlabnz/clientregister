@@ -17,7 +17,7 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import {
-  actionButton, badge, card, csrfField, emptyState, errorList, field, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
+  actionButton, badge, card, csrfField, filingPicker, emptyState, errorList, field, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
 } from '../../ui/components';
 import { dateInputValue, dateOrDateTime, dateShort, dateTime, truncate } from '../../ui/format';
 import {
@@ -35,7 +35,7 @@ import {
 import { openThreadCount } from '../../core/channels';
 import { can } from '../../core/rbac';
 import { caseTypes, isTerm, labelFor, termOptions } from '../../core/vocabulary';
-import { fileOntoRecord, filingOptions, filingTargetLabel, markLinkedFiled, parseFilingChoice, unfile } from '../../core/filing';
+import { fileOntoRecord, filingSearch, filingTargetLabel, markLinkedFiled, parseFilingChoice, unfile } from '../../core/filing';
 
 export interface InquiryRow {
   id: string; ref: string; source: InquirySource; source_ref: string | null; received_at: string;
@@ -348,7 +348,8 @@ export const inquiriesModule: AppModule = {
       // A first guess at where the family name ends, shown in the form so a
       // person can correct it before it is saved rather than after.
       const guessedName = splitFullName(inq.contact_name ?? '');
-      const fileTargets = writable && !inq.filed_at ? await filingOptions(c.env) : [];
+      const find = c.req.query('find') ?? '';
+      const fileTargets = writable && !inq.filed_at ? await filingSearch(c.env, find) : [];
       const filedTarget: 'case' | 'client' | null = inq.filed_at
         ? (inq.case_id ? 'case' : inq.client_id ? 'client' : null) : null;
       const filedOn = filedTarget
@@ -358,7 +359,7 @@ export const inquiriesModule: AppModule = {
       return page(c, { title: inq.ref, active: '/inquiries' }, html`
         ${breadcrumbs([{ href: '/inquiries', label: 'Inquiries' }, { label: inq.ref }])}
         ${pageHeader(inq.subject || `Inquiry ${inq.ref}`,
-          `${inq.ref} · ${INQUIRY_SOURCE_LABELS[inq.source]} · received ${stamp(inq.received_at)}`,
+          html`${inq.ref} · ${INQUIRY_SOURCE_LABELS[inq.source]} · received ${stamp(inq.received_at)}`,
           writable
             ? html`<a class="btn btn-secondary" href="/inquiries/${inq.id}/edit">Edit</a>
                    ${inq.client_id
@@ -388,17 +389,15 @@ export const inquiriesModule: AppModule = {
                        <button class="btn btn-small btn-secondary" type="submit">Put it back in the list</button>
                      </form>` : ''}
                  </div>`
-          : writable && fileTargets.length > 0
-            ? card('File it on a matter or client', html`
-                <form method="post" action="/inquiries/${inq.id}/file" class="row-form">
-                  ${csrfField(csrf)}
-                  ${select({ label: 'File on', name: 'onto', required: true,
-                             includeBlank: 'Choose a matter or client', options: fileTargets })}
-                  <button class="btn btn-primary" type="submit">File it</button>
-                </form>
-                <p class="hint">A note is written on that record with this inquiry's date, contact and
-                   text, and the inquiry moves to the Filed tab. Nothing is deleted, and you can put
-                   it back.</p>`)
+          : writable
+            ? card('File it on a matter or client', filingPicker({
+                action: `/inquiries/${inq.id}/file`, findAction: `/inquiries/${inq.id}`, csrf,
+                query: find, hits: fileTargets,
+                hint: html`<p class="hint">Search by name, reference, or an INZ application number.
+                   A note is written on that record with this inquiry's date, contact and text, and
+                   the inquiry moves to the Filed tab. Nothing is deleted, and you can put it
+                   back.</p>`,
+              }))
             : ''}
 
         <div class="cols">

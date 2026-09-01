@@ -65,7 +65,7 @@ export function normaliseQuery(raw: string): string {
 }
 
 /** SQLite's LIKE treats these as wildcards; a person typing them means them. */
-function likeTerm(q: string): string {
+export function likeTerm(q: string): string {
   return `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
 }
 
