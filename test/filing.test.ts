@@ -168,3 +168,138 @@ describe('the destination that arrives in the form', () => {
     }
   });
 });
+
+/**
+ * Finding the matter to file onto.
+ *
+ * The dropdown that held every matter and client was fine at sixty records and
+ * unusable at four hundred — and a list nobody can scan is a list people file
+ * into wrongly. What matters here is that the things somebody actually types
+ * find the right file: a family name, a reference, and above all the INZ
+ * application number, because that is how an INZ letter names the matter it is
+ * about and it appears nowhere in the matter's title.
+ */
+describe('finding the matter or client to file on', () => {
+  const env = (d: any) => ({ DB: {
+    prepare: (sql: string) => ({
+      bind: (...p: unknown[]) => ({ all: async () => ({ results: d.prepare(sql).all(...p) }) }),
+    }),
+  } } as any);
+
+  function seeded() {
+    const d = db();
+    d.exec(`UPDATE cases SET inz_application_number = 'WV01899056',
+                             descriptor = 'Partner of an AEWV holder' WHERE id = 'K1'`);
+    d.exec(`INSERT INTO clients (id,ref,kind,full_name,family_name,given_names,status,created_at,updated_at)
+            VALUES ('CL2','CL-0002','individual','Thi Ha Giang Bui','Bui','Thi Ha Giang','active','${AT}','${AT}')`);
+    d.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
+            VALUES ('K2','CASE-26-002','CL2','Seasonal peak work visa','Seasonal peak work visa',
+                    'wv_aewv','closed','U1','${AT}','${AT}')`);
+    return d;
+  }
+
+  const find = async (d: any, q: string) => {
+    const { filingSearch } = await import('../src/core/filing');
+    return filingSearch(env(d), q);
+  };
+
+  it('finds a matter by its INZ application number', async () => {
+    // The number on the letter. It is in no title and no client name, so if the
+    // search does not carry it, the one identifier INZ uses finds nothing.
+    const hits = await find(seeded(), 'WV01899056');
+    expect(hits.map((h) => h.value)).toContain('case:K1');
+  });
+
+  it('finds a client by family name, and their matter too', async () => {
+    const hits = await find(seeded(), 'Bui');
+    expect(hits.map((h) => h.value)).toEqual(expect.arrayContaining(['client:CL2', 'case:K2']));
+  });
+
+  it('finds a matter by reference, and puts the exact reference first', async () => {
+    const hits = await find(seeded(), 'CASE-26-002');
+    expect(hits[0]!.value).toBe('case:K2');
+  });
+
+  it('includes a closed matter, and says that it is closed', async () => {
+    // A decision letter on a matter closed last week is exactly the thing you
+    // file. Leaving it out says "no such matter" about one that plainly exists.
+    const hits = await find(seeded(), 'Seasonal peak');
+    const hit = hits.find((h) => h.value === 'case:K2');
+    expect(hit).toBeTruthy();
+    expect(hit!.closed).toBe(true);
+  });
+
+  it('answers nothing to one character, rather than most of the register', async () => {
+    expect(await find(seeded(), 'a')).toEqual([]);
+    expect(await find(seeded(), '')).toEqual([]);
+  });
+
+  it('treats a typed % as a per cent sign, not as everything', async () => {
+    // SQLite's LIKE would read it as a wildcard and return the whole register,
+    // which is the opposite of what somebody typing it means.
+    expect(await find(seeded(), '%%')).toEqual([]);
+  });
+});
+
+describe('a date in a page heading is a date, not tags', () => {
+  // Three pages passed `stamp()` — which is markup — into a plain template
+  // string, so the heading read `<span class="stamp">29 Aug 2026…` on screen.
+  // The subtitle takes markup now; this pins that it renders as one.
+  it('renders a stamped subtitle rather than escaping it', async () => {
+    const { pageHeader, stamp } = await import('../src/ui/components');
+    const { html } = await import('../src/ui/html');
+    const out = pageHeader('A subject', html`email · ${stamp('2026-08-29T02:10:00Z')}`).value;
+    expect(out).toContain('<span class="stamp"');
+    expect(out).not.toContain('&lt;span');
+  });
+
+  it('still escapes a subtitle that is only text', async () => {
+    const { pageHeader } = await import('../src/ui/components');
+    const out = pageHeader('A subject', 'from <script>alert(1)</script>').value;
+    expect(out).toContain('&lt;script&gt;');
+    expect(out).not.toContain('<script>');
+  });
+});
+
+describe('when a filed item happened', () => {
+  /*
+   * A filed email takes the date it was received, not the date somebody got
+   * round to filing it — so it lands in the right place on the timeline rather
+   * than at the top, weeks after the fact. The timeline orders by occurred_at,
+   * so this column is the whole of that behaviour.
+   */
+  const env = (d: any) => ({ DB: {
+    prepare: (sql: string) => ({
+      bind: (...p: unknown[]) => ({
+        run: async () => { d.prepare(sql).run(...p); return { success: true }; },
+        all: async () => ({ results: d.prepare(sql).all(...p) }),
+        first: async () => d.prepare(sql).all(...p)[0] ?? null,
+      }),
+    }),
+    batch: async (stmts: any[]) => { for (const s of stmts) await s.run(); return []; },
+  } } as any);
+
+  it('dates the note when the message arrived, not when it was filed', async () => {
+    const { fileOntoRecord } = await import('../src/core/filing');
+    const d = db();
+    await fileOntoRecord(env(d), {
+      target: 'case', targetId: 'K1', userId: 'U1', origin: 'the email inbox',
+      source: { channel: 'email', receivedAt: '2026-08-28T14:10:08.018Z',
+                from: 'them@x.test', subject: 'A subject', body: 'The body.' },
+    }, () => ({ run: async () => ({ success: true }) }) as any);
+    const [row] = d.prepare('SELECT occurred_at, created_at FROM entries').all() as any[];
+    expect(row.occurred_at).toBe('2026-08-28T14:10:08.018Z');
+    expect(row.created_at).not.toBe(row.occurred_at);
+  });
+
+  it('falls back to now when the message carries no date of its own', async () => {
+    const { fileOntoRecord } = await import('../src/core/filing');
+    const d = db();
+    await fileOntoRecord(env(d), {
+      target: 'case', targetId: 'K1', userId: 'U1', origin: 'the email inbox',
+      source: { channel: 'email', receivedAt: null, from: null, subject: null, body: 'x' },
+    }, () => ({ run: async () => ({ success: true }) }) as any);
+    const [row] = d.prepare('SELECT occurred_at, created_at FROM entries').all() as any[];
+    expect(row.occurred_at).toBe(row.created_at);
+  });
+});

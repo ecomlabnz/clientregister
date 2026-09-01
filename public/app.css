@@ -325,7 +325,7 @@ p:last-child { margin-bottom: 0; }
   position: absolute; top: calc(100% + 4px); left: 0; z-index: 20;
   display: flex; flex-direction: column; gap: 2px; min-width: 160px;
   padding: 6px; background: var(--surface);
-  border: 1px solid var(--border); border-radius: 6px;
+  border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
 }
 
@@ -1556,4 +1556,41 @@ body.site { background: var(--bg); }
 .flag-meta {
   display: flex; flex-wrap: wrap; gap: 4px 12px;
   font-size: 0.8rem; color: var(--muted);
+}
+
+/* Filing something onto a matter or a client.
+   A search and a short list of answers, rather than a dropdown holding the
+   whole register. The row is a label wrapping its radio, so the whole line is
+   the target — which matters most on a phone, where a bare radio is a 12px
+   thing to hit. */
+.filing-find { align-items: flex-end; }
+.pick-list { list-style: none; margin: 12px 0; padding: 0; }
+.pick {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  margin-bottom: 6px; background: var(--surface);
+}
+.pick:focus-within { border-color: var(--accent); }
+.pick > label {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  padding: 9px 11px; cursor: pointer; margin: 0;
+}
+/* The global rule makes every input full-width, which turns a radio into a
+   line of its own with the row's text beneath it. */
+.pick input[type="radio"] {
+  width: auto; margin: 0; padding: 0; flex: none; align-self: center;
+  border: none; background: none;
+}
+.pick-ref { flex: none; }
+.pick-title { font-weight: 600; color: var(--text); }
+.pick-detail { color: var(--muted); font-size: 0.85rem; }
+.pick-closed {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--muted); white-space: nowrap;
+}
+/* On a phone the reference and the description each get their own line rather
+   than wrapping mid-phrase. */
+@media (max-width: 560px) {
+  .pick > label { gap: 2px 8px; }
+  .pick-title { flex-basis: 100%; }
+  .pick-detail { flex-basis: 100%; }
 }

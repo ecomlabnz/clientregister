@@ -17,7 +17,7 @@ import { auditFrom } from '../../core/audit';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import {
-  actionButton, badge, card, csrfField, emptyState, pageHeader, select, stamp, statusTone, table,
+  actionButton, badge, card, csrfField, emptyState, filingPicker, pageHeader, select, stamp, statusTone, table,
 } from '../../ui/components';
 import { dateShort, dateTime, truncate } from '../../ui/format';
 import { processMessage } from '../../ingest/pipeline';
@@ -28,7 +28,7 @@ import { incomingCounts, incomingTabs } from '../inquiries';
 import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
 import { FormReader } from '../../core/validate';
 import { sanitiseHtml } from '../../core/sanitise';
-import { fileOntoRecord, filingOptions, filingTargetLabel, markIngestFiled, markLinkedFiled, parseFilingChoice, unfile } from '../../core/filing';
+import { fileOntoRecord, filingSearch, filingTargetLabel, markIngestFiled, markLinkedFiled, parseFilingChoice, unfile } from '../../core/filing';
 import {
   CHANNEL_LABELS, type ThreadEntry, type ThreadRow,
   forwardQuote, linkThread, postReply, threadFor, threadHistory,
@@ -395,7 +395,9 @@ export const inboxModule: AppModule = {
         ? can(c.get('user'), 'mail:send')
         : can(c.get('user'), 'register:write');
       const canFileThread = can(c.get('user'), 'register:write');
-      const threadTargets = canFileThread && !(thread as any).filed_at ? await filingOptions(c.env) : [];
+      const threadFind = c.req.query('find') ?? '';
+      const threadTargets = canFileThread && !(thread as any).filed_at
+        ? await filingSearch(c.env, threadFind) : [];
 
       return page(c, { title: thread.peer_label ?? thread.peer_id, active: '/inquiries' }, html`
         ${breadcrumbs([{ label: 'Inbox', href: '/inbox' },
@@ -413,17 +415,16 @@ export const inboxModule: AppModule = {
                        <button class="btn btn-small btn-secondary" type="submit">Put it back in the list</button>
                      </form>` : ''}
                  </div>`
-          : canFileThread && threadTargets.length > 0
-            ? card('File it on a matter or client', html`
-                <form method="post" action="/inbox/threads/${thread.id}/file" class="row-form">
-                  ${csrfField(session.csrf)}
-                  ${select({ label: 'File on', name: 'onto', required: true,
-                             includeBlank: 'Choose a matter or client', options: threadTargets })}
-                  <button class="btn btn-primary" type="submit">File it</button>
-                </form>
-                <p class="hint">A note is written on that record pointing at this conversation, and the
-                   conversation moves to the Filed tab. Nothing is deleted — the messages stay here in
-                   full, and you can put it back.</p>`)
+          : canFileThread
+            ? card('File it on a matter or client', filingPicker({
+                action: `/inbox/threads/${thread.id}/file`,
+                findAction: `/inbox/threads/${thread.id}`,
+                csrf: session.csrf, query: threadFind, hits: threadTargets,
+                hint: html`<p class="hint">Search by name, reference, or an INZ application number.
+                   A note is written on that record pointing at this conversation, and the
+                   conversation moves to the Filed tab. Nothing is deleted — the messages stay here
+                   in full, and you can put it back.</p>`,
+              }))
             : ''}
 
         <div class="cols">
@@ -668,7 +669,7 @@ export const inboxModule: AppModule = {
                        { label: thread.peer_label ?? thread.peer_id, href: here },
                        { label: 'Forward' }])}
         ${pageHeader('Send this on',
-          `From ${found.entry.who} · ${stamp(found.entry.at)}`)}
+          html`From ${found.entry.who} · ${stamp(found.entry.at)}`)}
         ${card('Where it goes', html`
           <form method="post" action="${`${here}/forward/${found.entry.kind}/${found.entry.id}`}"
                 class="entry-form">
@@ -891,7 +892,10 @@ ${quote}</textarea>
       const plain = c.req.query('plain') === '1';
       const formatted = msg.body_html ? sanitiseHtml(msg.body_html) : null;
       const canFile = can(c.get('user'), 'register:write');
-      const fileTargets = canFile && !msg.filed_at ? await filingOptions(c.env) : [];
+      // What was typed into the find box, if anything. Filing onto four
+      // hundred records is a search, not a scroll through a dropdown.
+      const find = c.req.query('find') ?? '';
+      const fileTargets = canFile && !msg.filed_at ? await filingSearch(c.env, find) : [];
       const filedOn = msg.filed_at && msg.filed_to_type && msg.filed_to_id
         ? await filingTargetLabel(c.env, msg.filed_to_type as 'case' | 'client', msg.filed_to_id)
         : null;
@@ -899,7 +903,7 @@ ${quote}</textarea>
       return page(c, { title: 'Inbox message', active: '/inquiries' }, html`
         ${breadcrumbs([{ href: '/inbox', label: 'Inbox' }, { label: msg.channel }])}
         ${pageHeader(msg.subject || '(no subject)',
-          `${msg.channel} · from ${msg.sender_display ?? msg.sender ?? 'unknown'} · ${stamp(msg.received_at)}`)}
+          html`${msg.channel} · from ${msg.sender_display ?? msg.sender ?? 'unknown'} · ${stamp(msg.received_at)}`)}
 
         ${msg.trusted
           ? ''
@@ -918,17 +922,16 @@ ${quote}</textarea>
                        <button class="btn btn-small btn-secondary" type="submit">Put it back in the inbox</button>
                      </form>` : ''}
                  </div>`
-          : canFile && fileTargets.length > 0
-            ? card('File it on a matter or client', html`
-                <form method="post" action="/inbox/${id}/file" class="row-form">
-                  ${csrfField(csrf)}
-                  ${select({ label: 'File on', name: 'onto', required: true,
-                             includeBlank: 'Choose a matter or client', options: fileTargets })}
-                  <button class="btn btn-primary" type="submit">File it</button>
-                </form>
-                <p class="hint">A note is written on that record with this message's date, sender and
-                   text, and the message moves out of the inbox to the Filed tab. Nothing is deleted:
-                   the message stays here exactly as it arrived, and you can put it back.</p>`)
+          : canFile
+            ? card('File it on a matter or client', filingPicker({
+                action: `/inbox/${id}/file`, findAction: `/inbox/${id}`, csrf,
+                query: find, hits: fileTargets,
+                hint: html`<p class="hint">Search by name, reference, or the INZ application number
+                   from the letter. A note is written on that record with this message's date, sender
+                   and text, and the message moves out of the inbox to the Filed tab. Nothing is
+                   deleted: the message stays here exactly as it arrived, and you can put it
+                   back.</p>`,
+              }))
             : ''}
 
         <div class="cols">

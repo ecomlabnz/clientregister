@@ -7,6 +7,43 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.89.0 — 1 September 2026
+
+### Changed
+- **Filing something searches instead of scrolling.** "File it on a matter or
+  client" was one `<select>` holding every matter and client in the register.
+  That was workable at sixty records and unusable at four hundred, which is
+  where batch 03 puts it — and a list nobody can scan is a list people file
+  into wrongly.
+
+  It is now a search box. Type a family name, a reference, or **the INZ
+  application number from the letter** — which is how INZ names the file it is
+  writing about, and which appears in no matter title — and pick from what
+  comes back. Matters first, then clients; the exact reference sorts to the
+  top.
+
+  Closed and withdrawn matters are included now, and marked as closed. The
+  dropdown left them out on the grounds that you rarely file onto a closed
+  file, but a decision letter on a matter closed last week is exactly the thing
+  you do file, and leaving it out made the search say "no such matter" about
+  one that plainly exists.
+
+  It works with scripting switched off — that is the rule, and it is why the
+  search is a button rather than a keystroke. Where scripting is there,
+  `app.js` narrows the list as you type, reusing the same `data-live-search`
+  mechanism the Search page already had. All three surfaces that file — the
+  inbox, conversations, and inquiries — use the one picker.
+
+### Fixed
+- **A date in a page heading is a date again, not tags.** Three pages passed
+  `stamp()`, which is markup, into a subtitle typed as a plain string, so the
+  heading read `<span class="stamp">29 Aug 2026<span class="stamp-time">, 02:10
+  am</span></span>` on screen. `pageHeader` takes markup now; plain text is
+  still escaped, and there is a test for each.
+- **The radio in a filing choice sat on its own line.** The stylesheet makes
+  every `input` full width, which turned each radio into a line of its own with
+  the row's text beneath it. Scoped back to `width: auto` inside the picker.
+
 ## 0.88.0 — 1 September 2026
 
 ### Added
