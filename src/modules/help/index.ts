@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.89.5', date: '1 September 2026',
+    notes: [
+      'Editing a fee line saves again. Saving, changing a status and deleting a fee all returned '
+        + '\u201cNot found\u201d \u2014 a missing bracket in the code meant those three actions '
+        + 'were never wired up, though the forms drew perfectly. Nothing you typed was at fault, '
+        + 'and nothing was lost.',
+    ],
+  },
+  {
     version: '0.89.4', date: '1 September 2026',
     notes: [
       'Showing 250 matters or 250 clients at once works again. Asking for a big page brought up '
