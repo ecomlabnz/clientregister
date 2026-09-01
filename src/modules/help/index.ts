@@ -30,7 +30,21 @@ interface Section { id: string; title: string; body: Raw }
  * reading a developer changelog. The full one is CHANGELOG.md in the
  * repository.
  */
-const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
+/**
+ * Exported so a test can hold it against `package.json` and `CHANGELOG.md`. A
+ * release is those three edits agreeing, and this is the one of the three a
+ * developer never sees while working, so it is the one that drifts.
+ */
+export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
+  {
+    version: '0.91.1', date: '1 September 2026',
+    notes: [
+      'The instructions for reading your folders were rewritten into one document. There were two, '
+        + 'and they had already started disagreeing \u2014 one still said to identify a person by '
+        + 'their passport number, which is the opposite of what you decided. Nothing in the register '
+        + 'itself changed.',
+    ],
+  },
   {
     version: '0.91.0', date: '1 September 2026',
     notes: [
@@ -1113,7 +1127,7 @@ const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
       'Settings page with tabs for practice details, security, fees, alerts and channels.',
       'Quotes can be printed, emailed and cancelled, and carry your terms of engagement.',
       'Two-factor authentication can be required for everyone.',
-      'This manual.',
+      'The Help manual you are reading now.',
     ],
   },
   {

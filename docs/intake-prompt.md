@@ -8,18 +8,45 @@ files, that does two jobs at once:
 2. **Report** what it found that the register has nowhere to put — so the
    register can grow towards the practice rather than the other way round.
 
-This prompt has been through two real batches — 23 clients and 24 matters on
-30 August 2026, and a second on 31 August. The rules below that cite either run
-are not hypothetical: each one exists because a run needed it, and several exist
-because a run was refused mid-load without it.
+This prompt has been through three real batches: 23 clients and 24 matters on
+30 August 2026, a second on 31 August, and 170 clients with 148 matters on
+1 September. Nothing below is hypothetical. Each rule exists because a run
+needed it, and several exist because a run was refused mid-load without one.
+
+**This is the only intake document.** There was briefly a second — a brief for
+one particular batch — and the two drifted apart within a day, disagreeing about
+how to identify a person. One document, edited per batch, is the arrangement.
+
+---
+
+## This batch
+
+Edit this section for each run; everything below it is standing.
+
+| | |
+|---|---|
+| **The folders** | `<PATH>` |
+| **Tag** | `Bankside` — the practice's own files, worked without the business partners |
+| **What it is** | `<current work \| closed archive \| mixed — say which>` |
+| **Batches 04 and 05** | 04 is the current work; 05 is the archive, about 25 GB. Do 04 first and finish it before 05 begins, so the archive's identity matching runs against a register that already holds the current clients |
+
+**Where the register stands** (1 September 2026): 230 clients, 193 matters,
+25 warnings. The next client reference is **CL-0252**. Matters are numbered by
+the year they were opened, and each year has its own counter — `CASE-23-`,
+`CASE-24-`, `CASE-25-` and `CASE-26-` are all in use, and 2026 stands at
+**CASE-26-208**.
+
+Everything currently in the register is tagged `omc`. Nothing in these batches
+is.
 
 ---
 
 ## Before you run it
 
 **Run it outside this repository.** Real client data never enters the repo — not
-in tests, fixtures, seeds or commit messages. Make a working directory somewhere
-else and run the session there:
+in tests, fixtures, seeds, commit messages or example text. This was breached
+twice on 1 September, once by using a client's name as a worked example in a code
+comment. Make a working directory somewhere else and run the session there:
 
 ```
 mkdir -p ~/register-intake && cd ~/register-intake
@@ -36,15 +63,11 @@ small lists from the register and put them in the working directory:
 - `existing-clients.txt` — one line per client: ref, family name, given names,
   date of birth, INZ client number if known. **No passport numbers.** They stay
   out of bulk exports by a standing rule of the practice, and they are not
-  needed here: the extractor records the passport numbers it reads from the
-  folders, and the loader matches them against the register at load time, where
-  the numbers never leave the database. Batch 02 worked exactly that way.
+  needed here — see **Identity** below, where a passport number is corroboration
+  and never the key.
 - `case-type-keys.txt` — the current case-type keys from Settings (the
   vocabulary is editable there, so a pasted list in this file goes stale;
   export it fresh each time).
-
-**Say what the batch is.** Tell the session whether these folders are current
-work, closed archive, or a mix — statuses land wrong otherwise.
 
 **Do a handful first.** Run it over five or six files, read the output line by
 line against the originals, and only then let it walk the whole tree. An
@@ -77,27 +100,168 @@ out the fields listed below. Then write three files into the working directory
 (never into the folders you are reading):
 
 - `clients.jsonl` — one JSON object per line, one per person or organisation
-- `cases.jsonl` — one per matter
+- `cases.jsonl` — one per matter, **ordered by `opened_on`, oldest first**
 - `findings.md` — everything below under **What to report**
+
+### What to read, and what to leave alone
+
+The practice's instruction, 1 September 2026. Reading everything is not
+thoroughness — it is how a large archive takes a fortnight and produces the same
+answer.
+
+**Start with the PREVIEW.** Almost every client folder holds a PDF whose name
+begins `PREVIEW`. It is a snapshot of the application as it stood before
+lodgement, produced so the client could read it and confirm it was accurate. It
+is therefore the single richest document in the folder: full name as lodged,
+date of birth, passport, nationality, address, the visa applied for, and the
+answers to INZ's questions — all in one place, and all checked by the client.
+
+Where a PREVIEW exists it is the source for the client's details, and the other
+documents fill in what it does not say: when the matter was opened, when it was
+lodged, and how it ended. Where there is no PREVIEW, work from the forms and
+correspondence.
+
+One caution: a PREVIEW is a snapshot *before* lodgement, so where the issued
+visa or an INZ letter disagrees with it, the later document is what happened.
+Record both and flag it, per rule 8.
+
+| Read | Why |
+|---|---|
+| The `PREVIEW` PDF | The application as lodged, confirmed by the client. Start here. |
+| Submissions and cover letters | What the matter was actually about, in the practice's own words |
+| The issued visa | The grant: type, conditions, dates. This is the outcome. |
+| Engagement letters, authorities, INZ receipts | What dates the matter |
+| Correspondence and file notes | Refusals, PPI letters, what went wrong |
+
+**Do not read extraneous PDFs and pictures.** Scanned bundles, photographs,
+identity documents already summarised in the PREVIEW, duplicated email
+attachments, payslips, bank statements, employer packs. They will be most of the
+bytes and almost none of the information, and the register has nowhere to put
+them.
+
+**Say what you skipped** in `findings.md` — folder and rough size — so the
+practice knows what was passed over and can ask for a second look.
+
+### Identity: when two records are the same person
+
+The practice's decision, 1 September 2026. It replaced an earlier rule that
+identified people by passport number, which was wrong in both directions.
+
+> Two records are the same client only when the **full name agrees** and the
+> **dates of birth do not disagree**. A differing date of birth is decisive —
+> that is a different person, whatever else matches. A passport number is
+> **corroboration and never the key**: the same person renews a passport and may
+> hold a second nationality's, so two numbers do not make two people, and a
+> number read off the wrong page does not make one.
+
+Three answers, and only the first acts without asking:
+
+| | |
+|---|---|
+| `same` | names agree, both dates present and equal → join them |
+| `different` | names disagree, or the dates disagree → never join |
+| `unknown` | names agree, one date missing → **stop and ask a person** |
+
+Applied mechanically to batch 03 this rejected two proposed joins that were
+wrong and found two that had been missed. What it means for you:
+
+1. **Always report a date of birth where the folder gives one**, and say which
+   document it came from. Without it the loader cannot confirm identity and has
+   to stop and ask. Batch 03 produced seven such questions.
+
+2. **`matches_existing` is a proposal, not a finding.** The loader checks every
+   one against the register by name and date of birth, in both directions.
+   Propose freely; give the evidence.
+
+3. **Write names consistently.** Batch 03 wrote the same person as
+   `GARCIA, Maria Luisa` in one folder and `Garcia, Maria Luisa` in another, and
+   the first version of the loader treated them as two people. Give
+   `family_name` and `given_names` as separate fields, always, and never rely on
+   a full name being parsed.
+
+4. **The same person in two folders is one record.** Merge them yourself where
+   the folder makes it obvious, and say in `why` that you did.
+
+5. **A person named in two folders under two names is a question, not a merge.**
+   Record both spellings and flag it.
+
+### Every matter needs its year
+
+This is the thing batch 03 got wrong, and it cost the most to fix.
+
+Batch 03 gave **every** matter a 2026 reference, because the loader asked the
+2026 counter for a number. Ninety-one of the 148 had been opened in 2023, 2024
+or 2025. A reference that says 26 for a matter opened in 2024 is wrong in the one
+place a reference is meant to be right, and correcting it afterwards cost a
+renumbering, a note on ninety-one files, and a permanent retirement of the
+vacated numbers. **A retired reference is never reused.**
+
+So report, for every matter, the date the practice opened it, and say where that
+date came from:
+
+```json
+{
+  "opened_on": "2024-11-05",
+  "opened_on_provenance": "engagement_letter",
+  "lodged_at": "2024-12-14",
+  "decided_at": "2025-03-02"
+}
+```
+
+| `opened_on_provenance` | Means |
+|---|---|
+| `engagement_letter` | a letter of engagement, retainer or authority, dated |
+| `first_document` | the earliest dated document showing the practice at work on it — **not** the client's own passport or birth certificate |
+| `folder_name` | the folder itself carries the date |
+| `inz_receipt` | INZ's acknowledgement of lodgement |
+| `inferred` | worked out from surrounding dates — say how in a note |
+| `unknown` | **nothing in the folder shows when the practice started work on it** |
+
+**Where nothing else dates a matter, take its year from the earliest document
+that shows the practice was working on it** — the practice's decision,
+1 September 2026, recorded as `first_document`.
+
+That is not a guess. It is evidence, it is labelled as evidence, and anybody can
+check it against the document later. A guess would be writing 2024 because the
+matter *feels* old.
+
+**Which document counts:** an engagement letter, an authority, correspondence, a
+completed form, a file note, an invoice. **Not** the earliest dated thing of any
+kind. A folder often holds a passport issued in 2019 or a birth certificate from
+1994; those date the client, not the work, and taking a year from one would put a
+matter years before the practice had heard of it. Where the only dated things are
+the client's own documents, that is `unknown`.
+
+**`unknown` is a real answer**, and it means: nothing here shows when the practice
+started. A matter there keeps a current-year number, and that is honest — "we do
+not know" is not 2025.
+
+Where the folder gives a year but not a full date, give `"opened_on": "2024"`
+rather than inventing a month and day.
+
+**Order `cases.jsonl` by `opened_on`, oldest first**, so the loader can walk it in
+order and allocate `CASE-24-001`, `CASE-24-002` and so on without sorting. Put a
+count per year at the top of `findings.md`:
+
+```
+Matters by year opened: 2021 — 4 | 2022 — 11 | 2023 — 26 | 2024 — 38
+                        2025 — 51 | 2026 — 9 | unknown — 17
+```
 
 ### The register already holds clients
 
-Before creating a person, check them against `existing-clients.txt` — by INZ
-client number first, then family name with date of birth. A match is not a new
-client: set `"matches_existing": "<their ref>"` on the object and still record
-everything you found, so the register's copy can be checked and completed. Say
-in `findings.md` how many matched and on what — counts, not names.
+Before creating a person, check them against `existing-clients.txt`, by the
+identity rule above. A match is not a new client: set
+`"matches_existing": "<their ref>"` on the object and still record everything you
+found, so the register's copy can be checked and completed. Say in `findings.md`
+how many matched and on what — counts, not names.
 
-**Passport matching happens at load, not here.** `existing-clients.txt` carries
-no passport numbers, because they stay out of bulk exports. Record the passport
-numbers you read from the folders in `clients.jsonl` as usual; the loader
-matches them against the register directly, where the numbers never leave the
-database. So a person you could not match on name and date of birth may still
-be matched at load — say so rather than asserting they are new.
-
-The first batch found the same person appearing in two places under differently
-ordered names; the passport number is what settled it. Names do not identify a
-person here — documents do.
+Record the passport numbers you read from the folders as usual. The loader
+checks each against what the register already holds and skips a document already
+recorded — five of seven passports in batch 03 were the same document the
+register held, and the sixth attempt to insert one stopped the load dead. Report
+the **passport number** always; it is what makes that check possible. It
+corroborates identity; it does not decide it.
 
 ### The fields the register holds
 
@@ -148,8 +312,10 @@ sent `expired` and was refused mid-load. **An out-of-date passport is still
 passport has taken over from it. `cancelled` is a passport an authority has
 cancelled.
 
-Passport numbers are recorded exactly as written. They identify people across
-folders — see matching above.
+Passport numbers are recorded exactly as written. They **corroborate** identity
+and never decide it — see **Identity** above. Report every one you read: the
+loader checks each against what the register already holds, and that check is
+what stops a duplicate document killing a load.
 
 **Certificates** — nest under the client as `certificates`:
 
@@ -184,8 +350,12 @@ client (how you are identifying the client — the same string you used for them
         in clients.jsonl), descriptor, case_type, status, priority,
 inz_application_number, inz_client_number, lodged_at, decision_due_at,
 decided_at, outcome, next_action, next_action_due, summary,
-opened_on, closed_on
+opened_on, opened_on_provenance, closed_on
 ```
+
+`opened_on` and `opened_on_provenance` are not optional — see **Every matter
+needs its year** above. They decide the matter's reference, and a reference
+cannot be corrected afterwards without retiring a number.
 
 No fee fields. The practice enters fees by hand, by its own decision — see rule
 12 — and a spec that lists ledger columns invites them to be filled in. A fee
@@ -201,7 +371,7 @@ say: **what this particular matter is about.** "Fresh application, chef's role
 with her current employer." "Partner of an AEWV holder, de facto basis."
 "Reply to a PPI letter about the relationship evidence."
 
-Do **not** write "NGUYEN, Ngoc Bich - Accredited Employer Work Visa". That is
+Do **not** write "OKONKWO, Chidi Amaka - Accredited Employer Work Visa". That is
 the client column and the type column read back, and producing it for every
 matter is exactly what made the earlier batches unreadable. If the only thing
 you can honestly say is the client and the type, the folder has told you
@@ -214,9 +384,10 @@ application this is among several for the same person.
 
 Statuses, in order: `lead`, `engaged`, `gathering_documents`, `preparing`,
 `ready_to_lodge`, `lodged`, `ppi`, `interim_visa`, `decision_pending`,
-`approved`, `declined`, `ipt_appeal`, `reconsideration`, `on_hold`,
-`withdrawn`, `closed`. Map the folder's own words (`Granted`, `SUBMITTED`) to
-one of these, and keep the original wording in `summary` or a note.
+`approved`, `declined`, `ipt_appeal`, `reconsideration`, `inz_investigation`,
+`on_hold`, `withdrawn`, `closed`. Map the folder's own words (`Granted`,
+`SUBMITTED`) to one of these, and keep the original wording in `summary` or a
+note.
 
 Two of these changed on 31 August 2026: `inz_rfi` is gone — a request for
 further information and a PPI letter are both `ppi`, "PPI / RFI letter
@@ -225,12 +396,12 @@ received", and which kind it was belongs in the note recording the letter. And
 (asking INZ again, or a s.61 request), because they are different places with
 different clocks.
 
-Use the keys in `case-type-keys.txt`. Do not force a matter into a type that
-does not fit: invent a key, say what it means, and list every invented key in
-`findings.md` — the practice decides what each becomes before the load. The
-first batch invented two (an eligibility assessment that concluded no
-application could be made, and a Privacy Act request), and both were mapped by
-the practice, not by the extractor.
+Use the keys in `case-type-keys.txt`. Where nothing fits, use `ot_other` and say
+plainly in `findings.md` what the work actually was. Do not invent a key unless
+the work is a recurring kind the register should learn — and then say what it
+means, and list every invented key, because the practice decides what each
+becomes before the load. Batch 01 invented two and both were mapped by the
+practice; batch 03 invented two that had to be unpicked.
 
 **Also collect, nested under the matter:**
 
@@ -350,6 +521,119 @@ the practice, not a number in a ledger.
     Redacted risk-alert pages, ministerial or privacy-release bundles: note
     that they exist and where, and read nothing into the redactions.
 
+### Warnings
+
+A note beginning `Warning` becomes a warning standing on the person's file,
+citing the matter it was read off. Batch 03 produced 25 this way and the
+convention works. Keep it:
+
+```
+Warning: the applicant is paid $27.76 against a visa condition of $27.80.
+Warning - previous refusal: Australian subclass 482 refused, per his own
+comfort letter.
+```
+
+Two things make a warning worth having:
+
+- **State the fact, with its date and figure.** "Previously refused a visa" is a
+  sentence nobody reads twice. "Visitor visa refused 10 July 2025" is one they
+  act on.
+- **Put it on the matter it came from**, not on a general note. The citation is
+  what lets somebody check it a year later.
+
+A warning is not the same as a declined matter: the loader already raises one for
+every matter recorded as `declined`. Yours are for what the structure does not
+say — a character issue, a condition breach, a name discrepancy, a deportation
+liability, an adverse INZ history.
+
+### What batch 03 got wrong, so you do not
+
+**A file uplift is not a matter.** It is a note on the matters uplifted. Same for
+an identity certification. Record them as notes and say which matter they belong
+to.
+
+**An INZ investigation is not a kind of work.** It is a *status* a matter is in,
+whatever the application underneath was. Use the `inz_investigation` status; do
+not invent a case type for it.
+
+**There are no class actions.** A folder that looks like one is a document
+written to help other people, not a matter. Do not load it; report it.
+
+**Do not invent a case type where `ot_other` will do.** If nothing in
+`case-type-keys.txt` fits, use `ot_other` and say plainly in `findings.md` what
+the work actually was. Two invented types in batch 03 had to be unpicked.
+
+### If this batch is a closed archive
+
+**Every matter is closed, and raises no alert and no task. Warnings only, where a
+warning is warranted.** The practice's instruction, 1 September 2026. An archive
+is history: a file finished in 2022 must not appear on tomorrow morning's Alerts
+page or put a task in anybody's list.
+
+Three rules follow, each checked against the register's own alert queries rather
+than assumed:
+
+1. **Every matter carries a finished status** — `approved`, `declined`,
+   `withdrawn` or `closed`. Never a working status. Every deadline, gone-quiet
+   and no-room-to-act alert is gated on those, so one archive matter left open
+   puts a 2022 file on tomorrow's list.
+
+2. **A matter recorded as `approved` or `declined` must carry its decision
+   date.** This is the one alert a *closed* matter can still raise: the register
+   flags "does not add up" when a matter says approved or declined and has no
+   `decided_at`, whatever its status, because that combination is usually a
+   half-finished edit. **If the folder gives no decision date, use `closed` and
+   say in the note how it ended.** The register holds seventeen matters in
+   exactly that position already, each one a standing alert.
+
+   And never give a decision date earlier than the lodgement date. That is the
+   same alert, and in an archive it usually means two dates read off different
+   documents.
+
+3. **Create no tasks and no follow-ups.** Not one. If something in an archived
+   folder genuinely needs doing, it is not an archive matter — report it and the
+   practice will open it as a current file.
+
+**Archive clients are `archived`** unless they are already in the register as a
+current client, in which case they stay `active` and the current matter is why.
+Passport, visa and certificate expiry alerts are raised per *client*, not per
+matter, and the query skips archived clients — so an archive client loaded
+`active` with a passport that expired in 2021 puts an expiry alert on the
+practice's page.
+
+### If the batch is very large
+
+Twenty-five gigabytes is not a normal batch with more folders in it. It fails
+differently, and it fails late, after hours of reading.
+
+**1. Survey before you read.** The first pass produces no extraction at all:
+walk the tree and write `inventory.md` — how many top-level folders, how deep,
+total size, the biggest twenty folders and what they are, and a count of the
+file types. The practice needs to see that before committing to the read, and so
+do you: it is what says whether this is 300 matters or 3,000.
+
+**2. Work in slices, and finish each one.** Split into slices of at most **150
+matters** — by top-level folder, or by year — and produce a complete
+`clients.jsonl`, `cases.jsonl` and `findings.md` for each. A slice that is
+finished is loaded and done. A single 3,000-matter extraction that stops
+two-thirds through leaves nothing usable and nothing to resume from. Name the
+files so the slice is obvious (`05a-clients.jsonl`); **each slice takes its own
+id prefix** in the loader (`cli_b05a_0001`), so re-running one cannot touch
+another's rows.
+
+**3. The same person will appear across slices.** Identity matching runs against
+**the register as it then stands**, which is why each slice is loaded before the
+next is extracted. Do not try to resolve identity across slices in the
+extraction — you cannot see the register from there. Report your proposals.
+
+**4. Do not read what you do not need**, per **What to read** above, and say what
+you skipped.
+
+**And the honest possibility:** if the survey shows the archive is mostly
+material with no matter behind it — old drafts, precedents, copies of things
+already loaded — say so. Not everything in 25 GB belongs in a client register,
+and finding that out in the first pass is a good result, not a failure.
+
 ### What to report
 
 `findings.md`, for the practice and for whoever maintains the register. It must
@@ -358,7 +642,7 @@ person. Describe shapes, not values.
 
 1. **The layout you found.** How the folders are organised, how consistently,
    and where the exceptions are — including any naming conventions beyond
-   those listed in rule 9, so the list can grow.
+   those listed in rule 10, so the list can grow.
 2. **Counts.** How many clients, matters, notes, documents; how many clients
    matched the register and on what; how many of each field you could fill,
    and how many you had to leave null; how many dates came from filenames
@@ -383,7 +667,18 @@ person. Describe shapes, not values.
 6. **What you could not read.** Scans without text, formats you could not open,
    folders you skipped and why.
 7. **Every case-type key you invented**, with what it means, so the practice
-   can map each one before the load.
+   can map each one before the load, and everything you had to force into
+   `ot_other`.
+8. **The per-year table** of matters opened, first thing in the file.
+9. **Every `opened_on_provenance: unknown`**, with the matter and what you
+   looked at. If that number is large, the practice may prefer to date them by
+   hand rather than lose the year. Also count how many took their year from
+   `first_document` rather than a dated engagement — that is the practice's
+   measure of how much of the numbering rests on inference.
+10. **Every client with no date of birth**, because each one is a question the
+    practice has to answer before the load can join them to an existing file.
+11. **What you skipped and why** — folder and rough size — so the practice can
+    ask for a second look at any of it.
 
 ### How to work
 
@@ -393,25 +688,59 @@ them correct it. Extract the whole tree only once that reading is agreed.
 
 Do not modify, move, rename or delete anything in the folders you are reading.
 
+Do not write to the register. You produce files; a separate session rehearses
+them on a scratch database and loads them.
+
+### What not to do
+
+- **Do not guess a date of birth or a nationality.** `unknown` is a finding; a
+  guess is a fault that survives. A year taken from the earliest working
+  document is not a guess — it is evidence, and it is labelled as such. A year
+  taken from a feeling about the folder is a guess.
+- **Do not merge two people because their names match.** Names match. Dates of
+  birth decide.
+- **Do not put real client data anywhere except the extraction files.** Not in
+  `findings.md` examples, not in commit messages, not in notes to yourself. Use
+  a reference — `CL-9001`, `matter 14` — or an invented name. A bare reference
+  is the right way to point at a client without naming them; a reference *plus*
+  facts about that client is naming them the long way round.
+
 ---
 
 ## What happens next
 
-`clients.jsonl` and `cases.jsonl` go into the register through an import run
-that reuses the register's own code paths, so every database rule applies to
-the arriving rows. The run is rehearsed on a scratch copy of the live database
-and verified — row counts, matching, provenance flags — before the identical
-SQL touches production. That machinery exists from the first batch; each new
-batch reuses it, it does not get rewritten.
+`clients.jsonl` and `cases.jsonl` go into the register through a load that is
+rehearsed on a scratch database **seeded from what production actually holds,
+table for table** — not a convenient subset. Batch 03's rehearsal carried users,
+counters, clients and cases but no passports, so every way the incoming batch
+could collide with existing data was invisible to it, and the load stopped
+halfway through against production on a constraint the rehearsal had no rows to
+violate. The rehearsed SQL, not a re-derivation of it, is what runs against
+production.
 
 Questions the extraction raises — invented case types, contradictions, matters
-with no visible outcome — go to the practice as one list *before* the load, and
-the practice's answers are what the loader implements. The first batch settled
-several standing answers this way (dates from filenames must be verified;
-identify people by passport; a misfiled document becomes a client), which are
-now baked into the rules above.
+with no visible outcome, identities the rule returns `unknown` for — go to the
+practice as one list *before* the load, and the practice's answers are what the
+loader implements. Several standing answers were settled this way and are now in
+the rules above: dates from filenames must say so; a misfiled document becomes a
+client; identity is name and date of birth, never the passport number.
 
 `findings.md` section 3 is a list of columns the register does not yet have,
-ordered by how much they are missed, in a form that can be read without
-exposing a single client. That is what we work from when we decide what to
-build next: the practice's actual paperwork, rather than a guess about it.
+ordered by how much they are missed, in a form that can be read without exposing
+a single client. That is what we work from when we decide what to build next: the
+practice's actual paperwork rather than a guess about it. It is half the point of
+the exercise — batch 03's report is why warnings, the `inz_investigation` status
+and the `Brief` document category exist.
+
+## What the register can hold now that it could not for batch 03
+
+- **A warning on a client or matter**, with a life (standing, or 30/90/180/365
+  days), citing the matter it came from, and editable afterwards.
+- **`inz_investigation`** as a case status.
+- **`Brief`** as a document category.
+- **A matter's own description**, separate from its title.
+- **Any number of nationalities and passports** per client.
+- **Police and medical certificates**, with provenance on the issue date.
+- **Matters numbered by the year they were opened**, each year with its own
+  counter.
+- Knowledge-base articles numbered by year — `KB-26-001`.

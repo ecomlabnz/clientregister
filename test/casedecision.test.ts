@@ -1,8 +1,8 @@
 /**
  * What a matter records when a decision arrives, and what it stops asking for.
  *
- * Three things went wrong together on a real file (CASE-26-051, approved on
- * 31 August 2026):
+ * Three things went wrong together on one real matter, found in the register on
+ * 31 August 2026:
  *
  *  - The status form offered "Response / decision due" on every move, decided
  *    statuses included. Approving a matter and typing the approval date into
