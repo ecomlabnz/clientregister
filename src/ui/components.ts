@@ -169,6 +169,73 @@ export function flagBand(opts: {
  * on a file for six months is part of how that file was handled, and why it came
  * down is the useful half.
  */
+/**
+ * Choosing the matter or client to file something on.
+ *
+ * This was one `<select>` holding every matter and client in the register. That
+ * was workable at sixty and unusable at four hundred: a list nobody can scan is
+ * a list people file into wrongly, and on a phone it is a scrolling wall.
+ *
+ * So it searches. Type a name, a reference, or an INZ application number, press
+ * Find, and pick from what comes back. Two forms rather than one, because they
+ * do different things: finding is a GET, so the results can be linked to and
+ * the back button behaves; filing is a POST, because it writes.
+ *
+ * It works with scripting switched off — that is the rule, and it is also why
+ * the search is a button rather than a keystroke. `app.js` narrows the list as
+ * you type where scripting is there, which changes how fast it feels and
+ * nothing about whether it works.
+ */
+export function filingPicker(opts: {
+  /** Where the POST goes. */
+  action: string;
+  /** Where the GET goes — usually this same page. */
+  findAction: string;
+  csrf: string;
+  query: string;
+  hits: Array<{ value: string; ref: string; title: string; detail: string; closed: boolean }>;
+  hint: Raw;
+}): Raw {
+  return html`
+    ${'' /* data-live-search is the enhancement the search page already uses:
+             app.js re-fetches this same page as you type and swaps the region
+             below. Same URL, same markup, same server rendering — scripting
+             only removes the press. */}
+    <form method="get" action="${opts.findAction}" class="row-form filing-find" data-live-search>
+      ${field({ label: 'Find the matter or client', name: 'find', value: opts.query,
+                placeholder: 'Name, CASE-26-014, CL-0082, or an INZ application number' })}
+      <button class="btn btn-secondary" type="submit">Find</button>
+    </form>
+    <div data-live-results>
+    ${opts.query.trim().length > 0 && opts.hits.length === 0
+      ? html`<p class="hint">Nothing matches “${opts.query}”. Try a family name, a reference,
+                or the INZ application number from the letter.</p>`
+      : ''}
+    ${opts.hits.length > 0
+      ? html`
+        <form method="post" action="${opts.action}" class="filing-choose">
+          <input type="hidden" name="_csrf" value="${opts.csrf}">
+          <ul class="pick-list">
+            ${opts.hits.map((hit, i) => html`
+              <li class="pick">
+                <label>
+                  <input type="radio" name="onto" value="${hit.value}" ${i === 0 ? raw('checked') : ''}>
+                  <span class="pick-ref"><code>${hit.ref}</code></span>
+                  <span class="pick-title">${hit.title}</span>
+                  ${hit.detail ? html`<span class="pick-detail">${hit.detail}</span>` : ''}
+                  ${'' /* Said plainly rather than hidden: a decision letter on a
+                          matter closed last week is exactly the thing you file. */}
+                  ${hit.closed ? html`<span class="pick-closed">closed</span>` : ''}
+                </label>
+              </li>`)}
+          </ul>
+          <button class="btn btn-primary" type="submit">File it</button>
+        </form>`
+      : ''}
+    </div>
+    ${opts.hint}`;
+}
+
 export function flagRaiser(opts: {
   entityType: 'client' | 'case';
   entityId: string;
@@ -395,7 +462,13 @@ export function caseSubline(descriptor: string | null | undefined, ref?: string 
     descriptor && ref ? ' · ' : ''}${ref ? html`<code>${ref}</code>` : ''}</div>`;
 }
 
-export function pageHeader(title: string, subtitle?: string | null, actions?: Raw): Raw {
+/**
+ * The subtitle takes markup as well as text, because what belongs there is
+ * usually a date — and `stamp()` returns markup. Passed as a plain string it
+ * came out as escaped tags on the page, which is what it was doing on three
+ * pages before this was widened.
+ */
+export function pageHeader(title: string, subtitle?: string | Raw | null, actions?: Raw): Raw {
   return html`
     <div class="page-head">
       <div>
