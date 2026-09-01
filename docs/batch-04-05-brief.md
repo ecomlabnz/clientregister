@@ -1,13 +1,24 @@
-# Batch 04 — the brief
+# Batches 04 and 05 — the brief
 
 **For the Claude Code session that reads the folders.** Written 1 September 2026,
 after batch 03 went in. Read this *with*
 [`intake-prompt.md`](intake-prompt.md), which carries the standing rules; this
 covers what changed and what batch 03 got wrong.
 
-Batch 04 is the practice's **own** files — the ones worked without the business
-partners. They are tagged **`Bankside`**, not `omc`. Everything currently in the
-register is `omc`; nothing in batch 04 is.
+These are the practice's **own** files — the ones worked without the business
+partners. Both batches are tagged **`Bankside`**, not `omc`. Everything currently
+in the register is `omc`; nothing in either of these batches is.
+
+| | What it is | Size |
+|---|---|---|
+| **Batch 04** | The **current** files — matters still live, or closed recently enough to matter | Manageable in one pass |
+| **Batch 05** | The **archive** | About **25 GB**. Read [Batch 05 is different](#batch-05-is-different) before starting it |
+
+**Do batch 04 first, and finish it before batch 05 begins.** The current files
+are the ones the practice needs in the register; the archive is history. Doing
+them in that order also means the archive's identity matching runs against a
+register that already holds the current clients, which is where most of the
+joins will be.
 
 ---
 
@@ -53,16 +64,36 @@ that date came from.
 | Value | Means |
 |---|---|
 | `engagement_letter` | a letter of engagement, retainer or authority, dated |
-| `first_document` | the earliest dated document in the folder |
+| `first_document` | the earliest dated document showing the practice at work on it — **not** the client's own passport or birth certificate |
 | `folder_name` | the folder itself carries the date |
 | `inz_receipt` | INZ's acknowledgement of lodgement |
 | `inferred` | worked out from surrounding dates — say how in a note |
-| `unknown` | **nothing in the folder dates it** |
+| `unknown` | **nothing in the folder shows when the practice started work on it** |
 
-**`unknown` is a real answer and the right one when it is true.** Do not guess a
-year. A matter with no date at all keeps a 2026 number, and that is honest —
-"we do not know" is not 2025. Sixty-one matters from batch 03 are in exactly
-that position and were deliberately left alone.
+### Take the year from the earliest document, when nothing else dates it
+
+**The practice's decision, 1 September 2026:** where no letter of engagement or
+INZ receipt dates a matter, **date it from the earliest document in the folder
+that shows the practice was working on it**, and record that as
+`first_document`.
+
+That is not a guess. It is evidence, it is labelled as evidence, and anybody can
+check it later against the document it came from. A guess would be writing 2024
+because the matter *feels* old, and nothing in the folder says so.
+
+**Which document counts.** The earliest document that shows *the practice
+working the matter* — an engagement letter, an authority, correspondence, a
+completed form, a file note, an invoice. **Not** the earliest dated thing of any
+kind. A folder often holds a passport issued in 2019 or a birth certificate from
+1994; those date the client, not the work, and taking a year from one would put
+a matter years before the practice had heard of it. If the only dated things in
+a folder are the client's own documents, that is `unknown`, not their year.
+
+**`unknown` is still a real answer** — but it now means something narrower:
+*nothing in this folder shows when the practice started work on it*. A matter
+there keeps a 2026 number, and that is honest. Batch 03 left sixty-one matters
+in that position under the older, stricter reading; under this rule most of them
+would have taken a year.
 
 Where the folder gives a year but not a full date, give `"opened_on": "2024"`
 rather than inventing a month and day.
@@ -112,7 +143,7 @@ What this means for the extraction:
 
 ---
 
-## What batch 03 got wrong, so batch 04 does not
+## What batch 03 got wrong, so these batches do not
 
 **A file uplift is not a matter.** It is a note on the matters uplifted. Same for
 an identity certification. Do not create a matter for either — record them as
@@ -183,6 +214,9 @@ what the structure does not say.
 2. **Every `opened_on_provenance: unknown`**, with the matter and what you
    looked at. If that number is large, the practice may prefer to date them by
    hand rather than lose the year.
+   Also count how many matters took their year from `first_document` rather than
+   from a dated engagement — that is the practice's measure of how much of the
+   numbering rests on inference, and it wants to know it.
 3. **Every client with no date of birth**, because each one is a question the
    practice has to answer before the load can join it to an existing file.
 4. **Anything you had to force into `ot_other`.**
@@ -192,12 +226,57 @@ what the structure does not say.
 
 ---
 
+<a id="batch-05-is-different"></a>
+
+## Batch 05 is different
+
+Twenty-five gigabytes is not batch 04 with more folders in it. It fails in ways
+batch 04 will not, and it fails late, after hours of reading. Four rules.
+
+**1. Survey before you read.** First pass produces no extraction at all: walk the
+tree and write `inventory.md` — how many top-level folders, how deep, total size,
+the biggest twenty folders and what they are, and a count of the file types. The
+practice needs to see that before committing to the read, and so do you: it is
+what tells us whether this is 300 matters or 3,000.
+
+**2. Work in slices, and finish each one.** Split the archive into slices of at
+most **150 matters** — by top-level folder, or by year — and produce a complete
+`clients.jsonl`, `cases.jsonl` and `findings.md` for each. A slice that is
+finished is loaded and done. A single 3,000-matter extraction that stops
+two-thirds through leaves nothing usable and nothing to resume from.
+
+Name each slice's files so a slice is obvious: `05a-clients.jsonl`,
+`05b-clients.jsonl`, and so on. **Each slice gets its own id prefix** in the
+loader (`cli_b05a_0001`), so a re-run of one slice cannot touch another's rows.
+
+**3. The same person will appear across slices, and across batch 04.** This is
+the archive's real difficulty. Identity matching must run against **the register
+as it then stands**, which is why each slice is loaded before the next is
+extracted. Do not try to resolve identity across slices in the extraction — you
+cannot see the register from there. Report your proposals; the loader checks
+them by name and date of birth, both directions, as it did for batch 03.
+
+**4. Do not read what you do not need.** Scanned bundles, video, photographs and
+duplicated email attachments will be most of the 25 GB and almost none of the
+information. Read folder names, correspondence, forms, letters and file notes.
+If a folder is 400 MB of scans and a two-page letter, the letter is the matter.
+Say in `findings.md` what you skipped, so the practice knows what was not read.
+
+**And the honest possibility:** if the survey shows the archive is mostly
+material with no matter behind it — old drafts, precedents, copies of things
+already in batch 04 — say so. Not everything in 25 GB belongs in a client
+register, and finding that out in the first pass is a good result, not a failure.
+
+---
+
 ## What not to do
 
 - **Do not write to the register.** You produce files; a separate session
   rehearses them on a scratch database and loads them.
-- **Do not guess a year, a date of birth, or a nationality.** `unknown` is a
-  finding; a guess is a fault that survives.
+- **Do not guess a date of birth or a nationality.** `unknown` is a finding; a
+  guess is a fault that survives. A year taken from the earliest working
+  document is not a guess — it is evidence, and it is labelled as such. A year
+  taken from a feeling about the folder is a guess.
 - **Do not merge two people because their names match.** Names match. Dates of
   birth decide.
 - **Do not put real client data anywhere except the extraction files.** Not in
