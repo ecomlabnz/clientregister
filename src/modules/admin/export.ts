@@ -57,6 +57,15 @@ export const DATASETS: Dataset[] = [
                       JOIN countries co ON co.code = cn.code
                      WHERE cn.client_id = c.id ORDER BY cn.position, cn.code) n) AS nationality,
                  c.date_of_birth,
+                 -- The INZ client number belongs to the person but is recorded
+                 -- on their matters, which is where INZ writes it. A person with
+                 -- two matters should have one number; where two disagree, both
+                 -- come out separated by a space, because that disagreement is
+                 -- the point. The intake asks for this column by name.
+                 (SELECT GROUP_CONCAT(n.num, ' ') FROM (
+                    SELECT DISTINCT k.inz_client_number AS num FROM cases k
+                     WHERE k.client_id = c.id AND k.inz_client_number IS NOT NULL
+                       AND trim(k.inz_client_number) <> '' ORDER BY 1) n) AS inz_client_number,
                  CASE WHEN c.passport_number IS NULL THEN 'no' ELSE 'yes' END AS passport_on_file,
                  c.passport_country, c.passport_expiry, c.current_visa_type, c.current_visa_expiry,
                  c.english_test_type, c.english_test_score, c.english_test_date,
@@ -204,6 +213,34 @@ export const DATASETS: Dataset[] = [
     sql: `SELECT ref, title, kind, status, published_at, effective_at, review_at, expires_at,
                  source, source_ref, summary, body, created_at, updated_at
             FROM kb_articles ORDER BY ref`,
+  },
+  {
+    key: 'vocabulary', label: 'Dropdown lists',
+    description: 'Every list an administrator can edit — case types, visa types, document '
+      + 'categories, English tests — as key and label. The intake needs the case-type keys, '
+      + 'and they change without a deployment, so they are exported rather than written down.',
+    // The lists live in `settings` as one row of `key | Label` lines each,
+    // because that is what an administrator edits in a textarea. Splitting them
+    // here means the export cannot go stale against the page that edits them.
+    // Carriage returns are stripped first: the textarea posts CRLF, and a key
+    // with an invisible \r on the end matches nothing.
+    sql: `WITH RECURSIVE src(list, rest) AS (
+             SELECT substr(key, 7),
+                    replace(replace(value, char(13), ''), char(10) || char(10), char(10)) || char(10)
+               FROM settings WHERE key LIKE 'vocab.%'
+           ), split(list, rest, line) AS (
+             SELECT list, rest, NULL FROM src
+             UNION ALL
+             SELECT list, substr(rest, instr(rest, char(10)) + 1),
+                    substr(rest, 1, instr(rest, char(10)) - 1)
+               FROM split WHERE instr(rest, char(10)) > 0
+           )
+           SELECT list,
+                  trim(substr(line, 1, instr(line || '|', '|') - 1)) AS key,
+                  trim(substr(line, instr(line || '|', '|') + 1)) AS label
+             FROM split
+            WHERE line IS NOT NULL AND trim(line) <> ''
+            ORDER BY list, key`,
   },
   {
     key: 'audit', label: 'Audit log',
