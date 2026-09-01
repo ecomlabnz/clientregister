@@ -149,17 +149,20 @@ Three answers, and only the first is acted on without asking:
 **What the rule found on its own.** Applied to the joins the extraction had
 proposed, in both directions:
 
-- **Rejected** the join to `CL-0080` (same name, 1991 vs 2002) and to `CL-0062`
-  (name does not agree). Both had previously been found by hand and carried as a
-  hardcoded exception list, which the rule replaced.
-- **Discovered** two joins the extraction had missed — `CL-0056` and `CL-0060`,
-  each same name and identical date of birth. Both would otherwise have become a
-  second file for a client already on the register.
+- **Rejected** two proposed joins: one where the names agree but the dates of
+  birth are eleven years apart, and one where the name does not agree at all.
+  Both had previously been found by hand and carried as a hardcoded exception
+  list, which the rule replaced.
+- **Discovered** two joins the extraction had missed, each same name and
+  identical date of birth. Both would otherwise have become a second file for a
+  client already on the register.
 
 Seven cases came back `unknown` and were put to the practice as a list. Six were
-answered "same person" and merged; one was answered "two people" and is
-deliberately two records. That answer is recorded in the loader as a decision
-with a date, not inferred.
+answered "same person" and merged; one was answered "two people" and loaded as
+two records. On reading those two files side by side the practice reversed that
+answer the same day, and the second file was removed by hand. Both answers are
+recorded as decisions with a date, not inferred — and the removal is the fault
+in the ledger's newest entry.
 
 The rule was tested against ten adversarial pairs including two companies with no
 personal names, a company against a person, and the same name written in

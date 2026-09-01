@@ -232,6 +232,33 @@ one registered before it (`/fees/shares` after `/fees/:feeId`), fixed by
 ordering. Both are invisible to the compiler and to any test that does not
 interrogate the router. If you build this, write that test early.
 
+### 19. A change made by hand writes no audit row
+
+**What happened.** A client file was removed from the register at the practice's
+instruction, with `DELETE FROM clients WHERE id = ...` run directly against
+production. The application has no route that deletes a client, so there was no
+other way to do it — and direct SQL writes nothing to the audit log. The record
+left the register and *nothing anywhere said so*. It was found weeks later by
+counting: the reference sequence had a gap the audit log could not explain.
+
+A register whose whole purpose is to know where a file went had lost one
+silently.
+
+**The rule.** Two halves, and both are needed:
+
+- **Any change made by hand writes its own audit row**, in the same session,
+  saying what changed, why, on whose instruction, and that it was done by hand.
+  Write it even when the row has to be written after the fact — say so in the
+  row.
+- **Reconcile the count.** Every reference the counter has issued is either on a
+  record or explained. A gap with no explanation is the alarm.
+
+This is the third occurrence of a related shape: the audit trail depends on the
+handler that happened to make the change. **The durable fix is a database
+trigger** — `AFTER DELETE ON clients` writing the audit row itself, so no route,
+no load and no hand-run statement can remove a record quietly. Invariants belong
+in the database; so does the record that they were exercised.
+
 ---
 
 ## Working practices that caught things
