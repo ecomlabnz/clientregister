@@ -10,7 +10,7 @@
  */
 
 import type { Env } from '../types';
-import { all, nowIso, one, run } from './db';
+import { all, nowIso, one, run, allByIds } from './db';
 import { newId } from './ids';
 
 export type TagColour = 'neutral' | 'green' | 'amber' | 'red' | 'blue' | 'grey';
@@ -53,13 +53,11 @@ export async function tagsForCases(env: Env, caseIds: string[]): Promise<Map<str
   const byCase = new Map<string, Tag[]>();
   if (caseIds.length === 0) return byCase;
 
-  const placeholders = caseIds.map(() => '?').join(',');
-  const rows = await all<Tag & { case_id: string }>(
-    env.DB,
+  // In chunks: a page showing 250 matters would otherwise bind 250 values in
+  // one statement, which D1 refuses outright — and the whole page became a 500.
+  const rows = await allByIds<Tag & { case_id: string }>(env.DB, caseIds, (placeholders) =>
     `SELECT t.*, ct.case_id FROM tags t JOIN case_tags ct ON ct.tag_id = t.id
-      WHERE ct.case_id IN (${placeholders}) ORDER BY t.name`,
-    ...caseIds,
-  );
+      WHERE ct.case_id IN (${placeholders}) ORDER BY t.name`);
   for (const row of rows) {
     const list = byCase.get(row.case_id) ?? [];
     list.push(row);

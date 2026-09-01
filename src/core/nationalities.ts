@@ -20,6 +20,7 @@
 
 import type { Env } from '../types';
 import { countryCodeFor } from './countries';
+import { allByIds } from './db';
 
 /** At most this many on one person. Enough for anybody; a bound all the same. */
 export const MAX_NATIONALITIES = 6;
@@ -126,12 +127,14 @@ export async function nationalitiesByClient(
 ): Promise<Map<string, string[]>> {
   const out = new Map<string, string[]>();
   if (clientIds.length === 0) return out;
-  const placeholders = clientIds.map(() => '?').join(',');
-  const rows = await env.DB
-    .prepare(`SELECT client_id, code FROM client_nationalities
-               WHERE client_id IN (${placeholders}) ORDER BY position, code`)
-    .bind(...clientIds).all<{ client_id: string; code: string }>();
-  for (const row of rows.results ?? []) {
+  // In chunks, for the same reason as the matter tags: a client list showing
+  // 250 people binds 250 values, and D1 refuses the statement rather than
+  // returning a short answer.
+  const rows = await allByIds<{ client_id: string; code: string }>(
+    env.DB, clientIds, (placeholders) =>
+      `SELECT client_id, code FROM client_nationalities
+        WHERE client_id IN (${placeholders}) ORDER BY position, code`);
+  for (const row of rows) {
     out.set(row.client_id, [...(out.get(row.client_id) ?? []), row.code]);
   }
   return out;

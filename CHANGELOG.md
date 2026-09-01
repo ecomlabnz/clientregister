@@ -7,6 +7,33 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.89.4 — 1 September 2026
+
+### Fixed
+- **Showing 250 matters or 250 clients at once broke the page.** Choosing a
+  larger page size on Cases or Clients returned "Something went wrong". The
+  database refuses a statement carrying more than a hundred bound values, and
+  the refusal is an error rather than a short answer: the list fetched the tags
+  for the matters it was about to show by passing one bound value per matter
+  into an `IN (...)`, so 250 matters meant 250 values and D1 answered *"too many
+  SQL variables"*.
+
+  It only appeared once the register was full enough to show that many. At 45
+  matters the page never asked for more than 45.
+
+  The same shape was in three places — matter tags, client nationalities and
+  knowledge-base article tags. All three now run the list in chunks of ninety,
+  through one helper (`allByIds`), so the number of rows on a page and the
+  number of values in a statement stop being the same thing. Ninety rather than
+  the hundred allowed, so a caller adding a parameter beside the list does not
+  tip it over.
+
+  Held by tests that build 250 matters and 250 clients against a wrapper that
+  refuses more than a hundred bound values exactly as D1 does, and check the
+  *last* row comes back — the tail is what broken chunking loses. Raising the
+  chunk size past the limit fails them, and both pages return to erroring in the
+  browser.
+
 ## 0.89.3 — 1 September 2026
 
 ### Fixed
