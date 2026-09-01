@@ -204,29 +204,69 @@ the guard must fail a test.
 
 ---
 
+### 13. A route can be defined and never registered
+
+**What happened.** Saving an edited fee line returned "Not found", as did
+changing a fee's status and deleting one. The three routes were *defined* but
+never registered: the handler above them was missing its closing `});`, so all
+three sat **inside that handler's callback** rather than beside it. They would
+only have registered if somebody posted to the route above.
+
+Valid JavaScript, so it compiled. Valid TypeScript, so it type-checked. No test
+touched those three routes, so the suite stayed green. The application drew the
+form perfectly and then posted into nothing.
+
+**The rule.** A test asks the built router what it actually holds and compares it
+against what each module's source declares, module by module, accounting for the
+prefix each mounts under. It cannot be fooled by nesting, because a nested route
+never reaches the router.
+
+**How it was diagnosed**, because the method generalises: routing was ruled out
+by probing Hono in isolation, CSRF by the status code (a rejection is 403, not
+404), and the handler's own lookup by a `console.log` inside it — which never
+printed. That silence is what pointed at registration rather than at the query.
+Then `app.routes` showed four fee routes where the source declares seven.
+
+**This is the second fault of this shape.** The first was a route *shadowed* by
+one registered before it (`/fees/shares` after `/fees/:feeId`), fixed by
+ordering. Both are invisible to the compiler and to any test that does not
+interrogate the router. If you build this, write that test early.
+
+---
+
 ## Working practices that caught things
 
-### 13. Mutation-test every guard
+### 14. Commit to the branch, not to `main`
+
+**What happened.** A commit was made on local `main` instead of the working
+branch, so a push to the branch moved nothing and the work sat unpushed. `main`
+takes changes only through a pull request, so pushing it directly would have been
+refused anyway.
+
+**The rule.** Check the branch before committing. A stop-hook that reports
+unpushed commits caught this; it is worth having.
+
+### 15. Mutation-test every guard
 
 Remove or invert the guard; the test must fail. Applied throughout this register.
 It has repeatedly shown a test to be vacuous — including one where two empty
 strings were compared and 17 records were reported as agreeing when nothing had
 been checked at all.
 
-### 14. Check the browser, with scripting on **and** off
+### 16. Check the browser, with scripting on **and** off
 
 Several rules here are only visible in a browser: a hidden required control, a
 radio made full-width by a global rule, a heading rendering as tags. And a
 feature claiming to work without scripting must be *tested* without scripting —
 one did not, and the fix changed which path the record type is chosen on.
 
-### 15. Reproduce before fixing
+### 17. Reproduce before fixing
 
 Every fault above was reproduced first, and in two cases the reproduction changed
 the diagnosis entirely. The browser console named the invalid field; the server
 log named "too many SQL variables". Neither was guessable from the code.
 
-### 16. Real client data never enters the repository
+### 18. Real client data never enters the repository
 
 **What happened.** A client's real name was used as a worked example while fixing
 the search — in code comments, three test files, the changelog, the Help page and
