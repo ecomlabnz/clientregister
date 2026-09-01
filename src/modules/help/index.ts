@@ -32,6 +32,20 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.88.0', date: '1 September 2026',
+    notes: [
+      'A warning can be changed or removed. \u201cChange it\u201d reworks the wording or the '
+        + 'kind without taking the warning down; \u201cDelete it instead\u201d is for one that '
+        + 'should never have been on the file at all \u2014 raised on the wrong person, or a '
+        + 'duplicate. Taking a warning down still keeps it as history, which is the difference '
+        + 'between the two. Either way, what it said goes into the audit log.',
+      'A warning says where it came from. When a warning was read off a matter \u2014 a decline '
+        + 'letter, a PPI response \u2014 the band names that matter and links to it, so the fact '
+        + 'can be checked in one press rather than taken on trust. A warning typed in by hand, '
+        + 'from a conversation, simply has nothing to cite, and that is the ordinary case.',
+    ],
+  },
+  {
     version: '0.87.0', date: '1 September 2026',
     notes: [
       'A matter can be \u201cUnder INZ investigation\u201d. It is a status rather than a kind of '

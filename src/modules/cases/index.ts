@@ -645,6 +645,7 @@ export const casesModule: AppModule = {
           label: (kind) => labelFor(flagKindTerms, kind),
           clear: writable ? { csrf } : null,
           clientHref: `/clients/${kase.client_id}`,
+          kinds: termOptions(flagKindTerms), lives: FLAG_LIVES,
         })}
         ${writable ? flagRaiser({
           entityType: 'case', entityId: kase.id, csrf,
