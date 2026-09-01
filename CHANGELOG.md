@@ -7,6 +7,55 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.91.2 — 1 September 2026
+
+### Fixed
+- **A worked example in the intake prompt was copied out of a real file note.**
+  "The applicant is paid $27.76 against a visa condition of $27.80" — both
+  figures appear once each in the register. No name was attached, which is
+  exactly why it got through: it did not look like client data. Replaced with
+  invented figures, checked against the register first, and the document now says
+  that the check happened and why.
+
+  The mistakes ledger gains the second occurrence, and its rule is widened: no
+  real figure or fact about a matter either, and check anything you did not make
+  up yourself — a name gets checked because it looks like client data, a wage
+  rate does not.
+
+### Changed
+- **The intake prompt no longer carries a snapshot of the register.** It opened
+  with client and matter counts and the next reference. Every one of those is
+  owned by the fresh exports and the loader, the extraction has no use for the
+  next reference at all, and a snapshot in a standing document is precisely the
+  staleness that killed the separate brief this one replaced. The same applies
+  to a count of undated matters further down, now phrased so it stays true.
+- **Extraction and loading are no longer both serial.** Only the loads need to
+  run in slice order: the loader re-checks every identity against the register in
+  both directions at load time, so a person one slice calls new, who arrived with
+  an earlier one, is caught when that slice loads. Extraction may run ahead. The
+  one thing that genuinely gates a load is an identity the rule cannot settle,
+  which needs the practice's answer first.
+- **Slice size is stated as the constraint rather than the number.** A slice must
+  extract in one sitting and load as one set of files — 150 matters is a ceiling
+  taken from the one batch that has been through this, not a target.
+
+### Added
+- **Four cautions on reading the PREVIEW**, the first created by the instruction
+  to prefer it: a certificate date read off a PREVIEW is `unverified`, never
+  `verified`, because a PREVIEW is a form somebody filled in and the register
+  computes legal deadlines from certificate issue dates. Also: a folder may hold
+  several PREVIEWs and the newest of the relevant application governs; and a
+  PREVIEW existing does not mean the application was lodged.
+- **Matching a person completes their record; it does not skip their folder.**
+  Their matters load like anybody else's. Only a provably identical application
+  merges rather than creating.
+- **Countries are written as plain English names everywhere** and mapped by the
+  loader, which has stored them as ISO codes with a trigger behind them since
+  migration 0055. A country that no longer exists goes in a note rather than
+  having a successor state picked on the client's behalf.
+- Matters with no year sort last in the oldest-first ordering, since they take
+  current-year numbers.
+
 ## 0.91.1 — 1 September 2026
 
 ### Added

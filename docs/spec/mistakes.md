@@ -300,9 +300,19 @@ the search — in code comments, three test files, the changelog, the Help page 
 two commit messages. A second client's name had been in the codebase since a much
 earlier commit.
 
-**The rule.** No real name, passport number or date of birth in the repository —
-not in tests, fixtures, seeds, commit messages or example text. Use invented
-names, and **check them against the register before using them**.
+**And it happened again the same day, in a different shape.** A worked example of
+a warning — "the applicant is paid $27.76 against a visa condition of $27.80" —
+was copied out of a production file note into a document in this repository. No
+name was attached, which is exactly why it got through: it did not *look* like
+client data. Both figures appear once each in the register. A distinctive number
+identifies a file the long way round, and so does a distinctive fact.
+
+**The rule.** No real name, passport number, date of birth, **figure or fact
+about a matter** in the repository — not in tests, fixtures, seeds, commit
+messages or example text. Invent your examples, and **check them against the
+register before using them**. The check is the part that works: a name gets
+checked because it looks like client data, and a wage rate does not, so check
+anything you did not make up yourself.
 
 **A reference is the exception, and it is worth stating**, because the first
 version of this rule banned references too and was wrong. `CL-0082` on its own
@@ -312,10 +322,17 @@ extraction to do exactly that. What is not allowed is a reference **carrying
 facts about that client**: "`CASE-26-051`, approved on 31 August" names a matter
 and then says what happened on it, which is naming the client the long way round.
 
-So: a bare reference, yes. A reference with a story attached, no. And in an
-*example* — a snippet showing the shape of a query, a placeholder in a form —
-use a number outside the range the register has issued (`CL-9001`), so nobody
-reading it has to work out whether it points at somebody.
+So: a bare reference, yes. A reference with a story attached, no.
+
+In an *example*, one more distinction, because the obvious rule gets it wrong.
+Where the example stands in for **a particular record** — a snippet showing the
+shape of a query, a placeholder in a form — use a number outside the range the
+register has issued (`CL-9001`), so nobody has to work out whether it points at
+somebody. But where the example demonstrates the **format or the sequence**
+itself, the real-looking number is the correct one: "the loader allocates
+`CASE-24-001`, `CASE-24-002` and so on" is about how counting works, and
+`CASE-24-901` would misrepresent it. The test is what the number is doing in the
+sentence, not whether it happens to exist.
 
 Commit messages are the part that cannot easily be undone: a protected branch
 will refuse the force-push needed to rewrite them.

@@ -30,14 +30,15 @@ Edit this section for each run; everything below it is standing.
 | **What it is** | `<current work \| closed archive \| mixed — say which>` |
 | **Batches 04 and 05** | 04 is the current work; 05 is the archive, about 25 GB. Do 04 first and finish it before 05 begins, so the archive's identity matching runs against a register that already holds the current clients |
 
-**Where the register stands** (1 September 2026): 230 clients, 193 matters,
-25 warnings. The next client reference is **CL-0252**. Matters are numbered by
-the year they were opened, and each year has its own counter — `CASE-23-`,
-`CASE-24-`, `CASE-25-` and `CASE-26-` are all in use, and 2026 stands at
-**CASE-26-208**.
-
 Everything currently in the register is tagged `omc`. Nothing in these batches
 is.
+
+**No counts live in this document.** An earlier version opened with how many
+clients and matters the register held and what the next reference was. Every one
+of those figures is owned by the fresh exports and by the loader, the extractor
+has no use for the next reference at all, and a snapshot in a standing document
+is exactly the staleness that killed the separate brief this one replaced. What
+the register holds comes from `existing-clients.txt`, exported the day you run.
 
 ---
 
@@ -121,9 +122,28 @@ documents fill in what it does not say: when the matter was opened, when it was
 lodged, and how it ended. Where there is no PREVIEW, work from the forms and
 correspondence.
 
-One caution: a PREVIEW is a snapshot *before* lodgement, so where the issued
-visa or an INZ letter disagrees with it, the later document is what happened.
-Record both and flag it, per rule 8.
+**Four cautions, and the first is the one this instruction creates.**
+
+**A date read off a PREVIEW is `unverified`, never `verified`.** This section
+steers you away from the certificate scans and towards the PREVIEW, so the
+natural mistake is to record a PREVIEW-sourced certificate date as though it had
+been read off the certificate itself. It has not: a PREVIEW is a form somebody
+filled in, and the register computes legal deadlines from certificate issue
+dates. Expect the count of unverified dates to grow, by design, and say so in
+`findings.md`. See rule 4.
+
+**A folder may hold several PREVIEWs.** One per application, and `v1`/`v2` of
+each — batch 02 had a same-day v2 correcting transposed names. The **newest
+version of the relevant application's PREVIEW** governs, and the client's
+details come from the newest one of all. Where two disagree, say so, per rule 8.
+
+**A PREVIEW does not mean the application was lodged.** It is produced *before*
+lodging, so an abandoned application has one too. Status comes from receipts,
+grants and correspondence — never from a PREVIEW existing.
+
+**A PREVIEW is a snapshot before lodgement**, so where the issued visa or an INZ
+letter disagrees with it, the later document is what happened. Record both and
+flag it, per rule 8.
 
 | Read | Why |
 |---|---|
@@ -240,7 +260,10 @@ Where the folder gives a year but not a full date, give `"opened_on": "2024"`
 rather than inventing a month and day.
 
 **Order `cases.jsonl` by `opened_on`, oldest first**, so the loader can walk it in
-order and allocate `CASE-24-001`, `CASE-24-002` and so on without sorting. Put a
+order and allocate `CASE-24-001`, `CASE-24-002` and so on without sorting.
+**Matters with no year sort last**, all together at the end: they take
+current-year numbers, so they belong after everything that has a year of its
+own. Put a
 count per year at the top of `findings.md`:
 
 ```
@@ -255,6 +278,15 @@ identity rule above. A match is not a new client: set
 `"matches_existing": "<their ref>"` on the object and still record everything you
 found, so the register's copy can be checked and completed. Say in `findings.md`
 how many matched and on what — counts, not names.
+
+**Matching a person completes their record; it does not skip their folder.**
+Their matters are extracted and loaded exactly as anybody else's. "A match is not
+a new client" is about the *client* row, and nothing else — do not read it as
+permission to drop the folder's matters on the ground that the practice already
+knows the person. Only a **provably identical application** merges rather than
+creating: the same INZ application number, or the practice confirming it. Where
+you suspect two records are one matter but cannot prove it, create both and say
+so.
 
 Record the passport numbers you read from the folders as usual. The loader
 checks each against what the register already holds and skips a document already
@@ -283,6 +315,19 @@ them — `["Vietnam", "New Zealand"]` — and put the one the practice would nam
 first, first. A document saying "dual Vietnamese/New Zealand citizen" is naming
 two: return both. One nationality is still a list of one.
 
+**Countries are written as plain English names, everywhere.** Nationality, a
+passport's `country`, a certificate's `country` — write `Vietnam`,
+`New Zealand`, `Russian Federation`, in the document's own words, and let the
+loader map them. Since migration 0055 the register stores all three as ISO
+country codes with a trigger behind them, so `NZ`, `N.Z.` and `New Zealand`
+cannot end up as three different countries — but that mapping is the loader's
+job, not yours. Do not send a code.
+
+**A country that no longer exists goes in a note, never in a country field.**
+"Soviet Union" as a place of birth was a real case in batch 02. It is true, it
+matters, and there is no code for it: record it in the note and leave the
+country null rather than picking a successor state on the client's behalf.
+
 **`current_visa_type` and `current_visa_expiry` apply to everybody**, not only
 to the person the matter is for. A supporting partner is on a visa too, and
 what visa they hold is often the point of the application. Record them for
@@ -307,7 +352,8 @@ country, number, issued_on, expires_on, status (held | replaced | lost | cancell
 ```
 
 Those four are the register's own words and the only ones it accepts — batch 02
-sent `expired` and was refused mid-load. **An out-of-date passport is still
+sent `expired`, and the database refused it. A fifth word does not become a
+fifth status; it stops the load. **An out-of-date passport is still
 `held`**: the expiry date carries that fact, and `replaced` means a newer
 passport has taken over from it. `cancelled` is a passport an authority has
 cancelled.
@@ -528,10 +574,16 @@ citing the matter it was read off. Batch 03 produced 25 this way and the
 convention works. Keep it:
 
 ```
-Warning: the applicant is paid $27.76 against a visa condition of $27.80.
-Warning - previous refusal: Australian subclass 482 refused, per his own
-comfort letter.
+Warning: the applicant is paid $31.15 against a visa condition of $31.20.
+Warning - previous refusal: Australian subclass 500 refused 14 March 2024,
+per his own account in the engagement note.
 ```
+
+**These figures are invented and were checked against the register before being
+written here.** The first version of this document used a real wage figure and a
+real refusal, copied out of production file notes. No name was attached, and it
+was still a breach: a distinctive figure identifies a file the long way round.
+Invent your examples, and check them.
 
 Two things make a warning worth having:
 
@@ -583,8 +635,9 @@ than assumed:
    flags "does not add up" when a matter says approved or declined and has no
    `decided_at`, whatever its status, because that combination is usually a
    half-finished edit. **If the folder gives no decision date, use `closed` and
-   say in the note how it ended.** The register holds seventeen matters in
-   exactly that position already, each one a standing alert.
+   say in the note how it ended.** The register already carries matters in
+   exactly that position from an earlier batch, and each one is a standing alert
+   until somebody dates it by hand.
 
    And never give a decision date earlier than the lodgement date. That is the
    same alert, and in an archive it usually means two dates read off different
@@ -612,19 +665,43 @@ total size, the biggest twenty folders and what they are, and a count of the
 file types. The practice needs to see that before committing to the read, and so
 do you: it is what says whether this is 300 matters or 3,000.
 
-**2. Work in slices, and finish each one.** Split into slices of at most **150
-matters** — by top-level folder, or by year — and produce a complete
-`clients.jsonl`, `cases.jsonl` and `findings.md` for each. A slice that is
-finished is loaded and done. A single 3,000-matter extraction that stops
-two-thirds through leaves nothing usable and nothing to resume from. Name the
-files so the slice is obvious (`05a-clients.jsonl`); **each slice takes its own
-id prefix** in the loader (`cli_b05a_0001`), so re-running one cannot touch
-another's rows.
+**2. Work in slices, and finish each one.** Produce a complete
+`clients.jsonl`, `cases.jsonl` and `findings.md` per slice. A slice that is
+finished is loaded and done; a single 3,000-matter extraction that stops
+two-thirds through leaves nothing usable and nothing to resume from.
 
-**3. The same person will appear across slices.** Identity matching runs against
-**the register as it then stands**, which is why each slice is loaded before the
-next is extracted. Do not try to resolve identity across slices in the
-extraction — you cannot see the register from there. Report your proposals.
+**How big is a slice?** Two things bind it, and neither is a number you can know
+in advance:
+
+- **A slice must extract in one sitting**, without the session running out of
+  room. Document-heavy folders fill it faster than thin ones.
+- **A slice must load as one set of files.** Batch 03's 148 matters produced a
+  764 KB SQL file that D1 refused whole and had to be split into seven.
+
+So: **at most 150 matters, and fewer where the folders are heavy.** 150 is a
+ceiling taken from the one batch that has been through this, not a target to aim
+at. Split by top-level folder or by year, whichever the tree makes natural.
+
+Name the files so the slice is obvious (`05a-clients.jsonl`), and give **each
+slice its own id prefix** in the loader (`cli_b05a_0001`), so re-running one
+cannot touch another's rows.
+
+**3. Extract ahead if you like; load strictly in order.** The same person will
+appear in more than one slice, and the temptation is to make the whole job
+serial to catch it. That is not necessary, because the loader already does the
+catching: `matches_existing` is a proposal, and the loader re-checks every
+identity against the register in both directions at load time. So a person slice
+B calls new, who in fact arrived with slice A, is caught when B loads — provided
+**the loads run in slice order**.
+
+Extraction may therefore run ahead, or in parallel, as convenient. What the
+extraction must not do is reason across slices: you cannot see the register from
+there, so do not try. Report your proposals and let the load decide.
+
+**The one thing that genuinely gates a load:** an identity the rule returns
+`unknown` for needs the practice's answer before that slice loads. Put those in
+`findings.md` as a list, early, so the answers can be got while you extract the
+next slice.
 
 **4. Do not read what you do not need**, per **What to read** above, and say what
 you skipped.
