@@ -18,7 +18,7 @@
  */
 
 import type { Env } from '../types';
-import { all, nowIso, one, run } from './db';
+import { all, allByIds, nowIso, one, run } from './db';
 import { newId } from './ids';
 import { readSettings, asBoolean, asInteger, type SettingsGroup } from './settings';
 import type { Raw } from '../ui/html';
@@ -334,13 +334,11 @@ export async function tagsForArticle(env: Env, articleId: string) {
 export async function tagsForArticles(env: Env, ids: string[]): Promise<Map<string, Array<{ id: string; name: string; colour: string }>>> {
   const byArticle = new Map<string, Array<{ id: string; name: string; colour: string }>>();
   if (ids.length === 0) return byArticle;
-  const rows = await all<{ id: string; name: string; colour: string; article_id: string }>(
-    env.DB,
-    `SELECT t.id, t.name, t.colour, at.article_id FROM tags t
-       JOIN kb_article_tags at ON at.tag_id = t.id
-      WHERE at.article_id IN (${ids.map(() => '?').join(',')}) ORDER BY t.name`,
-    ...ids,
-  );
+  const rows = await allByIds<{ id: string; name: string; colour: string; article_id: string }>(
+    env.DB, ids, (placeholders) =>
+      `SELECT t.id, t.name, t.colour, at.article_id FROM tags t
+         JOIN kb_article_tags at ON at.tag_id = t.id
+        WHERE at.article_id IN (${placeholders}) ORDER BY t.name`);
   for (const row of rows) {
     const list = byArticle.get(row.article_id) ?? [];
     list.push({ id: row.id, name: row.name, colour: row.colour });
