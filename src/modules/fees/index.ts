@@ -461,6 +461,7 @@ export const feesModule: AppModule = {
       if (statements.length > 0) await c.env.DB.batch(statements);
       await auditFrom(c, { action: 'fee.split_updated', entityType: 'case', entityId: caseId });
       return redirectWith(c, `/cases/${caseId}`, 'Split updated.');
+    });
 
     r.post('/cases/:caseId/fees/:feeId', requirePermission('register:write'), async (c) => {
       const caseId = c.req.param('caseId')!;
@@ -539,8 +540,6 @@ export const feesModule: AppModule = {
       await run(c.env.DB, 'DELETE FROM fee_items WHERE id = ? AND case_id = ?', feeId, caseId);
       await auditFrom(c, { action: 'fee.deleted', entityType: 'case', entityId: caseId, meta: { feeId } });
       return redirectWith(c, `/cases/${caseId}`, 'Fee line deleted.');
-    });
-
     });
 
     r.get('/fees', requirePermission('register:read'), async (c) => {

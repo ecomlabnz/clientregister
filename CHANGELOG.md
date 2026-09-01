@@ -7,6 +7,32 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.89.5 — 1 September 2026
+
+### Fixed
+- **Saving an edited fee line returned "Not found".** So did changing a fee's
+  status, and deleting one. The three routes were *defined* but never
+  registered: the handler above them — the revenue-split route — was missing its
+  closing `});`, so all three sat inside that handler's callback rather than
+  beside it.
+
+  That is valid JavaScript, so it compiled. It is valid TypeScript, so it
+  type-checked. And no test touched those three routes, so the suite stayed
+  green. The register gave no clue beyond a 404 on a form it had just drawn.
+
+  The brace is back where it belongs, and all six fee routes now register.
+
+### Added
+- **A test that every route a module writes down is actually reachable.** It
+  compares what each module's source declares against the routes the built
+  application really has, module by module, and cannot be fooled by nesting —
+  a nested route never reaches the router. Twenty-two modules; the fees module
+  was the only one affected. Reintroducing the missing brace fails it.
+
+  This is the second fault of this shape. The first — a route shadowed by one
+  registered before it — was fixed by ordering. Both are invisible to the
+  compiler and to any test that does not ask the router what it holds.
+
 ## 0.89.4 — 1 September 2026
 
 ### Fixed
