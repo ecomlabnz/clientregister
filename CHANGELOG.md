@@ -7,6 +7,74 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.91.0 — 1 September 2026
+
+### Changed
+- **Every list page now wears the same top.** A heading, whatever summary
+  figures the page has, then a row of named views with a count on each, then one
+  filter bar. Clients already read this way; Cases, the Knowledge base and Fees
+  did not, because each was written on its own day and drifted.
+
+  **Cases** gains **Open · Mine · All** across the top, with a count on each, and
+  loses two dropdowns from a filter bar that held six controls. "Open only /
+  Everything" and "Anyone / Assigned to me" were never filters — they are
+  different errands, and an errand belongs in a tab where the count answers the
+  question before you click. Filtering inside a view keeps you in it, and so
+  does Clear.
+
+  **The Knowledge base** gains **Current · Draft · Published · Superseded ·
+  Archived**, replacing the state dropdown. Nothing it could do before was lost.
+
+  **Fees** now shows its figures before the dates that narrow them. The page
+  opened on two empty date boxes and the reader had to look past them to find
+  the number they came for.
+
+  The row itself is one component (`viewTabs`) rather than markup written out on
+  each page, and a test asserts the shape page by page — that the views come
+  before the filter bar, that the filter form carries the current view so
+  filtering cannot move you, and that a view has not crept back into the bar as
+  a dropdown. Seven pages each writing the same shape by hand is precisely how
+  the search fault got onto seven pages and had to be found six times over.
+
+  Checked in Chromium at 1400px and 360px, with scripting on and off: the tabs
+  are ordinary links, so they work either way. Verified against the database
+  that "Mine" genuinely narrows — 222 open matters, 213 of them mine — rather
+  than looking as though it does.
+
+### Added
+- **The archive load will arrive quiet, and there are now tests that make that
+  true.** The practice's instruction is that every matter in the coming archive
+  batch is closed and raises no alert and no task — only warnings, where a
+  warning is warranted.
+
+  Checking that against the register's own alert queries turned up the one that
+  is *not* gated on an open status: a matter recorded as approved or declined
+  with no decision date is flagged whatever its status. So an archive matter
+  whose folder gives no decision date must be `closed`, not `approved`. The
+  register holds seventeen matters in exactly that position today, each one a
+  standing alert.
+
+  Expiry alerts are raised per client rather than per matter and skip archived
+  clients — all five branches, now asserted branch by branch — so archive
+  clients load as `archived` unless they are also a current client.
+
+  Both rules are mutation-tested: remove either guard and the tests fail.
+
+### Documentation
+- The intake brief now covers **batches 04 and 05 together**, both tagged
+  `Bankside`, and says what to read. Almost every client folder holds a PDF whose
+  name begins `PREVIEW` — the application as it stood before lodgement, checked
+  by the client — and that is the richest document in the folder and where the
+  extraction starts. Submissions, cover letters and the issued visa are read;
+  extraneous PDFs and photographs are not, and what was skipped is reported.
+- Where nothing else dates a matter, its year comes from the earliest document
+  showing the practice at work on it. That is evidence, labelled as evidence —
+  not a guess. The caution: a folder's earliest dated thing is often the client's
+  own passport or birth certificate, which dates the client and not the work.
+- The archive is about 25 GB, so it surveys before it reads, works in slices of
+  at most 150 matters that are each finished and loaded before the next is
+  extracted, and gives each slice its own id prefix.
+
 ## 0.90.0 — 1 September 2026
 
 ### Added

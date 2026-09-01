@@ -479,6 +479,37 @@ export function pageHeader(title: string, subtitle?: string | Raw | null, action
     </div>`;
 }
 
+/**
+ * The named views of a list, with a count on each.
+ *
+ * Every list page in the register wears the same top: a heading, whatever
+ * summary figures it has, then this row of views, then one filter bar. Seven
+ * pages had written that row out by hand, which is exactly how a fault gets
+ * onto seven pages at once — the search bug did, and had to be found six times
+ * over. One helper, and a test that every list page uses it.
+ *
+ * A view is a different *errand*, not a different filter. "Open matters" and
+ * "mine" are errands and belong here; "type is a work visa" is a filter and
+ * belongs in the bar below. The count is what makes a tab worth the width: it
+ * answers the question before the reader clicks.
+ */
+export interface ListView {
+  id: string;
+  label: string;
+  count?: number;
+  href: string;
+  current: boolean;
+}
+
+export function viewTabs(views: ListView[]): Raw {
+  return html`
+    <nav class="tabs">
+      ${views.map((v) => html`
+        <a class="${v.current ? 'tab current' : 'tab'}" href="${v.href}">${v.label}${
+          v.count === undefined ? '' : html` <span class="muted">${String(v.count)}</span>`}</a>`)}
+    </nav>`;
+}
+
 export function emptyState(message: string, actionHtml?: Raw): Raw {
   return html`<div class="empty"><p>${message}</p>${actionHtml ?? ''}</div>`;
 }

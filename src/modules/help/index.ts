@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.91.0', date: '1 September 2026',
+    notes: [
+      'The top of every list now looks the same. Cases has Open, Mine and All across the top with '
+        + 'a count on each \u2014 the same shape Clients already had \u2014 and two of the six '
+        + 'dropdowns are gone, because they were never filters. The Knowledge base gets the same '
+        + 'row, and Fees shows its figures before the dates that narrow them rather than after.',
+    ],
+  },
+  {
     version: '0.90.0', date: '1 September 2026',
     notes: [
       'If a client or a matter is ever removed from the register, the register now records it '

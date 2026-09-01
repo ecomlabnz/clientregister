@@ -35,7 +35,7 @@ import {
 import { breadcrumbs, page, redirectWith } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import {
-  actionButton, badge, card, csrfField, emptyState, field, pageHeader, select, stamp, table,
+  actionButton, badge, card, csrfField, emptyState, field, pageHeader, select, stamp, table, viewTabs,
 } from '../../ui/components';
 import { dateShort, dateTime, relativeDays, truncate } from '../../ui/format';
 
@@ -99,6 +99,20 @@ export const knowledgeModule: AppModule = {
         `SELECT DISTINCT t.name FROM tags t JOIN kb_article_tags at ON at.tag_id = t.id ORDER BY t.name`,
       );
 
+      // The states an article can be in, counted, so the row of views says what
+      // it holds. "Current" is the default view and means everything not
+      // archived — the reading a person wants nine times in ten.
+      const counts = await one<{ current: number; draft: number; published: number;
+                                 superseded: number; archived: number; total: number }>(
+        c.env.DB,
+        `SELECT SUM(status <> 'archived') AS current,
+                SUM(status = 'draft') AS draft,
+                SUM(status = 'published') AS published,
+                SUM(status = 'superseded') AS superseded,
+                SUM(status = 'archived') AS archived,
+                COUNT(*) AS total FROM kb_articles`,
+      );
+
       const query = (extra: Record<string, string>) => {
         const p = new URLSearchParams();
         if (q) p.set('q', q);
@@ -115,15 +129,23 @@ export const knowledgeModule: AppModule = {
           'Visa packs, circulars, legal material and announcements — with the dates they take effect.',
           html`<a class="btn btn-primary" href="/knowledge/new">New article</a>`)}
 
+        ${'' /* An article's state is an errand, not a filter — you come here
+                 either to read what stands or to look at what has been put
+                 aside — so it is the row of views, as on every other list. */}
+        ${viewTabs([
+          { id: '', label: 'Current', count: counts?.current ?? 0 },
+          { id: 'draft', label: 'Draft', count: counts?.draft ?? 0 },
+          { id: 'published', label: 'Published', count: counts?.published ?? 0 },
+          { id: 'superseded', label: 'Superseded', count: counts?.superseded ?? 0 },
+          { id: 'archived', label: 'Archived', count: counts?.archived ?? 0 },
+        ].map((v) => ({ ...v, current: v.id === status, href: query({ status: v.id }) })))}
+
         <form class="filters" method="get" action="/knowledge">
+          <input type="hidden" name="status" value="${status}">
           <input type="search" name="q" value="${q}" placeholder="Search titles and text" aria-label="Search">
           <select name="kind" aria-label="Kind">
             <option value="">All kinds</option>
             ${kinds.map((k) => html`<option value="${k.key}" ${k.key === kind ? raw('selected') : ''}>${k.label}</option>`)}
-          </select>
-          <select name="status" aria-label="Status">
-            <option value="">Current</option>
-            ${KB_STATUSES.map((s) => html`<option value="${s}" ${s === status ? raw('selected') : ''}>${KB_STATUS_LABELS[s]}</option>`)}
           </select>
           ${allTags.length ? html`
             <select name="tag" aria-label="Tag">
@@ -131,7 +153,11 @@ export const knowledgeModule: AppModule = {
               ${allTags.map((t) => html`<option value="${t.name}" ${t.name === tag ? raw('selected') : ''}>${t.name}</option>`)}
             </select>` : ''}
           <button class="btn btn-secondary" type="submit">Filter</button>
-          ${q || kind || status || tag ? html`<a class="btn btn-link" href="/knowledge">Clear</a>` : ''}
+          ${'' /* Clear empties the filters and stays in the view, which is a
+                   tab: clearing it would move the reader somewhere else. */}
+          ${q || kind || tag
+            ? html`<a class="btn btn-link" href="${query({ q: '', kind: '', tag: '' })}">Clear</a>`
+            : ''}
         </form>
 
         ${shown.length === 0
