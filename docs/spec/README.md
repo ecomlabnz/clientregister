@@ -15,7 +15,7 @@ fourth is the one that has to be written, and is the one to read first.
 
 ## Read them in this order
 
-**1. [`mistakes.md`](mistakes.md).** Eighteen faults, each with the rule that
+**1. [`mistakes.md`](mistakes.md).** Nineteen faults, each with the rule that
 replaced it. The other three documents tell you *what* to build; this one tells
 you what will go wrong while you build it. A rebuild that skips it will
 rediscover a primary-passport collision, a search that only works in one word
