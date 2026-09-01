@@ -10,6 +10,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
+import { everyTermClausePlain } from '../../core/search';
 import type { SettingsGroup } from '../../core/settings';
 import { all, count, nowIso, one, run } from '../../core/db';
 import { requireAuth, requirePermission } from '../../core/auth';
@@ -181,8 +182,11 @@ export const inboxModule: AppModule = {
       }
       if (['email', 'telegram', 'whatsapp', 'api'].includes(channel)) { conds.push('channel = ?'); params.push(channel); }
       if (q) {
-        conds.push('(subject LIKE ? OR body_text LIKE ? OR sender_display LIKE ? OR sender LIKE ?)');
-        params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+        // Every word, in any order — a sender is as often "NGUYEN Minh Khuong"
+        // as "Minh Khuong NGUYEN", and the phrase never matched both.
+        const m = everyTermClausePlain(
+          ['subject', 'body_text', 'sender_display', 'sender'], q);
+        if (m.sql) { conds.push(m.sql); params.push(...m.params); }
       }
       const whereSql = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
@@ -267,6 +271,8 @@ export const inboxModule: AppModule = {
       // and the working list shows only what still wants attention.
       const view = c.req.query('view') === 'filed' ? 'filed' : 'open';
       const filedCond = view === 'filed' ? 't.filed_at IS NOT NULL' : 't.filed_at IS NULL';
+      const threadMatch = everyTermClausePlain(
+        ['t.peer_label', 't.peer_id', 'cl.full_name'], q);
       const [rows, family] = await Promise.all([
         all<ThreadRow & { client_name: string | null; waiting: number }>(
           c.env.DB,
@@ -275,9 +281,9 @@ export const inboxModule: AppModule = {
                     WHERE m.thread_id = t.id AND m.status = 'pending' AND m.filed_at IS NULL) AS waiting
              FROM channel_threads t LEFT JOIN clients cl ON cl.id = t.client_id
             WHERE ${filedCond}
-              ${q ? 'AND (t.peer_label LIKE ? OR t.peer_id LIKE ? OR cl.full_name LIKE ?)' : ''}
+              ${threadMatch.sql ? `AND ${threadMatch.sql}` : ''}
             ORDER BY t.last_message_at DESC LIMIT 200`,
-          ...(q ? [`%${q}%`, `%${q}%`, `%${q}%`] : []),
+          ...threadMatch.params,
         ),
         incomingCounts(c.env),
       ]);

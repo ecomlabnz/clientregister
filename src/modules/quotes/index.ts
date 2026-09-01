@@ -9,6 +9,7 @@
 import { Hono } from 'hono';
 import type { AppContext, Env } from '../../types';
 import type { AppModule } from '../../core/module';
+import { everyTermClausePlain } from '../../core/search';
 import { all, count, nextRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
@@ -260,8 +261,11 @@ export const quotesModule: AppModule = {
       else if (view === 'accepted') conds.push(`q.status = 'accepted'`);
       else if (view === 'closed') conds.push(`q.status IN ('declined','expired','withdrawn')`);
       if (q0) {
-        conds.push('(q.ref LIKE ?1 OR q.description LIKE ?1 OR cl.full_name LIKE ?1)');
-        params.push(`%${q0}%`);
+        // Plain placeholders, like every other condition here — this used ?1
+        // while its neighbours used ?, so filtering by status and by text at
+        // once made both read the same value.
+        const m = everyTermClausePlain(['q.ref', 'q.description', 'cl.full_name'], q0);
+        if (m.sql) { conds.push(m.sql); params.push(...m.params); }
       }
       const whereSql = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 

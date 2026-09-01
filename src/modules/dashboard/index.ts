@@ -9,6 +9,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
+import { everyTermClausePlain } from '../../core/search';
 import { all, count } from '../../core/db';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { page } from '../../ui/layout';
@@ -324,20 +325,24 @@ export const dashboardModule: AppModule = {
           <button class="btn btn-primary" type="submit">Search</button>
         </form>`);
 
-      const like = `%${q}%`;
+      // Every word, in any order — the same rule as the rest of the register.
+      const cli = everyTermClausePlain(['full_name', 'email', 'phone', 'ref'], q);
+      const kase = everyTermClausePlain(
+        ['k.title', 'k.ref', 'k.inz_application_number', 'k.inz_client_number',
+         'cl.full_name'], q);
+      const inq = everyTermClausePlain(
+        ['subject', 'body', 'ref', 'contact_name', 'contact_email'], q);
       const [clients, cases, inquiries] = await Promise.all([
         all<any>(c.env.DB,
           `SELECT id, ref, full_name, email, phone, status FROM clients
-            WHERE full_name LIKE ?1 OR email LIKE ?1 OR phone LIKE ?1 OR ref LIKE ?1 LIMIT 25`, like),
+            WHERE ${cli.sql} LIMIT 25`, ...cli.params),
         all<any>(c.env.DB,
           `SELECT k.id, k.ref, k.title, k.status, k.case_type, cl.full_name AS client_name
              FROM cases k JOIN clients cl ON cl.id = k.client_id
-            WHERE k.title LIKE ?1 OR k.ref LIKE ?1 OR k.inz_application_number LIKE ?1
-               OR k.inz_client_number LIKE ?1 OR cl.full_name LIKE ?1 LIMIT 25`, like),
+            WHERE ${kase.sql} LIMIT 25`, ...kase.params),
         all<any>(c.env.DB,
           `SELECT id, ref, subject, status, contact_name, contact_email FROM inquiries
-            WHERE subject LIKE ?1 OR body LIKE ?1 OR ref LIKE ?1 OR contact_name LIKE ?1
-               OR contact_email LIKE ?1 LIMIT 25`, like),
+            WHERE ${inq.sql} LIMIT 25`, ...inq.params),
       ]);
 
       return page(c, { title: `Search: ${q}`, active: '/' }, html`

@@ -17,6 +17,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
+import { everyTermClausePlain } from '../../core/search';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { all, nextRef, nowIso, one, run } from '../../core/db';
@@ -81,8 +82,8 @@ export const invoicesModule: AppModule = {
       else if (view === 'paid') conds.push(`i.status = 'paid'`);
       else if (view === 'void') conds.push(`i.status = 'void'`);
       if (q0) {
-        conds.push('(i.ref LIKE ? OR i.description LIKE ? OR cl.full_name LIKE ?)');
-        params.push(`%${q0}%`, `%${q0}%`, `%${q0}%`);
+        const m = everyTermClausePlain(['i.ref', 'i.description', 'cl.full_name'], q0);
+        if (m.sql) { conds.push(m.sql); params.push(...m.params); }
       }
       const whereSql = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 

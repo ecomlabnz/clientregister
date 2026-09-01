@@ -106,6 +106,44 @@ export function otherTermPatterns(terms: string[]): string[] {
   return terms.slice(1).map(likeTerm);
 }
 
+/**
+ * `(col LIKE ?n OR col LIKE ?n ...) AND (…?n+1…)` — every word, any order.
+ *
+ * The list pages each build their own WHERE clause with their own parameter
+ * numbering, so this hands back the fragment and the values rather than a whole
+ * query. Empty query, empty fragment: the caller adds nothing.
+ */
+export function everyTermClause(
+  columns: string[], raw: string, from: number,
+): { sql: string; params: string[] } {
+  const terms = searchTerms(raw);
+  if (terms.length === 0) return { sql: '', params: [] };
+  const sql = terms.map((_, i) =>
+    `(${columns.map((c) => `${c} LIKE ?${from + i} ESCAPE '\\'`).join(' OR ')})`,
+  ).join(' AND ');
+  return { sql, params: terms.map(likeTerm) };
+}
+
+/**
+ * The same clause for a statement that uses plain `?` placeholders throughout.
+ *
+ * Mixing `?` and `?1` in one statement is legal SQL and a trap: the plain ones
+ * take the next free slot while the numbered ones count from the start, so the
+ * two can land on the same value. One statement, one style.
+ */
+export function everyTermClausePlain(
+  columns: string[], raw: string,
+): { sql: string; params: string[] } {
+  const terms = searchTerms(raw);
+  if (terms.length === 0) return { sql: '', params: [] };
+  const sql = terms.map(() =>
+    `(${columns.map((c) => `${c} LIKE ? ESCAPE '\\'`).join(' OR ')})`,
+  ).join(' AND ');
+  // One value per placeholder: each word repeated once for every column.
+  const params = terms.flatMap((t) => columns.map(() => likeTerm(t)));
+  return { sql, params };
+}
+
 export async function searchEverything(
   env: Env,
   rawQuery: string,
