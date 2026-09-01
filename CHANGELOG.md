@@ -7,6 +7,41 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.88.0 — 1 September 2026
+
+### Added
+- **A warning can be changed or deleted.** Raising one and taking one down were
+  the only two things you could do to a warning, and neither covers the ordinary
+  case of getting the wording wrong. "Change it" reworks the body, the kind or
+  the period in place. "Delete it instead" removes it outright.
+
+  The two removals mean different things and the wording says so: *taking down*
+  says "this was true and no longer applies", and the record keeps it; *deleting*
+  says "this should never have been here" — raised on the wrong person, or a
+  duplicate from a load — and there is no sense in a file carrying it. Both write
+  to the audit log, and both record what the warning said, so the append-only
+  half of the history survives either way.
+
+- **A warning says where it came from** — `flags.source_case_id`, added by
+  migration 0059. Every warning raised by the batch-03 load restates a fact
+  written down in a matter: a decline letter, a PPI response, a line in a brief.
+  Read a year later, a warning with no source is a claim you either believe or
+  go looking for; with the matter named it is one press to the evidence.
+
+  Nullable on purpose — a warning typed in from a conversation ("do not phone,
+  she is in a refuge") has no matter behind it, and that is the ordinary case
+  rather than an omission. `ON DELETE SET NULL` rather than `CASCADE`: if the
+  matter goes, the warning is still true. It loses its citation, not its point.
+
+### Notes
+- The batch-03 loader (outside this repository, as all data tooling is) now
+  resolves identity on **name and date of birth**, and a passport number
+  corroborates rather than decides — the same person renews a passport and may
+  hold a second nationality's, so two numbers do not make two people. Where the
+  name agrees but a date of birth is missing on one side, the loader refuses to
+  decide and asks. Applying the rule to the joins the extraction had proposed
+  rejected two of them and found two it had missed.
+
 ## 0.87.0 — 1 September 2026
 
 ### Added

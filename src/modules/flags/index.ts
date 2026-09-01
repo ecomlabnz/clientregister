@@ -13,7 +13,7 @@ import { requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { one } from '../../core/db';
 import { FormReader } from '../../core/validate';
-import { clearFlag, flagKinds, raiseAgain, raiseFlag, type Flag } from '../../core/flags';
+import { clearFlag, deleteFlag, editFlag, flagKinds, raiseAgain, raiseFlag, type Flag } from '../../core/flags';
 import { isTerm } from '../../core/vocabulary';
 import { redirectWith } from '../../ui/layout';
 
@@ -51,6 +51,45 @@ export const flagsModule: AppModule = {
         meta: { flag: id, kind, life: life ?? 'standing' },
       });
       return redirectWith(c, back, 'Warning raised. It shows at the top of this record.');
+    });
+
+    r.post('/flags/:id/edit', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const flag = await one<Flag>(c.env.DB, 'SELECT * FROM flags WHERE id = ?', id);
+      if (!flag) return c.notFound();
+      const back = backTo(flag.entity_type, flag.entity_id);
+
+      const f = new FormReader(await c.req.formData());
+      const kind = f.text('kind', { required: true, label: 'Kind', max: 40 });
+      const body = f.text('body', { required: true, label: 'Warning', max: 500 });
+      const life = f.optional('life', { max: 20 });
+      if (!f.valid) return redirectWith(c, back, Object.values(f.errors)[0]!, 'err');
+      if (!isTerm(await flagKinds(c.env), kind)) {
+        return redirectWith(c, back, 'Choose what kind of warning this is.', 'err');
+      }
+
+      await editFlag(c.env, { id, kind, body, life: life ?? null });
+      await auditFrom(c, {
+        action: 'flag.edited', entityType: flag.entity_type as never, entityId: flag.entity_id,
+        // What it said before, because the audit log is the append-only half and
+        // an edit that leaves no trace of the old wording is a rewrite.
+        meta: { flag: id, kind, was: flag.body, was_kind: flag.kind },
+      });
+      return redirectWith(c, back, 'Warning updated.');
+    });
+
+    r.post('/flags/:id/delete', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const flag = await one<Flag>(c.env.DB, 'SELECT * FROM flags WHERE id = ?', id);
+      if (!flag) return c.notFound();
+      const back = backTo(flag.entity_type, flag.entity_id);
+
+      await deleteFlag(c.env, id);
+      await auditFrom(c, {
+        action: 'flag.deleted', entityType: flag.entity_type as never, entityId: flag.entity_id,
+        meta: { flag: id, kind: flag.kind, said: flag.body },
+      });
+      return redirectWith(c, back, 'Warning deleted. What it said is in the audit log.');
     });
 
     r.post('/flags/:id/clear', requirePermission('register:write'), async (c) => {

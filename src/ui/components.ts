@@ -84,11 +84,14 @@ export function collapsibleCard(title: string, body: Raw, note?: string): Raw {
 export function flagBand(opts: {
   flags: Array<{
     id: string; kind: string; body: string; raised_at: string; expires_on: string | null;
-    raised_by_name?: string | null; from_client?: boolean;
+    raised_by_name?: string | null; from_client?: boolean; source_case_id?: string | null; source_case_ref?: string | null;
   }>;
   label: (kind: string) => string;
-  /** Null when the reader may not take one down. */
+  /** Null when the reader may not change one. */
   clear: { csrf: string } | null;
+  /** Offered alongside the wording, so an edit is one press from reading it. */
+  kinds?: Array<{ value: string; label: string }>;
+  lives?: Array<{ value: string; label: string }>;
   /** Where a flag on the client is taken down, when this is a matter. */
   clientHref?: string;
 }): Raw {
@@ -106,9 +109,34 @@ export function flagBand(opts: {
               ? html`<span>On the client${opts.clientHref
                   ? html` · <a href="${opts.clientHref}">their page</a>` : ''}</span>`
               : ''}
+            ${'' /* A warning that cites a matter can be checked against it in one
+                     press, which is the difference between a fact and a claim. */}
+            ${f.source_case_ref && f.source_case_id
+              ? html`<span>From <a href="/cases/${f.source_case_id}"><code>${f.source_case_ref}</code></a></span>`
+              : ''}
             ${f.raised_by_name ? html`<span>Raised by ${f.raised_by_name}</span>` : ''}
             ${f.expires_on ? html`<span>Until ${f.expires_on}</span>` : ''}
+            ${'' /* A warning on the client is changed on the client's page, not on
+                     each matter it appears on — one fact, one place to edit it. */}
             ${opts.clear && !f.from_client ? html`
+              <details class="reveal-inline">
+                <summary class="small">Change it</summary>
+                <form method="post" action="/flags/${f.id}/edit" class="row-form">
+                  <input type="hidden" name="_csrf" value="${opts.clear.csrf}">
+                  ${opts.kinds
+                    ? select({ label: 'What kind', name: 'kind', value: f.kind,
+                               includeBlank: false, options: opts.kinds })
+                    : raw(`<input type="hidden" name="kind" value="${f.kind}">`)}
+                  ${field({ label: 'What it says', name: 'body', value: f.body, required: true,
+                            maxlength: 500 })}
+                  ${opts.lives
+                    ? select({ label: 'How long it stands', name: 'life',
+                               value: f.expires_on ? '' : 'standing',
+                               includeBlank: 'Leave as it is', options: opts.lives })
+                    : ''}
+                  <button class="btn btn-primary btn-small" type="submit">Save</button>
+                </form>
+              </details>
               <details class="reveal-inline">
                 <summary class="small">Take it down</summary>
                 <form method="post" action="/flags/${f.id}/clear" class="row-form">
@@ -117,6 +145,15 @@ export function flagBand(opts: {
                             placeholder: 'e.g. Conviction disclosed to INZ and accepted' })}
                   <button class="btn btn-secondary btn-small" type="submit">Take it down</button>
                 </form>
+                ${'' /* Deleting is not taking down and the wording says so: one is
+                        "no longer true", the other "never belonged here". */}
+                <form method="post" action="/flags/${f.id}/delete" class="row-form">
+                  <input type="hidden" name="_csrf" value="${opts.clear.csrf}">
+                  <button class="btn btn-danger btn-small" type="submit">Delete it instead</button>
+                </form>
+                <p class="hint">Take it down when it stops applying — the record keeps it.
+                   Delete it only when it should never have been here. Either way the audit
+                   log records what it said.</p>
               </details>` : ''}
           </div>
         </div>`)}

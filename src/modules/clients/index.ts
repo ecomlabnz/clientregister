@@ -938,6 +938,7 @@ export const clientsModule: AppModule = {
           flags: clientFlags.filter((f) => isShowing(f)),
           label: (kind) => labelFor(flagKindTerms, kind),
           clear: writable ? { csrf } : null,
+          kinds: termOptions(flagKindTerms), lives: FLAG_LIVES,
         })}
         ${writable ? flagRaiser({
           entityType: 'client', entityId: client.id, csrf,
