@@ -303,3 +303,55 @@ describe('when a filed item happened', () => {
     expect(row.occurred_at).toBe(row.created_at);
   });
 });
+
+describe('finding a person whatever order the name is typed in', () => {
+  /*
+   * The register stores a name as it is written on the passport — given names
+   * first, "Minh Khuong NGUYEN". A lawyer, and INZ, write it the other way
+   * round. One phrase compared against one column can only match the order it
+   * happens to be stored in, so "NGUYEN Minh Khuong" found nothing at all while
+   * "Khuong" on its own worked.
+   *
+   * Every word must appear somewhere; the order is not the register's business.
+   */
+  const { DatabaseSync: DB } = process.getBuiltinModule('node:sqlite');
+  const env = (d: any) => ({ DB: {
+    prepare: (sql: string) => ({
+      bind: (...p: unknown[]) => ({ all: async () => ({ results: d.prepare(sql).all(...p) }) }),
+    }),
+  } } as any);
+
+  function seeded() {
+    const d = db();
+    d.exec(`INSERT INTO clients (id,ref,kind,full_name,family_name,given_names,status,created_at,updated_at)
+            VALUES ('N1','CL-0157','individual','Minh Khuong NGUYEN','NGUYEN','Minh Khuong','active','${AT}','${AT}'),
+                   ('N2','CL-0158','individual','Minh Khuong NGUYEN','NGUYEN','Minh Khuong','active','${AT}','${AT}'),
+                   ('N3','CL-0159','individual','Thi Ha Giang BUI','BUI','Thi Ha Giang','active','${AT}','${AT}')`);
+    return d;
+  }
+  const find = async (d: any, q: string) => {
+    const { filingSearch } = await import('../src/core/filing');
+    return (await filingSearch(env(d), q)).map((h) => h.ref).sort();
+  };
+
+  it('finds them however the name is ordered or punctuated', async () => {
+    const d = seeded();
+    for (const typed of ['Khuong', 'NGUYEN Minh Khuong', 'NGUYEN, Minh Khuong',
+                         'Minh Khuong NGUYEN', 'khuong nguyen', 'nguyen   minh']) {
+      expect(await find(d, typed), `typed: ${typed}`).toEqual(['CL-0157', 'CL-0158']);
+    }
+  });
+
+  it('still narrows — every word has to appear', async () => {
+    // Not an OR across words: "NGUYEN Giang" is nobody, and saying so is the
+    // whole value of typing a second word.
+    expect(await find(seeded(), 'NGUYEN Giang')).toEqual([]);
+    expect(await find(seeded(), 'BUI Giang')).toEqual(['CL-0159']);
+  });
+
+  it('matches across two different columns of the same record', async () => {
+    // "NGUYEN" is the family name, "CL-0157" is the reference. Neither column
+    // holds both, so this only works if each word is matched independently.
+    expect(await find(seeded(), 'NGUYEN CL-0157')).toEqual(['CL-0157']);
+  });
+});

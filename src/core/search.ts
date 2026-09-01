@@ -69,6 +69,43 @@ export function likeTerm(q: string): string {
   return `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
 }
 
+/**
+ * The words somebody typed, in the order they typed them — which is not the
+ * order the register stores them in.
+ *
+ * A name is held as it is written on the passport: "Minh Khuong NGUYEN", given
+ * names first. So a search for "NGUYEN Minh Khuong" — the order a lawyer writes
+ * it, and the order INZ writes it — matched nothing at all, while "Khuong" on
+ * its own worked. One phrase compared against one column can only ever match
+ * the order it happens to be stored in.
+ *
+ * Splitting on spaces and punctuation and requiring every word to appear
+ * somewhere makes the order irrelevant, which is the behaviour a person
+ * expects. "NGUYEN, Minh Khuong", "Minh Khuong Nguyen" and "khuong nguyen" all
+ * find the same person.
+ */
+export function searchTerms(raw: string): string[] {
+  return normaliseQuery(raw).split(/[\s,;]+/).filter((t) => t.length > 0);
+}
+
+/**
+ * `AND (col LIKE ?n OR col LIKE ?n ...)` for every word after the first.
+ *
+ * The first word keeps whatever placeholder the query already used, and the
+ * rest are appended after the query's own parameters, so adding this to an
+ * existing query does not renumber anything already in it.
+ */
+export function everyOtherTerm(columns: string[], terms: string[], from: number): string {
+  return terms.slice(1).map((_, i) =>
+    `\n          AND (${columns.map((c) => `${c} LIKE ?${from + i} ESCAPE '\\'`).join(' OR ')})`,
+  ).join('');
+}
+
+/** The LIKE patterns for every word after the first, in the same order. */
+export function otherTermPatterns(terms: string[]): string[] {
+  return terms.slice(1).map(likeTerm);
+}
+
 export async function searchEverything(
   env: Env,
   rawQuery: string,
@@ -77,18 +114,26 @@ export async function searchEverything(
   const q = normaliseQuery(rawQuery);
   // One character matches most of the register and answers nothing.
   if (q.length < 2) return [];
-  const like = likeTerm(q);
   const limit = opts.perKind ?? 8;
+  // Every word must appear somewhere, in any order. See searchTerms above.
+  // `like` is the FIRST word, not the whole phrase: it is ANDed with the rest,
+  // so binding it to the phrase would make every multi-word search match
+  // nothing at all — which is exactly what it did.
+  const terms = searchTerms(q);
+  const like = likeTerm(terms[0] ?? q);
+  const rest = otherTermPatterns(terms);
 
   const queries: Array<Promise<SearchHit[]>> = [
     all<any>(env.DB,
       `SELECT id, ref, full_name, email, phone, status FROM clients
-        WHERE full_name LIKE ?1 ESCAPE '\\' OR ref LIKE ?1 ESCAPE '\\'
+        WHERE (full_name LIKE ?1 ESCAPE '\\' OR ref LIKE ?1 ESCAPE '\\'
            OR email LIKE ?1 ESCAPE '\\' OR phone LIKE ?1 ESCAPE '\\'
            OR family_name LIKE ?1 ESCAPE '\\' OR given_names LIKE ?1 ESCAPE '\\'
-           OR preferred_name LIKE ?1 ESCAPE '\\' OR nzbn LIKE ?1 ESCAPE '\\'
+           OR preferred_name LIKE ?1 ESCAPE '\\' OR nzbn LIKE ?1 ESCAPE '\\')${
+             everyOtherTerm(['full_name','ref','email','phone','family_name','given_names',
+                             'preferred_name','nzbn'], terms, 4)}
         ORDER BY CASE WHEN ref = ?2 THEN 0 ELSE 1 END, full_name LIMIT ?3`,
-      like, q.toUpperCase(), limit,
+      like, q.toUpperCase(), limit, ...rest,
     ).then((rows) => rows.map((r) => ({
       kind: 'client' as const, id: r.id, href: `/clients/${r.id}`,
       title: r.full_name, detail: [r.ref, r.email].filter(Boolean).join(' · '),
@@ -98,13 +143,16 @@ export async function searchEverything(
     all<any>(env.DB,
       `SELECT k.id, k.ref, k.title, k.descriptor, k.status, cl.full_name AS client_name
          FROM cases k LEFT JOIN clients cl ON cl.id = k.client_id
-        WHERE k.title LIKE ?1 ESCAPE '\\' OR k.ref LIKE ?1 ESCAPE '\\'
+        WHERE (k.title LIKE ?1 ESCAPE '\\' OR k.ref LIKE ?1 ESCAPE '\\'
            OR k.descriptor LIKE ?1 ESCAPE '\\' OR k.summary LIKE ?1 ESCAPE '\\'
            OR k.inz_application_number LIKE ?1 ESCAPE '\\'
            OR k.inz_client_number LIKE ?1 ESCAPE '\\'
-           OR cl.full_name LIKE ?1 ESCAPE '\\'
+           OR cl.full_name LIKE ?1 ESCAPE '\\')${
+             everyOtherTerm(['k.title','k.ref','k.descriptor','k.summary',
+                             'k.inz_application_number','k.inz_client_number',
+                             'cl.full_name'], terms, 3)}
         ORDER BY k.updated_at DESC LIMIT ?2`,
-      like, limit,
+      like, limit, ...rest,
     ).then((rows) => rows.map((r) => ({
       kind: 'case' as const, id: r.id, href: `/cases/${r.id}`,
       title: r.title,
@@ -115,11 +163,12 @@ export async function searchEverything(
     all<any>(env.DB,
       `SELECT t.id, t.title, t.details, t.status, t.completion_note, u.name AS owner
          FROM tasks t LEFT JOIN users u ON u.id = t.assigned_to
-        WHERE t.title LIKE ?1 ESCAPE '\\' OR t.details LIKE ?1 ESCAPE '\\'
-           OR t.completion_note LIKE ?1 ESCAPE '\\'
+        WHERE (t.title LIKE ?1 ESCAPE '\\' OR t.details LIKE ?1 ESCAPE '\\'
+           OR t.completion_note LIKE ?1 ESCAPE '\\')${
+             everyOtherTerm(['t.completion_note', 't.details', 't.title'], terms, 3)}
         ORDER BY CASE WHEN t.status IN ('open','in_progress','blocked') THEN 0 ELSE 1 END,
                  t.due_at LIMIT ?2`,
-      like, limit,
+      like, limit, ...rest,
     ).then((rows) => rows.map((r) => ({
       kind: 'task' as const, id: r.id, href: `/tasks#${r.id}`,
       title: r.title, detail: [r.status, r.owner].filter(Boolean).join(' · '),
@@ -129,10 +178,11 @@ export async function searchEverything(
     all<any>(env.DB,
       `SELECT q.id, q.ref, q.description, q.status, cl.full_name AS client_name
          FROM quotes q LEFT JOIN clients cl ON cl.id = q.client_id
-        WHERE q.ref LIKE ?1 ESCAPE '\\' OR q.description LIKE ?1 ESCAPE '\\'
-           OR q.notes LIKE ?1 ESCAPE '\\' OR cl.full_name LIKE ?1 ESCAPE '\\'
+        WHERE (q.ref LIKE ?1 ESCAPE '\\' OR q.description LIKE ?1 ESCAPE '\\'
+           OR q.notes LIKE ?1 ESCAPE '\\' OR cl.full_name LIKE ?1 ESCAPE '\\')${
+             everyOtherTerm(['cl.full_name', 'q.description', 'q.notes', 'q.ref'], terms, 3)}
         ORDER BY q.created_at DESC LIMIT ?2`,
-      like, limit,
+      like, limit, ...rest,
     ).then((rows) => rows.map((r) => ({
       kind: 'quote' as const, id: r.id, href: `/quotes/${r.id}`,
       title: r.description || r.ref,
@@ -143,10 +193,11 @@ export async function searchEverything(
     all<any>(env.DB,
       `SELECT i.id, i.ref, i.description, i.status, cl.full_name AS client_name
          FROM invoices i LEFT JOIN clients cl ON cl.id = i.client_id
-        WHERE i.ref LIKE ?1 ESCAPE '\\' OR i.description LIKE ?1 ESCAPE '\\'
-           OR i.notes LIKE ?1 ESCAPE '\\' OR cl.full_name LIKE ?1 ESCAPE '\\'
+        WHERE (i.ref LIKE ?1 ESCAPE '\\' OR i.description LIKE ?1 ESCAPE '\\'
+           OR i.notes LIKE ?1 ESCAPE '\\' OR cl.full_name LIKE ?1 ESCAPE '\\')${
+             everyOtherTerm(['cl.full_name', 'i.description', 'i.notes', 'i.ref'], terms, 3)}
         ORDER BY i.created_at DESC LIMIT ?2`,
-      like, limit,
+      like, limit, ...rest,
     ).then((rows) => rows.map((r) => ({
       kind: 'invoice' as const, id: r.id, href: `/invoices/${r.id}`,
       title: r.description || r.ref,
@@ -156,10 +207,11 @@ export async function searchEverything(
 
     all<any>(env.DB,
       `SELECT id, ref, subject, contact_name, contact_email, status FROM inquiries
-        WHERE ref LIKE ?1 ESCAPE '\\' OR subject LIKE ?1 ESCAPE '\\' OR body LIKE ?1 ESCAPE '\\'
-           OR contact_name LIKE ?1 ESCAPE '\\' OR contact_email LIKE ?1 ESCAPE '\\'
+        WHERE (ref LIKE ?1 ESCAPE '\\' OR subject LIKE ?1 ESCAPE '\\' OR body LIKE ?1 ESCAPE '\\'
+           OR contact_name LIKE ?1 ESCAPE '\\' OR contact_email LIKE ?1 ESCAPE '\\')${
+             everyOtherTerm(['body', 'contact_email', 'contact_name', 'ref', 'subject'], terms, 3)}
         ORDER BY received_at DESC LIMIT ?2`,
-      like, limit,
+      like, limit, ...rest,
     ).then((rows) => rows.map((r) => ({
       kind: 'inquiry' as const, id: r.id, href: `/inquiries/${r.id}`,
       title: r.subject || r.contact_name || r.ref,
@@ -172,9 +224,10 @@ export async function searchEverything(
     // system line is not mistaken for something a person wrote.
     all<any>(env.DB,
       `SELECT id, entity_type, entity_id, kind, body, occurred_at FROM entries
-        WHERE body LIKE ?1 ESCAPE '\\'
+        WHERE (body LIKE ?1 ESCAPE '\\')${
+             everyOtherTerm(['body'], terms, 3)}
         ORDER BY occurred_at DESC LIMIT ?2`,
-      like, limit,
+      like, limit, ...rest,
     ).then((rows) => rows.map((r) => ({
       kind: 'note' as const, id: r.id,
       href: r.entity_type === 'case' ? `/cases/${r.entity_id}`
@@ -199,10 +252,11 @@ export async function searchEverything(
       `SELECT m.id, m.subject, m.body_text, m.received_at, m.sender_display, m.sender,
               m.thread_id, t.peer_label, t.peer_id
          FROM ingest_messages m LEFT JOIN channel_threads t ON t.id = m.thread_id
-        WHERE m.status != 'ignored'
-          AND (m.subject LIKE ?1 ESCAPE '\\' OR m.body_text LIKE ?1 ESCAPE '\\')
+        WHERE (m.status != 'ignored'
+          AND (m.subject LIKE ?1 ESCAPE '\\' OR m.body_text LIKE ?1 ESCAPE '\\'))${
+             everyOtherTerm(['m.body_text', 'm.subject'], terms, 3)}
         ORDER BY m.received_at DESC LIMIT ?2`,
-      like, limit,
+      like, limit, ...rest,
     ).then((rows) => rows.map((r) => ({
       kind: 'message' as const, id: r.id,
       href: r.thread_id ? `/inbox/threads/${r.thread_id}` : `/inbox/${r.id}`,
@@ -218,9 +272,10 @@ export async function searchEverything(
          FROM channel_replies r
          JOIN users u ON u.id = r.created_by
          LEFT JOIN channel_threads t ON t.id = r.thread_id
-        WHERE r.body LIKE ?1 ESCAPE '\\'
+        WHERE (r.body LIKE ?1 ESCAPE '\\')${
+             everyOtherTerm(['r.body'], terms, 3)}
         ORDER BY r.created_at DESC LIMIT ?2`,
-      like, limit,
+      like, limit, ...rest,
     ).then((rows) => rows.map((r) => ({
       kind: 'message' as const, id: r.id,
       href: `/inbox/threads/${r.thread_id}`,
@@ -232,9 +287,10 @@ export async function searchEverything(
 
     all<any>(env.DB,
       `SELECT id, entity_type, entity_id, filename, description FROM documents
-        WHERE filename LIKE ?1 ESCAPE '\\' OR description LIKE ?1 ESCAPE '\\'
+        WHERE (filename LIKE ?1 ESCAPE '\\' OR description LIKE ?1 ESCAPE '\\')${
+             everyOtherTerm(['description', 'filename'], terms, 3)}
         ORDER BY uploaded_at DESC LIMIT ?2`,
-      like, limit,
+      like, limit, ...rest,
     ).then((rows) => rows.map((r) => ({
       kind: 'document' as const, id: r.id,
       href: r.entity_type === 'case' ? `/cases/${r.entity_id}` : `/clients/${r.entity_id}`,
@@ -244,10 +300,11 @@ export async function searchEverything(
 
     all<any>(env.DB,
       `SELECT id, ref, title, summary, status FROM kb_articles
-        WHERE title LIKE ?1 ESCAPE '\\' OR summary LIKE ?1 ESCAPE '\\'
-           OR body LIKE ?1 ESCAPE '\\' OR ref LIKE ?1 ESCAPE '\\'
+        WHERE (title LIKE ?1 ESCAPE '\\' OR summary LIKE ?1 ESCAPE '\\'
+           OR body LIKE ?1 ESCAPE '\\' OR ref LIKE ?1 ESCAPE '\\')${
+             everyOtherTerm(['body', 'ref', 'summary', 'title'], terms, 3)}
         ORDER BY updated_at DESC LIMIT ?2`,
-      like, limit,
+      like, limit, ...rest,
     ).then((rows) => rows.map((r) => ({
       kind: 'article' as const, id: r.id, href: `/knowledge/${r.id}`,
       title: r.title, detail: [r.ref, r.status].filter(Boolean).join(' · '),
