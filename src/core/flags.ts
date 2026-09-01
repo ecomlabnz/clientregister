@@ -40,7 +40,11 @@ export interface Flag {
   cleared_by: string | null;
   cleared_note: string | null;
   updated_at: string;
+  /** The matter this warning was read off, when it was read off one. */
+  source_case_id: string | null;
   raised_by_name?: string | null;
+  /** Joined for display: the reference of that matter. */
+  source_case_ref?: string | null;
   /** Set when the flag is on the client and is being shown on their matter. */
   from_client?: boolean;
 }
@@ -90,8 +94,9 @@ function todayIso(): string {
 export async function flagsForClient(env: Env, clientId: string): Promise<Flag[]> {
   return all<Flag>(
     env.DB,
-    `SELECT f.*, u.name AS raised_by_name FROM flags f
+    `SELECT f.*, u.name AS raised_by_name, k.ref AS source_case_ref FROM flags f
        LEFT JOIN users u ON u.id = f.raised_by
+       LEFT JOIN cases k ON k.id = f.source_case_id
       WHERE f.entity_type = 'client' AND f.entity_id = ?
       ORDER BY f.raised_at DESC`,
     clientId,
@@ -109,13 +114,15 @@ export async function flagsForClient(env: Env, clientId: string): Promise<Flag[]
 export async function flagsForCase(env: Env, caseId: string, clientId: string): Promise<Flag[]> {
   const [own, theirs] = await Promise.all([
     all<Flag>(env.DB,
-      `SELECT f.*, u.name AS raised_by_name FROM flags f
+      `SELECT f.*, u.name AS raised_by_name, k.ref AS source_case_ref FROM flags f
          LEFT JOIN users u ON u.id = f.raised_by
+         LEFT JOIN cases k ON k.id = f.source_case_id
         WHERE f.entity_type = 'case' AND f.entity_id = ?
         ORDER BY f.raised_at DESC`, caseId),
     all<Flag>(env.DB,
-      `SELECT f.*, u.name AS raised_by_name FROM flags f
+      `SELECT f.*, u.name AS raised_by_name, k.ref AS source_case_ref FROM flags f
          LEFT JOIN users u ON u.id = f.raised_by
+         LEFT JOIN cases k ON k.id = f.source_case_id
         WHERE f.entity_type = 'client' AND f.entity_id = ?
         ORDER BY f.raised_at DESC`, clientId),
   ]);
@@ -127,6 +134,8 @@ export async function raiseFlag(
   input: {
     entityType: 'client' | 'case'; entityId: string; kind: string; body: string;
     life: string | null; byUserId: string;
+    /** The matter it was read off, when one is being cited. */
+    sourceCaseId?: string | null;
   },
 ): Promise<string> {
   const id = newId('flg');
@@ -134,12 +143,47 @@ export async function raiseFlag(
   await run(
     env.DB,
     `INSERT INTO flags (id, entity_type, entity_id, kind, body, raised_at, raised_by,
-                        expires_on, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
+                        expires_on, updated_at, source_case_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`,
     id, input.entityType, input.entityId, input.kind, input.body.trim(), at, input.byUserId,
-    expiryFor(input.life), at,
+    expiryFor(input.life), at, input.sourceCaseId ?? null,
   );
   return id;
+}
+
+/**
+ * Change what a warning says.
+ *
+ * A flag is a live statement about now, so unlike a file note it is meant to be
+ * reworded — a warning that has gone out of date is worse than none, and the
+ * person who can see that is the person reading it. What it cites does not
+ * change: the matter it was read off is where it came from, not what it says.
+ */
+export async function editFlag(
+  env: Env,
+  input: { id: string; kind: string; body: string; life: string | null },
+): Promise<void> {
+  await run(
+    env.DB,
+    `UPDATE flags SET kind = ?, body = ?, expires_on = ?, updated_at = ? WHERE id = ?`,
+    input.kind, input.body.trim(), expiryFor(input.life), nowIso(), input.id,
+  );
+}
+
+/**
+ * Delete a warning outright.
+ *
+ * Separate from taking one down, and it means a different thing. Taking down
+ * says "this was true and no longer applies", and the record keeps it. Deleting
+ * says "this should never have been here" — a warning raised on the wrong
+ * person, a duplicate from the load — and there is no sense in a file carrying
+ * a warning that was never about it.
+ *
+ * The audit log still records that it happened, and what it said. That is the
+ * append-only half, and it is the half that matters.
+ */
+export async function deleteFlag(env: Env, id: string): Promise<void> {
+  await run(env.DB, 'DELETE FROM flags WHERE id = ?', id);
 }
 
 /**
