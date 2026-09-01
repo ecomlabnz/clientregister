@@ -7,6 +7,35 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.89.2 — 1 September 2026
+
+### Fixed
+- **The rest of the register searches word by word too.** 0.89.1 fixed the
+  client list, the top-bar search and the filing picker. Every other list had
+  been written the same way, separately, and had the same fault: **Cases**,
+  **Quotes**, **Invoices**, **Knowledge**, the **Inbox** message list, the
+  **conversations** list and the dashboard's quick lookup all compared the whole
+  phrase against one column at a time. Cases mattered most — a matter is found
+  by its client's name as often as by its own.
+
+  All of them now match every word independently, in any order, through one
+  shared clause. Tasks has no text filter of its own; the NZBN lookup queries
+  MBIE's register rather than this one.
+
+- **Quotes could not be filtered by status and text at the same time.** The
+  status condition used a plain `?` while the text condition used `?1`. Mixing
+  the two is legal SQL and a trap: the plain ones take the next free slot while
+  the numbered ones count from the start, so both read the same value. Fixed by
+  using one style throughout, and there is now a test that fails if any
+  statement mixes them again.
+
+### Added
+- **A test that reads the source for the shape of this bug.** Six list pages had
+  to be found by hand after the seventh was reported. `%${q}%` — the whole
+  phrase, wrapped — now fails the suite wherever it appears in a filter, so the
+  next one is caught when it is written rather than when a search quietly
+  returns nothing.
+
 ## 0.89.1 — 1 September 2026
 
 ### Fixed

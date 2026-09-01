@@ -32,6 +32,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.89.2', date: '1 September 2026',
+    notes: [
+      'The rest of the register searches the same way. Cases, Quotes, Invoices, Knowledge, the '
+        + 'Incoming list and conversations all had the same fault as the client list, and all now '
+        + 'find what you are looking for whichever order you type the words in. Cases matters '
+        + 'most \u2014 a matter is found by its client\u2019s name as often as by its own.',
+    ],
+  },
+  {
     version: '0.89.1', date: '1 September 2026',
     notes: [
       'Searching a name now works whichever way round you type it. The register stores a name '
