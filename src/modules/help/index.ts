@@ -37,6 +37,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.91.2', date: '1 September 2026',
+    notes: [
+      'The folder-reading instructions were corrected after a second opinion. One example in them '
+        + 'had been copied from a real file note \u2014 a wage figure, no name attached \u2014 and '
+        + 'is now invented and checked. Nothing in the register itself changed.',
+    ],
+  },
+  {
     version: '0.91.1', date: '1 September 2026',
     notes: [
       'The instructions for reading your folders were rewritten into one document. There were two, '
