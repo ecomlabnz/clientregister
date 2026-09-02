@@ -71,8 +71,16 @@ describe('the model the practice runs on', () => {
   it('asks for structured output rather than parsing prose', () => {
     // Every call is schema-constrained, so a cheaper model cannot drift into
     // free text that the register would then have to guess at.
+    // Counted against the number of methods the provider actually has, not
+    // against a number written here. The first version of this said "3", so
+    // adding a fourth call failed the test that was supposed to be guarding it
+    // — which teaches whoever adds the fifth to edit the number rather than
+    // read the rule.
+    const methods = anthropic.match(/^ {4}async \w+\(input\)/gm) ?? [];
+    expect(methods.length).toBeGreaterThanOrEqual(3);
     const calls = anthropic.match(/client\.messages\.parse\(/g) ?? [];
-    expect(calls.length).toBe(3);
+    expect(calls.length, 'every provider method asks for structured output')
+      .toBe(methods.length);
     const formats = anthropic.match(/output_config: \{ format: zodOutputFormat\(/g) ?? [];
     expect(formats.length).toBe(calls.length);
   });
@@ -128,8 +136,10 @@ describe('a provider error says what was sent', () => {
   it('wraps every call, not just the one that was failing', () => {
     const wrapped = anthropic.match(/withContext\(\(\) => client\.messages\.parse\(\{/g) ?? [];
     const calls = anthropic.match(/client\.messages\.parse\(\{/g) ?? [];
-    expect(wrapped.length).toBe(calls.length);
-    expect(calls.length).toBe(3);
+    expect(wrapped.length, 'an unwrapped call loses the model and workspace from its error')
+      .toBe(calls.length);
+    const methods = anthropic.match(/^ {4}async \w+\(input\)/gm) ?? [];
+    expect(calls.length).toBe(methods.length);
   });
 });
 

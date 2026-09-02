@@ -23,6 +23,10 @@ import {
 import { dateShort, dateTime, truncate } from '../../ui/format';
 import { processMessage } from '../../ingest/pipeline';
 import { isAiEnabled } from '../../ai/provider';
+import {
+  latestSweeps, plainAiError, SWEEP_KIND_LABELS, SWEEP_KINDS_NEEDING_ACTION,
+  sweepMessage, sweepTone,
+} from '../../ai/sweep';
 import { latestTriage, runTriage } from '../../ai/triage';
 import { can } from '../../core/rbac';
 import { incomingCounts, incomingTabs } from '../inquiries';
@@ -106,6 +110,15 @@ interface DeletionCandidate {
   inquiry_id: string | null; filed_at: string | null;
   filed_to_type: string | null; filed_to_id: string | null;
 }
+
+/**
+ * How many messages one press of Read the post takes on.
+ *
+ * A sweep is one model call per message. Unbounded over a full inbox it is a
+ * bill and a wait nobody asked for, so it takes the newest waiting page and the
+ * button can simply be pressed again.
+ */
+const SWEEP_BATCH = 25;
 
 export const CHANNEL_SETTINGS: SettingsGroup = {
   id: 'channels',
@@ -219,10 +232,14 @@ export const inboxModule: AppModule = {
         ? counts.reduce((sum, row) => sum + row.n, 0)
         : counts.find((row) => row.status === s)?.n ?? 0;
       const csrf = c.get('session')!.csrf;
+      // What the last sweep made of each of these, if one has been run. Read
+      // for the whole page in one query rather than per row.
+      const sweeps = await latestSweeps(c.env, rows.map((row) => row.id));
       // Whether this page has anything the bulk button could act on. A Delete
       // selected button under a list of filed messages does nothing, and the
       // reader has to work out why.
       const deletable = rows.filter((row) => !row.inquiry_id && !row.filed_at).length;
+      const canRunAi = isAiEnabled(c.env) && can(c.get('user'), 'ai:run');
 
       const views = [
         { id: 'pending', label: 'Waiting' }, { id: 'processed', label: 'Processed' },
@@ -243,6 +260,16 @@ export const inboxModule: AppModule = {
             <a class="${v.id === status ? 'btn btn-primary btn-small' : 'btn btn-secondary btn-small'}"
                href="${`/inbox?${keep({ status: v.id })}`}">${v.label} (${countFor(v.id)})</a>`)}
         </div>
+
+        ${canRunAi ? html`
+          <form method="post" action="/inbox/sweep" class="filters">
+            ${csrfField(csrf)}
+            <input type="hidden" name="back" value="${keep({})}">
+            <button class="btn btn-secondary" type="submit">Read the post</button>
+            <span class="hint">Reads what is waiting and says what each piece looks like — a PPI
+               letter, a decision, a request for documents — and which matter it belongs to.
+               It changes nothing; you decide what to do with each one.</span>
+          </form>` : ''}
 
         <form method="get" action="/inbox" class="filters" data-live-search>
           <input type="hidden" name="status" value="${status}">
@@ -286,6 +313,32 @@ export const inboxModule: AppModule = {
                               form="inbox-bulk" aria-label="Select this message">`}</td>
             <td><a class="clamp-2" href="/inbox/${row.id}">${
               truncate(row.subject ?? row.body_text, 90) || '(no subject)'}</a>
+              ${(() => {
+                const found = sweeps.get(row.id);
+                if (!found) return '';
+                const { result, matches } = found;
+                const sole = matches.length === 1 ? matches[0]! : null;
+                return html`
+                  <div class="sweep-finding">
+                    ${badge(SWEEP_KIND_LABELS[result.kind], sweepTone(result.kind))}
+                    ${result.confidence === 'high' ? '' : badge(`${result.confidence} confidence`, 'grey')}
+                    ${result.deadline
+                      ? html`<span class="stamp">reply by ${dateShort(result.deadline.date)}</span>`
+                      : ''}
+                    ${'' /* One matter is a link. Several is a question, and the
+                             reader is shown all of them rather than the first —
+                             which of two similar files a letter belongs to is
+                             not something to decide on a list page. */}
+                    ${sole
+                      ? html`<a href="/cases/${sole.caseId}"><code>${sole.ref}</code></a>
+                             <span class="muted small">${sole.clientName}</span>`
+                      : matches.length
+                        ? html`<span class="muted small">matches ${String(matches.length)} matters:
+                                 ${matches.map((m) => html`<a href="/cases/${m.caseId}"><code>${m.ref}</code></a> `)}</span>`
+                        : html`<span class="muted small">no matter matched</span>`}
+                  </div>
+                  <div class="muted small">${result.why}</div>`;
+              })()}
               <div class="row-meta show-sm">
                 <span class="muted">${row.sender_display ?? row.sender ?? '—'}</span>
                 ${row.trusted ? badge('allow-listed', 'green') : badge('unverified', 'amber')}
@@ -342,6 +395,72 @@ export const inboxModule: AppModule = {
     /** The ids a form sent, de-duplicated and capped at what one page can show. */
     const selectedIds = (form: FormData): string[] =>
       [...new Set(form.getAll('id').map(String).filter(Boolean))].slice(0, 200);
+
+    /**
+     * Read the waiting post and say what each piece is.
+     *
+     * The practice's ask, 2 September 2026: something that spots a PPI letter
+     * as it lands, so the matter can be brought up to date before the clock it
+     * starts runs down.
+     *
+     * **It writes nothing.** Every finding is a proposal shown beside the
+     * message, and every change to a matter is still a person pressing a button
+     * on a page that shows them what they are about to do. The register holds
+     * live client files; that rule is why this can be pointed at them at all.
+     *
+     * It runs when somebody presses the button, never on arrival. A sweep is a
+     * model call per message against real client correspondence, and both the
+     * cost and the reading are the practice's to choose.
+     */
+    r.post('/sweep', requirePermission('ai:run'), async (c) => {
+      const form = await c.req.formData();
+      const back = String(form.get('back') ?? '');
+      const backHref = `/inbox${back ? `?${back}` : ''}`;
+      if (!isAiEnabled(c.env)) {
+        return redirectWith(c, backHref, 'The AI layer is switched off.', 'err');
+      }
+
+      // Only what is waiting and unfiled, and only a page of it. A sweep is one
+      // model call per message: an unbounded one over a full inbox is a bill
+      // and a wait nobody asked for.
+      const waiting = await all<{ id: string; subject: string | null; body_text: string | null;
+                                 sender: string | null }>(
+        c.env.DB,
+        `SELECT id, subject, body_text, sender FROM ingest_messages
+          WHERE filed_at IS NULL AND inquiry_id IS NULL AND status = 'pending'
+          ORDER BY received_at DESC LIMIT ?`, SWEEP_BATCH);
+      if (waiting.length === 0) {
+        return redirectWith(c, backHref, 'Nothing is waiting to be read.');
+      }
+
+      let read = 0;
+      let flagged = 0;
+      const failures: string[] = [];
+      for (const message of waiting) {
+        const outcome = await sweepMessage(c.env, message, c.get('user')!.id);
+        if (outcome.ok) {
+          read += 1;
+          if (SWEEP_KINDS_NEEDING_ACTION.includes(outcome.finding.result.kind)) flagged += 1;
+        } else {
+          failures.push(outcome.error);
+        }
+      }
+
+      await auditFrom(c, {
+        action: 'ai.sweep', entityType: 'inbox', entityId: 'inbox',
+        meta: { read, flagged, failed: failures.length },
+      });
+
+      // One message, and it says what happened rather than that it happened.
+      const said = failures.length && read === 0
+        ? `Nothing could be read. ${plainAiError(failures[0]!)}`
+        : `Read ${read} ${read === 1 ? 'message' : 'messages'}. `
+          + (flagged
+            ? `${flagged} ${flagged === 1 ? 'needs' : 'need'} something doing — shown below.`
+            : 'None of them look like they need action.')
+          + (failures.length ? ` ${failures.length} could not be read.` : '');
+      return redirectWith(c, backHref, said, failures.length && read === 0 ? 'err' : 'ok');
+    });
 
     r.post('/delete', requirePermission('ingest:triage'), async (c) => {
       const form = await c.req.formData();
