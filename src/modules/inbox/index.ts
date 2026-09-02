@@ -12,7 +12,7 @@ import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
 import { everyTermClausePlain } from '../../core/search';
 import type { SettingsGroup } from '../../core/settings';
-import { all, count, nowIso, one, run } from '../../core/db';
+import { all, allByIds, count, nowIso, one, run, runByIds } from '../../core/db';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
@@ -99,6 +99,14 @@ export function badAddresses(list: string | null | undefined): string[] {
     .filter((entry) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry));
 }
 
+/** The columns the bulk delete needs: enough to show it and to refuse it. */
+interface DeletionCandidate {
+  id: string; sender: string | null; sender_display: string | null;
+  subject: string | null; channel: string; received_at: string;
+  inquiry_id: string | null; filed_at: string | null;
+  filed_to_type: string | null; filed_to_id: string | null;
+}
+
 export const CHANNEL_SETTINGS: SettingsGroup = {
   id: 'channels',
   title: 'Inbound channels',
@@ -109,8 +117,17 @@ export const CHANNEL_SETTINGS: SettingsGroup = {
   settings: [
     { key: 'ingest.auto_create_inquiries', type: 'boolean',
       label: 'Create an inquiry automatically from allow-listed senders',
-      default: 'true',
-      help: 'When off, every captured message waits in the inbox until someone acts on it.' },
+      // Off, by the practice's decision of 2 September 2026. It was on, and it
+      // split the post in two: mail from an allow-listed sender became an
+      // inquiry without anybody seeing it, while mail from everybody else
+      // waited in the inbox. Nothing was lost, but there was no one place to
+      // look, and which of the two a message went to depended on a list nobody
+      // had in mind while reading. Everything arrives in the inbox now, and a
+      // person decides what it becomes.
+      default: 'false',
+      help: 'Off by default: everything that arrives waits in the inbox until somebody acts on '
+        + 'it, so there is one place to look. Turn this on and mail from an allow-listed sender '
+        + 'becomes an inquiry the moment it lands, without passing through the inbox.' },
   ],
 };
 
@@ -201,6 +218,11 @@ export const inboxModule: AppModule = {
       const countFor = (s: string): number => s === 'all'
         ? counts.reduce((sum, row) => sum + row.n, 0)
         : counts.find((row) => row.status === s)?.n ?? 0;
+      const csrf = c.get('session')!.csrf;
+      // Whether this page has anything the bulk button could act on. A Delete
+      // selected button under a list of filed messages does nothing, and the
+      // reader has to work out why.
+      const deletable = rows.filter((row) => !row.inquiry_id && !row.filed_at).length;
 
       const views = [
         { id: 'pending', label: 'Waiting' }, { id: 'processed', label: 'Processed' },
@@ -238,14 +260,30 @@ export const inboxModule: AppModule = {
                  mail client uses, and the order the eye wants: what is this,
                  who sent it, how old is it. The date led before, which put the
                  least useful column where the eye lands. */}
+        ${'' /* The whole list is one form, so the checkboxes and the button that
+                 acts on them are the same submission. Junk arrives in runs —
+                 the same sender, the same hour — and deleting it one page at a
+                 time was the job the inbox made hardest. */}
+        <form method="post" action="/inbox/delete" id="inbox-bulk">
+          ${csrfField(csrf)}
+          <input type="hidden" name="back" value="${keep({})}">
         ${table([
-          { label: 'Subject', width: '40' },
+          { label: raw('<span class="sr-only">Select</span>'), width: '4' },
+          { label: 'Subject', width: '36' },
           { label: 'From', width: '20', hideOn: 'sm' },
           { label: 'Received', width: '16' },
           { label: 'Trust', width: '11', hideOn: 'sm' },
           { label: 'Status', width: '13' },
         ], rows.map((row) => html`
           <tr>
+            <td>${'' /* A message that became an inquiry, or that has been filed,
+                        offers no checkbox: the inquiry and the file note both
+                        point at it. Absent rather than disabled — a control you
+                        cannot use is a question the reader has to answer. */}
+              ${row.inquiry_id || row.filed_at
+                ? html`<span class="muted small" title="Kept: something on the file points at this">—</span>`
+                : html`<input type="checkbox" name="id" value="${row.id}"
+                              form="inbox-bulk" aria-label="Select this message">`}</td>
             <td><a class="clamp-2" href="/inbox/${row.id}">${
               truncate(row.subject ?? row.body_text, 90) || '(no subject)'}</a>
               <div class="row-meta show-sm">
@@ -259,7 +297,134 @@ export const inboxModule: AppModule = {
             <td>${badge(row.status, statusTone(row.status === 'processed' ? 'approved' : row.status))}
                 ${row.inquiry_id ? html`<div class="small"><a href="/inquiries/${row.inquiry_id}">inquiry</a></div>` : ''}</td>
           </tr>`), { sticky: true, fixed: true, empty: 'Nothing here.' })}
+          ${deletable > 0 ? html`
+            <div class="filters mt">
+              <button class="btn btn-danger" type="submit">Delete selected</button>
+              <span class="hint">Tick what should not be here, then delete it. You will be shown
+                 exactly what is about to go before anything happens.</span>
+            </div>` : ''}
+        </form>
         </div>`);
+    });
+
+    /**
+     * Delete several messages at once, in two steps.
+     *
+     * Junk arrives in runs, and deleting it one page at a time was the job the
+     * inbox made hardest. What makes this safe to offer is the same thing that
+     * made the single delete safe: the captured copy goes, and the audit log —
+     * append-only, untouched by this — keeps the record that each message
+     * arrived, from whom, and that somebody deleted it. The fact survives; the
+     * content does not.
+     *
+     * Two steps rather than a confirmation dialog, because the register works
+     * with scripting off. A dialog declared with `data-confirm` is script, and
+     * on a destructive action that reaches this many rows at once, "it silently
+     * did not ask" is not an acceptable failure. So the first step renders what
+     * is about to go, by subject and sender, and only the second deletes.
+     *
+     * Two kinds of message are refused rather than deleted, and both are
+     * refused because something else on the file points at them: one that
+     * became an inquiry, and one that has been filed onto a matter or a client.
+     * The file note written when a message is filed copies the message and, for
+     * a long one, says the full text is kept where it arrived — so deleting the
+     * message would make that sentence untrue. They are dropped from the
+     * selection and named in the confirmation, rather than failing the batch.
+     */
+    const gatherForDeletion = async (env: AppContext['Bindings'], ids: string[]) =>
+      ids.length === 0 ? [] : await allByIds<DeletionCandidate>(
+        env.DB, ids,
+        (placeholders) => `SELECT id, sender, sender_display, subject, channel, received_at,
+                                  inquiry_id, filed_at, filed_to_type, filed_to_id
+                             FROM ingest_messages WHERE id IN (${placeholders})
+                            ORDER BY received_at DESC`);
+
+    /** The ids a form sent, de-duplicated and capped at what one page can show. */
+    const selectedIds = (form: FormData): string[] =>
+      [...new Set(form.getAll('id').map(String).filter(Boolean))].slice(0, 200);
+
+    r.post('/delete', requirePermission('ingest:triage'), async (c) => {
+      const form = await c.req.formData();
+      const ids = selectedIds(form);
+      const back = String(form.get('back') ?? '');
+      const backHref = `/inbox${back ? `?${back}` : ''}`;
+      if (ids.length === 0) {
+        return redirectWith(c, backHref, 'Nothing was selected.', 'err');
+      }
+
+      const found = await gatherForDeletion(c.env, ids);
+      const kept = found.filter((m) => m.inquiry_id || m.filed_at);
+      const going = found.filter((m) => !m.inquiry_id && !m.filed_at);
+
+      if (going.length === 0) {
+        return redirectWith(c, backHref,
+          'None of those can be deleted: each one became an inquiry or has been filed, '
+          + 'and something on the file points at it.', 'err');
+      }
+
+      const csrf = c.get('session')!.csrf;
+      const describe = (m: DeletionCandidate) =>
+        html`<li><strong>${truncate(m.subject, 80) || '(no subject)'}</strong>
+               <div class="muted small">${m.sender_display ?? m.sender ?? 'unknown sender'}
+                  · ${m.channel} · ${stamp(m.received_at)}</div></li>`;
+
+      return page(c, { title: 'Delete these messages?', active: '/inquiries' }, html`
+        ${pageHeader('Delete these messages?',
+          'They go for good. The audit log keeps the record that each one arrived.')}
+
+        ${card(`${going.length} ${going.length === 1 ? 'message' : 'messages'} will be deleted`,
+          html`<ul class="list">${going.map(describe)}</ul>`)}
+
+        ${kept.length ? card(`${kept.length} will be kept`, html`
+          <p class="small">Each of these became an inquiry or has been filed onto a record, and
+             that record points back at the message. They are left alone.</p>
+          <ul class="list">${kept.map(describe)}</ul>`) : ''}
+
+        <form method="post" action="/inbox/delete/confirm" class="filters">
+          ${csrfField(csrf)}
+          <input type="hidden" name="back" value="${back}">
+          ${going.map((m) => html`<input type="hidden" name="id" value="${m.id}">`)}
+          <button class="btn btn-danger" type="submit">
+            Delete ${String(going.length)} ${going.length === 1 ? 'message' : 'messages'}
+          </button>
+          <a class="btn btn-secondary" href="${backHref}">Cancel</a>
+        </form>`);
+    });
+
+    r.post('/delete/confirm', requirePermission('ingest:triage'), async (c) => {
+      const form = await c.req.formData();
+      const ids = selectedIds(form);
+      const back = String(form.get('back') ?? '');
+      const backHref = `/inbox${back ? `?${back}` : ''}`;
+      if (ids.length === 0) return redirectWith(c, backHref, 'Nothing was selected.', 'err');
+
+      // Re-read and re-check rather than trusting the ids the confirmation page
+      // sent back. Between the two steps somebody may have filed one of them,
+      // and the hidden fields in a form the user still has open are a claim
+      // about the past.
+      const found = await gatherForDeletion(c.env, ids);
+      const going = found.filter((m) => !m.inquiry_id && !m.filed_at);
+      if (going.length === 0) {
+        return redirectWith(c, backHref,
+          'Nothing was deleted — those messages are now filed or have become inquiries.', 'err');
+      }
+
+      // Audited one row at a time before anything goes, from the rows
+      // themselves, so the log says what was deleted rather than how many.
+      for (const m of going) {
+        await auditFrom(c, {
+          action: 'inbox.deleted', entityType: 'ingest_message', entityId: m.id,
+          meta: { sender: m.sender, subject: m.subject, channel: m.channel, bulk: true },
+        });
+      }
+      const changed = await runByIds(c.env.DB, going.map((m) => m.id),
+        (placeholders) => `DELETE FROM ingest_messages WHERE id IN (${placeholders})`);
+
+      const skipped = found.length - going.length;
+      return redirectWith(c, backHref,
+        `Deleted ${changed} ${changed === 1 ? 'message' : 'messages'}.`
+        + (skipped ? ` ${skipped} kept, because something on the file points at ${skipped === 1 ? 'it' : 'them'}.` : '')
+        + ' The audit log keeps the record that they arrived.');
     });
 
     // --- Conversations ------------------------------------------------------

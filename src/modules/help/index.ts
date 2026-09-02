@@ -37,6 +37,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.93.0', date: '2 September 2026',
+    notes: [
+      'Everything that arrives now waits in the Inbox. Mail from a known sender used to become an '
+        + 'inquiry on its own, without passing through, so the post was in two places \u2014 now '
+        + 'there is one place to look and you decide what each message becomes.',
+      'You can tick several messages in the Inbox and delete them in one go. It shows you exactly '
+        + 'what is about to be deleted before anything happens, and it will not delete a message '
+        + 'that became an inquiry or has been filed onto a matter, because those point back at it.',
+    ],
+  },
+  {
     version: '0.92.0', date: '1 September 2026',
     notes: [
       'Two new things under Admin \u2192 Export. Your client list now includes the INZ client '

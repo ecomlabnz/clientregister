@@ -515,7 +515,13 @@ export function emptyState(message: string, actionHtml?: Raw): Raw {
 }
 
 export interface Column {
-  label: string;
+  /**
+   * Takes markup as well as text, so a column whose heading is not a word — a
+   * checkbox column, an icon — can still carry something a screen reader can
+   * read. Plain text passed here is still escaped; there is a test for that,
+   * because widening a slot is exactly how escaping gets lost.
+   */
+  label: string | Raw;
   /**
    * Makes the heading a sort control. The value is a key the page understands,
    * never SQL — the page maps it through an allow-list, because a sort key
