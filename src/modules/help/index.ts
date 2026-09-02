@@ -37,6 +37,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.94.0', date: '2 September 2026',
+    notes: [
+      'A new button on the Inbox, Read the post. It reads what is waiting and tells you what each '
+        + 'piece looks like \u2014 a PPI letter with the date you must reply by, a decision, a '
+        + 'request for documents, or just a circular \u2014 and which matter it belongs to. '
+        + 'It changes nothing at all: it tells you, and you decide. Press it when you want it; it '
+        + 'never runs on its own.',
+    ],
+  },
+  {
     version: '0.93.0', date: '2 September 2026',
     notes: [
       'Everything that arrives now waits in the Inbox. Mail from a known sender used to become an '

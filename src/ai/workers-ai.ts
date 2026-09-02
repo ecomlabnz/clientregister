@@ -7,9 +7,9 @@
 
 import type { Env } from '../types';
 import {
-  BRIEF_SYSTEM_PROMPT, INTAKE_SYSTEM_PROMPT, TRIAGE_SYSTEM_PROMPT,
-  parseBriefJson, parseIntakeJson, parseTriageJson,
-  type AiProvider, type BriefResult, type IntakeResult, type TriageResult,
+  BRIEF_SYSTEM_PROMPT, INTAKE_SYSTEM_PROMPT, SWEEP_SYSTEM_PROMPT, TRIAGE_SYSTEM_PROMPT,
+  parseBriefJson, parseIntakeJson, parseSweepJson, parseTriageJson,
+  type AiProvider, type BriefResult, type IntakeResult, type SweepResult, type TriageResult,
 } from './provider';
 
 /**
@@ -91,6 +91,35 @@ dependent_child, employer, sponsor, agent, other.`;
 
       if (!result?.response) throw new Error('workers-ai returned no response');
       return parseIntakeJson(result.response);
+    },
+
+    async sweep(input): Promise<SweepResult> {
+      const instruction = `${SWEEP_SYSTEM_PROMPT}
+
+Reply with a single JSON object and nothing else, using exactly these keys:
+{"kind":string,"confidence":string,"identifiers":{"inz_application_number":string|null,
+"inz_client_number":string|null,"client_name":string|null,"case_reference":string|null},
+"deadline":{"date":"YYYY-MM-DD","what":string}|null,"suggested_status":string|null,
+"suggested_next_action":string|null,"why":string}
+"kind" is one of: ppi, decision_approved, decision_declined, acknowledgement,
+request_for_documents, interim_visa, inz_investigation, client_message,
+invoice_or_receipt, marketing, other.
+"suggested_status" is one of: ${input.caseStatuses.join(', ') || '(none configured)'}.`;
+
+      const result = (await env.AI!.run(model as never, {
+        messages: [
+          { role: 'system', content: instruction },
+          {
+            role: 'user',
+            content: `From: ${input.from ?? '(unknown)'}\nSubject: ${input.subject ?? '(none)'}\n\n`
+              + input.body.slice(0, 12_000),
+          },
+        ],
+        max_tokens: 1000,
+      } as never)) as { response?: string };
+
+      if (!result?.response) throw new Error('workers-ai returned no response');
+      return parseSweepJson(result.response);
     },
 
     async brief(input): Promise<BriefResult> {

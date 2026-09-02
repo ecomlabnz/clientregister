@@ -943,6 +943,13 @@ details[open] > summary { margin-bottom: 12px; }
 
 /* --- Lists, timeline, stats --------------------------------------------- */
 
+/* What the sweep made of a message, under its subject on the inbox list.
+   Wraps rather than truncating: the whole point of the row is the reason, and a
+   reason cut off at the column edge is a reason nobody reads. */
+.sweep-finding {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px;
+}
+
 .list { list-style: none; margin: 0; padding: 0; }
 .list li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
 .list li:last-child { border-bottom: none; }

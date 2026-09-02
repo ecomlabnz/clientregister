@@ -8,8 +8,9 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import * as z from 'zod/v4';
 import type { Env } from '../types';
 import {
-  BRIEF_SYSTEM_PROMPT, INTAKE_SYSTEM_PROMPT, TRIAGE_SYSTEM_PROMPT, normaliseIntake, normaliseTriage,
-  type AiProvider, type BriefResult, type IntakeResult, type TriageResult,
+  BRIEF_SYSTEM_PROMPT, INTAKE_SYSTEM_PROMPT, SWEEP_SYSTEM_PROMPT, TRIAGE_SYSTEM_PROMPT,
+  normaliseIntake, normaliseSweep, normaliseTriage,
+  type AiProvider, type BriefResult, type IntakeResult, type SweepResult, type TriageResult,
 } from './provider';
 
 /**
@@ -32,6 +33,36 @@ function triageSchema(caseTypes: string[]) {
   suggested_next_action: z.string().nullable(),
     key_dates: z.array(z.string()),
     is_spam: z.boolean(),
+  });
+}
+
+const SWEEP_KINDS = [
+  'ppi', 'decision_approved', 'decision_declined', 'acknowledgement',
+  'request_for_documents', 'interim_visa', 'inz_investigation',
+  'client_message', 'invoice_or_receipt', 'marketing', 'other',
+] as const;
+
+/**
+ * Built per request, like the triage schema, because the statuses a matter may
+ * take are the register's own vocabulary and the model must choose from the
+ * list the database will accept rather than inventing a word it would reject.
+ */
+function sweepSchema(caseStatuses: string[]) {
+  return z.object({
+    kind: z.enum(SWEEP_KINDS),
+    confidence: z.enum(['high', 'medium', 'low']),
+    identifiers: z.object({
+      inz_application_number: z.string().nullable(),
+      inz_client_number: z.string().nullable(),
+      client_name: z.string().nullable(),
+      case_reference: z.string().nullable(),
+    }),
+    deadline: z.object({ date: z.string(), what: z.string() }).nullable(),
+    suggested_status: (caseStatuses.length
+      ? z.enum(caseStatuses as [string, ...string[]])
+      : z.string()).nullable(),
+    suggested_next_action: z.string().nullable(),
+    why: z.string(),
   });
 }
 
@@ -205,6 +236,29 @@ export function createAnthropicProvider(
 
       if (!response.parsed_output) throw new Error('model returned no structured output');
       return normaliseIntake(response.parsed_output as Partial<IntakeResult>);
+    },
+
+    async sweep(input): Promise<SweepResult> {
+      const response = await withContext(() => client.messages.parse({
+        model,
+        max_tokens: 2000,
+        system: SWEEP_SYSTEM_PROMPT,
+        output_config: { format: zodOutputFormat(sweepSchema(input.caseStatuses)) },
+        messages: [
+          {
+            role: 'user',
+            // The sender travels with the message: an address ending
+            // immigration.govt.nz is most of what separates a decision letter
+            // from a client forwarding one. It is evidence, not proof, and the
+            // prompt says to treat it as such.
+            content: `From: ${input.from ?? '(unknown)'}\n`
+              + `Subject: ${input.subject ?? '(none)'}\n\n`
+              + `Message:\n${input.body.slice(0, 20_000)}`,
+          },
+        ],
+      }));
+      if (!response.parsed_output) throw new Error('model returned no structured output');
+      return normaliseSweep(response.parsed_output as Partial<SweepResult>);
     },
 
     async brief(input): Promise<BriefResult> {
