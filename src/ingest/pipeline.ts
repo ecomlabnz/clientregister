@@ -111,7 +111,13 @@ export async function captureMessage(env: Env, msg: CapturedMessage): Promise<Ca
     meta: { sender: msg.sender, trusted: msg.trusted, subject: msg.subject },
   });
 
-  const autoCreate = await getBoolSetting(env, 'ingest.auto_create_inquiries', true);
+  // Off unless somebody has turned it on. The practice's decision, 2 September
+  // 2026: everything that arrives waits in the inbox, so there is one place to
+  // look. This fallback is what decides until the setting row exists at all —
+  // nothing writes it until somebody saves the Settings page — so it has to
+  // agree with the default declared in CHANNEL_SETTINGS, and a test holds the
+  // two together.
+  const autoCreate = await getBoolSetting(env, 'ingest.auto_create_inquiries', false);
   if (msg.trusted && autoCreate) {
     const result = await processMessage(env, id, null);
     return { messageId: id, duplicate: false, inquiryId: result?.inquiryId, inquiryRef: result?.inquiryRef };

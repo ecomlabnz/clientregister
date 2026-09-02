@@ -792,6 +792,15 @@ textarea { resize: vertical; min-height: 70px; }
 }
 .filters input[type="search"] { flex: 1; min-width: 220px; }
 .filters select, .filters input[type="date"] { width: auto; }
+
+/* A tick box is a tick box at every width.
+   Inputs are full-width by default, which is right for a text field and wrong
+   for a control the browser draws at a fixed size: stretched, the inbox's
+   selection boxes came out 20 by 13 and were awkward to hit on a phone. The
+   same rule already had to be written for the radio buttons in Appearance. */
+input[type="checkbox"], input[type="radio"] {
+  width: 16px; height: 16px; flex: none; accent-color: var(--accent);
+}
 .filters label { display: inline-flex; gap: 6px; align-items: center; margin: 0; font-weight: 500; }
 
 .add-block { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
@@ -1469,7 +1478,7 @@ body.site { background: var(--bg); }
   .btn-link, .btn-link-danger { padding: 6px 4px; }
   .btn-tag-remove { padding: 4px 6px; font-size: 1.05rem; }
   .btn-block { margin-bottom: 10px; }
-  .checkbox-field input, .appearance-option input[type="radio"] { width: 18px; height: 18px; }
+  .checkbox-field input, input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; }
   .appearance-option { padding: 14px; }
 
   /* The website on a phone: the nav sits under the wordmark, sections lose

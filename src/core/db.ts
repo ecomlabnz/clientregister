@@ -53,6 +53,28 @@ export async function run(db: D1Database, sql: string, ...params: unknown[]): Pr
   return db.prepare(sql).bind(...params).run();
 }
 
+/**
+ * The write-side twin of `allByIds`, for a statement whose `IN (...)` list
+ * comes from the caller.
+ *
+ * The same hundred-bound-value limit applies to a DELETE as to a SELECT, and
+ * the failure is worse: a read that asks for too much returns an error, while a
+ * write that is silently not chunked leaves the caller believing rows went when
+ * the statement never ran. Returns how many rows were actually changed, so the
+ * caller can report a number it has rather than the length of the list it sent.
+ */
+export async function runByIds(
+  db: D1Database, ids: readonly string[], sql: (placeholders: string) => string,
+): Promise<number> {
+  let changed = 0;
+  for (let i = 0; i < ids.length; i += MAX_BOUND_VALUES) {
+    const chunk = ids.slice(i, i + MAX_BOUND_VALUES);
+    const res = await run(db, sql(chunk.map(() => '?').join(',')), ...chunk);
+    changed += res.meta?.changes ?? 0;
+  }
+  return changed;
+}
+
 export async function count(db: D1Database, sql: string, ...params: unknown[]): Promise<number> {
   const row = await one<{ n: number }>(db, sql, ...params);
   return row?.n ?? 0;

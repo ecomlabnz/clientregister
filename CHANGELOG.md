@@ -7,6 +7,57 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.93.0 — 2 September 2026
+
+### Changed
+- **Everything that arrives now waits in the inbox.** Mail from an allow-listed
+  sender was being turned into an inquiry the moment it landed, without passing
+  through the inbox, while mail from everybody else waited there. Nothing was
+  lost, but the post was in two places and which one a message went to depended
+  on a list nobody had in mind while reading. The practice's decision,
+  2 September 2026: one place to look, and a person decides what a message
+  becomes.
+
+  The setting stays, so it can be turned back on. Two things had to agree for
+  the change to have any effect at all, and a test now holds them together: the
+  default declared in Settings, and the fallback the pipeline passes when the
+  setting has never been saved. **Only the second was actually deciding** —
+  nothing writes the setting row until somebody opens that page — so changing
+  the first alone would have done nothing. The test caught that on its first
+  run.
+
+### Added
+- **Several inbox messages can be deleted at once.** A tick box on each row and
+  one button, for junk that arrives in runs — the same sender, the same hour —
+  which was the job the inbox made hardest.
+
+  It asks first, on a page rather than in a dialog box: the register works with
+  scripting switched off, and a dialog is script, so on a destructive action
+  reaching this many rows "it silently did not ask" is not an acceptable
+  failure. The page names every message about to go, by subject and sender.
+
+  **Two kinds of message are refused**, because something else on the file
+  points at them: one that became an inquiry, and one that has been filed onto a
+  matter or a client. The file note written when a message is filed copies the
+  message and, for a long one, says the full text is kept where it arrived — so
+  deleting it would make that sentence untrue. Those rows show no tick box at
+  all, and if one reaches the confirmation anyway it is listed under "will be
+  kept" rather than failing the batch.
+
+  What goes is the captured copy. The audit log — append-only, untouched by this
+  — keeps the record that each message arrived, from whom, and that somebody
+  deleted it, written from the row itself before the row goes. The confirmation
+  step re-reads every row rather than trusting what the form sent back, because
+  between the two steps somebody may have filed one of them.
+
+### Fixed
+- **A tick box is a tick box at every width.** Inputs are full-width by default,
+  which is right for a text field and wrong for a control the browser draws at a
+  fixed size: measured in Chromium at phone width the new selection boxes came
+  out 20 by 13 and were awkward to hit. The same rule had already been needed
+  once, for the radio buttons in Appearance; it is now general rather than
+  waiting for the next control to be squashed.
+
 ## 0.92.0 — 1 September 2026
 
 ### Added
