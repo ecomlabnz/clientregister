@@ -7,6 +7,51 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.94.0 — 2 September 2026
+
+### Added
+- **Read the post: the AI says what each waiting message is, and which matter it
+  belongs to.** The practice's ask — spot a PPI letter as it lands, so the matter
+  can be brought up to date before the clock it starts runs down.
+
+  It names the kind (PPI or RFI, a decision, an acknowledgement, a request for
+  documents, an interim visa, an INZ investigation, a client's own message, an
+  invoice, a circular), the reply-by date where the letter imposes one, which
+  matter it concerns, and one sentence quoting what it read that off — so it can
+  be checked in five seconds.
+
+  **It writes nothing.** Every finding is a proposal shown beside the message;
+  every change to a matter is still a person pressing a button on a page that
+  shows them what they are about to do. The register holds live client files,
+  and that rule is why this can be pointed at them at all. A test walks every
+  write statement in the sweep and fails if one names any table but `ai_runs`.
+
+  **It runs on a button, never on arrival.** A sweep is a model call per message
+  against real client correspondence; both the cost and the reading are the
+  practice's to choose. One press takes the newest twenty-five waiting messages.
+
+  **The model reads; the register matches.** Which matter a letter belongs to is
+  decided in code, by exact comparison on the INZ application number, then the
+  client number, then the matter's own reference, then — only if nothing else
+  identified it — the sender's address. A model asked to choose between two
+  similar files will choose one, and confidently; that is the mistake that
+  cannot be undone, so it is never asked. A name never matches, because two
+  people share a name and a letter does not say which. Where one number matches
+  two matters, both are shown and neither is chosen.
+
+### Fixed
+- **A deadline that was not a date could reach a matter.** The model's date was
+  cut to ten characters before being checked, which turned `2026-13-45x` into
+  `2026-13-45` — the right shape, and not a day on any calendar. It is now
+  validated before truncation and against the calendar, so a month of 13 and the
+  30th of February are refused rather than shown as "reply by".
+- **A provider failure showed the practice raw JSON.** `401 {"type":"error"...}`
+  is noise a lawyer cannot act on. What surfaces now is a sentence saying what
+  to do; the whole error stays on the run record.
+- Two tests that guarded the AI provider asserted "there are three calls" rather
+  than "every call is guarded", so adding a fourth failed the test that existed
+  to protect it. They now count the provider's own methods.
+
 ## 0.93.0 — 2 September 2026
 
 ### Changed

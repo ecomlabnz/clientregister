@@ -254,7 +254,101 @@ export interface AiProvider {
    * practice's configured vocabulary, as for triage.
    */
   extract(input: { text: string; files: IntakeFile[]; caseTypes: string[] }): Promise<IntakeResult>;
+  /**
+   * Read one piece of incoming post about a matter the register already holds,
+   * and say what it is and what it requires.
+   *
+   * `caseStatuses` is the register's own vocabulary, passed in for the same
+   * reason `caseTypes` is: so the model chooses from the list the database will
+   * accept rather than inventing a word it would reject.
+   */
+  sweep(input: {
+    subject: string | null; body: string; from: string | null; caseStatuses: string[];
+  }): Promise<SweepResult>;
 }
+
+/**
+ * What one piece of incoming post *is*, read against a register that already
+ * holds the matter it belongs to.
+ *
+ * Triage answers "who is writing in and what do they want" — it was built for
+ * a stranger's first email. This answers a different question: an application
+ * is already lodged, something has arrived about it, and the practice needs to
+ * know which matter it concerns and what has to change on that matter today.
+ * A PPI letter is the case that prompted it: it starts a clock, and a clock
+ * nobody noticed is the way a file is lost.
+ *
+ * Everything here is a *proposal*. Nothing in this result is written to a
+ * matter by the register. A person reads it and presses the button.
+ */
+export interface SweepResult {
+  /** What kind of post this is. `other` when nothing fits — never a guess. */
+  kind:
+    | 'ppi'                  // potentially prejudicial information / RFI: a clock starts
+    | 'decision_approved'
+    | 'decision_declined'
+    | 'acknowledgement'      // INZ confirming a lodgement
+    | 'request_for_documents'
+    | 'interim_visa'
+    | 'inz_investigation'
+    | 'client_message'       // the client themselves, not the department
+    | 'invoice_or_receipt'
+    | 'marketing'            // circulars, newsletters, nothing to file
+    | 'other';
+  /**
+   * How sure the model is. Anything but `high` is shown as a question rather
+   * than an answer, and never pre-selects a destination.
+   */
+  confidence: 'high' | 'medium' | 'low';
+  /**
+   * What the message says that identifies the matter. These are read off the
+   * page, never inferred — the register does the matching itself, in code,
+   * because a model guessing which of two similar files is meant is exactly the
+   * mistake that cannot be undone.
+   */
+  identifiers: {
+    inz_application_number: string | null;
+    inz_client_number: string | null;
+    client_name: string | null;
+    case_reference: string | null;
+  };
+  /**
+   * A date the message *imposes*, with what it is for. A PPI letter's reply-by
+   * date is the whole reason this exists. Null when the message sets none —
+   * a date merely mentioned in passing is not a deadline.
+   */
+  deadline: { date: string; what: string } | null;
+  /** One of the register's own case statuses, or null when the post does not move it. */
+  suggested_status: string | null;
+  /** What a person would do about this next, in one line. */
+  suggested_next_action: string | null;
+  /** One sentence, quoting what the message says, so a person can check it. */
+  why: string;
+}
+
+export const SWEEP_SYSTEM_PROMPT = `You assist a New Zealand licensed immigration adviser.
+You are given one piece of incoming post about an immigration matter the practice
+is already running. Say what it is and what it requires. Extract only what the
+message actually says.
+
+Rules:
+- Never invent an application number, a client number, a name or a date. If the
+  message does not state it, return null.
+- A deadline is a date the message *imposes* — "you must respond by 5 October",
+  "within 14 days of the date of this letter". A date merely mentioned is not a
+  deadline. Where the letter gives a period rather than a date, and states the
+  date it was written, return the resulting date; otherwise return null.
+- "ppi" covers a potentially prejudicial information letter and a request for
+  further information. Both start a clock and both are the most important thing
+  in this list to get right.
+- Choose "other" rather than the nearest fit. A wrong classification costs more
+  than an unclassified message, because somebody acts on it.
+- Set confidence "high" only when the message says plainly what it is. If you
+  are reasoning from tone, sender or surrounding context, that is "medium" at
+  best.
+- "why" is one sentence quoting the words you read it off, so a person can
+  check you in five seconds.
+Do not give immigration advice and do not draft a reply.`;
 
 export const TRIAGE_SYSTEM_PROMPT = `You assist a New Zealand licensed immigration adviser.
 You are given the raw text of an inbound message (email, WhatsApp or Telegram).
@@ -264,6 +358,14 @@ Assess urgency from any stated deadline: an Immigration New Zealand request for
 further information (RFI), a potentially prejudicial information (PPI) letter, a
 visa expiring within 30 days, or a removal or deportation reference are "urgent".
 Do not give immigration advice and do not draft a reply; only summarise and classify.`;
+
+/** Loose parsing for models that will not honour a schema. */
+export function parseSweepJson(text: string): SweepResult {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end <= start) throw new Error('no JSON object in the response');
+  return normaliseSweep(JSON.parse(text.slice(start, end + 1)) as Partial<SweepResult>);
+}
 
 /** Loose parsing for models that will not honour a schema. */
 export function parseBriefJson(text: string): BriefResult {
@@ -390,6 +492,74 @@ export function parseTriageJson(text: string): TriageResult {
   if (start === -1 || end === -1) throw new Error('model returned no JSON object');
   const parsed = JSON.parse(candidate.slice(start, end + 1)) as Partial<TriageResult>;
   return normaliseTriage(parsed);
+}
+
+const SWEEP_KINDS = [
+  'ppi', 'decision_approved', 'decision_declined', 'acknowledgement',
+  'request_for_documents', 'interim_visa', 'inz_investigation',
+  'client_message', 'invoice_or_receipt', 'marketing', 'other',
+] as const;
+
+/**
+ * Bring a sweep result back to something the register can show.
+ *
+ * A schema-validated response should already be this shape, but the register
+ * reaches the same code from a model that will not honour a schema, and from a
+ * stored result read back out of `ai_runs` months later. Every unknown value
+ * falls to the cautious answer rather than the plausible one: an unrecognised
+ * kind is `other`, an unrecognised confidence is `low`, and a malformed
+ * deadline is no deadline at all — because a deadline the register shows and
+ * the letter does not contain is worse than none.
+ */
+/**
+ * A real day on the calendar, written the way the register writes dates.
+ *
+ * The shape is not enough: `2026-13-45` matches any plain pattern and is not a
+ * date. Re-formatting what `Date` parsed and comparing it back is what catches
+ * a month of 13 and a 30th of February, both of which JavaScript will happily
+ * roll over into the next month rather than reject.
+ */
+function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+export function normaliseSweep(input: Partial<SweepResult>): SweepResult {
+  const str = (v: unknown, max = 300): string | null =>
+    typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null;
+
+  const ids = (input.identifiers ?? {}) as Partial<SweepResult['identifiers']>;
+  const raw = input.deadline as { date?: unknown; what?: unknown } | null | undefined;
+  // Not truncated before it is checked. Cutting to ten characters first turns
+  // "2026-13-45x" into "2026-13-45", which is the right *shape* and not a date
+  // — and the register would have shown "reply by 2026-13-45" on a matter.
+  const date = str(raw?.date, 40);
+  // A date the register will act on has to be a real one. "14 days from
+  // receipt", "shortly", an empty string and the 45th of the 13th month are all
+  // dropped, rather than shown as though somebody had read one off the letter.
+  const deadline = date && isCalendarDate(date)
+    ? { date, what: str(raw?.what) ?? 'a date this letter sets' }
+    : null;
+
+  return {
+    kind: (SWEEP_KINDS as readonly string[]).includes(String(input.kind))
+      ? (input.kind as SweepResult['kind'])
+      : 'other',
+    confidence: (['high', 'medium', 'low'] as readonly string[]).includes(String(input.confidence))
+      ? (input.confidence as SweepResult['confidence'])
+      : 'low',
+    identifiers: {
+      inz_application_number: str(ids.inz_application_number, 60),
+      inz_client_number: str(ids.inz_client_number, 60),
+      client_name: str(ids.client_name, 200),
+      case_reference: str(ids.case_reference, 60),
+    },
+    deadline,
+    suggested_status: str(input.suggested_status, 60),
+    suggested_next_action: str(input.suggested_next_action, 300),
+    why: str(input.why, 600) ?? '',
+  };
 }
 
 const URGENCIES = ['low', 'normal', 'high', 'urgent'] as const;
