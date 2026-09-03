@@ -163,3 +163,94 @@ describe('the heading', () => {
     expect(monthName('2026-12')).toMatch(/December 2026/);
   });
 });
+
+describe('weeks', () => {
+  it('starts a week on Monday', async () => {
+    const { weekStart } = await import('../src/core/months');
+    // 2026-09-03 is a Thursday.
+    expect(new Date('2026-09-03T00:00:00Z').getUTCDay()).toBe(4);
+    expect(weekStart('2026-09-03')).toBe('2026-08-31');
+  });
+
+  it('puts a Sunday in the week that started six days earlier', async () => {
+    // The case a naive implementation gets wrong — and it gets it wrong for
+    // exactly one day in seven, which is how it survives a casual check.
+    const { weekStart } = await import('../src/core/months');
+    expect(new Date('2026-09-06T00:00:00Z').getUTCDay()).toBe(0);
+    expect(weekStart('2026-09-06')).toBe('2026-08-31');
+    expect(weekStart('2026-09-07')).toBe('2026-09-07'); // the Monday after
+  });
+
+  it('leaves a Monday where it is', async () => {
+    const { weekStart } = await import('../src/core/months');
+    expect(weekStart('2026-08-31')).toBe('2026-08-31');
+  });
+
+  it('gives seven consecutive days, Monday to Sunday', async () => {
+    const { weekDays } = await import('../src/core/months');
+    const days = weekDays('2026-09-03');
+    expect(days).toHaveLength(7);
+    expect(days[0]).toBe('2026-08-31');
+    expect(days[6]).toBe('2026-09-06');
+    days.forEach((d, i) => {
+      expect((new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7).toBe(i);
+    });
+  });
+
+  it('crosses a month and a year boundary without a gap', async () => {
+    const { weekDays } = await import('../src/core/months');
+    for (const date of ['2026-12-31', '2027-01-01', '2024-02-29']) {
+      const days = weekDays(date);
+      expect(days).toHaveLength(7);
+      expect(new Set(days).size).toBe(7);
+      expect(days).toContain(date);
+      // Consecutive: each is one day after the last.
+      for (let i = 1; i < 7; i++) {
+        const gap = (Date.parse(`${days[i]}T00:00:00Z`) - Date.parse(`${days[i-1]}T00:00:00Z`)) / 86_400_000;
+        expect(gap).toBe(1);
+      }
+    }
+  });
+
+  it('moves by days across boundaries', async () => {
+    const { shiftDate } = await import('../src/core/months');
+    expect(shiftDate('2026-08-31', 7)).toBe('2026-09-07');
+    expect(shiftDate('2027-01-01', -1)).toBe('2026-12-31');
+    expect(shiftDate('2024-02-28', 1)).toBe('2024-02-29');
+    expect(shiftDate('2026-02-28', 1)).toBe('2026-03-01');
+  });
+
+  it('names a week, and says both months when it spans two', async () => {
+    const { weekName } = await import('../src/core/months');
+    expect(weekName('2026-09-10')).toMatch(/7–13 September 2026/);
+    expect(weekName('2026-09-03')).toMatch(/31 August – 6 September 2026/);
+    expect(weekName('2026-12-31')).toMatch(/2026.*2027/);
+  });
+
+  it('refuses a day that is not a day', async () => {
+    const { validDate } = await import('../src/core/months');
+    expect(validDate('2026-09-03')).toBe('2026-09-03');
+    // The shape is not enough: this matches the pattern and is not a date.
+    for (const bad of ['2026-02-30', '2026-13-01', '2026-09-32', 'today', '', undefined, '26-09-03']) {
+      expect(validDate(bad as never), `${bad}`).toBeNull();
+    }
+  });
+});
+
+describe('years', () => {
+  it('gives twelve months, January first', async () => {
+    const { yearMonths } = await import('../src/core/months');
+    const months = yearMonths(2026);
+    expect(months).toHaveLength(12);
+    expect(months[0]).toBe('2026-01');
+    expect(months[11]).toBe('2026-12');
+  });
+
+  it('refuses a year nothing can be in', async () => {
+    const { validYear } = await import('../src/core/months');
+    expect(validYear('2026', 2000)).toBe(2026);
+    for (const bad of ['1899', '2201', '26', 'nineteen', '', undefined]) {
+      expect(validYear(bad as never, 2000), `${bad}`).toBe(2000);
+    }
+  });
+});

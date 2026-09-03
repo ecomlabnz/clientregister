@@ -211,3 +211,59 @@ describe('grouping by day', () => {
     expect(byDay([]).get('2026-09-14')).toBeUndefined();
   });
 });
+
+describe('three views of the same events', () => {
+  const page = readFileSync('src/modules/calendar/index.ts', 'utf8');
+
+  it('offers month, week and year', () => {
+    expect(page).toMatch(/\['month', 'Month'\], \['week', 'Week'\], \['year', 'Year'\]/);
+  });
+
+  it('changes only the range and the drawing, not the events', () => {
+    // Three views, one collector. A view that fetched its own events would
+    // drift from the others within a month.
+    expect((page.match(/await calendarEvents\(/g) ?? []).length).toBe(1);
+    expect(page).toMatch(/calendarEvents\(\s*c\.env, range\.from, range\.to/);
+  });
+
+  it('carries every anchor, so switching view lands where you were', () => {
+    // Without this, moving from a week in March to the month view lands on
+    // today rather than on March.
+    expect(page).toMatch(/m: month, y: String\(year\), w: weekFrom/);
+  });
+
+  it('gives a week column room for everything on the day', () => {
+    // A month cell says "+4 more"; a week column is the view you open to stop
+    // seeing that, so its limit is far above what a day holds.
+    const week = page.slice(page.indexOf("view === 'week' ? html`"));
+    expect(week).toMatch(/dayCell\(day, days\.get\(day\) \?\? \[\], today, href, 40\)/);
+    expect(page).toMatch(/dayCell\(day, days\.get\(day\) \?\? \[\], today, href, PER_CELL\)/);
+  });
+
+  it('colours a day in the year view by the loudest thing on it', async () => {
+    // A day with a deadline and a circular on it is a day with a deadline on
+    // it. Taking the first event would colour it by whichever source happened
+    // to sort first, which is not information. Tested on the behaviour: the
+    // first version read the source, and passed when the function was replaced
+    // with `list[0].tone`.
+    const { busiestTone } = await import('../src/modules/calendar');
+    const ev = (tone: 'red' | 'amber' | 'green' | 'blue' | 'grey') => ({
+      date: '2026-09-14', source: 's', title: 't', detail: '', href: '#',
+      tone, ownerId: null, ownerName: null,
+    });
+    expect(busiestTone([ev('grey'), ev('red')])).toBe('red');
+    expect(busiestTone([ev('blue'), ev('amber'), ev('grey')])).toBe('amber');
+    expect(busiestTone([ev('green'), ev('blue')])).toBe('green');
+    expect(busiestTone([ev('grey')])).toBe('grey');
+    // Order in the list must not matter — that is the whole point.
+    expect(busiestTone([ev('red'), ev('grey')]))
+      .toBe(busiestTone([ev('grey'), ev('red')]));
+  });
+
+  it('only shows the day panel for a day inside what is on screen', () => {
+    // A stale link from another month would otherwise show a panel about
+    // nothing.
+    expect(page).toMatch(/day < range\.from \|\| day > range\.to/);
+    expect(page).toMatch(/validDate\(c\.req\.query\('d'\)\)/);
+  });
+});

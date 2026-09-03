@@ -7,6 +7,41 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.98.0 — 3 September 2026
+
+### Added
+- **A week and a year view on the calendar**, alongside the month.
+
+  **The week** is one column a day, and each column is deep enough to show
+  everything on that day rather than "+4 more" — which is the whole reason to
+  open a week rather than a month. It is named for what it spans, and says both
+  months or both years when it crosses one: *31 August – 6 September 2026*,
+  *28 December 2026 – 3 January 2027*.
+
+  **The year** is twelve small months. Too small for titles, so a day carries
+  only whether anything falls on it, coloured by the **loudest** thing there —
+  a day with a deadline and a circular on it is a day with a deadline on it.
+  Every month name is a link into that month, and every marked day a link into
+  that day.
+
+  All three draw the same events from the same collector; they differ only in
+  the range they ask for and how they draw it. Every anchor is carried between
+  them, so switching from a week in March to the month view lands on March
+  rather than on today. Filters, "Mine" and the agenda work identically in all
+  three.
+
+  The week arithmetic is tested where it is easy to get wrong: a **Sunday
+  belongs to the week that began six days earlier**, not the one starting
+  tomorrow — a mistake that is wrong for exactly one day in seven, which is how
+  it survives a casual check. Weeks crossing a month, a year and a leap day are
+  all checked for seven consecutive days with no gap.
+
+### Changed
+- **How far back the unbilled-work alert looks is now a list rather than a
+  number**: off, 30, 60, 90, 120, 150, 200 days, or a year. The useful settings
+  are a handful of round periods, and a box that accepts 37 invites a decision
+  nobody wanted to make. Widen it as the fees on file get more complete.
+
 ## 0.97.0 — 3 September 2026
 
 ### Changed
