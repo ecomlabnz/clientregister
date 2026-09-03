@@ -76,6 +76,47 @@ is "it depends", say what it depends on in one sentence. "Do not understand —
 clarify" means shorter and more concrete, not more detail. Standing
 instruction (31 August 2026): be brief and to the point, no fluff.
 
+## One practice, one database
+
+Decided 3 September 2026, when the practice said the register will be sold to
+other practices in time. **A second practice gets a database of its own.** Not a
+shared database with a "which practice" column on every table.
+
+The reason is what the register holds. Under a shared database, every one of the
+614 queries in this application has to remember to say "and only this practice",
+and the one somebody forgets does not produce a bug report — it shows one law
+firm another firm's client files. With a database each there is no query to
+forget. This is also what the code already is: every query here assumes the
+whole database belongs to one practice, and that assumption becomes the
+isolation rather than something to be undone.
+
+**What this means while working now:** nothing changes, and nothing is being
+built for it yet. The practice's own register is the only one. But do not
+introduce anything that would have to be unpicked later:
+
+- No table gets a tenant column, and no query gets a tenant clause. The database
+  boundary *is* the tenant boundary.
+- Anything that differs between practices belongs in `settings` or a vocabulary,
+  not in the code — because those already live inside the tenant's own database
+  and so become per-practice for free.
+- Nothing may assume there is exactly one row in `settings` for the whole world,
+  one practice name, or one sending address.
+
+**Not yet answered, and it must be answered before any of this is promised:**
+Cloudflare normally requires a D1 database to be named in `wrangler.jsonc` at
+deploy time, which would mean a deployment per practice signed up. There are
+ways around it. Nobody has confirmed which one works here. Do not plan around
+this being solved.
+
+**The order of work, as agreed:** the shape and running routines of the app
+settle first. Until then a second practice is set up by hand — a second Worker,
+a second database, a second address — which the one-database-each decision makes
+possible today and which will not scale past about three. The automation is
+worth building once somebody has paid.
+
+One thing to do before another practice's files are held here at all: **there is
+still no automated backup.** See `docs/operations.md`.
+
 ## The other standing decisions
 
 - **Security, modularity and mobile-friendliness rank first** — ahead of how it
