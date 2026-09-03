@@ -140,17 +140,26 @@ export const calendarModule: AppModule = {
       return page(c, { title: `Calendar — ${period.name}`, active: '/calendar' }, html`
         ${pageHeader(period.name,
           `${events.length} ${events.length === 1 ? 'thing' : 'things'} ${period.noun}`
-            + (mine ? ', yours' : ''),
-          // Named for the period rather than "Today": on a month grid "Today"
-          // is ambiguous — the day or the month — and it is also the old name of
-          // the dashboard, which the manual is careful not to reuse.
-          html`<a class="btn btn-secondary" href="${period.here}">${period.hereLabel}</a>`)}
+            + (mine ? ', yours' : ''))}
 
-        ${'' /* Ordinary links throughout: no script on this page. */}
+        ${'' /* Ordinary links throughout: no script on this page.
+
+                 Shortest span first — a week, then a month, then a year — so
+                 the row reads as one scale opening out rather than an arbitrary
+                 order. "Today" sits with them because it belongs to the same
+                 group of things: it lands on whichever period contains today in
+                 whatever view you are already in, which is what every calendar
+                 does with that word. (It used to be a button on the far right,
+                 named for the period — "This month" — out of a worry that
+                 "Today" would be read as the day rather than the period. The
+                 practice asked for it back here, and the convention settles
+                 it.) */}
         <nav class="tabs">
-          ${([['month', 'Month'], ['week', 'Week'], ['year', 'Year']] as const).map(([id, label]) => html`
+          ${([['week', 'Week'], ['month', 'Month'], ['year', 'Year']] as const).map(([id, label]) => html`
             <a class="${view === id ? 'tab current' : 'tab'}"
                href="${href({ v: id === 'month' ? '' : id })}">${label}</a>`)}
+          <a class="tab tab-now" href="${period.here}" title="${period.hereLabel}">Today</a>
+          <span class="tab-gap"></span>
           <a class="${!mine ? 'tab current' : 'tab'}" href="${href({ who: '' })}">Everyone</a>
           <a class="${mine ? 'tab current' : 'tab'}" href="${href({ who: 'me' })}">Mine</a>
         </nav>

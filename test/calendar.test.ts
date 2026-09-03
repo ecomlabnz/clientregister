@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { byDay, calendarEvents, CALENDAR_SOURCES } from '../src/core/calendar';
+import { mountModule, fakeUser } from './support/d1';
+import { calendarModule } from '../src/modules/calendar';
 const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
 
 /**
@@ -215,8 +217,66 @@ describe('grouping by day', () => {
 describe('three views of the same events', () => {
   const page = readFileSync('src/modules/calendar/index.ts', 'utf8');
 
-  it('offers month, week and year', () => {
-    expect(page).toMatch(/\['month', 'Month'\], \['week', 'Week'\], \['year', 'Year'\]/);
+  /**
+   * The bar as it is actually drawn.
+   *
+   * Read off the rendered page rather than the source: a test that matches the
+   * array literal passes whether or not the page shows it, and mutation
+   * testing has caught that shape of test being hollow three times here.
+   */
+  const bar = async (path: string) => {
+    const h = mountModule(calendarModule, { user: fakeUser() });
+    const body = await (await h.request(path)).text();
+    // From the view bar to its own closing tag — the site navigation above it
+    // is also a <nav>, so the first </nav> in the page is not this one.
+    const start = body.indexOf('<nav class="tabs">');
+    const nav = body.slice(start, body.indexOf('</nav>', start));
+    return {
+      labels: [...nav.matchAll(/>([^<>]+)<\/a>/g)].map((m) => (m[1] ?? '').trim()),
+      today: nav.match(/class="tab tab-now" href="([^"]+)"/)?.[1]?.replace(/&amp;/g, '&'),
+      currents: [...nav.matchAll(/class="tab current"[^>]*>([^<>]+)</g)].map((m) => (m[1] ?? '').trim()),
+      full: body,
+    };
+  };
+
+  it('offers week, month and year, shortest span first', async () => {
+    const { labels } = await bar('/calendar');
+    expect(labels.slice(0, 3)).toEqual(['Week', 'Month', 'Year']);
+  });
+
+  it('puts Today with them rather than off on its own', async () => {
+    const { labels } = await bar('/calendar');
+    expect(labels.slice(0, 4)).toEqual(['Week', 'Month', 'Year', 'Today']);
+    // The old far-right button is gone; nothing is named for the period.
+    const { full } = await bar('/calendar');
+    expect(full).not.toMatch(/This (month|week|year)</);
+  });
+
+  it('Today lands on the period holding today, keeping the view and the filters', async () => {
+    for (const [path, expected] of [
+      ['/calendar?m=2023-04&s=task', { s: 'task' }],
+      ['/calendar?v=week&w=2024-11-06', { v: 'week' }],
+      ['/calendar?v=year&y=2019&who=me', { v: 'year', who: 'me' }],
+    ] as const) {
+      const { today } = await bar(path);
+      expect(today, path).toBeDefined();
+      const q = new URLSearchParams(today!.slice(today!.indexOf('?') + 1));
+      const now = new Date().toISOString().slice(0, 10);
+      // Each view reads its own anchor, and Today sets that one to now.
+      const view = q.get('v') ?? 'month';
+      const anchor: Record<string, [string, string]> = {
+        week: ['w', now], year: ['y', now.slice(0, 4)], month: ['m', now.slice(0, 7)],
+      };
+      const [key, value] = anchor[view]!;
+      expect(q.get(key), `${path} → ${key}`).toBe(value);
+      for (const [k, v] of Object.entries(expected)) expect(q.get(k), `${path} kept ${k}`).toBe(v);
+    }
+  });
+
+  it('never marks Today as the view you are in', async () => {
+    // It is a jump, not a view: highlighting it would say you are "in" Today.
+    const { currents } = await bar('/calendar');
+    expect(currents).not.toContain('Today');
   });
 
   it('changes only the range and the drawing, not the events', () => {

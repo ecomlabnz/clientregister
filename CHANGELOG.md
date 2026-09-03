@@ -7,6 +7,28 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.99.1 — 3 September 2026
+
+### Changed
+- **The calendar's controls, rearranged.** The views now read **Week, Month,
+  Year** — shortest span first, so the row is one scale opening out rather than
+  an arbitrary order.
+
+  The button that used to float on the far right, named for whatever period was
+  on screen ("This month", "This week", "This year"), has gone. In its place a
+  single **Today** sits with the three views, where the rest of the calendar's
+  controls are. It lands on whichever period contains today *in the view you
+  are already in*, and keeps your filters and the Everyone/Mine choice.
+
+  Today is deliberately never highlighted as the current tab: it is a jump, not
+  a view. An earlier note here argued that "Today" would be read as the day
+  rather than the period, which is why the button was named for the period
+  instead — the practice asked for it back with the group, and the convention
+  every other calendar follows settles it.
+
+  The tests for that row read the page as it is drawn rather than the source
+  that draws it, for the reason recorded in `docs/spec/mistakes.md`.
+
 ## 0.99.0 — 3 September 2026
 
 ### Added
