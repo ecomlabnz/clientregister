@@ -88,15 +88,16 @@ describe('a deadline and a provenance are not the same date', () => {
 describe('the dashboard cards can be sorted and opened out', () => {
   const dash = readFileSync('src/modules/dashboard/index.ts', 'utf8');
 
-  it('leads with the working order, not the raw date', () => {
-    // Asserted on the sort call itself, not on the words appearing somewhere in
-    // the file. The first version checked that `byWorkingOrder` and `needsSort`
-    // were mentioned — and both still are after the sort is reverted to a plain
-    // date comparison, because the import and the query parameter remain. It
-    // passed the mutation it existed to catch.
-    const sorter = dash.slice(dash.indexOf('const needsToday'), dash.indexOf('const weekAway'));
-    expect(sorter).toMatch(/\.sort\(needsSort === 'date'/);
-    expect(sorter).toMatch(/: byWorkingOrder\)/);
+  it('leads with the working order when no column is chosen', () => {
+    // The fallback handed to the sorter is what orders the card before anybody
+    // clicks a heading. Asserted on the call, not on the words appearing
+    // somewhere in the file: an earlier version checked only that
+    // `byWorkingOrder` was mentioned, and it still is after the sort is
+    // reverted, because the import remains.
+    const call = dash.slice(dash.indexOf('const needsCard = sortCard('),
+                            dash.indexOf('const deadlineCard'));
+    expect(call).toMatch(/: byWorkingOrder,/);
+    expect(call).toMatch(/needsSort === 'date'/);
   });
 
   it('offers the controls as links, so they work with scripting off', () => {
@@ -110,8 +111,11 @@ describe('the dashboard cards can be sorted and opened out', () => {
     // The Deadlines query capped at 15 and the card simply stopped, with
     // nothing saying there was more.
     expect(dash).not.toMatch(/ORDER BY k\.decision_due_at LIMIT 15/);
-    expect(dash).toMatch(/needsToday\.slice\(0, needsRows\)/);
-    expect(dash).toMatch(/sortedDeadlines\.slice\(0, needsRows\)/);
+    // Every card takes its length from the same preference-derived number.
+    for (const card of ['needsCard', 'deadlineCard', 'myCasesCard']) {
+      expect(dash, `${card} does not use the shared row count`)
+        .toMatch(new RegExp(`${card}\\.rows\\.slice\\(0, needsRows\\)`));
+    }
   });
 
   it('takes its row count from the reader’s own preference', () => {
@@ -129,16 +133,20 @@ describe('the dashboard cards can be sorted and opened out', () => {
     expect(rank.indexOf('normal')).toBeLessThan(rank.indexOf('low'));
   });
 
-  it('falls back to the due date when the chosen key ties', () => {
-    // So a control narrows the order rather than replacing it with something
-    // arbitrary — twenty matters at the same priority still read soonest-first.
-    const sorter = dash.slice(dash.indexOf('const sortedDeadlines'), dash.indexOf('dashHref = '));
-    expect(sorter).toMatch(/decision_due_at\)\.localeCompare/);
-    expect((sorter.match(/if \(d !== 0\) return d;/g) ?? []).length).toBe(2);
+  it('gives every card its own place in the address', () => {
+    // So sorting the Deadlines card does not silently reset "Needs you today".
+    for (const pair of [['nk', 'nd'], ['dk', 'dd'], ['mk', 'md']]) {
+      expect(dash, `${pair[0]} is not carried`).toMatch(new RegExp(`key: '${pair[0]}', dir: '${pair[1]}'`));
+      expect(dash).toMatch(new RegExp(`q\\('${pair[0]}'\\)`));
+    }
   });
 
-  it('keeps the other controls when one is used', () => {
-    // Choosing a deadline order must not silently reset "Needs you today".
-    expect(dash).toMatch(/needs: needsSort, deadlines: deadlineSort/);
+  it('offers a sortable heading on all three cards', () => {
+    // The ordinary thing a table does, which is what the practice asked for
+    // when two whole-card orderings turned out to be interchangeable.
+    for (const key of ['due', 'what', 'detail', 'case', 'client', 'status', 'next']) {
+      expect(dash, `no heading sorts by ${key}`).toMatch(new RegExp(`sort: '${key}'`));
+    }
+    expect((dash.match(/sort: \w+Card\.table/g) ?? []).length).toBe(3);
   });
 });
