@@ -1353,19 +1353,39 @@ details[open] > summary { margin-bottom: 12px; }
   gap: 10px; margin: 0 0 4px; padding: 0; border: none;
 }
 .appearance-set legend { padding: 0; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+/* Each option is a submit button, so pressing one *is* choosing it. Styled
+   back to a plain card: a button element carries the browser's own appearance,
+   which on a row of palettes reads as twelve grey rectangles. */
 .appearance-option {
-  display: block; margin: 0; padding: 12px 14px; font-weight: 500; cursor: pointer;
+  display: block; width: 100%; margin: 0; padding: 12px 14px; cursor: pointer;
+  font: inherit; font-weight: 500; text-align: left; color: var(--text);
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  -webkit-appearance: none; appearance: none;
 }
 .appearance-option:hover { border-color: var(--accent); }
 .appearance-option-head { display: flex; align-items: center; gap: 8px; }
-.appearance-option input { width: auto; margin: 0; flex-shrink: 0; }
 .appearance-option-name { font-weight: 650; font-size: 0.92rem; }
-.appearance-option .hint { margin-top: 6px; }
-.appearance-option:has(input:checked) {
+.appearance-option .hint { display: block; margin-top: 6px; }
+.appearance-option:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* The one in use. Marked three ways over, because a border alone is a colour
+   difference and this is the one card in the register where the colours are
+   the subject: the ring, the filled tick, and aria-pressed for a screen
+   reader. */
+.appearance-option[aria-pressed="true"] {
   border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent);
 }
-.appearance-option:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.appearance-tick {
+  width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%;
+  border: 1px solid var(--muted); background: var(--surface);
+}
+.appearance-option[aria-pressed="true"] .appearance-tick {
+  border-color: var(--accent); background: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--surface);
+}
+
+/* Day and night is three short words, not six descriptions. */
+.appearance-set-narrow { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 
 /* The swatch reads its colours from the palette named by its own data-theme
    attribute, so the picker can never drift out of step with the themes. */

@@ -37,6 +37,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.99.2', date: '3 September 2026',
+    notes: [
+      'Themes now apply the moment you press one. Go to your account, press a palette, and the '
+        + 'page comes back in it \u2014 same for light and dark. There is no longer a Save '
+        + 'button, because there is nothing left to save. Pressing a theme leaves your light or '
+        + 'dark choice alone, and the other way round.',
+    ],
+  },
+  {
     version: '0.99.1', date: '3 September 2026',
     notes: [
       'The calendar\u2019s buttons are in a sensible order now \u2014 Week, Month, Year \u2014 '
