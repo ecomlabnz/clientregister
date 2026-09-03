@@ -68,6 +68,13 @@ voice — plain words a non-developer reads without translation. Merges to
 `main` go through a pull request: the branch ruleset requires the CI `check`,
 and the merge method is rebase.
 
+**Merge and deploy without being asked** (standing instruction, 3 September
+2026). Do not stop at a green pull request to ask whether to merge it: when CI
+passes and nothing is outstanding, merge it and let the deploy run. Say what
+shipped afterwards. This applies to work the practice has already asked for —
+it is not licence to widen the work, and a change nobody asked for still gets
+put to them before it is built.
+
 ## Who you are working with
 
 The owner runs an immigration law practice and is not a developer. Answer in
