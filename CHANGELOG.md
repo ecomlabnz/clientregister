@@ -7,6 +7,59 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.96.0 — 3 September 2026
+
+### Added
+- **A calendar.** A month at a glance, an agenda beneath it, and any single day
+  on its own — over the dates the register already owns.
+
+  On it: decision deadlines, tasks, visa, passport and certificate expiries,
+  invoices due, quotes running out and warnings about to lapse — and, which the
+  Alerts page never showed, **what has already happened**: when a matter was
+  lodged, and when it was decided. A calendar that cannot show last month is
+  half a calendar.
+
+  **It holds nothing of its own.** The practice decided against appointments, so
+  every entry belongs to a record and is changed on that record — moving a visa
+  expiry on a calendar would not change when the visa expires. Guarded rather
+  than intended: a test walks both files for any write statement and fails on
+  one, and asserts there is no `appointments` table and no `POST` route.
+
+  **The legend is the filter.** One row of keys under the month, each with a
+  colour and this month's count; click a key and that kind comes off the month.
+  Not a legend nobody reads beside a filter nobody finds.
+
+  **Everyone or Mine.** "Mine" narrows to matters and tasks assigned to you.
+  Client dates — visas, passports, certificates — belong to a client rather than
+  a member of staff, so they step aside in that view rather than being listed
+  under somebody's name. This is the seed of the per-user calendars the practice
+  asked to keep possible: a filter value, not a second page.
+
+  **Modular by construction.** Each kind of date is a source in a registry — a
+  label, a colour, and a function returning events between two dates. Adding a
+  new kind is one entry in that list, not an edit to a query eleven things
+  depend on. A source that fails is dropped and logged rather than taking the
+  page down: a calendar missing one kind of date is still a calendar, and a
+  blank page is not.
+
+  **No script at all.** Every control is a link — months, filters, days — which
+  the content-security policy would require in any case. Below 780px the grid
+  steps aside and the agenda takes over: seven columns do not fit a phone.
+
+  The month arithmetic is its own file so the awkward cases could be tested
+  directly: a month starting on a Sunday (six leading blanks, not none — the
+  case a naive implementation gets exactly wrong), a 31-day month starting on a
+  Saturday (six rows, not five), leap Februaries including the 1900 and 2000
+  century rule, and the assertion that every day of the month appears exactly
+  once. A day dropped from a grid is a deadline nobody sees.
+
+### Changed
+- The navigation bar's ceiling moves from eight items to nine, to make room. It
+  was raised on a measurement rather than as an allowance: the nine-item bar
+  holds a single line at every width from 780px — where the mobile navigation
+  takes over — to 1680px, checked in Chromium. The alternative was demoting
+  Alerts, which the register's own rule keeps one glance away.
+
 ## 0.95.0 — 3 September 2026
 
 ### Fixed

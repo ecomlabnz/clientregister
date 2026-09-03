@@ -37,6 +37,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.96.0', date: '3 September 2026',
+    notes: [
+      'A calendar. Your month laid out \u2014 deadlines, tasks, visa and passport and certificate '
+        + 'expiries, invoices, and what already happened: when each matter was lodged and decided. '
+        + 'The coloured keys under the month are the filter: click one to take that kind off. '
+        + '\u201cMine\u201d narrows it to your own matters and tasks. On a phone the month steps '
+        + 'aside and the list takes over.',
+      'It changes nothing. Every date on it belongs to a record, and is edited on that record.',
+    ],
+  },
+  {
     version: '0.95.0', date: '3 September 2026',
     notes: [
       'The dashboard now leads with what is actually late. It was sorting by date alone, so an old '
@@ -1861,6 +1872,31 @@ function sections(origin: string): Section[] {
         <p class="hint">Reading data back in is a separate job and is not built. An import has to
            decide what to do about records that already exist, and getting that wrong is worse than
            not having it.</p>`,
+    },
+    {
+      id: 'calendar',
+      title: 'Calendar',
+      body: html`
+        <p>Your dates laid out as a month. Everything the register already knows falls on it —
+           decision deadlines, tasks, visa and passport and certificate expiries, invoices due,
+           quotes running out, warnings about to lapse — plus what has already happened: when a
+           matter was lodged, and when it was decided.</p>
+        <p><strong>It holds nothing of its own.</strong> Every entry belongs to a record, and is
+           changed on that record. Moving a visa expiry on a calendar would not change when the
+           visa expires, so the calendar does not offer to.</p>
+        <p><strong>The colours are the filter.</strong> The row of keys under the month is not
+           just a legend: click one and that kind comes off the month, click it again and it
+           comes back. The number beside each says how many there are this month.</p>
+        <p><strong>Everyone or just yours.</strong> "Mine" narrows it to matters and tasks
+           assigned to you. Client dates — visas, passports, certificates — belong to a client
+           rather than to a person, so they step aside in that view rather than being listed
+           under somebody's name.</p>
+        <p>Click a day with something on it to see that day on its own. Under the month there is
+           always the full list in order, which is what you get on a phone: seven columns do not
+           fit a phone screen, so the month steps aside and the list takes over.</p>
+        <p>Move by month with the arrows, or press <strong>This month</strong> to come back. The
+           month you are looking at is in the address, so a particular month can be bookmarked
+           or sent to somebody.</p>`,
     },
     {
       id: 'alerts',
