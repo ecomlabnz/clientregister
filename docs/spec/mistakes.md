@@ -351,3 +351,14 @@ Ranked by how often each one earned its keep here:
 5. **Execute the SQL** rather than mocking it.
 6. **Look at it in a browser**, at phone width, with scripting off.
 7. **Say the numbers out loud before and after**, and reconcile every one.
+
+**The one that keeps failing this list: a test that reads the source.** Three
+times now a test has asserted that a handler's source *contains* something — a
+function call, a permission, a string — and passed while the behaviour was
+broken. The archive routes were the plainest case: the handler was changed to
+call the re-check and then ignore what it said, so a client whose matter had
+been reopened would have been archived, and every one of the five tests
+guarding those routes still passed. A source match proves the words are in the
+file, nothing more. Where a route can be mounted and posted to, post to it and
+read the database afterwards; keep source-reading for the few things that
+genuinely are about the text (a forbidden import, a secret in a file).
