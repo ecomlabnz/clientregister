@@ -849,6 +849,20 @@ details[open] > summary { margin-bottom: 12px; }
 }
 .tabs-sub .tab.current { background: var(--blue-bg); border-color: transparent; color: var(--accent); }
 
+/* A breath between two groups of tabs in one bar — which view you are in, and
+   whose things are on it. Not a rule, which would read as a heavier division
+   than it is.
+
+   Measured in Chromium at 360, 500, 700, 721, 900 and 1400px: the bar is one
+   line from 500px up, and at 360px it wraps with the gap trailing the first
+   line and "Everyone" starting the second flush left. So it never leaves a
+   dent at the start of a line. If a tab is ever added to either group, measure
+   again — a spacer that lands first on a wrapped line would show. */
+.tab-gap { flex: 0 0 22px; }
+/* "Today" is a jump, not a view, so it never takes the current-tab treatment
+   even when you are already looking at today. */
+.tab-now { font-weight: 600; }
+
 /*
  * A tab bar stays under the navigation while its page scrolls.
  *

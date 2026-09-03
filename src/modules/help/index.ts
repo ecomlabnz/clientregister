@@ -37,6 +37,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.99.1', date: '3 September 2026',
+    notes: [
+      'The calendar\u2019s buttons are in a sensible order now \u2014 Week, Month, Year \u2014 '
+        + 'and the stray button on the far right has gone. In its place there is one '
+        + '\u201cToday\u201d button sitting with the others: press it from anywhere and you land '
+        + 'on today, in whichever view you are already using, with your filters kept.',
+    ],
+  },
+  {
     version: '0.99.0', date: '3 September 2026',
     notes: [
       'Clients has a new view, \u201cFinished with?\u201d, for people whose matters are all '
