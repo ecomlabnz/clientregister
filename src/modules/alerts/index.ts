@@ -31,6 +31,8 @@ export type AlertKind =
   | 'quiet'
   /** A matter whose own recorded facts disagree with each other. */
   | 'contradiction'
+  /** Mail is set up and the poll is running, but nothing has arrived. */
+  | 'mail_quiet'
   /** Lodged with INZ, but no application number was ever written down. */
   | 'unacknowledged'
   /** A task that leaves no working time before the deadline it serves. */
@@ -51,6 +53,48 @@ export interface Alert {
   href: string;
 }
 
+/**
+ * Whether an alert's `date` is a deadline or a provenance.
+ *
+ * The two are not comparable, and treating them as one field sorted by date is
+ * what put a 2024 lodgement at the top of "Needs you today" above a reply due
+ * this afternoon. The practice said so on 3 September: *"there are some old
+ * ones for closed cases — yes they need to be attended to but the priority is
+ * so low."*
+ *
+ *   - **`due`** — the date is when the thing must be done. A visa expiry, a
+ *     decision deadline, a task. Older means more overdue, so oldest first is
+ *     right, and being old is exactly what makes it urgent.
+ *   - **`wrong`** — the date is only *when the record was made*. A matter that
+ *     says approved with no decision date has been wrong since it was lodged;
+ *     that lodgement date says nothing about how pressing it is. These are
+ *     real work and must not be hidden, but they do not compete with today.
+ *
+ * So: everything `due` first, oldest first; everything `wrong` after it,
+ * newest first — because a record that went wrong yesterday is likelier to be
+ * a live mistake than one that has been wrong for two years.
+ */
+export function alertTiming(kind: AlertKind): 'due' | 'wrong' {
+  switch (kind) {
+    case 'case_deadline': case 'task': case 'document': case 'quote': case 'no_slack':
+      return 'due';
+    default:
+      return 'wrong';
+  }
+}
+
+/**
+ * The order a working morning wants: what is late or due today, then what is
+ * merely wrong. Exported so the dashboard and the alerts page cannot drift into
+ * two different ideas of what "first" means.
+ */
+export function byWorkingOrder(a: Alert, b: Alert): number {
+  const at = alertTiming(a.kind);
+  const bt = alertTiming(b.kind);
+  if (at !== bt) return at === 'due' ? -1 : 1;
+  return at === 'due' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
+}
+
 const KIND_LABELS: Record<AlertKind, string> = {
   case_deadline: 'Case deadline',
   task: 'Task',
@@ -58,6 +102,7 @@ const KIND_LABELS: Record<AlertKind, string> = {
   quote: 'Quote expiry',
   quiet: 'Gone quiet',
   contradiction: 'Does not add up',
+  mail_quiet: 'No mail arriving',
   unacknowledged: 'Not acknowledged',
   no_slack: 'No room to act',
   status_unknown: 'Status not recorded',
@@ -342,6 +387,73 @@ export const CHECKS_NOT_ABOUT_A_DATE = {
         ORDER BY ref LIMIT 100`,
 };
 
+/**
+ * Mail is configured, the poll is running, and nothing is arriving.
+ *
+ * This is the one check that fires on an **absence**, and it exists because an
+ * absence was invisible. On 3 September the practice's domain had no SPF record,
+ * so Gmail refused every message forwarded into the polled mailbox and the
+ * register's Incoming quietly thinned out. Nothing in the register looked wrong:
+ * an empty inbox is exactly what a quiet week looks like. It was found only when
+ * a sender showed the practice the bounce.
+ *
+ * Three things have to be true together, and the third is what makes it a
+ * finding rather than a guess:
+ *
+ *   1. Mail is set up at all — no alert on a register that does not poll.
+ *   2. The poll is **alive**, having run within the hour. Without this the alert
+ *      would fire on a worker that is simply not running, which is a different
+ *      fault with a different fix, and saying the wrong one wastes an hour.
+ *   3. Nothing has been captured for longer than the practice's threshold.
+ *
+ * Poll alive + nothing arriving is the signature of the delivery path being
+ * broken upstream: forwarding, authentication, a filter. That is what to look
+ * at, and the alert says so.
+ */
+async function mailQuietAlert(env: Env, today: string): Promise<Alert[]> {
+  const quietDays = Number(
+    await settingValue(env, ALERT_SETTINGS.settings.find((d) => d.key === 'alerts.mail_quiet_days')!),
+  ) || 3;
+  if (quietDays <= 0) return [];
+
+  const rows = await all<{ key: string; value: string }>(
+    env.DB,
+    `SELECT key, value FROM settings
+      WHERE key IN ('ingest.last_poll_at', 'ingest.last_capture_at')`);
+  const at = (key: string) => rows.find((r) => r.key === key)?.value ?? null;
+  const lastPoll = at('ingest.last_poll_at');
+  const lastCapture = at('ingest.last_capture_at');
+
+  // Never polled: mail is not set up, or has never run. Not this alert's
+  // business — there is nothing to say "has stopped" about.
+  if (!lastPoll) return [];
+
+  // The poll itself is not running. A different fault, and the register cannot
+  // tell from here whether mail is arriving, so it says nothing rather than
+  // pointing at the wrong thing.
+  const pollAgeMinutes = (Date.parse(`${today}T23:59:59Z`) - Date.parse(lastPoll)) / 60_000;
+  if (!Number.isFinite(pollAgeMinutes) || pollAgeMinutes > 24 * 60) return [];
+
+  const since = lastCapture ? lastCapture.slice(0, 10) : null;
+  if (since && daysBetween(since, today) < quietDays) return [];
+  if (!since) return [];
+
+  const quietFor = daysBetween(since, today);
+  return [{
+    kind: 'mail_quiet',
+    // Louder the longer it runs. Post that is not arriving is post the practice
+    // does not know it is missing.
+    severity: quietFor >= quietDays * 2 ? 'overdue' : 'urgent',
+    date: since,
+    title: 'No mail has arrived',
+    detail: `The mailbox has been checked as usual, but nothing has come in for `
+      + `${quietFor} days — last on ${dateShort(since)}. The checking is working, so `
+      + `look at what happens before it: forwarding from the practice address, and the `
+      + `domain's SPF, DKIM and DMARC records. See docs/email-setup.md.`,
+    href: '/admin/maintenance',
+  }];
+}
+
 /** Everything with a date attached, in one list. */
 export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]> {
   const { today, horizon } = window(horizonDays);
@@ -400,7 +512,13 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
     all<any>(env.DB, CHECKS_NOT_ABOUT_A_DATE.expiryUnfixed()),
   ]);
 
+  // Fired on an absence rather than on a row, so it is assembled rather than
+  // queried, and it is the last thing collected because it depends on nothing
+  // above it.
+  const mailQuiet = await mailQuietAlert(env, today);
+
   const alerts: Alert[] = [
+    ...mailQuiet,
     ...cases.map((k: any) => ({
       kind: 'case_deadline' as const,
       severity: severityFor(k.decision_due_at, today),
@@ -530,6 +648,13 @@ export const ALERT_SETTINGS: SettingsGroup = {
     { key: 'alerts.urgent_days', type: 'integer', label: 'Treat as urgent within (days)',
       default: '14', min: 1, max: 90,
       help: 'Anything due inside this window is counted as pressing rather than upcoming.' },
+    { key: 'alerts.mail_quiet_days', type: 'integer',
+      label: 'Warn when no mail has arrived for (days)',
+      default: '3', min: 1, max: 60,
+      help: 'The register checks the mailbox every few minutes. If the checking is working but '
+        + 'nothing has come in for this many days, something before it is probably broken — '
+        + 'forwarding, or the domain\u2019s mail records. Set to the longest quiet spell that '
+        + 'would not worry you.' },
     { key: 'alerts.certificate_notice_days', type: 'integer',
       label: 'Warn about an expiring certificate (days ahead)',
       default: '30', min: 7, max: 180,

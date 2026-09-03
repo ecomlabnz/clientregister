@@ -31,6 +31,7 @@ import { accessToken, type GmailCredentials } from '../mail/gmail';
 import { allowList, captureMessage, isAllowed } from './pipeline';
 import { parseInboundEmail } from './email';
 import { audit } from '../core/audit';
+import { nowIso, run } from '../core/db';
 
 /**
  * How often the mailbox is read. Must match the entry in `wrangler.jsonc`, and
@@ -191,6 +192,38 @@ export async function pollInbox(env: Env): Promise<PollResult | null> {
       actorLabel: 'channel:email',
       meta: { ...result, mailbox: creds.address },
     });
+  }
+
+  /*
+   * A heartbeat, written on every poll including the quiet ones.
+   *
+   * Until this existed, a poll that found nothing left no trace at all, so
+   * "the poll ran and the mailbox was empty" and "the poll is not running"
+   * looked exactly the same from inside the register. On 3 September the
+   * practice's domain had no SPF record, Gmail refused every forwarded message,
+   * and the register's Incoming quietly thinned out. Nobody could tell, because
+   * an empty inbox is what a quiet week looks like too. It was found when a
+   * sender showed the practice the bounce.
+   *
+   * Two rows, not an audit entry: the poll runs every five minutes, and an
+   * audit row each time would be a hundred thousand a year saying nothing
+   * happened. These are overwritten, and the pair is what the check needs — one
+   * says the poll is alive, the other says when mail last actually arrived.
+   */
+  const at = nowIso();
+  await run(
+    env.DB,
+    `INSERT INTO settings (key, value, updated_at) VALUES ('ingest.last_poll_at', ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    at, at,
+  );
+  if (result.captured > 0) {
+    await run(
+      env.DB,
+      `INSERT INTO settings (key, value, updated_at) VALUES ('ingest.last_capture_at', ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      at, at,
+    );
   }
   return result;
 }
