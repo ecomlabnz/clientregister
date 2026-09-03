@@ -7,6 +7,59 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.95.0 — 3 September 2026
+
+### Fixed
+- **The dashboard was leading with the least urgent thing on it.** "Needs you
+  today" sorted by date alone, so the oldest row came first whatever it was —
+  and a matter lodged in 2024 whose record contradicts itself carries a 2024
+  date. It sat above a reply due this afternoon, permanently.
+
+  The cause was one field carrying two meanings. An alert's date is a
+  **deadline** on a task or an expiry, and merely **when the record was made**
+  on a finding that something is wrong. Sorted together, a lodgement date was
+  being compared with a due date, which is not a comparison at all.
+
+  Now: everything actually due comes first, most overdue at the top; everything
+  that is merely wrong follows, newest first — because a record that went wrong
+  last week is likelier to be a live mistake than one that has been wrong for
+  two years. **Nothing is hidden**; the complaint was about priority, not about
+  wanting those rows gone.
+
+### Added
+- **The dashboard cards can be sorted and opened out.** "Needs you today" offers
+  *What is late first* or *Oldest date first*; Deadlines offers *Soonest*,
+  *Priority* or *Client*, and a choice narrows the order rather than replacing
+  it — twenty matters at one priority still read soonest-first. Every control is
+  an ordinary link, so they work with scripting switched off.
+- **A card no longer stops at a number nobody chose.** Deadlines was capped at
+  fifteen in its query and simply ended, with nothing saying there was more; the
+  cards now follow the reader's own **Rows per page** preference, show their
+  full count in the heading, and offer *Show all*.
+- **An alert when mail stops arriving.** The register checks the mailbox every
+  few minutes; if the checking is working but nothing has come in for a few days,
+  something before it is broken. That is what happened on 3 September — the
+  practice's domain had no SPF record, Gmail refused every forwarded message, and
+  Incoming quietly thinned out with nothing in the register looking wrong. An
+  empty inbox is what a quiet week looks like too.
+
+  Two things had to change. A poll that found nothing previously recorded
+  **nothing at all**, so "the poll ran and the mailbox was empty" and "the poll
+  is not running" were indistinguishable; each poll now leaves a heartbeat. And
+  the alert fires only when the poll is *alive* and nothing has arrived — poll
+  running plus no mail is the signature of the delivery path being broken
+  upstream, and the alert says to look at forwarding and the domain's mail
+  records. How many days counts as quiet is a setting.
+
+### Documentation
+- `docs/calendar-scope.md` — the calendar, scoped and not yet built. It records
+  that `collectAlerts()` already returns something shaped exactly like a calendar
+  event, so the calendar must render that collector rather than write its own
+  queries; counts the 190 dated things the register holds today; names the one
+  thing genuinely missing (a table for a date the practice *chooses* — a
+  consultation, a hearing); and ends in three questions for the practice,
+  including why an Outlook-subscribable feed deserves its own decision.
+
 ## 0.94.0 — 2 September 2026
 
 ### Added
