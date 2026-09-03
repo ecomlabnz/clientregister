@@ -182,7 +182,8 @@ src/
   modules/        one folder per feature
   ui/             html escaping, layout, components, formatting
 migrations/       numbered, forward-only, applied by CI before deploy
-test/             ~330 tests: pure logic, schema guarantees, CSS invariants
+test/             1,373 tests: pure logic, schema guarantees, browser rules,
+                  and every route exercised through the real handler
 ```
 
 **Nightly** (`scheduled`): flush the mail queue, expire stale quotes, reconcile
@@ -201,6 +202,14 @@ new timing by morning. Work somebody has already done is left alone.
 Push to `main` → GitHub Actions runs typecheck, tests, `d1 migrations apply
 --remote`, `wrangler deploy`, then syncs secrets. Migrations are forward-only
 and numbered; they run before the code that needs them.
+
+**One Worker, one database, one practice.** When the register is sold to another
+practice it gets a deployment of its own rather than a share of this one — the
+decision of 3 September 2026, and the reasoning is in
+[CLAUDE.md](CLAUDE.md#one-practice-one-database). So no table carries a tenant
+column and no query carries a tenant clause: the database boundary is the tenant
+boundary. Anything that differs between practices belongs in `settings` or a
+vocabulary, both of which already live inside the practice's own database.
 
 ## Testing
 
