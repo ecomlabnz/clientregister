@@ -7,6 +7,39 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.99.0 — 3 September 2026
+
+### Added
+- **A way to find the clients the practice has finished with, and archive them
+  together.** Raised by the practice: *"some of the visa expiries we cannot
+  handle — as the clients move on."* An expired visa on somebody who left the
+  country two years ago goes on raising an alert for ever, and there was no way
+  to say so except one client at a time.
+
+  A fifth view on Clients, **Finished with?**, which appears only when there is
+  somebody in it. Three things have to be true together, and all three are
+  needed:
+
+  1. **No live matter** — not merely no open case, but nothing at any working
+     status. A matter still being prepared means the person is here.
+  2. **At least one expired document** — otherwise a client taken on this
+     morning, with nothing on file yet, is proposed on their first day.
+  3. **Nothing still in date** — a passport good until 2029 says somebody
+     expects to use it. One live document keeps a person off the list.
+
+  Documents means all three kinds that carry a date: the current visa, a
+  passport still held, and a certificate.
+
+  Archiving is a status change, not a deletion: the file, the matters, the notes
+  and the history all stay, and changing the status back brings everything with
+  it. Each client archived gets the same note on the file and the same audit row
+  that archiving them by hand would have written, marked as part of a batch.
+
+  Two steps, both a page rather than a dialog, because the register works with
+  scripting switched off. Between them the list is read again from the database
+  — somebody may have opened a matter for one of them since the page was drawn,
+  and the person pressing the button cannot see that.
+
 ## 0.98.0 — 3 September 2026
 
 ### Added
