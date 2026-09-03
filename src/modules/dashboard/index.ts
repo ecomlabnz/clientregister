@@ -28,6 +28,7 @@ import { byWorkingOrder, collectAlerts, documentAlerts, type Alert } from '../al
 import { CHANNEL_LABELS } from '../../core/channels';
 import { preferencesFor } from '../../core/preferences';
 import { pageSizeFor } from '../../ui/pager';
+import { sortCard } from '../../ui/cardsort';
 
 export const dashboardModule: AppModule = {
   name: 'dashboard',
@@ -163,6 +164,7 @@ export const dashboardModule: AppModule = {
        * reader can override it with the control on the card.
        */
       const needsSort = c.req.query('needs') === 'date' ? 'date' : 'working';
+      const q = (k: string) => c.req.query(k);
       /*
        * How many rows a dashboard card shows before it says "show all".
        *
@@ -178,37 +180,92 @@ export const dashboardModule: AppModule = {
       // own ranking rather than alphabetically — "urgent" must not sort under
       // "high" because u comes after h.
       const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
-      const deadlineSort = ['priority', 'client'].includes(c.req.query('deadlines') ?? '')
-        ? c.req.query('deadlines')! : 'due';
-      const sortedDeadlines = [...deadlines].sort((a: any, b: any) => {
-        if (deadlineSort === 'priority') {
-          const d = (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9);
-          // Same priority falls back to the due date, so the control narrows
-          // the order rather than replacing it with something arbitrary.
-          if (d !== 0) return d;
-        }
-        if (deadlineSort === 'client') {
-          const d = String(a.client_name).localeCompare(String(b.client_name));
-          if (d !== 0) return d;
-        }
-        return String(a.decision_due_at).localeCompare(String(b.decision_due_at));
-      });
 
-      /** One spelling of this page's address, so a control keeps the others. */
+      /**
+       * One spelling of this page's address, so a control never clears another.
+       *
+       * Reads the query directly rather than the card objects: a card's
+       * direction is derived from the query anyway, and taking it from the card
+       * would make the two define each other.
+       */
       const dashHref = (over: Record<string, string>) => {
-        const p = new URLSearchParams({
-          needs: needsSort, deadlines: deadlineSort,
-          ...(needsShowAll ? { rows: 'all' } : {}), ...over,
+        const params = new URLSearchParams({
+          needs: needsSort,
+          ...(q('nk') ? { nk: q('nk')!, nd: q('nd') === 'desc' ? 'desc' : 'asc' } : {}),
+          ...(q('dk') ? { dk: q('dk')!, dd: q('dd') === 'desc' ? 'desc' : 'asc' } : {}),
+          ...(q('mk') ? { mk: q('mk')!, md: q('md') === 'desc' ? 'desc' : 'asc' } : {}),
+          ...(needsShowAll ? { rows: 'all' } : {}),
+          ...over,
         });
-        for (const [k, v] of [...p]) if (!v) p.delete(k);
-        const q = p.toString();
-        return q ? `/?${q}` : '/';
+        for (const [k, v] of [...params]) if (!v) params.delete(k);
+        const query = params.toString();
+        return query ? `/?${query}` : '/';
       };
-      const needsToday = [...everything, ...overdueInvoices]
-        .filter((a) => a.date <= today)
-        .sort(needsSort === 'date'
-          ? (a, b) => a.date.localeCompare(b.date)
-          : byWorkingOrder);
+
+      /*
+       * What bites today, in the order a working morning wants it.
+       *
+       * Sorted by date alone this put the oldest thing first whatever it was —
+       * and a matter lodged in 2024 whose record contradicts itself carries a
+       * 2024 date, so it sat above a reply due this afternoon, permanently.
+       * `byWorkingOrder` separates a date that is a deadline from one that is
+       * only when the record was made.
+       */
+      const needsToday = [...everything, ...overdueInvoices].filter((a) => a.date <= today);
+
+      /*
+       * Each card sorts by its own column and keeps its own place in the
+       * address, so one card's ordering never resets another's. The practice
+       * asked for this having found the two orderings interchangeable — both
+       * were by date, so a visa expiry five hundred days overdue led the list
+       * either way.
+       */
+      const needsCard = sortCard(
+        needsToday,
+        [
+          { key: 'due', value: (a: Alert) => a.date },
+          { key: 'what', value: (a: Alert) => a.title },
+          { key: 'detail', value: (a: Alert) => a.detail },
+        ],
+        { key: q('nk'), dir: q('nd') },
+        dashHref,
+        { key: 'nk', dir: 'nd' },
+        needsSort === 'date'
+          ? (a: Alert, b: Alert) => a.date.localeCompare(b.date)
+          : byWorkingOrder,
+      );
+
+      const deadlineCard = sortCard(
+        deadlines as any[],
+        [
+          { key: 'due', value: (k: any) => String(k.decision_due_at) },
+          { key: 'case', value: (k: any) => String(k.title) },
+          { key: 'client', value: (k: any) => String(k.client_name) },
+          { key: 'status', value: (k: any) => String(k.status) },
+          { key: 'priority', value: (k: any) => PRIORITY_RANK[k.priority] ?? 9 },
+        ],
+        { key: q('dk'), dir: q('dd') },
+        dashHref,
+        { key: 'dk', dir: 'dd' },
+        // Soonest first when nothing is chosen: a deadline card is read for
+        // what bites next.
+        (a: any, b: any) => String(a.decision_due_at).localeCompare(String(b.decision_due_at)),
+      );
+
+      const myCasesCard = sortCard(
+        myCases as any[],
+        [
+          { key: 'case', value: (k: any) => String(k.title) },
+          { key: 'client', value: (k: any) => String(k.client_name) },
+          { key: 'status', value: (k: any) => String(k.status) },
+          // A matter with no next action sorts last rather than first: nothing
+          // planned is not the most pressing thing on the list.
+          { key: 'next', value: (k: any) => k.next_action_due ?? null },
+        ],
+        { key: q('mk'), dir: q('md') },
+        dashHref,
+        { key: 'mk', dir: 'md' },
+      );
 
       const weekAway = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
       // Two degrees rather than one: already late, and late this week.
@@ -256,10 +313,11 @@ export const dashboardModule: AppModule = {
                        is worse than no control. */}
               <div class="filters">
                 <span class="hint">Order:</span>
-                <a class="${needsSort === 'working' ? 'btn btn-primary btn-small' : 'btn btn-secondary btn-small'}"
-                   href="${dashHref({ needs: 'working' })}">What is late first</a>
-                <a class="${needsSort === 'date' ? 'btn btn-primary btn-small' : 'btn btn-secondary btn-small'}"
-                   href="${dashHref({ needs: 'date' })}">Oldest date first</a>
+                <a class="${needsSort === 'working' && !needsCard.key ? 'btn btn-primary btn-small' : 'btn btn-secondary btn-small'}"
+                   href="${dashHref({ needs: 'working', nk: '', nd: '' })}">What is late first</a>
+                <a class="${needsSort === 'date' && !needsCard.key ? 'btn btn-primary btn-small' : 'btn btn-secondary btn-small'}"
+                   href="${dashHref({ needs: 'date', nk: '', nd: '' })}">Oldest date first</a>
+                <span class="hint">or click a heading</span>
                 ${needsToday.length > needsRows
                   ? html`<a class="btn btn-link" href="${dashHref({ rows: 'all' })}">
                            Show all ${String(needsToday.length)}</a>`
@@ -268,17 +326,17 @@ export const dashboardModule: AppModule = {
                     : ''}
               </div>
               ${table([
-              { label: 'Due', width: '16' },
-              { label: 'What', width: '50' },
-              { label: 'Detail', width: '34', hideOn: 'sm' },
-            ], needsToday.slice(0, needsRows).map((a) => html`
+              { label: 'Due', width: '16', sort: 'due' },
+              { label: 'What', width: '50', sort: 'what' },
+              { label: 'Detail', width: '34', hideOn: 'sm', sort: 'detail' },
+            ], needsCard.rows.slice(0, needsRows).map((a) => html`
               <tr class="${a.date < today ? 'row-urgent' : ''}">
                 <td class="small ${a.date < today ? 'warn' : ''}">${dateShort(a.date)}
                   <div class="muted">${relativeDays(a.date)}</div></td>
                 <td><a class="clamp-2" href="${a.href}">${a.title}</a>
                   <div class="row-meta show-sm"><span class="muted">${a.detail}</span></div></td>
                 <td class="small muted col-sm-hide clamp-2">${a.detail}</td>
-              </tr>`), { fixed: true })}`)}
+              </tr>`), { fixed: true, sort: needsCard.table })}`)}
 
         <div class="cols">
           <div class="col-main">
@@ -286,19 +344,20 @@ export const dashboardModule: AppModule = {
               ? emptyState('No dated deadlines on open cases.')
               : html`
               <div class="filters">
-                <span class="hint">Order:</span>
-                ${([['due', 'Soonest first'], ['priority', 'Priority'], ['client', 'Client']] as const)
-                  .map(([id, label]) => html`
-                    <a class="${deadlineSort === id ? 'btn btn-primary btn-small' : 'btn btn-secondary btn-small'}"
-                       href="${dashHref({ deadlines: id })}">${label}</a>`)}
+                <span class="hint">Click a heading to sort.</span>
                 ${deadlines.length > needsRows
                   ? html`<a class="btn btn-link" href="${dashHref({ rows: 'all' })}">
                            Show all ${String(deadlines.length)}</a>`
                   : ''}
               </div>
               ${table(
-              ['Due', 'Case', 'Client', 'Status'],
-              sortedDeadlines.slice(0, needsRows).map((d: any) => html`
+              [
+                { label: 'Due', sort: 'due' },
+                { label: 'Case', sort: 'case' },
+                { label: 'Client', sort: 'client' },
+                { label: 'Status', sort: 'status' },
+              ],
+              deadlineCard.rows.slice(0, needsRows).map((d: any) => html`
                 <tr class="${isOverdue(d.decision_due_at) ? 'row-urgent' : ''}">
                   <td class="small ${isOverdue(d.decision_due_at) ? 'warn' : ''}">
                     ${dateShort(d.decision_due_at)}<div class="muted">${relativeDays(d.decision_due_at)}</div></td>
@@ -308,6 +367,7 @@ export const dashboardModule: AppModule = {
                   <td>${badge(CASE_STATUS_LABELS[d.status as keyof typeof CASE_STATUS_LABELS] ?? d.status, statusTone(d.status))}
                       ${DEADLINE_CASE_STATUSES.includes(d.status) ? badge('response required', 'red') : ''}</td>
                 </tr>`),
+              { sort: deadlineCard.table },
             )}`)}
 
             ${card('Tasks due or overdue', overdueTasks.length === 0 ? emptyState('Nothing due.') : table(
@@ -322,9 +382,15 @@ export const dashboardModule: AppModule = {
                 </tr>`),
             ))}
 
-            ${card('My open cases', myCases.length === 0 ? emptyState('Nothing assigned to you.') : table(
-              ['Case', 'Client', 'Status', 'Next action'],
-              myCases.map((k: any) => html`
+            ${card(`My open cases — ${myCases.length}`, myCases.length === 0
+              ? emptyState('Nothing assigned to you.') : table(
+              [
+                { label: 'Case', sort: 'case' },
+                { label: 'Client', sort: 'client' },
+                { label: 'Status', sort: 'status' },
+                { label: 'Next action', sort: 'next' },
+              ],
+              myCasesCard.rows.slice(0, needsRows).map((k: any) => html`
                 <tr>
                   <td><a href="/cases/${k.id}">${k.title}</a>${caseSubline(k.descriptor, k.ref)}</td>
                   <td class="small">${k.client_name}</td>
@@ -332,6 +398,7 @@ export const dashboardModule: AppModule = {
                   <td class="small">${k.next_action ? html`${truncate(k.next_action, 50)}
                     <div class="muted">${dateShort(k.next_action_due)}</div>` : '—'}</td>
                 </tr>`),
+              { sort: myCasesCard.table },
             ))}
           </div>
 
