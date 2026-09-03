@@ -16,6 +16,7 @@
  */
 
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
 import { searchTerms } from '../../core/search';
@@ -66,6 +67,7 @@ import {
   setPrimaryPassport, updatePassport,
 } from '../../core/passports';
 import { composeFullName, familyNameFor, plainAscii, splitFullName, type ClientKind } from '../../core/names';
+import { dormantClients, stillDormant, type DormantClient } from '../../core/dormant';
 import {
   fetchEntity, isValidNzbnFormat, normaliseNzbn, nzbnConfigured, searchEntities,
 } from '../../integrations/nzbn';
@@ -484,6 +486,77 @@ export const CLIENT_SORTS: Record<string, string[]> = {
   updated: ['c.updated_at'],
 };
 
+/**
+ * The "Finished with?" view: clients who look done, and a way to say so.
+ *
+ * Its own renderer rather than a branch inside the main list, because it
+ * answers a different question and shows different columns — how much has
+ * expired and when, rather than contact details.
+ */
+function renderDormant(c: Context<AppContext>, rows: DormantClient[], q: string) {
+  const csrf = c.get('session')!.csrf;
+  const writable = can(c.get('user'), 'register:write');
+  const shown = q
+    ? rows.filter((r) => `${r.full_name} ${r.ref}`.toLowerCase().includes(q.toLowerCase()))
+    : rows;
+
+  return page(c, { title: 'Clients — finished with?', active: '/clients' }, html`
+    ${pageHeader('Finished with?',
+      'Every matter closed, and everything on file expired. Until somebody says otherwise these '
+      + 'go on raising expiry alerts for ever.')}
+
+    <nav class="tabs">
+      <a class="tab" href="/clients">← Back to clients</a>
+      <a class="tab current">Finished with? ${String(rows.length)}</a>
+    </nav>
+
+    ${rows.length === 0
+      ? emptyState('Nobody looks finished with. Every client either has a matter running or '
+          + 'something still in date.')
+      : html`
+        <p class="hint">Archiving stops the alerts. <strong>Nothing is deleted</strong> — the
+           file, the matters and the notes all stay, and changing the status back brings them
+           with it. Anyone who has a matter running again is left out automatically.</p>
+
+        <form method="get" action="/clients" class="filters" data-live-search>
+          <input type="hidden" name="view" value="dormant">
+          <input type="search" name="q" value="${q}" placeholder="Search name or reference">
+          <button class="btn btn-secondary js-hide" type="submit">Filter</button>
+        </form>
+
+        <form method="post" action="/clients/archive" id="dormant-form">
+          ${csrfField(csrf)}
+          ${table([
+            { label: raw('<span class="sr-only">Select</span>'), width: '4' },
+            { label: 'Client', width: '34' },
+            { label: 'Expired', width: '14' },
+            { label: 'Last expiry', width: '18' },
+            { label: 'Matters', width: '14', hideOn: 'sm' },
+            { label: 'Status', width: '16', hideOn: 'sm' },
+          ], shown.map((r) => html`
+            <tr>
+              <td>${writable
+                ? html`<input type="checkbox" name="id" value="${r.id}" form="dormant-form"
+                              aria-label="${`Select ${r.full_name}`}">`
+                : ''}</td>
+              <td><a href="/clients/${r.id}">${r.full_name}</a>
+                  <div class="muted small"><code>${r.ref}</code></div></td>
+              <td>${badge(`${r.expired} expired`, r.expired > 2 ? 'red' : 'amber')}</td>
+              <td class="small">${dateShort(r.last_expiry)}
+                  <div class="muted">${relativeDays(r.last_expiry)}</div></td>
+              <td class="small col-sm-hide">${String(r.matters)}, all finished</td>
+              <td class="col-sm-hide">${badge(
+                CLIENT_STATUS_LABELS[r.status as ClientStatus] ?? r.status,
+                statusTone(r.status))}</td>
+            </tr>`), { fixed: true, empty: 'Nobody matches that.' })}
+          ${writable && shown.length ? html`
+            <div class="filters mt">
+              <button class="btn btn-primary" type="submit">Archive selected</button>
+              <span class="hint">You will be shown exactly who before anything happens.</span>
+            </div>` : ''}
+        </form>`}`);
+}
+
 export const clientsModule: AppModule = {
   name: 'clients',
   title: 'Clients',
@@ -510,6 +583,22 @@ export const clientsModule: AppModule = {
       // because in practice you are either working a pipeline or looking for a
       // person or a company, and those are different errands.
       const view = c.req.query('view') ?? prefs['pref.clients_view'] ?? 'individuals';
+
+      /*
+       * "Finished with?" is a proposal, not a filter over the same rows.
+       *
+       * A person whose matters are all closed and whose documents have all
+       * expired goes on raising alerts for ever, and the practice said so:
+       * *"some of the visa expiries we cannot handle — as the clients move
+       * on."* This view finds them; archiving them silences the alerts without
+       * deleting anything. The register never archives anybody on its own.
+       */
+      if (view === 'dormant') {
+        const today = new Date().toISOString().slice(0, 10);
+        const candidates = await dormantClients(c.env, today);
+        return renderDormant(c, candidates, q);
+      }
+
       const where: string[] = [];
       const params: unknown[] = [];
       if (view === 'leads' && !status) where.push(`status = 'prospect'`);
@@ -582,6 +671,10 @@ export const clientsModule: AppModule = {
         { id: 'organisations', label: 'Organisations', count: counts?.organisations ?? 0 },
         { id: 'all', label: 'All', count: counts?.total ?? 0 },
       ];
+      // Counted separately: it is a different question, not a slice of the same
+      // list, and it is worth showing the number even when nobody is looking.
+      const dormantCount = (await dormantClients(c.env, new Date().toISOString().slice(0, 10))).length;
+      if (dormantCount > 0) views.push({ id: 'dormant', label: 'Finished with?', count: dormantCount });
 
       return page(c, { title: 'Clients', active: '/clients' }, html`
         ${pageHeader('Clients',
@@ -648,6 +741,105 @@ export const clientsModule: AppModule = {
                     href: (key, dir) => listHref({ sort: key, dir, page: 1 }) } })}
         ${pager({ page: pageNum, size: PAGE_SIZE, hasMore, shown: shown.length, href: listHref })}
         </div>`);
+    });
+
+    /**
+     * Archive several clients at once, in two steps.
+     *
+     * Nothing is deleted. An archived client keeps their file, their matters,
+     * their notes and their history; what changes is that they stop raising
+     * expiry alerts and stop appearing on the calendar, which is the whole
+     * point. Changing the status back brings all of it with them.
+     *
+     * Two steps rather than a dialog, as with the inbox: the register works
+     * with scripting off, and this reaches many live client records at once.
+     * The first step names every person about to be archived; only the second
+     * writes. Between them the list is read again from the database, because
+     * somebody may have opened a matter for one of them in the meantime — and
+     * the person pressing the button cannot see that.
+     */
+    r.post('/archive', requirePermission('register:write'), async (c) => {
+      const form = await c.req.formData();
+      const ids = [...new Set(form.getAll('id').map(String).filter(Boolean))].slice(0, 500);
+      if (ids.length === 0) {
+        return redirectWith(c, '/clients?view=dormant', 'Nobody was selected.', 'err');
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      const allowed = await stillDormant(c.env, today, ids);
+      const rows = (await dormantClients(c.env, today)).filter((r) => allowed.has(r.id));
+      if (rows.length === 0) {
+        return redirectWith(c, '/clients?view=dormant',
+          'None of those can be archived now — each one has a matter running again.', 'err');
+      }
+
+      const csrf = c.get('session')!.csrf;
+      const skipped = ids.length - rows.length;
+      return page(c, { title: 'Archive these clients?', active: '/clients' }, html`
+        ${pageHeader('Archive these clients?',
+          'Nothing is deleted. Their files, matters and notes stay exactly as they are — they '
+          + 'stop raising expiry alerts, and they come back if you change the status again.')}
+
+        ${card(`${rows.length} ${rows.length === 1 ? 'client' : 'clients'}`, html`
+          <ul class="list">${rows.map((r) => html`
+            <li><a href="/clients/${r.id}">${r.full_name}</a>
+              <span class="muted small"> · ${r.ref}</span>
+              <div class="muted small">${String(r.expired)} expired
+                ${r.expired === 1 ? 'document' : 'documents'}, last on
+                ${dateShort(r.last_expiry)} · ${String(r.matters)}
+                ${r.matters === 1 ? 'matter' : 'matters'}, all finished</div></li>`)}</ul>`)}
+
+        ${skipped ? html`<p class="hint">${String(skipped)} left out: a matter is running again.</p>` : ''}
+
+        <form method="post" action="/clients/archive/confirm" class="filters">
+          ${csrfField(csrf)}
+          ${rows.map((r) => html`<input type="hidden" name="id" value="${r.id}">`)}
+          <button class="btn btn-primary" type="submit">
+            Archive ${String(rows.length)} ${rows.length === 1 ? 'client' : 'clients'}
+          </button>
+          <a class="btn btn-secondary" href="/clients?view=dormant">Cancel</a>
+        </form>`);
+    });
+
+    r.post('/archive/confirm', requirePermission('register:write'), async (c) => {
+      const form = await c.req.formData();
+      const ids = [...new Set(form.getAll('id').map(String).filter(Boolean))].slice(0, 500);
+      const today = new Date().toISOString().slice(0, 10);
+      const allowed = [...await stillDormant(c.env, today, ids)];
+      if (allowed.length === 0) {
+        return redirectWith(c, '/clients?view=dormant',
+          'Nothing was archived — those clients have matters running again.', 'err');
+      }
+
+      const user = c.get('user')!;
+      const at = nowIso();
+      let archived = 0;
+      for (const id of allowed) {
+        const before = await one<{ status: string; full_name: string }>(
+          c.env.DB, 'SELECT status, full_name FROM clients WHERE id = ?', id);
+        if (!before || before.status === 'archived') continue;
+        await run(c.env.DB, 'UPDATE clients SET status = ?, updated_at = ? WHERE id = ?',
+          'archived', at, id);
+        // A note on the file and an audit row, exactly as archiving one client
+        // by hand writes — so a batch leaves the same trail as forty-three
+        // separate decisions would have.
+        await addEntry(c.env, {
+          entityType: 'client', entityId: id, kind: 'system',
+          body: `Status changed from ${CLIENT_STATUS_LABELS[before.status as ClientStatus]} `
+            + 'to Archived. Everything on file had expired and no matter was running.',
+          createdBy: user.id,
+        });
+        await auditFrom(c, {
+          action: 'client.status_changed', entityType: 'client', entityId: id,
+          meta: { from: before.status, to: 'archived', bulk: true },
+        });
+        archived += 1;
+      }
+
+      const skipped = ids.length - archived;
+      return redirectWith(c, '/clients?view=dormant',
+        `Archived ${archived} ${archived === 1 ? 'client' : 'clients'}.`
+        + (skipped ? ` ${skipped} left alone.` : '')
+        + ' Their expiry alerts have stopped; nothing was deleted.');
     });
 
     // --- Create -------------------------------------------------------------

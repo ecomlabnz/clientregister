@@ -37,6 +37,20 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.99.0', date: '3 September 2026',
+    notes: [
+      'Clients has a new view, \u201cFinished with?\u201d, for people whose matters are all '
+        + 'closed and whose visa, passport and certificates have all run out \u2014 the ones '
+        + 'whose expiry alerts you cannot do anything about because they have moved on. It only '
+        + 'appears when there is somebody in it, and anyone with a matter running, or anything '
+        + 'still in date, is left off it.',
+      'You can tick several of them and archive them in one go. Archiving stops their expiry '
+        + 'alerts and takes them off the calendar. Nothing is deleted \u2014 the file, the '
+        + 'matters and the notes all stay, and changing the status back brings them with it. '
+        + 'You see everyone by name and press a second button before anything is written.',
+    ],
+  },
+  {
     version: '0.98.0', date: '3 September 2026',
     notes: [
       'The calendar now has a week and a year view as well as the month. The week gives each day '
