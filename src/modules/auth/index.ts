@@ -33,6 +33,7 @@ import {
 } from '../../ui/components';
 import { dateTime } from '../../ui/format';
 import { ROLE_LABELS } from '../../core/rbac';
+import type { ColourMode, Theme } from '../../ui/theme';
 import {
   COLOUR_MODES, COLOUR_MODE_LABELS, THEMES, THEME_INFO, colourModeOf, isColourMode, isTheme, themeOf,
 } from '../../ui/theme';
@@ -455,6 +456,19 @@ export const authModule: AppModule = {
           </form>
           <p class="hint">Session ID shown to support: <code>${sessionLabel(session.sid)}</code></p>`)}` : ''}
 
+        ${'' /* Choosing is the whole action: press a palette and the next page
+                 is drawn in it. There is no Save, because there was never a
+                 second decision to make on this card — a theme you have chosen
+                 and not yet saved is a theme you cannot see, which is the one
+                 thing a person picking a colour actually wants.
+
+                 With no script on the page, "applies at once" means the press
+                 is the submit. So each option is its own submit button carrying
+                 its own name and value: the browser sends only the button that
+                 was pressed, so one form serves twelve choices and the handler
+                 changes only what arrived. The current choice is a button too,
+                 pressed to no effect rather than disabled — a disabled control
+                 in a row of identical ones reads as broken. */}
         ${tab === 'appearance' ? html`
         ${card('Appearance', html`
           <form method="post" action="/account/appearance">
@@ -462,9 +476,10 @@ export const authModule: AppModule = {
             <fieldset class="appearance-set">
               <legend>Theme</legend>
               ${THEMES.map((id) => html`
-                <label class="appearance-option">
+                <button class="appearance-option" type="submit" name="theme" value="${id}"
+                        aria-pressed="${id === theme ? 'true' : 'false'}">
                   <span class="appearance-option-head">
-                    <input type="radio" name="theme" value="${id}" ${raw(id === theme ? 'checked' : '')}>
+                    <span class="appearance-tick" aria-hidden="true"></span>
                     <span class="appearance-option-name">${THEME_INFO[id].name}</span>
                     <span class="swatch" data-theme="${id}" aria-hidden="true">
                       <span class="sw-bg"></span><span class="sw-surface"></span><span class="sw-accent"></span>
@@ -472,20 +487,21 @@ export const authModule: AppModule = {
                     </span>
                   </span>
                   <span class="hint">${THEME_INFO[id].description}</span>
-                </label>`)}
+                </button>`)}
             </fieldset>
-            <fieldset class="appearance-set mt">
+            <fieldset class="appearance-set appearance-set-narrow mt">
               <legend>Day and night</legend>
               ${COLOUR_MODES.map((id) => html`
-                <label class="appearance-option">
+                <button class="appearance-option" type="submit" name="colour_mode" value="${id}"
+                        aria-pressed="${id === mode ? 'true' : 'false'}">
                   <span class="appearance-option-head">
-                    <input type="radio" name="colour_mode" value="${id}" ${raw(id === mode ? 'checked' : '')}>
+                    <span class="appearance-tick" aria-hidden="true"></span>
                     <span class="appearance-option-name">${COLOUR_MODE_LABELS[id]}</span>
                   </span>
-                </label>`)}
+                </button>`)}
             </fieldset>
-            <p class="hint">Saved against your account, so it follows you to any device you sign in from.</p>
-            <button class="btn btn-primary mt" type="submit">Save appearance</button>
+            <p class="hint">Press one and it is on. Saved against your account, so it follows you to
+               any device you sign in from.</p>
           </form>`)}` : ''}
       `);
     });
@@ -524,25 +540,55 @@ export const authModule: AppModule = {
       return redirectWith(c, '/account?tab=preferences', `${group.title} saved.`);
     });
 
-    // Appearance is a preference, not a free-text field: only the themes and
-    // modes the application actually defines can reach the database.
+    /**
+     * One appearance choice, applied.
+     *
+     * The page sends whichever button was pressed and nothing else, so exactly
+     * one of the two arrives and the other is left as it stands. Writing both
+     * from one press would mean reading the untouched one back out of the form,
+     * and a form is not where the current value lives.
+     *
+     * Appearance is a preference, not a free-text field: only the themes and
+     * modes the application actually defines can reach the database. Anything
+     * else is refused rather than coerced, because a value that reached the
+     * users table unrecognised would be rendered as an attribute on every page.
+     */
     r.post('/account/appearance', async (c) => {
       const user = c.get('user')!;
       const f = new FormReader(await c.req.formData());
       const theme = f.text('theme', { max: 32 });
       const mode = f.text('colour_mode', { max: 32 });
-      if (!isTheme(theme) || !isColourMode(mode)) {
-        return redirectWith(c, '/account', 'That appearance choice is not one we offer.', 'err');
+
+      const changes: Array<[string, string]> = [];
+      if (theme !== '') {
+        if (!isTheme(theme)) {
+          return redirectWith(c, '/account?tab=appearance', 'That is not a theme we offer.', 'err');
+        }
+        changes.push(['theme', theme]);
       }
+      if (mode !== '') {
+        if (!isColourMode(mode)) {
+          return redirectWith(c, '/account?tab=appearance', 'That is not a setting we offer.', 'err');
+        }
+        changes.push(['colour_mode', mode]);
+      }
+      if (changes.length === 0) {
+        return redirectWith(c, '/account?tab=appearance', 'Nothing was chosen.', 'err');
+      }
+
+      // The column names come from the two literals above, never from the form.
+      const sets = changes.map(([column]) => `${column} = ?`).join(', ');
       await run(
         c.env.DB,
-        'UPDATE users SET theme = ?, colour_mode = ?, updated_at = ? WHERE id = ?',
-        theme, mode, nowIso(), user.id,
+        `UPDATE users SET ${sets}, updated_at = ? WHERE id = ?`,
+        ...changes.map(([, value]) => value), nowIso(), user.id,
       );
       await auditFrom(c, {
-        action: 'account.appearance_changed', entityType: 'user', entityId: user.id, meta: { theme, colour_mode: mode },
+        action: 'account.appearance_changed', entityType: 'user', entityId: user.id,
+        meta: Object.fromEntries(changes),
       });
-      return redirectWith(c, '/account?tab=appearance', 'Appearance saved.');
+      const what = theme !== '' ? THEME_INFO[theme as Theme].name : COLOUR_MODE_LABELS[mode as ColourMode];
+      return redirectWith(c, '/account?tab=appearance', `${what} it is.`);
     });
 
     r.post('/account/password', async (c) => {
