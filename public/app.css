@@ -943,6 +943,77 @@ details[open] > summary { margin-bottom: 12px; }
 
 /* --- Lists, timeline, stats --------------------------------------------- */
 
+/* --- Calendar ------------------------------------------------------------
+   A month grid, drawn as a table because a month *is* tabular: seven weekday
+   columns and a row per week, with real <th> headings a screen reader can
+   announce. Fixed layout so one busy day cannot widen its column and shunt the
+   rest of the week sideways. */
+
+.cal-wrap { overflow-x: auto; margin-bottom: 16px; }
+.cal { width: 100%; table-layout: fixed; border-collapse: collapse; min-width: 700px; }
+.cal th {
+  padding: 6px 8px; text-align: left; font-size: 0.75rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.cal td {
+  vertical-align: top; padding: 4px; height: 96px; width: 14.28%;
+  border: 1px solid var(--border); background: var(--surface);
+}
+.cal-blank { background: var(--surface-2); }
+.cal-today { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cal-daynum { font-size: 0.8rem; font-weight: 600; margin-bottom: 3px; }
+.cal-today .cal-daynum { color: var(--accent); }
+
+/* An event in a cell: one line, clipped rather than wrapped, because three
+   wrapped lines in a 96px cell push the rest out of sight. The full text is on
+   the title attribute and in the agenda below. */
+.cal-event {
+  display: block; font-size: 0.72rem; line-height: 1.35; padding: 1px 4px;
+  margin-bottom: 2px; border-radius: 3px; border-left: 3px solid transparent;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: var(--surface-2); color: var(--text);
+}
+.cal-event:hover { text-decoration: none; filter: brightness(0.97); }
+.cal-more { display: block; font-size: 0.7rem; color: var(--muted); padding: 0 4px; }
+
+/* Colour carries the kind, and never carries it alone: every event is also a
+   word, and the legend names each colour. */
+.cal-red    { border-left-color: var(--red); }
+.cal-amber  { border-left-color: var(--amber); }
+.cal-green  { border-left-color: var(--green); }
+.cal-blue   { border-left-color: var(--accent); }
+.cal-grey   { border-left-color: var(--muted); }
+
+.cal-dot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 2px;
+  margin-right: 6px; vertical-align: baseline; flex: none;
+}
+.cal-dot.cal-red { background: var(--red); }
+.cal-dot.cal-amber { background: var(--amber); }
+.cal-dot.cal-green { background: var(--green); }
+.cal-dot.cal-blue { background: var(--accent); }
+.cal-dot.cal-grey { background: var(--muted); }
+
+/* The legend is the filter. Clicking a key takes that kind off the month, so
+   there is one row rather than a key nobody reads beside a filter nobody
+   finds. */
+.cal-legend { gap: 4px 10px; }
+.cal-key {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 0.8rem;
+  padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border);
+  color: var(--text);
+}
+.cal-key:hover { background: var(--surface-2); text-decoration: none; }
+.cal-key-off { opacity: 0.45; text-decoration: line-through; }
+
+@media (max-width: 760px) {
+  /* Seven columns on a phone is seven columns of nothing. The agenda below the
+     grid is the primary reading at this width, not a fallback — so the grid
+     goes rather than being squeezed. */
+  .cal-wrap { display: none; }
+}
+
 /* What the sweep made of a message, under its subject on the inbox list.
    Wraps rather than truncating: the whole point of the row is the reason, and a
    reason cut off at the column edge is a reason nobody reads. */
