@@ -7,6 +7,30 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.99.2 — 3 September 2026
+
+### Changed
+- **Choosing a look is now the whole action.** The appearance card made you pick
+  a theme and then press Save — two decisions where there is only one, and in
+  between, a theme you had chosen and could not see. The practice compared it
+  with another of their applications, where a theme is simply selected and is
+  working right away, and asked for the same here.
+
+  Press a palette and the page you land on is drawn in it. Same for light and
+  dark. There is no Save button, because there is nothing left to save.
+
+  With no script on any page, "applies at once" has to mean the press *is* the
+  submit — so each option is its own submit button carrying its own name and
+  value. The browser sends only the button pressed, which is why one form
+  serves twelve choices and why pressing a theme leaves your light/dark choice
+  exactly as it was. The one in use is marked three ways over — a ring, a filled
+  tick, and `aria-pressed` for a screen reader — because this is the one card in
+  the register where the colours are the subject and a colour difference alone
+  will not do.
+
+  Still saved against your account rather than in the browser, so it follows you
+  to any device you sign in from.
+
 ## 0.99.1 — 3 September 2026
 
 ### Changed
