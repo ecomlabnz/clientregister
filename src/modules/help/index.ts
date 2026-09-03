@@ -37,6 +37,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.98.0', date: '3 September 2026',
+    notes: [
+      'The calendar now has a week and a year view as well as the month. The week gives each day '
+        + 'a full column, so a busy day shows everything on it rather than \u201c+4 more\u201d. '
+        + 'The year is twelve small months \u2014 click any month name or any marked day to go '
+        + 'straight there.',
+      'How far back the unbilled-work alert looks is now a list to choose from \u2014 off, 30, '
+        + '60, 90, 120, 150 or 200 days, or a year \u2014 rather than a number to type. Widen it '
+        + 'as the fees on file get more complete.',
+    ],
+  },
+  {
     version: '0.97.0', date: '3 September 2026',
     notes: [
       'Every heading on the dashboard cards now sorts. Click one to sort by it, click again to '
@@ -1906,7 +1918,12 @@ function sections(origin: string): Section[] {
         <p>Click a day with something on it to see that day on its own. Under the month there is
            always the full list in order, which is what you get on a phone: seven columns do not
            fit a phone screen, so the month steps aside and the list takes over.</p>
-        <p>Move by month with the arrows, or press <strong>This month</strong> to come back. The
+        <p><strong>Month, week or year.</strong> The week gives each day a full column, so a busy
+           day shows everything on it instead of “+4 more”. The year is twelve small
+           months, with a mark on every day that has something on it, coloured by the most
+           pressing thing there — click a month name or a marked day to go straight to it.
+           Whichever view you switch to lands where you were, not back on today.</p>
+        <p>Move with the arrows, or press <strong>This month</strong> to come back. The
            month you are looking at is in the address, so a particular month can be bookmarked
            or sent to somebody.</p>`,
     },

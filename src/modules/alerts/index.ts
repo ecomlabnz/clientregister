@@ -735,13 +735,26 @@ export const ALERT_SETTINGS: SettingsGroup = {
     { key: 'alerts.urgent_days', type: 'integer', label: 'Treat as urgent within (days)',
       default: '14', min: 1, max: 90,
       help: 'Anything due inside this window is counted as pressing rather than upcoming.' },
-    { key: 'alerts.unbilled_days', type: 'integer',
-      label: 'Look for unbilled work finished in the last (days)',
-      default: '90', min: 0, max: 730,
+    { key: 'alerts.unbilled_days', type: 'enum',
+      label: 'Look for unbilled work finished in the last',
+      default: '90',
+      // Offered as a list rather than a free number, at the practice's request:
+      // the useful settings are a handful of round periods, and a box that
+      // accepts 37 invites a decision nobody wanted to make.
+      options: [
+        { value: '0', label: 'Off \u2014 do not look' },
+        { value: '30', label: '30 days' },
+        { value: '60', label: '60 days' },
+        { value: '90', label: '90 days' },
+        { value: '120', label: '120 days' },
+        { value: '150', label: '150 days' },
+        { value: '200', label: '200 days' },
+        { value: '365', label: 'A year' },
+      ],
       help: 'Matters that finished without a fee, an invoice or an agreed fee. Older than this '
         + 'is treated as history rather than a missed payment \u2014 the register holds an '
         + 'archive of matters already dealt with, and without a window this would name every '
-        + 'one of them. Set to 0 to switch it off.' },
+        + 'one of them. Widen it as the fees on file get more complete.' },
     { key: 'alerts.unbilled_grace_days', type: 'integer',
       label: 'Leave unbilled work alone for (days)',
       default: '14', min: 0, max: 120,

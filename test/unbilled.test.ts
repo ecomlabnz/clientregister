@@ -148,8 +148,21 @@ describe('the settings that narrow it', () => {
 
   it('can be switched off entirely', () => {
     // A practice that bills elsewhere should not have to look at this.
-    expect(setting('alerts.unbilled_days')!.min).toBe(0);
+    expect(setting('alerts.unbilled_days')!.options!.map((o) => o.value)).toContain('0');
     expect(source).toMatch(/if \(lookBack <= 0\) return \[\];/);
+  });
+
+  it('offers round periods rather than a free number', () => {
+    // The practice asked for a list: the useful settings are a handful of round
+    // periods, and a box that accepts 37 invites a decision nobody wanted.
+    const values = setting('alerts.unbilled_days')!.options!.map((o) => o.value);
+    for (const period of ['30', '60', '90', '120', '150', '200']) {
+      expect(values, `${period} days should be offered`).toContain(period);
+    }
+    // Every option has to be a number the window arithmetic can use.
+    for (const v of values) expect(Number.isFinite(Number(v)), `${v} is not a number`).toBe(true);
+    // And the default has to be one of them, or the page opens on a blank box.
+    expect(values).toContain(setting('alerts.unbilled_days')!.default);
   });
 
   it('explains itself in plain words', () => {
