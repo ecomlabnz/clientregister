@@ -37,6 +37,19 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.95.0', date: '3 September 2026',
+    notes: [
+      'The dashboard now leads with what is actually late. It was sorting by date alone, so an old '
+        + 'record that needed tidying sat above a reply due this afternoon \u2014 those rows are '
+        + 'still there, just below the things with a clock on them.',
+      'Needs you today and Deadlines can both be re-ordered and opened out, and they now show as '
+        + 'many rows as your Rows per page setting rather than stopping at a fixed number.',
+      'If mail stops arriving, the register will now say so. It cannot see your mailbox, but it '
+        + 'knows when it last received anything \u2014 so a break in forwarding no longer looks '
+        + 'the same as a quiet week.',
+    ],
+  },
+  {
     version: '0.94.0', date: '2 September 2026',
     notes: [
       'A new button on the Inbox, Read the post. It reads what is waiting and tells you what each '
