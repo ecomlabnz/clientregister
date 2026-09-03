@@ -33,6 +33,8 @@ export type AlertKind =
   | 'contradiction'
   /** Mail is set up and the poll is running, but nothing has arrived. */
   | 'mail_quiet'
+  /** Work finished and nothing was ever charged for it. */
+  | 'unbilled'
   /** Lodged with INZ, but no application number was ever written down. */
   | 'unacknowledged'
   /** A task that leaves no working time before the deadline it serves. */
@@ -77,6 +79,10 @@ export interface Alert {
 export function alertTiming(kind: AlertKind): 'due' | 'wrong' {
   switch (kind) {
     case 'case_deadline': case 'task': case 'document': case 'quote': case 'no_slack':
+    // The date is the day the work finished. The longer ago that was, the
+    // likelier the money is to be forgotten — so it sorts like a deadline,
+    // oldest first, rather than like a record that is merely wrong.
+    case 'unbilled':
       return 'due';
     default:
       return 'wrong';
@@ -103,6 +109,7 @@ const KIND_LABELS: Record<AlertKind, string> = {
   quiet: 'Gone quiet',
   contradiction: 'Does not add up',
   mail_quiet: 'No mail arriving',
+  unbilled: 'Nothing charged',
   unacknowledged: 'Not acknowledged',
   no_slack: 'No room to act',
   status_unknown: 'Status not recorded',
@@ -454,6 +461,84 @@ async function mailQuietAlert(env: Env, today: string): Promise<Alert[]> {
   }];
 }
 
+/**
+ * Work finished, and nothing was ever charged for it.
+ *
+ * The practice asked for this on 3 September: *"do not want to miss payments
+ * for work done."*
+ *
+ * **The window is what makes it usable.** Counted against production the day it
+ * was written: 135 finished matters have no fee, no invoice and no agreed fee
+ * — because the register was loaded from an archive of matters the practice had
+ * already dealt with, and because fees are entered by hand rather than derived.
+ * An alert firing 135 times on the first morning is not an alert; it is a
+ * screen nobody reads again. Two settings narrow it to work that is plausibly
+ * still collectable:
+ *
+ *   - **How far back to look.** Ninety days by default. Older than that and it
+ *     is the archive, not a forgotten invoice.
+ *   - **How long to leave it.** A fortnight by default. A matter decided
+ *     yesterday has not been forgotten; it has not been billed *yet*, and
+ *     nagging on the day is how a person learns to ignore the page.
+ *
+ * With those two, the same production data yields six — which is a morning's
+ * work rather than a wall.
+ *
+ * "Charged for" is read broadly on purpose: a fee line, an invoice, or an
+ * agreed fee on the matter all count. The practice records money in more than
+ * one place and this is asking whether the money was *dealt with*, not whether
+ * a particular row exists.
+ */
+export function unbilledWindow(
+  today: string, lookBackDays: number, graceDays: number,
+): { from: string; until: string } {
+  // Two ends, and they are not symmetrical. `from` is how far back the archive
+  // stops being interesting; `until` is how recently a matter finished for it
+  // still to be somebody's in-tray rather than a forgotten invoice. Extracted
+  // so both can be tested: the first version of these tests passed the dates
+  // in, and so proved nothing about the arithmetic that produces them —
+  // removing the grace period entirely did not fail a single one.
+  return {
+    from: shiftDays(today, -Math.max(0, lookBackDays)),
+    until: shiftDays(today, -Math.max(0, graceDays)),
+  };
+}
+
+async function unbilledAlerts(env: Env, today: string): Promise<Alert[]> {
+  const lookBack = Number(await settingValue(
+    env, ALERT_SETTINGS.settings.find((d) => d.key === 'alerts.unbilled_days')!)) || 0;
+  if (lookBack <= 0) return [];
+  const grace = Number(await settingValue(
+    env, ALERT_SETTINGS.settings.find((d) => d.key === 'alerts.unbilled_grace_days')!)) || 0;
+
+  const { from, until } = unbilledWindow(today, lookBack, grace);
+
+  const rows = await all<any>(
+    env.DB,
+    `SELECT k.id, k.ref, k.title, k.descriptor, k.status, cl.full_name AS client_name,
+            substr(COALESCE(k.decided_at, k.closed_at, k.updated_at), 1, 10) AS done_on
+       FROM cases k JOIN clients cl ON cl.id = k.client_id
+      WHERE (k.status IN ('approved','declined','withdrawn','closed') OR k.closed_at IS NOT NULL)
+        AND substr(COALESCE(k.decided_at, k.closed_at, k.updated_at), 1, 10) BETWEEN ? AND ?
+        AND NOT EXISTS (SELECT 1 FROM fee_items fi WHERE fi.case_id = k.id)
+        AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.case_id = k.id)
+        AND COALESCE(k.fee_agreed_cents, 0) = 0
+      ORDER BY done_on LIMIT 100`,
+    from, until);
+
+  return rows.map((k: any) => ({
+    kind: 'unbilled' as const,
+    // Louder the longer it has sat. Not "overdue" on the day the grace period
+    // ends — it is a prompt, not a deadline somebody has missed.
+    severity: (daysBetween(String(k.done_on), today) >= grace * 3 ? 'overdue' : 'urgent') as AlertSeverity,
+    date: String(k.done_on),
+    title: k.title,
+    detail: `${k.descriptor ? `${k.descriptor} · ` : ''}${k.client_name} · ${k.ref} · `
+      + `finished ${dateShort(String(k.done_on))}, nothing charged`,
+    href: `/cases/${k.id}`,
+  }));
+}
+
 /** Everything with a date attached, in one list. */
 export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]> {
   const { today, horizon } = window(horizonDays);
@@ -516,9 +601,11 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
   // queried, and it is the last thing collected because it depends on nothing
   // above it.
   const mailQuiet = await mailQuietAlert(env, today);
+  const unbilled = await unbilledAlerts(env, today);
 
   const alerts: Alert[] = [
     ...mailQuiet,
+    ...unbilled,
     ...cases.map((k: any) => ({
       kind: 'case_deadline' as const,
       severity: severityFor(k.decision_due_at, today),
@@ -648,6 +735,19 @@ export const ALERT_SETTINGS: SettingsGroup = {
     { key: 'alerts.urgent_days', type: 'integer', label: 'Treat as urgent within (days)',
       default: '14', min: 1, max: 90,
       help: 'Anything due inside this window is counted as pressing rather than upcoming.' },
+    { key: 'alerts.unbilled_days', type: 'integer',
+      label: 'Look for unbilled work finished in the last (days)',
+      default: '90', min: 0, max: 730,
+      help: 'Matters that finished without a fee, an invoice or an agreed fee. Older than this '
+        + 'is treated as history rather than a missed payment \u2014 the register holds an '
+        + 'archive of matters already dealt with, and without a window this would name every '
+        + 'one of them. Set to 0 to switch it off.' },
+    { key: 'alerts.unbilled_grace_days', type: 'integer',
+      label: 'Leave unbilled work alone for (days)',
+      default: '14', min: 0, max: 120,
+      help: 'How long after a matter finishes before it is worth mentioning. A matter decided '
+        + 'yesterday has not been forgotten, and being nagged on the day is how a page stops '
+        + 'being read.' },
     { key: 'alerts.mail_quiet_days', type: 'integer',
       label: 'Warn when no mail has arrived for (days)',
       default: '3', min: 1, max: 60,

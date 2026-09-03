@@ -7,6 +7,48 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.97.0 — 3 September 2026
+
+### Changed
+- **Every dashboard card sorts by any of its columns now.** Click a heading to
+  sort by it, click again to reverse — on *Needs you today*, *Deadlines* and *My
+  open cases*.
+
+  The two whole-card orderings added in 0.95.0 were not enough, and the practice
+  said so: *"nothing really changes when switching."* Both were by date, so a
+  visa expiry five hundred days overdue led the list either way. What was wanted
+  was the ordinary thing a table does.
+
+  One helper serves all three, because three implementations of "click to sort"
+  drift into three behaviours — and the one that drifts is always the second
+  click. Each card keeps its own place in the address, so sorting Deadlines
+  never resets Needs you today. Rows with nothing in the sorted column go last
+  in **either** direction: a matter with no next action is not the most pressing
+  thing on the list, and reversing should not promote the rows that say nothing.
+
+### Added
+- **An alert for work finished with nothing charged for it.** The practice
+  asked for it plainly: *"do not want to miss payments for work done."*
+
+  **The window is what makes it usable, and it was measured before it was
+  written.** Counted against production: **135** finished matters have no fee,
+  no invoice and no agreed fee — because the register was loaded from an archive
+  of matters already dealt with, and because fees are entered by hand. An alert
+  firing 135 times on the first morning is not an alert; it is a screen nobody
+  reads again.
+
+  Two settings narrow it. **How far back to look** (90 days) — older than that
+  is history, not a missed payment. **How long to leave it** (14 days) — a
+  matter decided yesterday has not been forgotten, it has not been billed *yet*,
+  and being nagged on the day is how a page stops being read. Against the same
+  data those two turn 135 into **six**, which is a morning's work rather than a
+  wall. Set the look-back to 0 to switch it off.
+
+  "Charged for" is read broadly on purpose: a fee line, an invoice, or an agreed
+  fee on the matter all count. The practice records money in more than one place
+  and the question is whether it was *dealt with*, not whether a particular row
+  exists.
+
 ## 0.96.0 — 3 September 2026
 
 ### Added

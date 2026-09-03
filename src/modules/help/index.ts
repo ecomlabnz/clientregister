@@ -37,6 +37,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.97.0', date: '3 September 2026',
+    notes: [
+      'Every heading on the dashboard cards now sorts. Click one to sort by it, click again to '
+        + 'reverse \u2014 on Needs you today, Deadlines and My open cases. Sorting one card no '
+        + 'longer disturbs the others.',
+      'A new alert for work you finished and never charged for. It looks at matters finished in '
+        + 'the last ninety days, leaves them alone for a fortnight first, and ignores anything '
+        + 'with a fee, an invoice or an agreed amount already on it. Both periods are yours to '
+        + 'change under Settings \u2192 Alerts, and setting the first to zero turns it off.',
+    ],
+  },
+  {
     version: '0.96.0', date: '3 September 2026',
     notes: [
       'A calendar. Your month laid out \u2014 deadlines, tasks, visa and passport and certificate '
