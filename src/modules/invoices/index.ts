@@ -259,7 +259,7 @@ export const invoicesModule: AppModule = {
         { id: 'all', label: 'All', count: counts?.total ?? 0 },
       ];
 
-      return page(c, { title: 'Invoices', active: '/quotes' }, html`
+      return page(c, { title: 'Invoices', active: '/invoices' }, html`
         ${pageHeader('Invoices', 'What has been billed, and what is still owed.',
           can(c.get('user'), 'quote:write')
             ? html`<a class="btn btn-primary" href="/invoices/new">New invoice</a>`
@@ -353,7 +353,7 @@ export const invoicesModule: AppModule = {
       const allocation = allocateSplit(splitBase_cents, shares);
       const bpTotal = sumBp(shares);
 
-      return page(c, { title: `Invoice ${invoice.ref}`, active: '/quotes' }, html`
+      return page(c, { title: `Invoice ${invoice.ref}`, active: '/invoices' }, html`
         ${breadcrumbs([{ label: 'Quotes', href: '/quotes' },
                        { label: 'Invoices', href: '/invoices' }, { label: invoice.ref }])}
         ${pageHeader(`Invoice ${invoice.ref}`, invoice.description, html`

@@ -116,10 +116,16 @@
   --d-shadow: none;
 
   /* How far down the page the sticky navigation reaches, so a sticky table
-     heading knows where to stop. Measured at each breakpoint in a browser and
-     rounded up: overshooting leaves an invisible gap, undershooting hides the
-     heading behind the bar. */
-  --topbar-h: 48px;
+     heading knows where to stop. Measured at each breakpoint in Chromium:
+     overshooting leaves an invisible gap, undershooting hides the heading
+     behind the bar.
+
+     Re-measured on 4 September 2026 and every figure was wrong, because the
+     bar had gained a row at two breakpoints since anybody last looked and the
+     variable had not been touched. It is a stated number about a measured
+     thing, so it goes stale silently; `test/nav.test.ts` now pins the set of
+     breakpoints against the ones the layout actually has. */
+  --topbar-h: 52px;
   /* The height of one item in the top-bar run. See .nav-group. */
   --nav-item-h: 29px;
 
@@ -341,9 +347,9 @@ p:last-child { margin-bottom: 0; }
 .whoami:hover { text-decoration: none; }
 /* The register-wide search box.
    Sized to be usable rather than prominent: it sits between the menu and the
-   account link, shrinks before either of them does, and is dropped on a phone
-   where the menu already needs the whole width — Search has its own page and
-   the menu reaches it. */
+   account link and shrinks before either of them does. On a phone it takes
+   the rest of its row rather than being dropped — this comment said it was
+   dropped, and had said so while the box was plainly there. */
 .topsearch { display: flex; }
 .topsearch input {
   width: clamp(140px, 18vw, 260px);
@@ -1577,8 +1583,15 @@ body.site { background: var(--bg); }
 .kb-body > :last-child { margin-bottom: 0; }
 .lede-sm { font-size: 1rem; color: var(--muted); margin: 0 0 16px; max-width: 74ch; line-height: 1.6; }
 
-@media (max-width: 1100px) { :root { --topbar-h: 82px; } }
-@media (max-width: 720px) { :root { --topbar-h: 98px; } }
+/* The bar takes a second row here (the navigation gets a line of its own),
+   and a third once the wordmark and the account controls stop sharing one. */
+@media (max-width: 1520px) { :root { --topbar-h: 87px; } }
+@media (max-width: 720px) { :root { --topbar-h: 91px; } }
+@media (max-width: 679px) { :root { --topbar-h: 123px; } }
+@media (max-width: 559px) { :root { --topbar-h: 155px; } }
+/* Below 360px the nine sections need a third row. Only the oldest small
+   phones are this narrow; everything from a 360px Android upwards takes two. */
+@media (max-width: 359px) { :root { --topbar-h: 187px; } }
 
 /* --- Small screens -------------------------------------------------------- */
 /* This register is read on a phone between appointments as often as at a desk,
@@ -1604,25 +1617,42 @@ body.site { background: var(--bg); }
   .brand { order: 1; }
   .topbar-right { order: 2; }
 
-  /* The whole navigation stays on the page as one swipeable strip: every
-     section is one thumb-flick away, and there is no menu script to load. */
+  /* The navigation wraps onto as many rows as it needs, so every section is
+     on the screen.
+
+     It used to be a single strip that scrolled sideways, on the reasoning that
+     a swipe is cheaper than a menu. Two things were wrong with that. The strip
+     gave no sign it could be swiped — no scrollbar, by design, and no fading
+     edge — so on a 390px phone the run stopped after Cases and the six
+     sections past it may as well not have existed. And the groups, which were
+     opened out into the strip with `display: contents` so their items would
+     sit in the run, were inside a *closed* `<details>`: a browser renders
+     nothing inside one of those whatever its display is, so Quotes, Invoices,
+     Knowledge and the Assistant were not merely off the edge, they were not
+     drawn at all. Reported by the practice on 4 September 2026 — "Where are
+     the invoices and quotes? Cannot see them on my phone."
+
+     Wrapping costs a row of height and buys back the whole navigation. It also
+     removes the sideways-scrolling box, and with it the reason the menus were
+     dropped on a phone in the first place: nothing clips a panel now. */
   .topnav {
-    order: 3; width: 100%; flex: none; flex-wrap: nowrap;
-    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
-    margin: 0 -12px; padding: 2px 12px 3px;
+    order: 3; width: 100%; flex: none; flex-wrap: wrap;
+    gap: 3px; margin: 0; padding: 2px 0 1px;
   }
-  .topnav::-webkit-scrollbar { display: none; }
-  .nav-link { white-space: nowrap; padding: 0 11px; }
-  /* No menus on a phone. Grouping exists to keep the bar to one line on a
-     wide screen; the strip already holds any number of sections, and a box
-     that scrolls sideways clips what overflows it downwards too, so a menu
-     opened inside one drops behind the bar and cannot be read. So the groups
-     open out into the strip: Quotes, Fees, Knowledge and the Assistant sit in
-     the run like everything else, one swipe away. */
-  .nav-group { display: contents; }
-  .nav-group > summary { display: none; }
+  /* Tight enough that the nine sections take two rows and not three, all the
+     way down to a 320px screen. Measured, not guessed. */
+  .nav-link { white-space: nowrap; padding: 0 clamp(7px, 2.4vw, 11px); }
+  /* The menus stay, because they are what keeps the run to two rows — and
+     because the practice asked for them by name. They open *into* the bar
+     rather than over it: a panel floating above a two-row bar has to be
+     positioned against something, and an inline row has to be positioned
+     against nothing. The bar grows while a menu is open and shrinks when the
+     page changes, which on a phone is the whole of the interaction. */
   .nav-group-items {
-    display: contents;
+    position: static; flex-direction: row; min-width: 0;
+    padding: 0 0 0 6px; margin-left: 3px; gap: 3px;
+    background: none; border: none; border-left: 2px solid var(--border);
+    border-radius: 0; box-shadow: none;
   }
   .whoami-name { display: none; }
 
