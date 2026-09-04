@@ -37,6 +37,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.0.1', date: '4 September 2026',
+    notes: [
+      'The panel that was called \u201cTimeline\u201d on a client, an inquiry and a quote is now '
+        + 'called \u201cFile notes\u201d, which is what the matter page and the search results '
+        + 'already called it. Same panel, same entries \u2014 one name.',
+      '\u201cFile note\u201d is now one of the categories you can file a document under.',
+    ],
+  },
+  {
     version: '1.0.0', date: '4 September 2026',
     notes: [
       'A matter marked Approved or Declined now always carries the date it was decided. Entering '

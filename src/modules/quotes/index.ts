@@ -823,7 +823,7 @@ export const quotesModule: AppModule = {
                  exactly as it is. A quote can reasonably be invoiced more than once — staged fees
                  are precisely that — so nothing here consumes it.</p>`) : ''}
 
-            ${card('Timeline', entries.length === 0 ? emptyState('Nothing recorded yet.') : html`
+            ${card('File notes', entries.length === 0 ? emptyState('Nothing recorded yet.') : html`
               <ul class="timeline">${entries.map((e) => html`
                 <li class="timeline-item">
                   <div class="timeline-meta"><span class="muted small">${stamp(e.occurred_at)}${e.author_name ? ` · ${e.author_name}` : ''}</span></div>

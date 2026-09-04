@@ -468,7 +468,7 @@ export const inquiriesModule: AppModule = {
                      <a href="/clients/${suggested.id}">${suggested.full_name}</a> (${suggested.ref}).</p>` : ''}
                 </form>`) : ''}
 
-            ${card('Timeline', html`
+            ${card('File notes', html`
               ${writable ? html`
                 <form method="post" action="/inquiries/${inq.id}/entries" class="entry-form">
                   ${csrfField(csrf)}

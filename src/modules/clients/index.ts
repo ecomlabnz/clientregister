@@ -1177,17 +1177,17 @@ export const clientsModule: AppModule = {
                 <td class="small">${stamp(qt.created_at)}</td>
               </tr>`)))}
 
-            ${card('Timeline', html`
+            ${card('File notes', html`
               ${writable ? html`
               <form method="post" action="/clients/${client.id}/entries" class="entry-form">
                 ${csrfField(csrf)}
                 ${select({ label: 'Kind', name: 'kind', value: 'note', includeBlank: false,
                            options: optionsFrom(ENTRY_KINDS.filter((k) => k !== 'system') as any, ENTRY_KIND_LABELS as any) })}
-                ${field({ label: 'Entry', name: 'body', type: 'textarea', rows: 3, required: true, maxlength: 5000,
+                ${field({ label: 'Note', name: 'body', type: 'textarea', rows: 3, required: true, maxlength: 5000,
                           placeholder: 'What happened, what was advised, what was agreed.' })}
-                <button class="btn btn-primary" type="submit">Add to timeline</button>
+                <button class="btn btn-primary" type="submit">Add a note</button>
               </form>` : ''}
-              ${entries.length === 0 ? emptyState('No timeline entries yet.') : html`
+              ${entries.length === 0 ? emptyState('Nothing on the file yet.') : html`
                 <ul class="timeline">
                   ${entries.map((e) => timelineItem({
                     entry: e,
