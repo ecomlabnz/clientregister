@@ -7,6 +7,29 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.0.1 — 4 September 2026
+
+### Changed
+- **One word for one thing: file notes.** The practice, looking at a client
+  page: *"Timeline section — what is that? is it the File Notes section? this is
+  confusing."*
+
+  It was, and the register was disagreeing with itself. The matter page called
+  the panel **File notes**, search results grouped hits under **File notes** —
+  while the client, inquiry and quote pages called the same panel **Timeline**,
+  with a button reading "Add to timeline". They all say File notes now, and the
+  button says "Add a note".
+
+  The table underneath holds more than notes — calls, emails, system lines — so
+  "Timeline" was accurate. It was also not what a practice calls the running
+  record on a file, which is the only thing that matters here.
+
+### Added
+- **"File note" as a document category**, so a note written up as a file can be
+  filed as one. Note that the categories are a list an administrator edits under
+  Settings, so a register whose list has already been changed keeps its own —
+  this one has been added to the practice's list directly.
+
 ## 1.0.0 — 4 September 2026
 
 ### Fixed
