@@ -117,18 +117,6 @@ export const DATASETS: Dataset[] = [
            ORDER BY cl.ref, c.kind, c.issued_on DESC`,
   },
   {
-    key: 'fees', label: 'Fees',
-    description: 'Every fee line on every matter, in cents and in dollars.',
-    sql: `SELECT k.ref AS case_ref, cl.full_name AS client, f.description, f.kind,
-                 f.gst_treatment, f.net_cents, f.gst_cents, f.gross_cents,
-                 printf('%.2f', f.gross_cents / 100.0) AS gross_dollars,
-                 f.currency, f.status, f.invoiced_at, f.paid_at, f.notes, f.created_at
-            FROM fee_items f
-            JOIN cases k ON k.id = f.case_id
-            LEFT JOIN clients cl ON cl.id = k.client_id
-           ORDER BY k.ref, f.created_at`,
-  },
-  {
     key: 'quotes', label: 'Quotes',
     description: 'Quotes with their totals and how they landed.',
     sql: `SELECT q.ref, cl.full_name AS client, k.ref AS case_ref, q.description, q.status,

@@ -19,7 +19,7 @@ import { all, nextRef, nowIso, one, run } from './db';
 import { newId } from './ids';
 import { audit } from './audit';
 import { computeLine, summariseQuote, type QuoteTotals } from './quotes';
-import type { FeeKind, GstTreatment } from './fees';
+import type { FeeKind, GstTreatment, SplitBase } from './money';
 
 export type InvoiceStatus = 'draft' | 'issued' | 'part_paid' | 'paid' | 'void';
 
@@ -379,4 +379,36 @@ export async function paymentsFor(env: Env, invoiceId: string): Promise<PaymentR
       WHERE p.invoice_id = ? ORDER BY p.paid_on, p.created_at`,
     invoiceId,
   );
+}
+
+export interface InvoiceShareRow {
+  id: string; invoice_id: string; party_key: string; label: string;
+  percent_bp: number; user_id: string | null; position: number;
+}
+
+/**
+ * The base a split divides.
+ *
+ * Only professional fees by default, GST-exclusive. Disbursements are money
+ * passed through on the client's behalf — an INZ fee, a medical, a translation
+ * — and apportioning them would hand somebody a share of another organisation's
+ * fee. The practice can change the base in Settings; it cannot change what a
+ * disbursement is.
+ */
+export function splitBaseFor(
+  lines: Array<{ kind: string; net_cents: number; gross_cents: number }>,
+  base: SplitBase,
+): number {
+  if (base === 'net_all') return lines.reduce((n, l) => n + l.net_cents, 0);
+  const professional = lines.filter((l) => l.kind === 'professional');
+  return base === 'gross_professional'
+    ? professional.reduce((n, l) => n + l.gross_cents, 0)
+    : professional.reduce((n, l) => n + l.net_cents, 0);
+}
+
+/** The split on an invoice, in the order it was entered. */
+export async function sharesFor(env: Env, invoiceId: string): Promise<InvoiceShareRow[]> {
+  return all<InvoiceShareRow>(
+    env.DB,
+    'SELECT * FROM invoice_shares WHERE invoice_id = ? ORDER BY position, rowid', invoiceId);
 }

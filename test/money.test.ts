@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  allocateSplit, computeGst, formatBp, parsePercentToBp, roundCents, summariseFees, sumBp,
-  type FeeLine,
-} from '../src/core/fees';
+  allocateSplit, computeGst, formatBp, parsePercentToBp, roundCents, sumBp,
+} from '../src/core/money';
 
 const NZ_GST = 1500; // 15%
 
@@ -40,66 +39,6 @@ describe('computeGst', () => {
     expect(computeGst(3, 'exclusive', NZ_GST).gst).toBe(0);
     // $0.04 + 15% = $0.046 -> rounds to 1 cent.
     expect(computeGst(4, 'exclusive', NZ_GST).gst).toBe(1);
-  });
-});
-
-function line(over: Partial<FeeLine> = {}): FeeLine {
-  return {
-    kind: 'professional', net_cents: 100000, gst_cents: 15000, gross_cents: 115000,
-    include_in_split: 1, status: 'quoted', ...over,
-  };
-}
-
-describe('summariseFees', () => {
-  it('separates professional fees from disbursements', () => {
-    const totals = summariseFees([
-      line({ net_cents: 250000, gst_cents: 37500, gross_cents: 287500 }),
-      line({ kind: 'disbursement', net_cents: 75000, gst_cents: 0, gross_cents: 75000, include_in_split: 0 }),
-    ]);
-    expect(totals.professionalNet).toBe(250000);
-    expect(totals.disbursementsGross).toBe(75000);
-    expect(totals.totalGross).toBe(362500);
-    expect(totals.totalGst).toBe(37500);
-  });
-
-  it('splits only the net professional fees by default', () => {
-    const totals = summariseFees([
-      line({ net_cents: 250000, gst_cents: 37500, gross_cents: 287500 }),
-      line({ kind: 'disbursement', net_cents: 75000, gst_cents: 0, gross_cents: 75000, include_in_split: 0 }),
-    ]);
-    expect(totals.splitBaseCents).toBe(250000);
-  });
-
-  it('honours the net_all and gross_professional split bases', () => {
-    const lines = [
-      line({ net_cents: 250000, gst_cents: 37500, gross_cents: 287500 }),
-      line({ kind: 'disbursement', net_cents: 75000, gst_cents: 0, gross_cents: 75000, include_in_split: 1 }),
-    ];
-    expect(summariseFees(lines, 'net_all').splitBaseCents).toBe(325000);
-    expect(summariseFees(lines, 'gross_professional').splitBaseCents).toBe(287500);
-  });
-
-  it('excludes a line explicitly kept out of the split', () => {
-    const totals = summariseFees([line(), line({ include_in_split: 0 })]);
-    expect(totals.splitBaseCents).toBe(100000);
-    expect(totals.totalNet).toBe(200000);
-  });
-
-  it('ignores cancelled and written-off lines entirely', () => {
-    const totals = summariseFees([line(), line({ status: 'cancelled' }), line({ status: 'written_off' })]);
-    expect(totals.totalNet).toBe(100000);
-    expect(totals.splitBaseCents).toBe(100000);
-  });
-
-  it('tracks invoiced, paid and outstanding', () => {
-    const totals = summariseFees([
-      line({ status: 'invoiced', gross_cents: 115000 }),
-      line({ status: 'paid', gross_cents: 50000 }),
-      line({ status: 'quoted', gross_cents: 20000 }),
-    ]);
-    expect(totals.invoicedGross).toBe(165000);
-    expect(totals.paidGross).toBe(50000);
-    expect(totals.outstandingGross).toBe(115000);
   });
 });
 

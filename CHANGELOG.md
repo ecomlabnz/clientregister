@@ -7,6 +7,51 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.1.0 — 4 September 2026
+
+### Changed
+- **Money lives in quotes and invoices. There is no third place.** Asked
+  directly: *"why do we need fees section at all?? should there just be quotes
+  and invoices… why complicate things??"*
+
+  There was no good answer. The register held 3 fee lines across 2 matters and
+  no invoices at all — a whole section, three tables and a module, for three
+  lines, while the invoice machinery that does the same job properly sat unused
+  because the only way to reach it was to write a quote first.
+
+  **The Fees section is gone.** A matter now shows **Invoices**: what has been
+  billed on it, what is paid, what is outstanding, and a button to raise one.
+  Quotes keep their own card, as before.
+
+  Nothing was migrated, on instruction. The fee lines and the 42 splits were
+  written out to a file first and then dropped.
+
+### Added
+- **A bill can be divided, on the invoice, behind a control that opens when you
+  want it.** Asked for exactly that way: *"the bill split should be a button
+  that opens the options… good if they are available but not always visible."*
+
+  It divides professional fees only, GST-exclusive, by default — a disbursement
+  is money passed through on the client's behalf, and apportioning an INZ fee
+  would hand somebody a share of INZ's money. The base is a setting.
+
+  A split is set while the invoice is a draft and freezes with it. If there is
+  one, it has to come to 100% before the invoice can be issued — the database
+  refuses otherwise, so it holds whatever writes the row. Most bills are not
+  split, and that stays the easy path: no split at all issues freely.
+
+- **Choosing from the price list works on an invoice with scripting off.** That
+  guarantee was written for the Fees panel and came across with the money. A
+  price list only reachable by script is a price list this register could not
+  offer, since it runs with no script at all. What you type still wins over what
+  the list says, so a fee that differs on a particular matter is yours to
+  change.
+
+### Fixed
+- **An invoice and a quote must say what they are for.** Both descriptions were
+  `NOT NULL`, which permits an empty string — the application refused one in two
+  places and the database did not. Now it does.
+
 ## 1.0.3 — 4 September 2026
 
 ### Added

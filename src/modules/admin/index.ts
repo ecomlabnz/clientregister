@@ -27,7 +27,7 @@ import {
 } from '../../ui/components';
 import { dateShort, dateTime, timeShort, truncate } from '../../ui/format';
 import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../core/rbac';
-import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABELS, SPLIT_BASES } from '../../core/fees';
+import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABELS, SPLIT_BASES } from '../../core/money';
 import { currentModel, isAiEnabled } from '../../ai/provider';
 import { nzbnConfigured } from '../../integrations/nzbn';
 import { mailConfigured, mailSetupGaps, mailTransportDetail } from '../../mail/provider';
@@ -298,8 +298,6 @@ export const adminModule: AppModule = {
         'DELETE FROM tags WHERE id LIKE ? ESCAPE \'\\\'',
         'DELETE FROM case_followups WHERE case_id LIKE ? ESCAPE \'\\\'',
         'DELETE FROM case_parties WHERE id LIKE ? ESCAPE \'\\\' OR case_id LIKE ? ESCAPE \'\\\' OR client_id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM fee_shares WHERE id LIKE ? ESCAPE \'\\\' OR case_id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM fee_items WHERE id LIKE ? ESCAPE \'\\\' OR case_id LIKE ? ESCAPE \'\\\'',
         'DELETE FROM quotes WHERE id LIKE ? ESCAPE \'\\\'',
         'DELETE FROM tasks WHERE id LIKE ? ESCAPE \'\\\' OR entity_id LIKE ? ESCAPE \'\\\'',
         'DELETE FROM entries WHERE id LIKE ? ESCAPE \'\\\' OR entity_id LIKE ? ESCAPE \'\\\'',
