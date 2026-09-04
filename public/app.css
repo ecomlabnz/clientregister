@@ -549,10 +549,41 @@ body.bare {
 /* Column widths are obeyed rather than guessed from content. */
 .table-fixed { table-layout: fixed; }
 .table-fixed td, .table-fixed th { overflow-wrap: break-word; }
-col.w-10 { width: 10%; } col.w-12 { width: 12%; } col.w-14 { width: 14%; }
-col.w-16 { width: 16%; } col.w-18 { width: 18%; } col.w-20 { width: 20%; }
-col.w-22 { width: 22%; } col.w-25 { width: 25%; } col.w-28 { width: 28%; }
-col.w-30 { width: 30%; } col.w-34 { width: 34%; } col.w-40 { width: 40%; }
+/*
+ * A column width is a class, because the content policy forbids an inline
+ * style. That is fine, but it means a width nobody wrote a class for is
+ * silently ignored — the `<col>` gets a class that matches nothing, the browser
+ * sizes that column itself, and with `table-layout: fixed` it takes an equal
+ * share of whatever is left. That is exactly what happened: eleven of the
+ * seventeen tables in the register asked for at least one width that did not
+ * exist, and the tick-box column on the inbox, asking for 4%, was given a
+ * sixth of the table.
+ *
+ * So every whole percent a table can reasonably want is written out, rather
+ * than the handful somebody happened to need that afternoon. `test/table.test.ts`
+ * fails if any width used in `src/` has no class here, so the silent version
+ * of this cannot come back.
+ */
+col.w-4 { width: 4%; } col.w-5 { width: 5%; } col.w-6 { width: 6%; } col.w-7 { width: 7%; }
+col.w-8 { width: 8%; } col.w-9 { width: 9%; } col.w-10 { width: 10%; } col.w-11 { width: 11%; }
+col.w-12 { width: 12%; } col.w-13 { width: 13%; } col.w-14 { width: 14%; } col.w-15 { width: 15%; }
+col.w-16 { width: 16%; } col.w-17 { width: 17%; } col.w-18 { width: 18%; } col.w-19 { width: 19%; }
+col.w-20 { width: 20%; } col.w-21 { width: 21%; } col.w-22 { width: 22%; } col.w-23 { width: 23%; }
+col.w-24 { width: 24%; } col.w-25 { width: 25%; } col.w-26 { width: 26%; } col.w-27 { width: 27%; }
+col.w-28 { width: 28%; } col.w-29 { width: 29%; } col.w-30 { width: 30%; } col.w-31 { width: 31%; }
+col.w-32 { width: 32%; } col.w-33 { width: 33%; } col.w-34 { width: 34%; } col.w-35 { width: 35%; }
+col.w-36 { width: 36%; } col.w-37 { width: 37%; } col.w-38 { width: 38%; } col.w-39 { width: 39%; }
+col.w-40 { width: 40%; } col.w-41 { width: 41%; } col.w-42 { width: 42%; } col.w-43 { width: 43%; }
+col.w-44 { width: 44%; } col.w-45 { width: 45%; } col.w-46 { width: 46%; } col.w-47 { width: 47%; }
+col.w-48 { width: 48%; } col.w-49 { width: 49%; } col.w-50 { width: 50%; } col.w-51 { width: 51%; }
+col.w-52 { width: 52%; } col.w-53 { width: 53%; } col.w-54 { width: 54%; } col.w-55 { width: 55%; }
+col.w-56 { width: 56%; } col.w-57 { width: 57%; } col.w-58 { width: 58%; } col.w-59 { width: 59%; }
+col.w-60 { width: 60%; }
+
+/* A column holding one tick box wants the width of a tick box, not a share of
+   the table. A share is the wrong tool: 4% of a wide screen is far more than a
+   checkbox needs, and 4% of a narrow one is less. */
+col.w-pick { width: 44px; }
 table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
 th {
   text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border);

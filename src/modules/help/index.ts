@@ -37,6 +37,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '0.99.3', date: '4 September 2026',
+    notes: [
+      'The tick-box column on the inbox was taking up far more room than a tick box needs, '
+        + 'squeezing the subject line. It is now exactly as wide as the box. The same fix '
+        + 'applies to the \u201cFinished with?\u201d list of clients.',
+      'The cause turned out to affect eleven of the register\u2019s seventeen tables: each was '
+        + 'asking for column widths the styling did not actually define, so the browser guessed. '
+        + 'Alerts, cases, clients, conversations, quotes, invoices and a few others now lay out '
+        + 'the way they were meant to.',
+    ],
+  },
+  {
     version: '0.99.2', date: '3 September 2026',
     notes: [
       'Themes now apply the moment you press one. Go to your account, press a palette, and the '
