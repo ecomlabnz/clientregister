@@ -7,6 +7,49 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.0.0 — 4 September 2026
+
+### Fixed
+- **A matter that says it was decided now carries the date it was decided.** The
+  practice entered a newly granted matter and found the file saying "Decided —"
+  beside a status of Approved. Both had been written by the same press, and they
+  disagreed.
+
+  The rule existed — in the status-change handler, which stamps the date when a
+  matter moves to Approved or Declined. What it did not cover was a matter
+  *entered* at one of those statuses through the intake tool, which accepts any
+  status and never wrote the column. There was no field anywhere through which a
+  person could write it either, so nothing could be corrected.
+
+  **Nine matters in the register are in that state** — seven approved, two
+  declined — and every one has been raising a contradiction alert nobody could
+  act on. They are left exactly as they are rather than stamped with today's
+  date, which would be a worse record than an honest blank; they are named on
+  the alerts page one by one, and can now be filled in.
+
+  The database keeps the rule now, so it holds whatever writes the row — the
+  create form, the status card, the intake tool, a bulk load, or a statement run
+  by hand. It fills a blank and never corrects one.
+
+- **"Decided on" is a field you can type.** On the matter form, beside the
+  lodgement date. Use it when a decision arrived before the file reached the
+  register, or to correct a date the status button stamped as today.
+
+### Changed
+- **The Key details panel says what happened, not just when.** Asked for
+  directly: *"Decided there does not say much — it is either approved or
+  declined."*
+
+  - **Decision** now names the outcome and the date together — "Approved · 04
+    Sept 2026" — and adds the recorded outcome when it says more than the status
+    already does. An undecided matter shows its **Status** instead.
+  - **Due** appears only while something is still awaited. On a decided matter a
+    date under "Due" read as a missed deadline.
+  - **Took** / **Waiting** is new: how long INZ held it, or has held it — counted
+    from lodgement, which is when the waiting starts.
+  - **Priority** appears only when it is not Normal. A row that says the same
+    thing on every matter is a row that says nothing.
+
 ## 0.99.3 — 4 September 2026
 
 ### Fixed

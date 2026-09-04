@@ -187,6 +187,15 @@ function caseForm(
         ${field({ label: 'Response / decision due', name: 'decision_due_at', type: 'date', value: dateInputValue(values.decision_due_at),
                   hint: 'The date that must not be missed — RFI or PPI deadline, or expected decision. '
                     + 'Left empty on a lodged matter, it is filled in from the practice default.' })}
+        ${'' /* The decision's own date, which until now could not be typed
+                 anywhere. Moving a matter to Approved from the status card
+                 stamps today, which is right when the decision has just
+                 arrived and wrong when a granted matter is being entered
+                 weeks later — and that second case had no remedy at all. */}
+        ${field({ label: 'Decided on', name: 'decided_at', type: 'date', value: dateInputValue(values.decided_at),
+                  hint: 'The day the decision actually arrived. Leave it empty while the matter is '
+                    + 'still running; set it here if a decision came before the file reached the '
+                    + 'register, or to correct a date the status button stamped.' })}
         <div class="field checkbox-field">
           <label><input type="checkbox" name="chase_inz" value="1"
                    ${values.chase_inz === 0 ? '' : raw('checked')}>
@@ -242,11 +251,67 @@ function readCaseForm(f: FormReader, types: Term[]) {
     inz_client_number: f.optional('inz_client_number', { max: 60 }),
     lodged_at: f.date('lodged_at'),
     decision_due_at: f.date('decision_due_at'),
+    decided_at: f.date('decided_at'),
     chase_inz: f.checkbox('chase_inz') ? 1 : 0,
     next_action: f.optional('next_action', { max: 200 }),
     next_action_due: f.date('next_action_due'),
     summary: f.optional('summary', { max: 4000 }),
   };
+}
+
+/** Matters whose story has an ending the practice would call a decision. */
+const DECIDED_STATUSES = ['approved', 'declined'] as const;
+
+export function isDecidedStatus(status: string): boolean {
+  return (DECIDED_STATUSES as readonly string[]).includes(status);
+}
+
+/**
+ * How the decision reads on the file.
+ *
+ * The panel used to show a bare date under "Decided", which never said which
+ * way it went — and on a matter entered already granted it showed nothing at
+ * all, because no route wrote the date. This says the outcome first, because
+ * that is the thing a person opening the file is looking for, and the date
+ * after it.
+ *
+ * `outcome` is shown only when it says more than the status already does. It
+ * holds one word on most matters ("approved") and a paragraph on a handful, so
+ * repeating "Approved · approved" is exactly what it must not do.
+ */
+export function decisionLine(kase: Pick<CaseRow, 'status' | 'decided_at' | 'outcome'>): string {
+  const label = CASE_STATUS_LABELS[kase.status as CaseStatus] ?? kase.status;
+  const outcome = (kase.outcome ?? '').trim();
+  const adds = outcome !== '' && outcome.toLowerCase() !== label.toLowerCase()
+    && outcome.toLowerCase() !== kase.status.toLowerCase();
+  const when = kase.decided_at
+    ? dateShort(kase.decided_at)
+    : 'date not recorded — add it under Edit';
+  return `${label}${adds ? ` — ${outcome}` : ''} · ${when}`;
+}
+
+/**
+ * The span the practice talks about: how long INZ held it, or has held it.
+ *
+ * Counted from lodgement, because that is when the waiting starts — not from
+ * when the file was opened, which is when the work started. Null when there is
+ * nothing to count from, so the row is simply not drawn.
+ */
+export function elapsedLine(
+  kase: Pick<CaseRow, 'lodged_at' | 'decided_at'>,
+  today: string,
+): string | null {
+  if (!kase.lodged_at) return null;
+  const from = kase.lodged_at.slice(0, 10);
+  const to = (kase.decided_at ?? today).slice(0, 10);
+  if (to < from) return null;
+  const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+  if (!Number.isFinite(days)) return null;
+  if (days === 0) return 'same day';
+  if (days === 1) return '1 day';
+  if (days < 60) return `${days} days`;
+  const months = Math.floor(days / 30);
+  return `${days} days (about ${months} month${months === 1 ? '' : 's'})`;
 }
 
 export const casesModule: AppModule = {
@@ -567,11 +632,11 @@ export const casesModule: AppModule = {
       await run(
         c.env.DB,
         `INSERT INTO cases (id, ref, client_id, title, descriptor, case_type, status, priority, assigned_to,
-            inz_application_number, inz_client_number, lodged_at, decision_due_at,
+            inz_application_number, inz_client_number, lodged_at, decision_due_at, decided_at,
             next_action, next_action_due, summary, chase_inz, currency, created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NZD',?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NZD',?,?,?)`,
         id, ref, v.client_id, v.title, v.descriptor, v.case_type, status, v.priority, v.assigned_to,
-        v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue,
+        v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue, v.decided_at,
         v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), nowIso(), user.id,
       );
       await run(
@@ -604,6 +669,8 @@ export const casesModule: AppModule = {
 
       const writable = can(c.get('user'), 'register:write');
       const csrf = c.get('session')!.csrf;
+      const decided = isDecidedStatus(kase.status);
+      const elapsed = elapsedLine(kase, new Date().toISOString().slice(0, 10));
 
       const [entries, history, tasks, quotes, users, fees, caseFlags, flagKindTerms,
              parties, caseTags, allTags, clients,
@@ -1001,11 +1068,37 @@ export const casesModule: AppModule = {
                   </form>
                 </details>` : ''}`)}
 
+            ${'' /* Every row here has to earn its place.
+                     
+                     The practice, on being shown a granted matter whose panel
+                     said "Decided —": *"Decided there does not say much — it is
+                     either approved or declined or some other status"*, and
+                     *"the panels must be as useful as possible with relevant
+                     information"*.
+                     
+                     So the panel answers what a person opening the file wants
+                     to know, and a row that would say nothing is not drawn:
+                     
+                     - **Decision** names the outcome and when, rather than a
+                       date under a label that never said which way it went.
+                     - **Due** is shown only while something is still awaited. A
+                       decided matter is waiting for nothing, and a date under
+                       "Due" on it reads as an overdue deadline.
+                     - **Took / Waiting** is the span the practice actually
+                       talks about — how long INZ held it, or how long it has
+                       been holding it now.
+                     - **Priority** appears only when it is not the default,
+                       because "Normal" on every matter is a row of noise. */}
             ${foldingCard('Key details', html`
               <dl class="kv">
                 <dt>Client</dt><dd><a href="/clients/${kase.client_id}">${kase.client_name}</a> <code>${kase.client_ref}</code></dd>
                 <dt>Type</dt><dd>${labelFor(types, kase.case_type)}</dd>
-                <dt>Priority</dt><dd>${PRIORITY_LABELS[kase.priority as keyof typeof PRIORITY_LABELS] ?? kase.priority}</dd>
+                ${decided
+                  ? html`<dt>Decision</dt><dd>${decisionLine(kase)}</dd>`
+                  : html`<dt>Status</dt><dd>${CASE_STATUS_LABELS[kase.status as CaseStatus] ?? kase.status}</dd>`}
+                ${kase.priority !== 'normal'
+                  ? html`<dt>Priority</dt><dd>${PRIORITY_LABELS[kase.priority as keyof typeof PRIORITY_LABELS] ?? kase.priority}</dd>`
+                  : ''}
                 ${'' /* Only reachable for a matter whose owner's account was
                          removed, which nothing in the application does. Kept as
                          a visible gap rather than an empty cell. */}
@@ -1013,8 +1106,11 @@ export const casesModule: AppModule = {
                 <dt>INZ application</dt><dd>${kase.inz_application_number ?? '—'}</dd>
                 <dt>INZ client no.</dt><dd>${kase.inz_client_number ?? '—'}</dd>
                 <dt>Lodged</dt><dd>${dateShort(kase.lodged_at)}</dd>
-                <dt>Due</dt><dd>${dateShort(kase.decision_due_at)}</dd>
-                <dt>Decided</dt><dd>${dateShort(kase.decided_at)}</dd>
+                ${!decided && kase.decision_due_at
+                  ? html`<dt>Due</dt><dd class="${isOverdue(kase.decision_due_at) ? 'warn' : ''}">
+                          ${dateShort(kase.decision_due_at)} (${relativeDays(kase.decision_due_at)})</dd>`
+                  : ''}
+                ${elapsed ? html`<dt>${decided ? 'Took' : 'Waiting'}</dt><dd>${elapsed}</dd>` : ''}
                 <dt>Opened</dt><dd>${stamp(kase.created_at)}</dd>
               </dl>`)}
 
@@ -1072,11 +1168,11 @@ export const casesModule: AppModule = {
       await run(
         c.env.DB,
         `UPDATE cases SET client_id=?, title=?, descriptor=?, case_type=?, priority=?, assigned_to=?,
-           inz_application_number=?, inz_client_number=?, lodged_at=?, decision_due_at=?,
+           inz_application_number=?, inz_client_number=?, lodged_at=?, decision_due_at=?, decided_at=?,
            next_action=?, next_action_due=?, summary=?, chase_inz=?, updated_at=?
          WHERE id=?`,
         v.client_id, v.title, v.descriptor, v.case_type, v.priority, v.assigned_to,
-        v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue,
+        v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue, v.decided_at,
         v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), id,
       );
       // The chases follow the dates rather than being fired once: moving the
