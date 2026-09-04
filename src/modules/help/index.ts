@@ -37,6 +37,21 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.0.0', date: '4 September 2026',
+    notes: [
+      'A matter marked Approved or Declined now always carries the date it was decided. Entering '
+        + 'an already-granted matter through the intake tool used to leave that blank, which is '
+        + 'why one of yours said \u201cDecided \u2014\u201d. Nine older matters are still blank; '
+        + 'they are listed on the Alerts page and you can now fill them in.',
+      'The matter form has a \u201cDecided on\u201d box. Use it when a decision arrived before '
+        + 'the file reached the register, or to correct a date.',
+      'Key details on a matter now says \u201cDecision: Approved \u00b7 04 Sept 2026\u201d rather '
+        + 'than a bare date under a heading that never said which way it went. It also shows how '
+        + 'long INZ took, or how long it has been waiting; the due date disappears once a matter '
+        + 'is decided; and the priority is only shown when it is not Normal.',
+    ],
+  },
+  {
     version: '0.99.3', date: '4 September 2026',
     notes: [
       'The tick-box column on the inbox was taking up far more room than a tick box needs, '

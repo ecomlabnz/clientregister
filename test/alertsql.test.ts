@@ -90,7 +90,12 @@ beforeAll(() => {
   // Contradictions.
   matter('k_backwards', 'K-BACKWARDS', 'cl_visa', 'approved',
     { lodged: '2026-08-01', decided: '2026-07-01', created: '2026-07-01' });
+  // Approved or declined with no decision date. Since migration 0061 the
+  // database fills that in, so this state can no longer be *created* — but nine
+  // matters loaded before it still hold it, which is what the check is for. The
+  // date is cleared after the insert to reproduce them exactly.
   matter('k_nodate', 'K-NODATE', 'cl_visa', 'declined', { lodged: '2026-08-01', created: '2026-07-01' });
+  db.prepare(`UPDATE cases SET decided_at = NULL WHERE id = 'k_nodate'`).run();
   matter('k_future', 'K-FUTURE', 'cl_visa', 'lodged', { lodged: '2027-01-01', inz: '600999999', created: '2026-08-01' });
 
   const task = (id: string, caseId: string, due: string | null, status = 'open') =>
