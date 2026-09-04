@@ -14,7 +14,9 @@ import type { AppContext, Env, EntityType } from '../../types';
 import type { AppModule } from '../../core/module';
 import { all, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
-import { sha256Hex } from '../../core/crypto';
+import {
+  MAX_UPLOAD_BYTES, fileResponse, putFile, safeFilename,
+} from '../../core/files';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
@@ -28,17 +30,12 @@ import { addEntry } from '../../core/timeline';
 import { safeReturn } from '../tasks';
 import { docCategories, isTerm, labelFor, type Term } from '../../core/vocabulary';
 
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const ENTITY_TYPES: EntityType[] = ['client', 'case', 'inquiry', 'quote'];
 
-/**
- * Types a browser may render in place. Anything else is served as an
- * attachment with an octet-stream type, so nothing user-supplied is ever
- * handed back with a content type a browser would execute.
- */
-const SAFE_INLINE_TYPES = new Set([
-  'application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'text/plain',
-]);
+// How a file is named, stored and served back is decided in one place for both
+// file tables — see `core/files.ts` and migration 0063. Re-exported because
+// this module was where callers found it first.
+export { safeFilename };
 
 interface DocumentRow {
   id: string; entity_type: string; entity_id: string; r2_key: string | null; filename: string;
@@ -76,25 +73,20 @@ export async function storeDocument(
     return { error: `Files must be ${MAX_UPLOAD_BYTES / 1024 / 1024} MB or smaller, so the file was not attached.` };
   }
 
-  const bytes = new Uint8Array(await opts.file.arrayBuffer());
-  const digest = await sha256Hex(bytes);
   const filename = safeFilename(opts.file.name);
   const id = newId('doc');
   const key = `${opts.entityType}/${opts.entityId}/${id}-${filename}`;
+  const put = await putFile(env.DOCS, { key, file: opts.file, uploadedBy: opts.uploadedBy });
 
-  await env.DOCS.put(key, bytes, {
-    httpMetadata: { contentType: opts.file.type || 'application/octet-stream' },
-    customMetadata: { uploadedBy: opts.uploadedBy ?? 'unknown', sha256: digest },
-  });
   await run(
     env.DB,
     `INSERT INTO documents (id, entity_type, entity_id, r2_key, filename, content_type, size_bytes,
         sha256, description, category, uploaded_at, uploaded_by)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-    id, opts.entityType, opts.entityId, key, filename, opts.file.type || 'application/octet-stream',
-    bytes.byteLength, digest, opts.description ?? null, opts.category || 'other', nowIso(), opts.uploadedBy,
+    id, opts.entityType, opts.entityId, key, filename, put.contentType,
+    put.size, put.digest, opts.description ?? null, opts.category || 'other', nowIso(), opts.uploadedBy,
   );
-  return { id, filename, size: bytes.byteLength };
+  return { id, filename, size: put.size };
 }
 
 /**
@@ -173,12 +165,6 @@ export async function listCaseFiles(env: Env, caseId: string): Promise<DocumentR
      ORDER BY uploaded_at DESC`,
     caseId,
   );
-}
-
-/** Reduce a supplied filename to a safe set of characters. */
-export function safeFilename(name: string): string {
-  const cleaned = name.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._]+/, '').slice(0, 200);
-  return cleaned || 'file';
 }
 
 export const documentsModule: AppModule = {
@@ -353,17 +339,7 @@ export const documentsModule: AppModule = {
 
       await auditFrom(c, { action: 'document.downloaded', entityType: doc.entity_type, entityId: doc.entity_id, meta: { id: doc.id } });
 
-      const inline = SAFE_INLINE_TYPES.has(doc.content_type);
-      return new Response(object.body, {
-        headers: {
-          'content-type': inline ? doc.content_type : 'application/octet-stream',
-          'content-disposition': `${inline ? 'inline' : 'attachment'}; filename="${safeFilename(doc.filename)}"`,
-          'content-length': String(doc.size_bytes),
-          'cache-control': 'no-store, private',
-          'x-content-type-options': 'nosniff',
-          'content-security-policy': "default-src 'none'; sandbox",
-        },
-      });
+      return fileResponse(object.body, doc);
     });
 
     r.post('/:id/delete', requirePermission('register:delete'), async (c) => {

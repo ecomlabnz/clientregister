@@ -350,36 +350,16 @@ Two conventions hold throughout:
 | `gross_cents` | INTEGER | NOT NULL |  |
 | `created_at` | TEXT | NOT NULL |  |
 
-### `fee_items`
+### `invoice_shares`
+
+How one invoice's professional fees are divided between the parties who owe
+them. Frozen with the invoice: once it is issued the split cannot be changed,
+and it must come to 100% before it will issue at all.
 
 | Column | Type | | Default |
 |---|---|---|---|
 | `id` | TEXT | PK |  |
-| `case_id` | TEXT | NOT NULL |  |
-| `description` | TEXT | NOT NULL |  |
-| `kind` | TEXT | NOT NULL | 'professional' |
-| `amount_cents` | INTEGER | NOT NULL |  |
-| `gst_treatment` | TEXT | NOT NULL | 'exclusive' |
-| `gst_rate_bp` | INTEGER | NOT NULL | 1500 |
-| `net_cents` | INTEGER | NOT NULL |  |
-| `gst_cents` | INTEGER | NOT NULL |  |
-| `gross_cents` | INTEGER | NOT NULL |  |
-| `currency` | TEXT | NOT NULL | 'NZD' |
-| `include_in_split` | INTEGER | NOT NULL | 1 |
-| `status` | TEXT | NOT NULL | 'quoted' |
-| `invoiced_at` | TEXT |  |  |
-| `paid_at` | TEXT |  |  |
-| `notes` | TEXT |  |  |
-| `created_at` | TEXT | NOT NULL |  |
-| `updated_at` | TEXT | NOT NULL |  |
-| `created_by` | TEXT |  |  |
-
-### `fee_shares`
-
-| Column | Type | | Default |
-|---|---|---|---|
-| `id` | TEXT | PK |  |
-| `case_id` | TEXT | NOT NULL |  |
+| `invoice_id` | TEXT | NOT NULL |  |
 | `party_key` | TEXT | NOT NULL |  |
 | `label` | TEXT | NOT NULL |  |
 | `percent_bp` | INTEGER | NOT NULL |  |
@@ -721,6 +701,26 @@ Two conventions hold throughout:
 | `note` | TEXT |  |  |
 | `created_at` | TEXT | NOT NULL |  |
 | `created_by` | TEXT | NOT NULL |  |
+
+### `kb_documents`
+
+Files filed against an article — the circular, the instructions, whatever the
+article is about. Its own table rather than a row in `documents`, and migration
+0063 says why at length: `documents` restricts what a file may hang off, and
+that restriction cannot be widened on D1 without putting existing file-note
+attachments at risk.
+
+| Column | Type | | Default |
+|---|---|---|---|
+| `id` | TEXT | PK |  |
+| `article_id` | TEXT | NOT NULL |  |
+| `r2_key` | TEXT | NOT NULL |  |
+| `filename` | TEXT | NOT NULL |  |
+| `content_type` | TEXT | NOT NULL |  |
+| `size_bytes` | INTEGER | NOT NULL |  |
+| `sha256` | TEXT |  |  |
+| `uploaded_at` | TEXT | NOT NULL |  |
+| `uploaded_by` | TEXT |  |  |
 
 ### `kb_followups`
 

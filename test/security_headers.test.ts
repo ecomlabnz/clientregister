@@ -66,6 +66,23 @@ describe('security headers on every response', () => {
     }
   });
 
+  it('leaves a stricter policy a route set for itself', async () => {
+    // The two file downloads hand back something that came from outside, and
+    // set `default-src 'none'; sandbox` on it. This used to be overwritten
+    // with the page policy — which permits same-origin script — on exactly the
+    // responses that most needed it not to be.
+    const app = new Hono<AppContext>();
+    app.use('*', securityHeaders);
+    app.get('/file', (c) => new Response('bytes', {
+      headers: { 'content-security-policy': "default-src 'none'; sandbox" },
+    }));
+    const res = await app.request('/file');
+    expect(res.headers.get('content-security-policy')).toBe("default-src 'none'; sandbox");
+    // Everything else the middleware adds is still added.
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(res.headers.get('x-frame-options')).toBe('DENY');
+  });
+
   it("never weakens script-src with 'unsafe-inline' or 'unsafe-eval'", async () => {
     const csp = (await headersApp().request('/')).headers.get('content-security-policy') ?? '';
     expect(csp).not.toContain('unsafe-inline');
