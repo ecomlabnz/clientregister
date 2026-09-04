@@ -37,6 +37,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.0.2', date: '4 September 2026',
+    notes: [
+      'Builds no longer fail when npm\u2019s own servers are down. A real security problem in a '
+        + 'dependency still stops a release \u2014 nothing has been relaxed \u2014 but an '
+        + 'unreachable registry now says so plainly instead of looking like a broken build.',
+      'There is a new prompt for turning a working conversation with Claude into a file note the '
+        + 'register can use \u2014 docs/case-note-prompt.md. It writes the note, lists the fields '
+        + 'it actually settled, and tells you what is still unconfirmed.',
+    ],
+  },
+  {
     version: '1.0.1', date: '4 September 2026',
     notes: [
       'The panel that was called \u201cTimeline\u201d on a client, an inquiry and a quote is now '
