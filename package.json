@@ -1,6 +1,6 @@
 {
   "name": "clientregister",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Modular, security-first client & case register for an immigration practice, built on Cloudflare Workers.",
   "type": "module",
@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:security": "vitest run test/security_",
-    "audit": "npm audit --audit-level=high",
+    "audit": "node scripts/audit.mjs",
     "build:check": "wrangler deploy --dry-run --outdir=.wrangler/dry",
     "db:migrate:local": "wrangler d1 migrations apply clientregister-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply clientregister-db --remote",

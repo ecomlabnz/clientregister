@@ -7,6 +7,38 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.0.2 — 4 September 2026
+
+### Fixed
+- **A dependency check that failed on a bad night rather than on a
+  vulnerability.** Four builds went red on 3–4 September because npm's own
+  registry was returning 503 — each after minutes of retries, and each time the
+  very same commit passed the very same step on a parallel run. The practice was
+  told twice that a run had failed, about something that had nothing to do with
+  the code, and two merges were held up behind it.
+
+  `npm audit` exits non-zero for two quite different reasons: a dependency
+  carries an advisory, or npm could not be reached. Those are now told apart.
+  A high or critical advisory stops the build exactly as before — nothing is
+  skipped because it is inconvenient. An unreachable registry is retried three
+  times and then reported, in a banner nobody can miss, as **did not run**:
+  not a pass, because nothing was checked, but not a failure of this code
+  either.
+
+### Added
+- **A prompt for turning a working conversation into a file note**
+  (`docs/case-note-prompt.md`). The practice works cases with Claude, and some
+  conversations end up knowing a great deal about a matter. Paste the prompt at
+  the end of one and it produces three things: a file note written as a lawyer
+  would write it, the register's own fields for the facts that were actually
+  settled, and — the part worth reading first — a list of what is missing,
+  uncertain, or worked out rather than read.
+
+  It carries the practice's case types and statuses inside it, so it works in a
+  conversation with no access to anything. And it proposes: the intake tool
+  reads it and shows every field for checking, and nothing is written until
+  somebody presses the button.
+
 ## 1.0.1 — 4 September 2026
 
 ### Changed

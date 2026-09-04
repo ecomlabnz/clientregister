@@ -152,12 +152,14 @@ practice's files are held here at all (see the tenancy decision in CLAUDE.md).
   than stamped with today, and are named on the Alerts page for the practice to
   fill in.
 
-### 8. CI is fragile to npm being down
-Three CI runs failed on 3–4 September because `npm audit` could not reach
-`registry.npmjs.org` (503, after seven minutes of retries), while the same commit
-passed on a parallel run. The step is a real security control and should not be
-weakened casually — but a registry outage should not read as a red build. **Not
-changed without the practice's say-so**, since it is a security gate.
+### 8. ~~CI is fragile to npm being down~~ — done, 1.0.2
+Four CI runs failed on 3–4 September because `npm audit` could not reach
+`registry.npmjs.org`, while the same commit passed on a parallel run each time.
+The gate is unchanged — a high or critical advisory still stops the build — but
+an unreachable registry is now retried three times and then reported loudly as
+*did not run*, rather than as a failure. The reading of npm's answer is in
+`scripts/audit-gate.mjs` and is tested against the shapes npm actually produces,
+including the one it printed for hours that night.
 
 ### 9. Reading across from other sessions
 The **App field comparison review** session produced the nine fields above. Its
