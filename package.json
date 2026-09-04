@@ -1,6 +1,6 @@
 {
   "name": "clientregister",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "Modular, security-first client & case register for an immigration practice, built on Cloudflare Workers.",
   "type": "module",

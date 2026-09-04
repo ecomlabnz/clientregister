@@ -110,13 +110,24 @@ There is none. `docs/operations.md` says so in bold, and the register has held
 real client files since 30 August 2026. This must be closed before another
 practice's files are held here at all (see the tenancy decision in CLAUDE.md).
 
-### 5. Dead code and stale tooling
-- `sealField` / `unsealField` in `src/core/crypto.ts`, left from the passport
-  encryption removed in 0.69.0. Nothing calls them.
-- `scripts/seed-demo.mjs` references `clients.nationality`, a column dropped in
-  favour of `client_nationalities`. It will fail on a fresh copy.
-- Six stale branches on the remote. Deleting them needs the practice's own
-  GitHub session; the token here is refused (403).
+### 5. ~~Dead code and stale tooling~~ — done, 1.1.1
+- `sealField` / `unsealField` removed from `src/core/crypto.ts`, dead since
+  0.69.0 when the practice decided passport numbers are stored as written. The
+  `FIELD_KEY` secret is now referenced by nothing; it can be removed from the
+  deployment when convenient, and is harmless where it is.
+- **`scripts/seed-demo.mjs` had rotted in four ways**, none of them noticed
+  because nothing ever ran it: a dropped `clients.nationality` column, country
+  names where migration 0055 requires ISO codes, no `assigned_to` on a matter
+  (which a trigger has long refused), and writes to `fee_items` / `fee_shares`.
+  Fixed, and now **run by a test** against every migration with foreign keys and
+  triggers on.
+- `scripts/seed-demo-remove.sql` named the two dropped tables. Running it turned
+  up a real fault nobody had hit: `invoice_items` lacked the `demo_` exemption
+  that `invoices` and `invoice_payments` both carry, so demonstration data could
+  not be removed once an invoice was issued. Fixed in migration 0062.
+
+**Still open here:** six stale branches on the remote. Deleting them needs the
+practice's own GitHub session; the token here is refused (403).
 
 ### 6. Data shapes worth a decision
 - **`cases.outcome` holds two shapes** — about 123 one-word verdicts and 10

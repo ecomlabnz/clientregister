@@ -136,3 +136,23 @@ WHEN TRIM(NEW.description) = ''
 BEGIN
   SELECT RAISE(ABORT, 'a quote has to say what it is for');
 END;
+
+-- Demonstration data must be removable, and one trigger forgot.
+--
+-- `invoices` and `invoice_payments` both exempt rows whose id begins `demo_`
+-- from their delete guards, deliberately: a register that holds real client
+-- files cannot also hold demonstration records that nobody can take out again.
+-- `invoice_items` was written without that exemption, so `seed-demo-remove.sql`
+-- stopped at the first line of the first issued demo invoice — found by running
+-- the removal script rather than reading it.
+--
+-- The freeze itself is untouched for every real invoice. This says only that a
+-- line belonging to a demonstration invoice may be deleted with it.
+DROP TRIGGER invoice_items_frozen_on_delete;
+CREATE TRIGGER invoice_items_frozen_on_delete
+BEFORE DELETE ON invoice_items
+WHEN IFNULL((SELECT status FROM invoices WHERE id = OLD.invoice_id), 'draft') != 'draft'
+ AND OLD.id NOT LIKE 'demo\_%' ESCAPE '\'
+BEGIN
+  SELECT RAISE(ABORT, 'an issued invoice cannot lose a line');
+END;

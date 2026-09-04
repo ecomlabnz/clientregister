@@ -168,40 +168,6 @@ export async function hmacSha256Hex(secret: string, message: string | Uint8Array
   return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-// --- Sealed fields -----------------------------------------------------------
-
-async function fieldKey(rawBase64: string): Promise<CryptoKey> {
-  const raw = base64Decode(rawBase64);
-  if (raw.length !== 32) throw new Error('FIELD_KEY must decode to exactly 32 bytes');
-  return crypto.subtle.importKey('raw', raw as BufferSource, 'AES-GCM', false, ['encrypt', 'decrypt']);
-}
-
-/** Encrypt a value for storage. Returns `v1.<base64(iv||ciphertext)>`. */
-export async function sealField(plaintext: string, keyB64: string): Promise<string> {
-  const key = await fieldKey(keyB64);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv as BufferSource }, key, enc.encode(plaintext));
-  const combined = new Uint8Array(iv.length + ct.byteLength);
-  combined.set(iv, 0);
-  combined.set(new Uint8Array(ct), iv.length);
-  return `v1.${base64Encode(combined)}`;
-}
-
-/** Decrypt a sealed value. Returns null if the value is malformed or forged. */
-export async function unsealField(sealed: string, keyB64: string): Promise<string | null> {
-  if (!sealed.startsWith('v1.')) return null;
-  try {
-    const key = await fieldKey(keyB64);
-    const combined = base64Decode(sealed.slice(3));
-    if (combined.length <= 12) return null;
-    const iv = combined.slice(0, 12);
-    const ct = combined.slice(12);
-    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv as BufferSource }, key, ct as BufferSource);
-    return new TextDecoder().decode(pt);
-  } catch {
-    return null;
-  }
-}
 
 // --- TOTP (RFC 6238) ---------------------------------------------------------
 

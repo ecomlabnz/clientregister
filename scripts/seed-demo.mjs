@@ -27,6 +27,9 @@ const q = (v) => (v === null || v === undefined ? 'NULL' : `'${String(v).replace
 const out = [];
 const emit = (sql) => out.push(sql);
 
+const OWNER_ID = `(SELECT id FROM users WHERE status = 'active'` +
+  ` ORDER BY CASE role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, created_at LIMIT 1)`;
+
 let clientSeq = 0;
 let caseSeq = 0;
 let quoteSeq = 0;
@@ -46,7 +49,7 @@ function client(key, row) {
   clients.set(key, { id, ref, name: row.full_name });
   emit(
     `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name, preferred_name, nzbn,` +
-    ` company_number, email, phone, whatsapp, nationality, date_of_birth, passport_country,` +
+    ` company_number, email, phone, whatsapp, date_of_birth, passport_country,` +
     ` passport_expiry, police_certificate_country, police_certificate_date, police_certificate_expiry,` +
     ` medical_certificate_date, medical_certificate_expiry, current_visa_type, current_visa_expiry,` +
     ` address, status, notes, organisation_id, organisation_role, created_at, updated_at) VALUES (` +
@@ -59,7 +62,7 @@ function client(key, row) {
      row.given_names ?? null,
      row.family_name ? row.family_name.toUpperCase() : null,
      row.preferred_name ?? null, row.nzbn ?? null, row.company_number ?? null, row.email ?? null,
-     row.phone ?? null, row.whatsapp ?? null, row.nationality ?? null, row.date_of_birth ?? null,
+     row.phone ?? null, row.whatsapp ?? null, row.date_of_birth ?? null,
      row.passport_country ?? null, row.passport_expiry ?? null, row.police_country ?? null,
      row.police_date ?? null, row.police_expiry ?? null, row.medical_date ?? null,
      row.medical_expiry ?? null, row.visa_type ?? null, row.visa_expiry ?? null, row.address ?? null,
@@ -80,12 +83,12 @@ function kase(key, row) {
   emit(
     `INSERT INTO cases (id, ref, client_id, title, case_type, status, priority, inz_application_number,` +
     ` lodged_at, decision_due_at, decided_at, outcome, next_action, next_action_due, summary,` +
-    ` currency, created_at, updated_at, closed_at) VALUES (` +
+    ` currency, created_at, updated_at, closed_at, assigned_to) VALUES (` +
     [id, ref, clients.get(row.client).id, row.title, row.case_type, row.status, row.priority ?? 'normal',
      row.inz ?? null, row.lodged ?? null, row.due ?? null, row.decided ?? null, row.outcome ?? null,
      row.next_action ?? null, row.next_due ?? null, row.summary ?? null, 'NZD',
      at(row.created ?? -90), at(row.updated ?? -2), row.closed ?? null,
-    ].map(q).join(', ') + ');',
+    ].map(q).join(', ') + `, ${OWNER_ID});`,
   );
   emit(
     `INSERT INTO case_status_history (id, case_id, from_status, to_status, at, note) VALUES (` +
@@ -126,31 +129,47 @@ function tagCase(caseKey, names) {
 }
 
 let feeSeq = 0;
-function fee(caseKey, description, kind, amountCents, treatment, status, includeInSplit = 1) {
-  feeSeq += 1;
-  const rate = treatment === 'none' ? 0 : 1500;
-  let net; let gst;
-  if (treatment === 'inclusive') { net = Math.round((amountCents * 10000) / (10000 + rate)); gst = amountCents - net; }
-  else if (treatment === 'none') { net = amountCents; gst = 0; }
-  else { net = amountCents; gst = Math.round((amountCents * rate) / 10000); }
-  emit(
-    `INSERT INTO fee_items (id, case_id, description, kind, amount_cents, gst_treatment, gst_rate_bp,` +
-    ` net_cents, gst_cents, gross_cents, currency, include_in_split, status, invoiced_at, paid_at,` +
-    ` created_at, updated_at) VALUES (` +
-    [`demo_fee_${feeSeq}`, cases.get(caseKey).id, description, kind, amountCents, treatment, rate,
-     net, gst, net + gst, 'NZD', includeInSplit, status,
-     status === 'invoiced' || status === 'paid' ? at(-30) : null,
-     status === 'paid' ? at(-20) : null, at(-60), at(-30)].map(q).join(', ') + ');',
-  );
-}
 
-let shareSeq = 0;
-function split(caseKey, shares) {
-  for (const [i, sh] of shares.entries()) {
-    shareSeq += 1;
+/**
+ * A demonstration invoice on a matter.
+ *
+ * Replaces the fee lines and splits the demo used to write. Money lives in
+ * quotes and invoices now, and a seed that writes to tables the schema no
+ * longer has is a seed that fails on the first run of a fresh copy — which is
+ * what this one did.
+ */
+let invSeq = 0;
+function invoice(caseKey, clientKey, description, amountCents, { treatment = 'exclusive', status = 'issued' } = {}) {
+  invSeq += 1;
+  const rate = treatment === 'none' ? 0 : 1500;
+  let net = amountCents;
+  let gst = 0;
+  if (treatment === 'inclusive') { net = Math.round((amountCents * 10000) / (10000 + rate)); gst = amountCents - net; }
+  else if (treatment !== 'none') { gst = Math.round((amountCents * rate) / 10000); }
+  const id = `demo_inv_${invSeq}`;
+  // Written as a draft, then the line, then the status. An issued invoice
+  // cannot gain a line — the database refuses — so the order is not a style
+  // choice.
+  emit(
+    `INSERT INTO invoices (id, ref, client_id, case_id, description, payment_terms_days, status,` +
+    ` currency, net_cents, gst_cents, gross_cents, paid_cents, created_at, updated_at,` +
+    ` created_by) VALUES (` +
+    [id, `INV-9${String(invSeq).padStart(3, '0')}`, clients.get(clientKey).id, cases.get(caseKey).id,
+     description, 7, 'draft', 'NZD', net, gst, net + gst, 0,
+     at(-60), at(-30)].map(q).join(', ') + `, ${OWNER_ID});`,
+  );
+  emit(
+    `INSERT INTO invoice_items (id, invoice_id, position, description, kind, unit_label,` +
+    ` quantity_milli, unit_amount_cents, gst_treatment, gst_rate_bp, net_cents, gst_cents,` +
+    ` gross_cents, created_at) VALUES (` +
+    [`demo_ili_${invSeq}`, id, 0, description, 'professional', 'matter', 1000, amountCents,
+     treatment, rate, net, gst, net + gst, at(-60)].map(q).join(', ') + ');',
+  );
+  if (status !== 'draft') {
     emit(
-      `INSERT INTO fee_shares (id, case_id, party_key, label, percent_bp, position, created_at, updated_at) VALUES (` +
-      [`demo_shr_${shareSeq}`, cases.get(caseKey).id, sh.key, sh.label, sh.bp, i, at(-60), at(-60)].map(q).join(', ') + ');',
+      `UPDATE invoices SET status = ${q(status)}, issued_on = ${q(at(-30))}` +
+      `${status === 'paid' ? `, paid_cents = ${net + gst}` : ''}` +
+      ` WHERE id = ${q(id)};`,
     );
   }
 }
@@ -162,8 +181,6 @@ let taskSeq = 0;
  * account is looked up in the statement itself. If somehow no account is
  * active, the insert is skipped rather than failing the whole seed.
  */
-const OWNER_ID = `(SELECT id FROM users WHERE status = 'active'` +
-  ` ORDER BY CASE role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, created_at LIMIT 1)`;
 
 function task(caseKey, title, dueOffset, priority = 'normal', status = 'open') {
   taskSeq += 1;
@@ -245,20 +262,20 @@ client('hine', {
 client('rahul', {
   full_name: 'Rahul Sharma', given_names: 'Rahul', family_name: 'Sharma', nationality: 'India',
   email: 'rahul.sharma@example.com', phone: '021 555 0201', whatsapp: '6421555201',
-  date_of_birth: '1988-06-14', passport_country: 'India', passport_expiry: day(400),
-  police_country: 'India', police_date: day(-120), police_expiry: day(60),
+  date_of_birth: '1988-06-14', passport_country: 'IN', passport_expiry: day(400),
+  police_country: 'IN', police_date: day(-120), police_expiry: day(60),
   medical_date: day(-150), medical_expiry: day(30),
   visa_type: 'AEWV (pending)', visa_expiry: day(45), address: '3/22 Grafton Road, Auckland',
 });
 client('priya', {
   full_name: 'Priya Sharma', given_names: 'Priya', family_name: 'Sharma', nationality: 'India',
   email: 'priya.sharma@example.com', phone: '021 555 0202', date_of_birth: '1990-02-03',
-  passport_country: 'India', passport_expiry: day(120),
+  passport_country: 'IN', passport_expiry: day(120),
   visa_type: 'Visitor visa', visa_expiry: day(25), address: '3/22 Grafton Road, Auckland',
 });
 client('aarav', {
   full_name: 'Aarav Sharma', given_names: 'Aarav', family_name: 'Sharma', nationality: 'India',
-  date_of_birth: '2013-09-21', passport_country: 'India', passport_expiry: day(700),
+  date_of_birth: '2013-09-21', passport_country: 'IN', passport_expiry: day(700),
   visa_type: 'Dependent child visitor visa', visa_expiry: day(25),
   address: '3/22 Grafton Road, Auckland',
 });
@@ -267,8 +284,8 @@ client('aarav', {
 client('ana', {
   full_name: 'Ana Maria Silva', given_names: 'Ana Maria', family_name: 'Silva', preferred_name: 'Ana',
   nationality: 'Brazil', email: 'ana.silva@example.com', phone: '022 555 0301', whatsapp: '6422555301',
-  date_of_birth: '1992-04-11', passport_country: 'Brazil', passport_expiry: day(210),
-  police_country: 'Brazil', police_date: day(-60), police_expiry: day(120),
+  date_of_birth: '1992-04-11', passport_country: 'BR', passport_expiry: day(210),
+  police_country: 'BR', police_date: day(-60), police_expiry: day(120),
   medical_date: day(-40), medical_expiry: day(320),
   visa_type: 'Interim visa', visa_expiry: day(90), address: '18 Ponsonby Road, Auckland',
 });
@@ -279,7 +296,7 @@ client('bruno', {
 });
 client('mariasilva', {
   full_name: 'Maria Silva', given_names: 'Maria', family_name: 'Silva', nationality: 'Brazil',
-  date_of_birth: '1962-01-19', passport_country: 'Brazil', passport_expiry: day(500),
+  date_of_birth: '1962-01-19', passport_country: 'BR', passport_expiry: day(500),
   visa_type: 'Visitor visa', visa_expiry: day(150), status: 'inactive',
   notes: 'Ana’s mother. Visitor visa granted.',
 });
@@ -288,14 +305,14 @@ client('mariasilva', {
 client('wei', {
   full_name: 'Wei Chen', given_names: 'Wei', family_name: 'Chen', nationality: 'China',
   email: 'wei.chen@example.com', phone: '027 555 0401', date_of_birth: '1985-08-02',
-  passport_country: 'China', passport_expiry: day(340),
-  police_country: 'China', police_date: day(-30), police_expiry: day(150),
+  passport_country: 'CN', passport_expiry: day(340),
+  police_country: 'CN', police_date: day(-30), police_expiry: day(150),
   visa_type: 'AEWV', visa_expiry: day(260), address: '9 Redwood Avenue, Blenheim',
 });
 client('li', {
   full_name: 'Li Chen', given_names: 'Li', family_name: 'Chen', nationality: 'China',
   email: 'li.chen@example.com', phone: '027 555 0402', date_of_birth: '1987-12-15',
-  passport_country: 'China', passport_expiry: day(75),
+  passport_country: 'CN', passport_expiry: day(75),
   visa_type: 'Visitor visa', visa_expiry: day(55), address: '9 Redwood Avenue, Blenheim',
 });
 
@@ -303,43 +320,43 @@ client('li', {
 client('sione', {
   full_name: 'Sione Tagata', given_names: 'Sione', family_name: 'Tagata', nationality: 'Samoa',
   email: 'sione.tagata@example.com', phone: '021 555 0501', whatsapp: '6421555501',
-  date_of_birth: '1994-03-08', passport_country: 'Samoa', passport_expiry: day(180),
-  police_country: 'Samoa', police_date: day(-200), police_expiry: day(-10),
+  date_of_birth: '1994-03-08', passport_country: 'WS', passport_expiry: day(180),
+  police_country: 'WS', police_date: day(-200), police_expiry: day(-10),
   visa_type: 'AEWV', visa_expiry: day(20), address: 'RD 2, Te Puke',
   notes: 'Police certificate has expired — a fresh one is needed before the RFI response.',
 });
 client('mai', {
   full_name: 'Nguyen Thi Mai', given_names: 'Thi Mai', family_name: 'Nguyen', nationality: 'Vietnam',
   email: 'mai.nguyen@example.com', phone: '020 555 0601', date_of_birth: '2004-07-22',
-  passport_country: 'Vietnam', passport_expiry: day(900),
+  passport_country: 'VN', passport_expiry: day(900),
   visa_type: 'Student visa', visa_expiry: day(40), address: '55 Symonds Street, Auckland',
 });
 client('joseph', {
   full_name: 'Joseph Okafor', given_names: 'Joseph', family_name: 'Okafor', nationality: 'Nigeria',
   email: 'joseph.okafor@example.com', phone: '021 555 0701', date_of_birth: '1991-05-05',
-  passport_country: 'Nigeria', passport_expiry: day(260),
+  passport_country: 'NG', passport_expiry: day(260),
   visa_type: 'None — unlawful', address: '2 Hobson Street, Auckland',
   notes: 'Unlawful since visa expired. Section 61 request lodged.',
 });
 client('elena', {
   full_name: 'Elena Petrova', given_names: 'Elena', family_name: 'Petrova', nationality: 'Russia',
   email: 'elena.petrova@example.com', phone: '021 555 0801', date_of_birth: '1983-10-12',
-  passport_country: 'Russia', passport_expiry: day(150),
-  police_country: 'Russia', police_date: day(-90), police_expiry: day(90),
+  passport_country: 'RU', passport_expiry: day(150),
+  police_country: 'RU', police_date: day(-90), police_expiry: day(90),
   visa_type: 'Work visa', visa_expiry: day(110), address: '14 Oriental Parade, Wellington',
   notes: 'PPI letter received regarding an undisclosed conviction.',
 });
 client('ahmed', {
   full_name: 'Ahmed Hassan', given_names: 'Ahmed', family_name: 'Hassan', nationality: 'Egypt',
   email: 'ahmed.hassan@example.com', phone: '021 555 0901', date_of_birth: '1989-01-27',
-  passport_country: 'Egypt', passport_expiry: day(300),
+  passport_country: 'EG', passport_expiry: day(300),
   visa_type: 'None — visitor visa declined', address: 'Cairo, Egypt',
   notes: 'Visitor visa declined for insufficient funds. Reconsideration lodged.',
 });
 client('daniel', {
   full_name: 'Daniel Park', given_names: 'Daniel', family_name: 'Park', nationality: 'South Korea',
   email: 'daniel.park@example.com', phone: '021 555 1001', date_of_birth: '1976-09-09',
-  passport_country: 'South Korea', passport_expiry: day(600),
+  passport_country: 'KR', passport_expiry: day(600),
   visa_type: 'Visitor visa', visa_expiry: day(200), address: 'Seoul, South Korea',
   notes: 'Considering an investment in Southern Vineyards. On hold pending due diligence.',
 });
@@ -380,9 +397,7 @@ kase('sharma_aewv', {
 party('sharma_aewv', 'rahul', 'principal_applicant');
 party('sharma_aewv', 'harbour', 'employer', 'Accredited employer, job check approved');
 tagCase('sharma_aewv', ['AEWV', 'Employer', 'Family group']);
-fee('sharma_aewv', 'AEWV — preparation and lodgement', 'professional', 250000, 'exclusive', 'paid');
-fee('sharma_aewv', 'INZ application fee', 'disbursement', 75000, 'none', 'paid', 0);
-split('sharma_aewv', [{ key: 'principal', label: 'Principal (me)', bp: 7000 }, { key: 'admin', label: 'Admin team', bp: 3000 }]);
+invoice('sharma_aewv', 'rahul', 'AEWV — preparation and lodgement', 250000, { treatment: 'exclusive', status: 'paid' });
 task('sharma_aewv', 'Diarise decision follow-up with INZ', 28, 'normal');
 
 kase('priya_partnership', {
@@ -394,8 +409,7 @@ kase('priya_partnership', {
 party('priya_partnership', 'priya', 'principal_applicant');
 party('priya_partnership', 'rahul', 'supporting_partner', 'AEWV holder');
 tagCase('priya_partnership', ['Partnership', 'Family group']);
-fee('priya_partnership', 'Partnership work visa — preparation', 'professional', 200000, 'exclusive', 'invoiced');
-split('priya_partnership', [{ key: 'principal', label: 'Principal (me)', bp: 7000 }, { key: 'admin', label: 'Admin team', bp: 3000 }]);
+invoice('priya_partnership', 'priya', 'Partnership work visa — preparation', 200000, { treatment: 'exclusive', status: 'issued' });
 task('priya_partnership', 'Chase joint bank statements', 9, 'high');
 task('priya_partnership', 'Draft relationship submission', 16, 'normal');
 
@@ -407,8 +421,7 @@ kase('aarav_student', {
 party('aarav_student', 'aarav', 'principal_applicant');
 party('aarav_student', 'rahul', 'sponsor', 'Parent and AEWV holder');
 tagCase('aarav_student', ['Student', 'Family group']);
-fee('aarav_student', 'Dependent child student visa', 'professional', 90000, 'exclusive', 'quoted');
-split('aarav_student', [{ key: 'principal', label: 'Principal (me)', bp: 5000 }, { key: 'admin', label: 'Admin team', bp: 5000 }]);
+invoice('aarav_student', 'aarav', 'Dependent child student visa', 90000, { treatment: 'exclusive', status: 'draft' });
 
 kase('harbour_accreditation', {
   client: 'harbour', title: 'Employer accreditation renewal', case_type: 'emp_accreditation_renewal', status: 'approved',
@@ -417,8 +430,7 @@ kase('harbour_accreditation', {
 });
 party('harbour_accreditation', 'harbour', 'principal_applicant', 'The employer is the client on this matter');
 tagCase('harbour_accreditation', ['Employer', 'Accreditation']);
-fee('harbour_accreditation', 'Accreditation renewal', 'professional', 180000, 'exclusive', 'paid');
-split('harbour_accreditation', [{ key: 'principal', label: 'Principal (me)', bp: 7000 }, { key: 'admin', label: 'Admin team', bp: 3000 }]);
+invoice('harbour_accreditation', 'harbour', 'Accreditation renewal', 180000, { treatment: 'exclusive', status: 'paid' });
 
 kase('orchards_jobcheck', {
   client: 'orchards', title: 'Job check — 3 seasonal orchard roles', case_type: 'emp_job_check', status: 'lodged',
@@ -428,8 +440,7 @@ kase('orchards_jobcheck', {
 });
 party('orchards_jobcheck', 'orchards', 'principal_applicant', 'The employer is the client on this matter');
 tagCase('orchards_jobcheck', ['Employer', 'Seasonal']);
-fee('orchards_jobcheck', 'Job check — 3 roles', 'professional', 150000, 'exclusive', 'invoiced');
-split('orchards_jobcheck', [{ key: 'principal', label: 'Principal (me)', bp: 6000 }, { key: 'admin', label: 'Admin team', bp: 4000 }]);
+invoice('orchards_jobcheck', 'orchards', 'Job check — 3 roles', 150000, { treatment: 'exclusive', status: 'issued' });
 
 kase('sione_aewv', {
   client: 'sione', title: 'AEWV — Orchard worker, Kiwi Orchards', case_type: 'wv_aewv',
@@ -440,9 +451,7 @@ kase('sione_aewv', {
 party('sione_aewv', 'sione', 'principal_applicant');
 party('sione_aewv', 'orchards', 'employer', 'Accredited employer');
 tagCase('sione_aewv', ['AEWV', 'Employer', 'Seasonal', 'Urgent deadline']);
-fee('sione_aewv', 'AEWV — preparation and lodgement', 'professional', 220000, 'exclusive', 'paid');
-fee('sione_aewv', 'RFI response', 'professional', 60000, 'exclusive', 'invoiced');
-split('sione_aewv', [{ key: 'principal', label: 'Principal (me)', bp: 7000 }, { key: 'admin', label: 'Admin team', bp: 3000 }]);
+invoice('sione_aewv', 'sione', 'AEWV — preparation and lodgement', 280000, { treatment: 'exclusive', status: 'paid' });
 task('sione_aewv', 'Order replacement Samoan police certificate', 2, 'urgent');
 task('sione_aewv', 'File RFI response with INZ', 5, 'urgent');
 
@@ -456,9 +465,7 @@ kase('ana_residence', {
 party('ana_residence', 'ana', 'principal_applicant');
 party('ana_residence', 'bruno', 'supporting_partner', 'New Zealand citizen');
 tagCase('ana_residence', ['Partnership', 'Residence', 'Family group']);
-fee('ana_residence', 'Partnership residence — preparation and lodgement', 'professional', 380000, 'exclusive', 'paid');
-fee('ana_residence', 'INZ application fee', 'disbursement', 153500, 'none', 'paid', 0);
-split('ana_residence', [{ key: 'principal', label: 'Principal (me)', bp: 7500 }, { key: 'admin', label: 'Admin team', bp: 2500 }]);
+invoice('ana_residence', 'ana', 'Partnership residence — preparation and lodgement', 380000, { treatment: 'exclusive', status: 'paid' });
 quote('ana_residence', 'ana', 'Partnership residence — preparation and lodgement', 380000, 153500, 'accepted', -40);
 
 kase('maria_visitor', {
@@ -469,8 +476,7 @@ kase('maria_visitor', {
 party('maria_visitor', 'mariasilva', 'principal_applicant');
 party('maria_visitor', 'ana', 'sponsor', 'Daughter, residence applicant');
 tagCase('maria_visitor', ['Visitor', 'Family group']);
-fee('maria_visitor', 'Visitor visa', 'professional', 95000, 'exclusive', 'paid');
-split('maria_visitor', [{ key: 'principal', label: 'Principal (me)', bp: 5000 }, { key: 'admin', label: 'Admin team', bp: 5000 }]);
+invoice('maria_visitor', 'mariasilva', 'Visitor visa', 95000, { treatment: 'exclusive', status: 'paid' });
 
 kase('wei_skilled', {
   client: 'wei', title: 'Skilled residence — Green List straight to residence', case_type: 'rv_smc',
@@ -482,8 +488,7 @@ party('wei_skilled', 'wei', 'principal_applicant');
 party('wei_skilled', 'li', 'secondary_applicant', 'Partner, included in the application');
 party('wei_skilled', 'vineyards', 'employer', 'Current AEWV employer');
 tagCase('wei_skilled', ['Residence', 'Family group', 'Employer']);
-fee('wei_skilled', 'Skilled residence — preparation', 'professional', 450000, 'exclusive', 'invoiced');
-split('wei_skilled', [{ key: 'principal', label: 'Principal (me)', bp: 7000 }, { key: 'admin', label: 'Admin team', bp: 3000 }]);
+invoice('wei_skilled', 'wei', 'Skilled residence — preparation', 450000, { treatment: 'exclusive', status: 'issued' });
 task('wei_skilled', 'Chase occupational registration certificate', 21, 'high');
 quote('wei_skilled', 'wei', 'Skilled residence — preparation and lodgement', 450000, 240000, 'sent', 20);
 
@@ -496,8 +501,7 @@ kase('li_partnership', {
 party('li_partnership', 'li', 'principal_applicant');
 party('li_partnership', 'wei', 'supporting_partner', 'AEWV holder');
 tagCase('li_partnership', ['Partnership', 'Family group']);
-fee('li_partnership', 'Partnership work visa', 'professional', 200000, 'exclusive', 'quoted');
-split('li_partnership', [{ key: 'principal', label: 'Principal (me)', bp: 7000 }, { key: 'admin', label: 'Admin team', bp: 3000 }]);
+invoice('li_partnership', 'li', 'Partnership work visa', 200000, { treatment: 'exclusive', status: 'draft' });
 
 kase('joseph_s61', {
   client: 'joseph', title: 'Section 61 request — unlawful since March', case_type: 'rq_section_61_request',
@@ -508,8 +512,7 @@ kase('joseph_s61', {
 });
 party('joseph_s61', 'joseph', 'principal_applicant');
 tagCase('joseph_s61', ['Section 61', 'Urgent deadline']);
-fee('joseph_s61', 'Section 61 request', 'professional', 175000, 'exclusive', 'invoiced');
-split('joseph_s61', [{ key: 'principal', label: 'Principal (me)', bp: 8000 }, { key: 'admin', label: 'Admin team', bp: 2000 }]);
+invoice('joseph_s61', 'joseph', 'Section 61 request', 175000, { treatment: 'exclusive', status: 'issued' });
 task('joseph_s61', 'Call INZ Resolution team for an update', 3, 'urgent');
 
 kase('mai_student', {
@@ -520,8 +523,7 @@ kase('mai_student', {
 });
 party('mai_student', 'mai', 'principal_applicant');
 tagCase('mai_student', ['Student']);
-fee('mai_student', 'Student visa — further study', 'professional', 85000, 'exclusive', 'invoiced');
-split('mai_student', [{ key: 'principal', label: 'Principal (me)', bp: 5000 }, { key: 'admin', label: 'Admin team', bp: 5000 }]);
+invoice('mai_student', 'mai', 'Student visa — further study', 85000, { treatment: 'exclusive', status: 'issued' });
 task('mai_student', 'Lodge student visa application', 7, 'high');
 
 kase('ahmed_recon', {
@@ -533,8 +535,7 @@ kase('ahmed_recon', {
 });
 party('ahmed_recon', 'ahmed', 'principal_applicant');
 tagCase('ahmed_recon', ['Appeal', 'Urgent deadline', 'Visitor']);
-fee('ahmed_recon', 'Reconsideration request', 'professional', 140000, 'exclusive', 'invoiced');
-split('ahmed_recon', [{ key: 'principal', label: 'Principal (me)', bp: 8000 }, { key: 'admin', label: 'Admin team', bp: 2000 }]);
+invoice('ahmed_recon', 'ahmed', 'Reconsideration request', 140000, { treatment: 'exclusive', status: 'issued' });
 task('ahmed_recon', 'File supplementary bank statements', 8, 'urgent');
 
 kase('elena_ppi', {
@@ -546,8 +547,7 @@ kase('elena_ppi', {
 });
 party('elena_ppi', 'elena', 'principal_applicant');
 tagCase('elena_ppi', ['Character', 'Urgent deadline']);
-fee('elena_ppi', 'PPI response — submissions', 'professional', 260000, 'exclusive', 'invoiced');
-split('elena_ppi', [{ key: 'principal', label: 'Principal (me)', bp: 8500 }, { key: 'admin', label: 'Admin team', bp: 1500 }]);
+invoice('elena_ppi', 'elena', 'PPI response — submissions', 260000, { treatment: 'exclusive', status: 'issued' });
 task('elena_ppi', 'Obtain character references', 6, 'urgent');
 task('elena_ppi', 'Draft PPI response', 10, 'urgent');
 
@@ -561,8 +561,7 @@ kase('daniel_investor', {
 party('daniel_investor', 'daniel', 'principal_applicant');
 party('daniel_investor', 'vineyards', 'ot_other', 'Target business for the proposed investment');
 tagCase('daniel_investor', ['Investor', 'Residence']);
-fee('daniel_investor', 'Investor residence — initial advice', 'professional', 300000, 'exclusive', 'paid');
-split('daniel_investor', [{ key: 'principal', label: 'Principal (me)', bp: 9000 }, { key: 'admin', label: 'Admin team', bp: 1000 }]);
+invoice('daniel_investor', 'daniel', 'Investor residence — initial advice', 300000, { treatment: 'exclusive', status: 'paid' });
 quote('daniel_investor', 'daniel', 'Active Investor Plus — full application', 1200000, 0, 'sent', 30);
 
 // A few file notes, so timelines are not empty.

@@ -37,6 +37,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.1.1', date: '4 September 2026',
+    notes: [
+      'Housekeeping. The demonstration data can be loaded and removed again \u2014 it had quietly '
+        + 'stopped working against the current database, and a test now runs it so that cannot '
+        + 'happen unnoticed. Some unused encryption code was removed with it.',
+    ],
+  },
+  {
     version: '1.1.0', date: '4 September 2026',
     notes: [
       'The Fees section has gone. Money is in Quotes and Invoices and nowhere else \u2014 a matter '
