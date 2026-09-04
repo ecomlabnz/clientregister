@@ -7,6 +7,55 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.2.0 — 4 September 2026
+
+### Added
+- **A knowledge-base article can carry files.** Asked for on the New article
+  page, in front of a form with a "Source link or citation" box and nowhere to
+  put the PDF that box was describing: *"i must be able to add a file here, why
+  not??"*
+
+  The form now takes files — several at once, because an instruction usually
+  arrives as a set — and the article itself has a Files panel to add more later,
+  read them back, and remove one. Files are stored in R2 and streamed through
+  the register, so every read stays inside the session and in the audit log.
+
+  **Why it needed a new table, `kb_documents`.** The obvious move is a row in
+  `documents`, and it is not available: that table restricts what a file may
+  hang off to a client, matter, inquiry or quote, and SQLite can only widen that
+  by rebuilding the table. Migration 0044 already established that the rebuild
+  cannot be done here — D1 will not let a migration switch foreign keys off, so
+  dropping `documents` fires `ON DELETE SET NULL` across `entries.document_id`,
+  and the append-only trigger on file notes rightly refuses. Measured rather
+  than assumed: the live register holds 5 documents and every one of them is
+  referenced by a file note. Migration 0063 names the accommodation and says
+  what would remove it.
+
+  What is *not* duplicated is the part that matters for safety: how a supplied
+  filename is reduced and what content type a file is served back with now live
+  once, in `src/core/files.ts`, and both sets of routes call it.
+
+- **"General practice note" as a kind of article** — the catch-all for what the
+  practice does about something, as opposed to what somebody outside has
+  instructed. Kinds are a setting, so a practice that has customised its own
+  list adds it under Settings → Knowledge base.
+
+### Fixed
+- **File downloads keep their own security policy.** A document or an
+  attachment is served with the strictest policy there is, because it came from
+  outside the register — and the middleware that hardens every response was
+  overwriting it with the *page* policy, which permits same-origin script. It
+  now applies as a default rather than an override. The rest of the hardening
+  was holding, so this was a wall behind a wall; it was still not doing what the
+  code said. Fault 22 in `docs/spec/mistakes.md`.
+
+- **The specification says what the database actually does.** `data-model.md`
+  still described two tables dropped in 1.1.0 and had never heard of the one
+  added in their place; `invariants.md` counted 39 refusals where there are 51.
+  Both corrected, and a test now holds them against the built schema — the
+  documents claimed they *could not* drift, which was a claim rather than a
+  fact. Fault 23.
+
 ## 1.1.2 — 4 September 2026
 
 ### Fixed

@@ -1,7 +1,7 @@
 # The invariants
 
 **What the database refuses to do, and why.** The most valuable document here
-and the hardest to recover from reading the code: the rules are spread across 59
+and the hardest to recover from reading the code: the rules are spread across 63
 migrations, and each exists because something went wrong or was foreseen going
 wrong.
 
@@ -11,7 +11,7 @@ guarantee in a handler lasts until somebody adds a second handler — and this
 register is written to by the application, by bulk loads, and occasionally by
 hand at a console. Everything below holds in all three cases.
 
-**39 refusals** across 17 tables, plus
+**51 refusals** across 20 tables, plus
 **8 uniqueness rules**. Each is quoted in the words the
 database itself uses, because that is what somebody will see.
 
@@ -146,6 +146,24 @@ whether or not the rule exists is not a test.
 |---|---|
 | delete | an invoice cannot be deleted; void it instead |
 | update | an issued invoice cannot be altered; void it and raise another |
+| insert | an invoice has to say what it is for |
+| update | an invoice has to say what it is for |
+| update | the split on this invoice does not add up to 100%; fix it or remove it |
+
+### `invoice_shares`
+
+| On | The database refuses |
+|---|---|
+| insert | this invoice has been issued; its split cannot be changed |
+| update | this invoice has been issued; its split cannot be changed |
+| delete | this invoice has been issued; its split cannot be changed |
+
+### `quotes`
+
+| On | The database refuses |
+|---|---|
+| insert | a quote has to say what it is for |
+| update | a quote has to say what it is for |
 
 ### `kb_article_versions`
 
@@ -153,6 +171,15 @@ whether or not the rule exists is not a test.
 |---|---|
 | delete | kb_article_versions is append-only |
 | update | kb_article_versions is append-only |
+
+### `kb_documents`
+
+| On | The database refuses |
+|---|---|
+| insert | this file is not stored under the article it is filed against |
+| update | this file is not stored under the article it is filed against |
+| insert | a file has to have a name |
+| update | a file has to have a name |
 
 ### `tasks`
 
@@ -170,7 +197,7 @@ whether or not the rule exists is not a test.
 | `case_parties` | case_id, client_id | always |
 | `case_parties` | case_id | role = 'principal_applicant' |
 | `client_passports` | client_id | is_primary = 1 |
-| `fee_shares` | case_id, party_key | always |
+| `invoice_shares` | invoice_id, party_key | always |
 | `kb_article_versions` | article_id, version | always |
 | `service_items` | name COLLATE NOCASE | always |
 | `tags` | name | always |

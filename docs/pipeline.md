@@ -162,6 +162,22 @@ the navigation starts, because the wordmark, the account controls and the
 search box cannot share one. Nothing is wrong with it; it is just where the
 height goes if it ever needs finding.
 
+### 10. Two tables hold files, and one day they should be one
+`documents` (client, matter, inquiry, quote) and `kb_documents` (knowledge
+articles), because `documents` restricts what a file may hang off and that
+restriction cannot be widened on D1 without risking the file notes that point at
+existing documents. Migration 0063 sets out the whole of it.
+
+What would let them merge: D1 allowing a table rebuild with foreign keys off, or
+`entries` losing its foreign key to `documents`. Neither is worth chasing on its
+own — the duplication is a table and three short routes, and the part that
+matters for safety (how a file is named, stored and served back) is already
+shared in `src/core/files.ts`. Revisit if a third thing needs to carry files.
+
+Related and unfixed: an article deleted through the database takes its file rows
+with it, but nothing removes the objects from R2. No route deletes an article
+today, so there are no orphans yet.
+
 ### 8. Reading across from other sessions
 The **App field comparison review** session produced the nine fields above. Its
 own audit ended with no repository changes and a mail-DNS fix. Nothing else has
@@ -173,6 +189,9 @@ been pulled from it.
 
 Kept short — the full record is in `CHANGELOG.md`.
 
+- **1.2.0** — a knowledge base article can carry files; "General practice note"
+  as a kind; file downloads keep their own security policy; the specification
+  documents held against the schema by a test.
 - **1.1.2** — the phone navigation shows every section again; the bar's stated
   height re-measured at every breakpoint; the Invoices pages stop highlighting
   Quotes.

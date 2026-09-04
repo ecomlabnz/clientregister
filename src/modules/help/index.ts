@@ -37,6 +37,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.2.0', date: '4 September 2026',
+    notes: [
+      'A knowledge base article can carry files. The New article form takes them \u2014 several at '
+        + 'once \u2014 and every article has a Files panel to add more later, open them, or take one '
+        + 'out. The circular itself can now live with the note about it.',
+      '\u201cGeneral practice note\u201d is a kind of article: what we do about something, as '
+        + 'opposed to what somebody outside has instructed. The full list is yours to edit under '
+        + 'Settings \u2192 Knowledge base.',
+    ],
+  },
+  {
     version: '1.1.2', date: '4 September 2026',
     notes: [
       'The menu on a phone shows everything again. It used to be one row you had to swipe '

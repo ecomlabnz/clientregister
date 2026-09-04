@@ -56,6 +56,10 @@ const DEFAULT_KINDS = [
   'policy | Policy and procedure',
   'template | Template or precedent',
   'guide | How-to guide',
+  // Asked for on 4 September 2026. The catch-all the practice actually reaches
+  // for: what we do about a thing, written down, that is not an instruction
+  // from anybody outside.
+  'practice_note | General practice note',
 ].join('\n');
 
 export const KNOWLEDGE_SETTINGS: SettingsGroup = {
