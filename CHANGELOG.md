@@ -7,6 +7,31 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.1.1 — 4 September 2026
+
+### Fixed
+- **The demonstration seed works again.** It had rotted in four separate ways,
+  none of them noticed because nothing had ever run it: a column dropped a
+  fortnight ago, country names where the database now insists on ISO codes, no
+  owner on a matter (which a trigger has long refused), and writes to the two
+  fee tables removed yesterday. Each would have surfaced the first time somebody
+  set up a demonstration — which is the worst moment to find out.
+
+  It now runs as part of the test suite, against every migration with the
+  triggers on, so it cannot rot silently again.
+
+- **Demonstration data can be taken out again.** Running the removal script
+  rather than reading it turned up a real fault: an issued invoice's lines could
+  not be deleted even when they were demonstration rows, because `invoice_items`
+  was missing the exemption that invoices and payments both carry. A register
+  holding real client files cannot also hold demonstration records nobody can
+  remove.
+
+### Removed
+- **Dead encryption code** (`sealField` / `unsealField`), unused since the
+  practice decided in August that passport numbers are stored as written. They
+  still stay out of bulk exports, which is the control that actually matters.
+
 ## 1.1.0 — 4 September 2026
 
 ### Changed
