@@ -7,6 +7,29 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.0.3 — 4 September 2026
+
+### Added
+- **An invoice can be raised on its own.** Until now the only way to bill
+  anything was to write a quote first and convert it — a fair description of how
+  the work usually goes and a poor description of the times it does not. An hour
+  of advice given and charged for needs a bill, not an offer followed by a bill.
+
+  **Invoices → New invoice.** Choose the client, optionally a matter of theirs,
+  say what it is for, and it starts as a draft. The lines go on next and nothing
+  is fixed until it is issued — from that moment the database stops accepting
+  changes, exactly as for an invoice raised from a quote.
+
+  It refuses two things outright: an invoice addressed to nobody (a quote may sit
+  against an inquiry that is not a client yet; a demand may not), and a matter
+  belonging to a different client — the kind of mistake nobody spots until they
+  go looking for the money.
+
+  Part payments needed nothing built. An invoice has always taken as many
+  payments as you like, each with a date, method and reference, and none of them
+  can be edited or deleted afterwards — a wrong amount is corrected by a further
+  entry.
+
 ## 1.0.2 — 4 September 2026
 
 ### Fixed

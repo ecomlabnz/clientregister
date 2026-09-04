@@ -37,6 +37,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.0.3', date: '4 September 2026',
+    notes: [
+      'You can raise an invoice without writing a quote first \u2014 Invoices \u2192 New invoice. '
+        + 'Choose the client, optionally one of their matters, say what it is for, add the lines, '
+        + 'then issue it. Nothing is fixed until you issue.',
+      'An invoice has always been able to take part payments: open it and use Record a payment, '
+        + 'as many times as you need. Each one keeps its date, method and reference, and none can '
+        + 'be edited or deleted afterwards \u2014 a wrong amount is corrected by another entry.',
+    ],
+  },
+  {
     version: '1.0.2', date: '4 September 2026',
     notes: [
       'Builds no longer fail when npm\u2019s own servers are down. A real security problem in a '

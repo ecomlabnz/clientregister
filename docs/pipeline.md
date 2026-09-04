@@ -86,53 +86,50 @@ own (it is asked on every INZ form and drives police certificates); it simply is
 not evidenced by our own migration.
 
 ### 3. Collapse Fees into Quotes and Invoices
-**Asked 4 September 2026**, and it is the right question: *"why do we need fees
-section at all?? should there just be quotes and invoices - both being able to be
-entered independently and the quotes can be converted into invoices - invoices
-can be part paid??? why complicate things??"*
+**Asked 4 September 2026:** *"why do we need fees section at all?? should there
+just be quotes and invoices - both being able to be entered independently and the
+quotes can be converted into invoices - invoices can be part paid??? why
+complicate things??"*, then *"we should have a powerful quotation system and
+powerful invoicing - both may later be connecting to accounting systems for push
+and integration"*.
 
-Nothing good was going to come of the earlier answer, which was to bolt payments
-onto fee lines so that invoices could be avoided. That would have been a third
-place for money to live. **A fee-line payments table was written and deleted
-before it shipped**, on the strength of the question.
+**Decided by the practice, and it clears the way completely:**
 
-**What the register actually holds, counted 4 September 2026:**
+- **Splits belong to invoicing**, not to the matter: *"fee splits can be
+  implemented in invoicing I believe"*.
+- **The split is a button, not a permanent fixture**: *"the bill split should be
+  a button that opens the options — I can simply issue an invoice for already
+  split amounts if I choose to… good if they are available but not always
+  visible - can be activated if and where needed"*.
+- **Nothing needs migrating.** *"delete any split info - i want to avoid
+  migration - the tables must be built efficiently - so no real financials were
+  entered yet - those that have - can be deleted"*. That covers all of it: 3 fee
+  lines, 42 fee shares, 3 quotes, 6 quote lines. Invoices and payments were
+  already empty.
 
-| | rows |
-|---|---|
-| fee lines | **3**, across 2 matters |
-| **fee shares (splits)** | **42, across 22 matters** |
-| quotes | 3 (6 lines) |
-| invoices | **0** |
-| invoice payments | 0 |
+**Done so far (1.0.3):** an invoice can be **raised on its own**, which was the
+concrete gap — until now the only way to bill anything was to write a quote and
+convert it. Part payments needed nothing built: `invoice_payments` already
+exists, append-only and signed, with a date, method and reference.
 
-So Fees-as-billing is barely used, invoices are not used at all, and **the one
-thing in the Fees section genuinely in use is the split** — how a matter's
-income is divided between the principal and whoever else. That is the piece
-needing a home before anything is removed.
+**Still to do:**
 
-**The shape proposed:**
+1. Clear the financial tables, on the practice's instruction above.
+2. Remove the Fees module and `POST /quotes/:id/to-fees`; drop `fee_items` and
+   `fee_shares`.
+3. Rebuild the split on the invoice, behind a control that is shown when wanted
+   rather than always.
+4. Repoint the unbilled-work alert from "finished with no fee line" to "finished
+   and never invoiced". Its measured design stands — a 90-day look-back and a
+   14-day grace turned 135 candidates into 6.
+5. Accounting integration is the stated direction, not a task yet. `invoices`
+   already carries `xero_invoice_id`, `xero_pushed_at` and `xero_error`, and is
+   frozen by trigger once issued, which is the property a pushed invoice needs.
 
-- **Quote** and **Invoice**, each raisable on its own, and a quote converts to an
-  invoice carrying its lines.
-- **Part payments on an invoice** — already built and untouched:
-  `invoice_payments` is append-only, signed, with a date, method and reference.
-- **The split moves to the matter**, where it belongs: it is a property of how
-  this matter's income is shared, not of a fee line. It then applies to whatever
-  is invoiced on that matter.
-- **Fee lines go**, and the three existing ones move to a quote or an invoice.
-- **The unbilled-work alert changes its question** from "finished with no fee
-  line" to "finished and never invoiced". Its measured design stands (a 90-day
-  look-back and a 14-day grace turned 135 candidates into 6).
-
-**Now is the moment**, if it is to be done: 0 invoices and 3 fee lines is as
-cheap as this will ever be. Waiting until fees are entered in earnest makes it a
-migration of live money records.
-
-**Open question for the practice:** whether the split should sit on the matter
-(one split per matter, applying to everything billed on it) or on the invoice
-(a split per bill, so one matter could be shared differently on different
-invoices). The matter is simpler and matches how the 22 existing splits read.
+**One thing to carry into the rebuild:** `invoices.description` is `TEXT NOT
+NULL` with no `CHECK`, so an empty string is a legal invoice description. The
+application refuses one in two places; the database does not. In a rebuilt table
+that belongs in the constraint.
 
 ### 4. Automated backups — the largest single risk
 There is none. `docs/operations.md` says so in bold, and the register has held
