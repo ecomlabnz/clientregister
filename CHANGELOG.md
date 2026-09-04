@@ -7,6 +7,43 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.1.2 — 4 September 2026
+
+### Fixed
+- **The whole navigation is on the screen on a phone again.** Reported by the
+  practice: *"Where are the invoices and quotes? Cannot see them on my phone.
+  Shouldn't there be a separate menu called Money?"*
+
+  There was a Money menu, and there still is — on a wide screen. On a phone the
+  bar was a single strip that scrolled sideways, with no scrollbar and no fading
+  edge to say so, and it stopped after *Cases*: Calendar, Tasks, Quotes,
+  Invoices, Knowledge and the Assistant were all past the right-hand edge.
+
+  Worse, the four inside a menu were not merely off the edge. The menus were
+  flattened into the strip with `display: contents` so their items would sit in
+  the run — but a browser renders nothing inside a *closed* `<details>` whatever
+  its display says, so those four links were never drawn at all. Two tests
+  guarded this and both passed, because both asserted what the stylesheet said
+  rather than what the page did. Written up as faults 20 and 21 in
+  `docs/spec/mistakes.md`.
+
+  The bar now wraps onto a second row instead of scrolling, and keeps its Money
+  and Tools menus, which open into the bar rather than over it. All nine
+  sections are on the screen at 360px and up; at 320px it takes a third row.
+
+- **The bar's stated height matches the bar.** `--topbar-h` tells sticky table
+  headings where to stop. The bar had gained a row at two breakpoints since it
+  was last measured, so every one of its figures was wrong — on a phone a
+  sticky column heading sat 27px behind the bar. Re-measured in Chromium at
+  every breakpoint, and the test now pins the one thing that can be checked
+  without a browser: a bar that wraps can only get taller as the screen narrows,
+  so the number may never fall.
+
+- **The Invoices pages highlighted *Quotes* in the menu**, left over from when
+  an invoice could only be reached through a quote. On a phone, where the menu
+  opens into the bar, that put the highlight on the wrong word directly beside
+  the right one.
+
 ## 1.1.1 — 4 September 2026
 
 ### Fixed

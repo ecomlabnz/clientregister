@@ -220,20 +220,28 @@ describe('the navigation fits the width it is given', () => {
   });
 
   it('gives the navigation its own row before it would wrap raggedly', () => {
-    const block = css.slice(css.indexOf('@media (max-width: 1520px)'));
-    expect(block.slice(0, 400)).toContain('.topnav { order: 3; width: 100%; flex: none; }');
+    // More than one block carries this width — one of them only states the
+    // bar's height — so look at all of them.
+    const blocks = css.split('@media (max-width: 1520px)').slice(1)
+      .map((b) => b.split('@media')[0]!);
+    expect(blocks.length).toBeGreaterThan(0);
+    expect(blocks.some((b) => b.includes('.topnav { order: 3; width: 100%; flex: none; }')))
+      .toBe(true);
   });
 
-  it('still becomes one swipeable strip on a phone', () => {
-    // The full-width row above must not have replaced this: on a phone the set
-    // is wider than the screen however tight the spacing, and a strip you can
-    // flick beats four stacked rows of chrome above every page.
+  it('wraps onto as many rows as it needs on a phone', () => {
+    // This used to require the opposite — one strip, flicked sideways — on the
+    // reasoning that a swipe beats stacked rows of chrome. It does not beat
+    // them if there is nothing to say the strip can be swiped: on a 390px
+    // phone the run stopped after Cases and six sections were past the edge,
+    // unreachable and unannounced. Two rows of chrome is the price of a
+    // navigation that is all there. See `test/nav.test.ts`.
     // There is more than one phone block, so look at all of them rather than
     // whichever happens to come first.
     const blocks = css.split('@media (max-width: 720px)').slice(1)
       .map((b) => b.split('@media')[0]!);
     expect(blocks.length).toBeGreaterThan(0);
-    expect(blocks.some((b) => b.includes('flex-wrap: nowrap') && b.includes('overflow-x: auto')))
-      .toBe(true);
+    expect(blocks.some((b) => /\.topnav \{[^}]*flex-wrap: wrap/.test(b))).toBe(true);
+    expect(blocks.some((b) => b.includes('overflow-x: auto'))).toBe(false);
   });
 });
