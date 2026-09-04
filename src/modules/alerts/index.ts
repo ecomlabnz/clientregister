@@ -520,8 +520,11 @@ async function unbilledAlerts(env: Env, today: string): Promise<Alert[]> {
        FROM cases k JOIN clients cl ON cl.id = k.client_id
       WHERE (k.status IN ('approved','declined','withdrawn','closed') OR k.closed_at IS NOT NULL)
         AND substr(COALESCE(k.decided_at, k.closed_at, k.updated_at), 1, 10) BETWEEN ? AND ?
-        AND NOT EXISTS (SELECT 1 FROM fee_items fi WHERE fi.case_id = k.id)
-        AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.case_id = k.id)
+        -- Was "no fee line and no invoice". Fee lines are gone, so the question
+        -- is the plain one: was this ever billed? A voided invoice does not
+        -- count, because a bill withdrawn is a bill not sent.
+        AND NOT EXISTS (SELECT 1 FROM invoices i
+                         WHERE i.case_id = k.id AND i.status <> 'void')
         AND COALESCE(k.fee_agreed_cents, 0) = 0
       ORDER BY done_on LIMIT 100`,
     from, until);

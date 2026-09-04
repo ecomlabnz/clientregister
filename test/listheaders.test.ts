@@ -36,9 +36,10 @@ describe('a list page wears the standard top', () => {
   });
 
   it('shows the figures before the controls that narrow them', () => {
-    // Fees has no views — it is one set of totals over a period — but the
-    // ordering rule still holds, and it is the page that broke it.
-    const s = source('fees');
+    // Was checked on the Fees page, which broke the rule and was the reason for
+    // it. Fees is gone; Invoices carries the same shape — a set of totals above
+    // a bar that narrows the list — so the rule is checked there.
+    const s = source('invoices');
     expect(s.indexOf('class="fee-summary"')).toBeLessThan(s.indexOf('class="filters"'));
   });
 

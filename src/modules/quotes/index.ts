@@ -28,13 +28,14 @@ import { can } from '../../core/rbac';
 import {
   computeGst, FEE_KIND_LABELS, FEE_KINDS, GST_TREATMENT_LABELS, GST_TREATMENTS,
   type FeeKind, type GstTreatment,
-} from '../../core/fees';
+  moneySettings,
+} from '../../core/money';
 import {
   computeLine, formatQuantity, parseQuantityToMilli, pluraliseUnit, summariseQuote, validUntil,
   type QuoteTotals,
 } from '../../core/quotes';
 import { asInteger, readSettings, type SettingsGroup } from '../../core/settings';
-import { feeSettings } from '../fees';
+
 import { practiceDetails } from '../../core/practice';
 import { invoiceFromQuote } from '../../core/invoices';
 import { renderEmailHtml } from '../../core/richtext';
@@ -431,7 +432,7 @@ export const quotesModule: AppModule = {
     r.get('/catalogue', requirePermission('quote:write'), async (c) => {
       const items = await catalogue(c.env, true);
       const csrf = c.get('session')!.csrf;
-      const fees = await feeSettings(c.env);
+      const fees = await moneySettings(c.env);
       const qs = await quoteSettings(c.env);
       const editing = c.req.query('edit');
       const item = editing ? items.find((i) => i.id === editing) ?? null : null;
@@ -555,7 +556,7 @@ export const quotesModule: AppModule = {
         practiceDetails(c.env),
         quoteLines(c.env, id),
         catalogue(c.env),
-        feeSettings(c.env),
+        moneySettings(c.env),
         quoteSettings(c.env),
         quoteStages(c.env, id),
         all<{ id: string; ref: string; status: string; gross_cents: number }>(
@@ -798,12 +799,6 @@ export const quotesModule: AppModule = {
                   </form>
                 </details>` : ''}`)}
 
-            ${writable && q.case_id && q.status === 'accepted' ? card('Record as case fees', html`
-              <p>Copy this quote onto case <code>${q.case_ref}</code> as fee lines, so the money is tracked and split.</p>
-              <form method="post" action="/quotes/${q.id}/to-fees">
-                ${csrfField(csrf)}
-                <button class="btn btn-primary" type="submit">Add to case fees</button>
-              </form>`) : ''}
 
             ${writable ? card('Invoices', html`
               ${quoteInvoices.length === 0
@@ -1174,11 +1169,9 @@ export const quotesModule: AppModule = {
       const q = await one<QuoteRow>(c.env.DB, 'SELECT * FROM quotes WHERE id = ?', id);
       if (!q) return c.notFound();
 
-      const [clients, settings, copied] = await Promise.all([
+      const [clients, settings] = await Promise.all([
         clientOptions(c.env),
-        feeSettings(c.env),
-        one<{ n: number }>(c.env.DB,
-          'SELECT COUNT(*) AS n FROM fee_items WHERE notes = ?', `From quote ${q.ref}`),
+        moneySettings(c.env),
       ]);
       const csrf = c.get('session')!.csrf;
 
@@ -1189,10 +1182,6 @@ export const quotesModule: AppModule = {
       return page(c, { title: `Edit ${q.ref}`, active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { href: `/quotes/${q.id}`, label: q.ref }, { label: 'Edit' }])}
         ${pageHeader(`Edit ${q.ref}`)}
-        ${(copied?.n ?? 0) > 0
-          ? html`<div class="alert alert-warn">This quote has already been copied onto the case as fee
-                   lines. Changing it here does not change those fee lines — edit them on the case.</div>`
-          : ''}
         <form method="post" action="/quotes/${q.id}" class="form-grid">
           ${csrfField(csrf)}
           <div class="form-section">
@@ -1228,7 +1217,7 @@ export const quotesModule: AppModule = {
       const existing = await one<QuoteRow>(c.env.DB, 'SELECT * FROM quotes WHERE id = ?', id);
       if (!existing) return c.notFound();
 
-      const settings = await feeSettings(c.env);
+      const settings = await moneySettings(c.env);
       const f = new FormReader(await c.req.formData());
       const clientId = f.optional('client_id', { max: 60 });
       const description = f.text('description', { required: true, label: 'Description', max: 500 });
@@ -1301,7 +1290,7 @@ export const quotesModule: AppModule = {
       const q = await one<QuoteRow>(c.env.DB, 'SELECT * FROM quotes WHERE id = ?', id);
       if (!q) return c.notFound();
 
-      const fees = await feeSettings(c.env);
+      const fees = await moneySettings(c.env);
       const qs = await quoteSettings(c.env);
       const form = await c.req.formData();
       const f = new FormReader(form);
@@ -1449,7 +1438,7 @@ export const quotesModule: AppModule = {
       const q = await one<QuoteRow>(c.env.DB, 'SELECT id FROM quotes WHERE id = ?', id);
       if (!q) return c.notFound();
 
-      const fees = await feeSettings(c.env);
+      const fees = await moneySettings(c.env);
       const form = await c.req.formData();
       const now = nowIso();
 
@@ -1578,57 +1567,6 @@ export const quotesModule: AppModule = {
         meta: { invoice: result.ref } });
       return redirectWith(c, `/invoices/${result.id}`,
         `${result.ref} raised as a draft. Check it, then issue it.`, 'ok');
-    });
-
-    r.post('/:id/to-fees', requirePermission('register:write'), async (c) => {
-      const id = c.req.param('id')!;
-      const user = c.get('user')!;
-      const q = await one<QuoteRow>(c.env.DB, 'SELECT * FROM quotes WHERE id = ?', id);
-      if (!q) return c.notFound();
-      if (!q.case_id) return redirectWith(c, `/quotes/${id}`, 'Link this quote to a case first.', 'err');
-
-      const existing = await one<{ n: number }>(
-        c.env.DB, `SELECT COUNT(*) AS n FROM fee_items WHERE case_id = ? AND notes = ?`, q.case_id, `From quote ${q.ref}`,
-      );
-      if ((existing?.n ?? 0) > 0) return redirectWith(c, `/quotes/${id}`, 'This quote has already been copied to case fees.', 'err');
-
-      const lines = await quoteLines(c.env, id);
-      if (lines.length === 0) return redirectWith(c, `/quotes/${id}`, 'This quote has no items to record.', 'err');
-
-      // One fee line per quote line, not one lump. The quote's itemisation is
-      // what the client agreed to, so it is what the case should show — and it
-      // is the only way the split can be right, because only professional fees
-      // are apportioned. Disbursements are money passed through on the client's
-      // behalf; apportioning them would hand the practice a share of somebody
-      // else's fee.
-      const stmts: D1PreparedStatement[] = lines.map((l) => {
-        const quantity = l.quantity_milli === 1000
-          ? ''
-          : ` (${formatQuantity(l.quantity_milli)} ${pluraliseUnit(l.unit_label, l.quantity_milli)} × ${money(l.unit_amount_cents, q.currency)})`;
-        return c.env.DB.prepare(
-          `INSERT INTO fee_items (id, case_id, description, kind, amount_cents, gst_treatment, gst_rate_bp,
-             net_cents, gst_cents, gross_cents, currency, include_in_split, status, notes, created_at, updated_at, created_by)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'quoted',?,?,?,?)`,
-        ).bind(
-          newId('fee'), q.case_id, `${l.description}${quantity}`, l.kind,
-          l.unit_amount_cents === l.net_cents ? l.net_cents : l.net_cents,
-          l.gst_treatment, l.gst_rate_bp,
-          l.net_cents, l.gst_cents, l.gross_cents, q.currency,
-          l.kind === 'professional' ? 1 : 0,
-          `From quote ${q.ref}`, nowIso(), nowIso(), user.id,
-        );
-      });
-      await c.env.DB.batch(stmts);
-
-      const totals = summariseQuote(lines.map((l) => ({
-        kind: l.kind, lineAmountCents: l.unit_amount_cents,
-        netCents: l.net_cents, gstCents: l.gst_cents, grossCents: l.gross_cents,
-      })));
-      await addEntry(c.env, { entityType: 'case', entityId: q.case_id, kind: 'system',
-        body: `Fees recorded from quote ${q.ref} — ${lines.length} line(s), ${money(totals.totalCents, q.currency)} total.`,
-        createdBy: user.id });
-      await auditFrom(c, { action: 'quote.copied_to_fees', entityType: 'quote', entityId: id, meta: { caseId: q.case_id } });
-      return redirectWith(c, `/cases/${q.case_id}`, `Fees recorded from quote ${q.ref}.`);
     });
 
     app.route('/quotes', r);

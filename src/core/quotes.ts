@@ -10,7 +10,7 @@
  * that multiplies into a rounding error.
  */
 
-import { computeGst, roundCents, type GstTreatment, type FeeKind } from './fees';
+import { computeGst, roundCents, type GstTreatment, type FeeKind } from './money';
 
 export interface QuoteLineInput {
   description: string;
