@@ -295,12 +295,12 @@ export const inboxModule: AppModule = {
           ${csrfField(csrf)}
           <input type="hidden" name="back" value="${keep({})}">
         ${table([
-          { label: raw('<span class="sr-only">Select</span>'), width: '4' },
-          { label: 'Subject', width: '36' },
+          { label: raw('<span class="sr-only">Select</span>'), width: 'pick' },
+          { label: 'Subject', width: '38' },
           { label: 'From', width: '20', hideOn: 'sm' },
           { label: 'Received', width: '16' },
           { label: 'Trust', width: '11', hideOn: 'sm' },
-          { label: 'Status', width: '13' },
+          { label: 'Status', width: '15' },
         ], rows.map((row) => html`
           <tr>
             <td>${'' /* A message that became an inquiry, or that has been filed,
