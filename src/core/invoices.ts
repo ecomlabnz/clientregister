@@ -152,6 +152,63 @@ export async function refreshTotals(env: Env, invoiceId: string): Promise<QuoteT
 }
 
 /**
+ * Raise an invoice on its own.
+ *
+ * Until now the only way to bill anything was to write a quote first and
+ * convert it — which is a fair description of how the work usually goes, and a
+ * poor description of the times it does not. The practice put it plainly:
+ * *"both being able to be entered independently"*. An hour of advice given and
+ * charged for needs a bill, not an offer followed by a bill.
+ *
+ * It starts empty and in draft. Lines are added exactly as they are added to an
+ * invoice raised from a quote, and issuing it is the same act with the same
+ * consequences — from that moment the database stops accepting changes.
+ *
+ * The one thing that cannot be left out is who it is addressed to. A quote may
+ * sit against an inquiry that has not become a client yet; an invoice may not.
+ */
+export async function newInvoice(
+  env: Env,
+  input: { clientId: string; caseId?: string | null; description: string; termDays?: number; currency?: string },
+  userId: string,
+): Promise<{ ok: true; id: string; ref: string } | { ok: false; message: string }> {
+  const description = input.description.trim();
+  if (description === '') return { ok: false, message: 'Say what this invoice is for.' };
+
+  const client = await one<{ id: string }>(
+    env.DB, 'SELECT id FROM clients WHERE id = ?', input.clientId);
+  if (!client) return { ok: false, message: 'Choose an existing client — an invoice has to be addressed to someone.' };
+
+  // A matter is optional, but if one is named it must belong to that client.
+  // An invoice filed against somebody else's matter is a mistake nobody spots
+  // until they go looking for the money.
+  if (input.caseId) {
+    const matter = await one<{ client_id: string }>(
+      env.DB, 'SELECT client_id FROM cases WHERE id = ?', input.caseId);
+    if (!matter) return { ok: false, message: 'That matter no longer exists.' };
+    if (matter.client_id !== input.clientId) {
+      return { ok: false, message: 'That matter belongs to a different client.' };
+    }
+  }
+
+  const id = newId('inv');
+  const ref = await nextRef(env.DB, 'invoice', 'INV');
+  const stamp = nowIso();
+  const termDays = Math.max(0, Math.min(365, input.termDays ?? 7));
+
+  await run(
+    env.DB,
+    `INSERT INTO invoices (id, ref, quote_id, client_id, case_id, description, payment_terms_days,
+                           status, currency, created_at, updated_at, created_by)
+     VALUES (?,?,NULL,?,?,?,?, 'draft', ?,?,?,?)`,
+    id, ref, input.clientId, input.caseId ?? null, description, termDays,
+    input.currency ?? 'NZD', stamp, stamp, userId,
+  );
+  await refreshTotals(env, id);
+  return { ok: true, id, ref };
+}
+
+/**
  * Raise an invoice from a quote.
  *
  * The quote is left exactly as it is. A quote may reasonably be invoiced more

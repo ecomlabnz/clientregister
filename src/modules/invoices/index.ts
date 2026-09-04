@@ -34,10 +34,11 @@ import { FEE_KINDS, FEE_KIND_LABELS, GST_TREATMENTS, GST_TREATMENT_LABELS,
          type FeeKind, type GstTreatment } from '../../core/fees';
 import { computeLine, formatQuantity, parseQuantityToMilli, pluraliseUnit } from '../../core/quotes';
 import { practiceDetails } from '../../core/practice';
+import { clientOptions } from '../../core/lookups';
 import { feeSettings } from '../fees';
 import { catalogue } from '../quotes';
 import {
-  INVOICE_STATUS_LABELS, PAYMENT_METHOD_LABELS, type InvoiceRow, type PaymentMethod,
+  INVOICE_STATUS_LABELS, PAYMENT_METHOD_LABELS, newInvoice, type InvoiceRow, type PaymentMethod,
   invoiceItems, issueInvoice, isOverdue, outstanding, paymentsFor, recordPayment,
   refreshTotals, totalsFor, voidInvoice,
 } from '../../core/invoices';
@@ -70,6 +71,82 @@ export const invoicesModule: AppModule = {
     r.use('*', requireAuth);
 
     // --- The list -----------------------------------------------------------
+    r.get('/new', requirePermission('quote:write'), async (c) => {
+      const csrf = c.get('session')!.csrf;
+      const clients = await clientOptions(c.env);
+      const presetClient = c.req.query('client_id') ?? '';
+      const presetCase = c.req.query('case_id') ?? '';
+      // Only this client's matters, and only when a client is already chosen —
+      // a list of every matter in the register is not a thing to scroll.
+      const matters = presetClient
+        ? await all<{ id: string; ref: string; descriptor: string | null; title: string }>(
+            c.env.DB,
+            `SELECT id, ref, descriptor, title FROM cases WHERE client_id = ?
+              ORDER BY created_at DESC LIMIT 200`, presetClient)
+        : [];
+
+      return page(c, { title: 'New invoice', active: '/invoices' }, html`
+        ${breadcrumbs([{ href: '/invoices', label: 'Invoices' }, { label: 'New' }])}
+        ${pageHeader('New invoice',
+          'For work you are billing without having quoted it first. Start with who it is for; '
+          + 'the lines go on next, and nothing is fixed until you issue it.')}
+        <form method="post" action="/invoices" class="form-grid">
+          ${csrfField(csrf)}
+          <div class="form-section">
+            <h3>Who and what</h3>
+            ${select({ label: 'Client', name: 'client_id', required: true, value: presetClient,
+                       options: clients, includeBlank: 'Choose a client',
+                       hint: 'An invoice has to be addressed to somebody. A quote does not.' })}
+            ${matters.length > 0
+              ? select({ label: 'Matter', name: 'case_id', value: presetCase,
+                         options: matters.map((m) => ({ value: m.id,
+                           label: `${m.ref} — ${m.descriptor ?? m.title}` })),
+                         includeBlank: 'Not against a particular matter',
+                         hint: 'Optional. Linking it puts the invoice on the matter\u2019s file.' })
+              : html`<input type="hidden" name="case_id" value="${presetCase}">`}
+            ${field({ label: 'What this is for', name: 'description', required: true, maxlength: 500,
+                      placeholder: 'e.g. Advice on a section 61 request',
+                      hint: 'One line. The itemisation comes next.' })}
+          </div>
+          <div class="form-section">
+            <h3>Terms</h3>
+            ${'' /* Seven days, the same default a quote-raised invoice takes.
+                     There is no setting for it yet; when there is, both should
+                     read it rather than one growing its own. */}
+            ${field({ label: 'Due in (days)', name: 'payment_terms_days', value: '7', maxlength: 3,
+                      hint: 'Counted from the day it is issued.' })}
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Create draft</button>
+            <a class="btn btn-secondary" href="/invoices">Cancel</a>
+          </div>
+        </form>`);
+    });
+
+    r.post('/', requirePermission('quote:write'), async (c) => {
+      const user = c.get('user')!;
+      const f = new FormReader(await c.req.formData());
+      const clientId = f.text('client_id', { required: true, label: 'Client', max: 60 });
+      const caseId = f.optional('case_id', { max: 60 });
+      const description = f.text('description', { required: true, label: 'What this is for', max: 500 });
+      const termDays = Number(f.optional('payment_terms_days', { max: 3 }) ?? '') || undefined;
+
+      if (Object.keys(f.errors).length > 0) {
+        return redirectWith(c, '/invoices/new', Object.values(f.errors)[0]!, 'err');
+      }
+
+      const made = await newInvoice(
+        c.env, { clientId, caseId: caseId || null, description, termDays }, user.id);
+      if (!made.ok) return redirectWith(c, '/invoices/new', made.message, 'err');
+
+      await auditFrom(c, {
+        action: 'invoice.created', entityType: 'invoice', entityId: made.id,
+        meta: { ref: made.ref, from: 'direct' },
+      });
+      return redirectWith(c, `/invoices/${made.id}`,
+        `${made.ref} created. Add the lines, then issue it.`);
+    });
+
     r.get('/', requirePermission('register:read'), async (c) => {
       const view = ['draft', 'owing', 'paid', 'void', 'all'].includes(c.req.query('view') ?? '')
         ? c.req.query('view')! : 'owing';
@@ -121,7 +198,10 @@ export const invoicesModule: AppModule = {
       ];
 
       return page(c, { title: 'Invoices', active: '/quotes' }, html`
-        ${pageHeader('Invoices', 'What has been billed, and what is still owed.')}
+        ${pageHeader('Invoices', 'What has been billed, and what is still owed.',
+          can(c.get('user'), 'quote:write')
+            ? html`<a class="btn btn-primary" href="/invoices/new">New invoice</a>`
+            : undefined)}
 
         <div class="fee-summary">
           <div class="stat"><span class="stat-label">Outstanding</span>
