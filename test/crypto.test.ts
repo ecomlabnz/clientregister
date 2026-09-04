@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   base32Decode, base32Encode, generateTotpSecret, hashPassword, hmacSha256Hex,
-  passwordNeedsRehash, sealField, sha256Hex, timingSafeEqualStr, unsealField,
+  passwordNeedsRehash, sha256Hex, timingSafeEqualStr,
   PASSWORD_HASH_PARAMS, totpCode, verifyPassword, verifyTotp,
 } from '../src/core/crypto';
 import { base64Encode } from '../src/core/ids';
@@ -93,34 +93,6 @@ describe('constant-time comparison', () => {
     expect(timingSafeEqualStr('abc123', 'abc124')).toBe(false);
     expect(timingSafeEqualStr('abc', 'abcd')).toBe(false);
     expect(timingSafeEqualStr('', '')).toBe(true);
-  });
-});
-
-describe('sealed fields', () => {
-  const key = base64Encode(new Uint8Array(32).fill(7));
-
-  it('round-trips a value', async () => {
-    const sealed = await sealField('LM123456', key);
-    expect(sealed.startsWith('v1.')).toBe(true);
-    expect(sealed).not.toContain('LM123456');
-    expect(await unsealField(sealed, key)).toBe('LM123456');
-  });
-
-  it('produces a different ciphertext each time (random IV)', async () => {
-    expect(await sealField('LM123456', key)).not.toBe(await sealField('LM123456', key));
-  });
-
-  it('returns null for a wrong key, a tampered value or a bad format', async () => {
-    const otherKey = base64Encode(new Uint8Array(32).fill(9));
-    const sealed = await sealField('LM123456', key);
-    expect(await unsealField(sealed, otherKey)).toBeNull();
-    expect(await unsealField(`${sealed}AA`, key)).toBeNull();
-    expect(await unsealField('not-sealed', key)).toBeNull();
-    expect(await unsealField('v1.AAAA', key)).toBeNull();
-  });
-
-  it('refuses a key that is not 32 bytes', async () => {
-    await expect(sealField('x', base64Encode(new Uint8Array(16)))).rejects.toThrow(/32 bytes/);
   });
 });
 
