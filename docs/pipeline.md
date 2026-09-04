@@ -85,55 +85,61 @@ research note about an institute's name. The previous-names point stands on its
 own (it is asked on every INZ form and drives police certificates); it simply is
 not evidenced by our own migration.
 
-### 3. Recording payments on a fee line
-**Asked 4 September 2026:** *"how do i enter part payments??"*, then, after being
-told payments live on invoices: *"I do not want to use invoices in this practice
-but it must be available for others - in the future - so i want to have the
-option of recording payments in the fees - possible?"*
+### 3. Collapse Fees into Quotes and Invoices
+**Asked 4 September 2026**, and it is the right question: *"why do we need fees
+section at all?? should there just be quotes and invoices - both being able to be
+entered independently and the quotes can be converted into invoices - invoices
+can be part paid??? why complicate things??"*
 
-Yes. The answer stands that a fee line is Quoted → Invoiced → Paid with nothing
-in between, and that the practice holds no invoices — so today there is nowhere
-to put a part payment at all.
+Nothing good was going to come of the earlier answer, which was to bolt payments
+onto fee lines so that invoices could be avoided. That would have been a third
+place for money to live. **A fee-line payments table was written and deleted
+before it shipped**, on the strength of the question.
 
-**The shape, so it does not create a second source of truth:**
+**What the register actually holds, counted 4 September 2026:**
 
-- A **`fee_payments`** table, append-only like `invoice_payments`: date, amount,
-  method, reference, who recorded it.
-- **A line's paid amount is the sum of its payments**, not a number stored twice.
-  Its status follows: nothing → part paid → paid.
-- **One owner per line, decided by whether it is invoiced.** A fee line that
-  belongs to an invoice takes its payments through the invoice; a line that does
-  not takes them directly. The database should refuse the other combination,
-  rather than the panel merely not offering it.
-- Invoices are untouched, so they remain available for a practice that wants
-  them.
+| | rows |
+|---|---|
+| fee lines | **3**, across 2 matters |
+| **fee shares (splits)** | **42, across 22 matters** |
+| quotes | 3 (6 lines) |
+| invoices | **0** |
+| invoice payments | 0 |
 
-### 4. A path from Fees to an invoice
-**Asked 4 September 2026:** *"how do i enter part payments??"*
+So Fees-as-billing is barely used, invoices are not used at all, and **the one
+thing in the Fees section genuinely in use is the split** — how a matter's
+income is divided between the principal and whoever else. That is the piece
+needing a home before anything is removed.
 
-You cannot, on a fee line: a line is Quoted → Invoiced → Paid, all or nothing.
-Part payments live on an **invoice** (`invoice_payments`, append-only, each with
-a date, method and reference), and the invoice tracks paid against outstanding.
-The register holds **no invoices at all**, which is why it could not be found.
+**The shape proposed:**
 
-What is missing is the signpost: the Fees panel shows "PAID / OUTSTANDING" and
-offers nothing to click. **Proposed:** a link from the Fees panel to raise an
-invoice for that matter, carrying the fee lines over.
+- **Quote** and **Invoice**, each raisable on its own, and a quote converts to an
+  invoice carrying its lines.
+- **Part payments on an invoice** — already built and untouched:
+  `invoice_payments` is append-only, signed, with a date, method and reference.
+- **The split moves to the matter**, where it belongs: it is a property of how
+  this matter's income is shared, not of a fee line. It then applies to whatever
+  is invoiced on that matter.
+- **Fee lines go**, and the three existing ones move to a quote or an invoice.
+- **The unbilled-work alert changes its question** from "finished with no fee
+  line" to "finished and never invoiced". Its measured design stands (a 90-day
+  look-back and a 14-day grace turned 135 candidates into 6).
 
-Still worth having even for a practice that never invoices, because an invoice
-is what a client asks for when they want one — but it is now the second of the
-two, not the only way to record a payment.
+**Now is the moment**, if it is to be done: 0 invoices and 3 fee lines is as
+cheap as this will ever be. Waiting until fees are entered in earnest makes it a
+migration of live money records.
 
----
+**Open question for the practice:** whether the split should sit on the matter
+(one split per matter, applying to everything billed on it) or on the invoice
+(a split per bill, so one matter could be shared differently on different
+invoices). The matter is simpler and matches how the 22 existing splits read.
 
-## Standing, from earlier
-
-### 5. Automated backups — the largest single risk
+### 4. Automated backups — the largest single risk
 There is none. `docs/operations.md` says so in bold, and the register has held
 real client files since 30 August 2026. This must be closed before another
 practice's files are held here at all (see the tenancy decision in CLAUDE.md).
 
-### 6. Dead code and stale tooling
+### 5. Dead code and stale tooling
 - `sealField` / `unsealField` in `src/core/crypto.ts`, left from the passport
   encryption removed in 0.69.0. Nothing calls them.
 - `scripts/seed-demo.mjs` references `clients.nationality`, a column dropped in
@@ -141,7 +147,7 @@ practice's files are held here at all (see the tenancy decision in CLAUDE.md).
 - Six stale branches on the remote. Deleting them needs the practice's own
   GitHub session; the token here is refused (403).
 
-### 7. Data shapes worth a decision
+### 6. Data shapes worth a decision
 - **`cases.outcome` holds two shapes** — about 123 one-word verdicts and 10
   free-text paragraphs. The application will overwrite the paragraphs. Reported,
   not actioned: it wants a migration, not a convention.
@@ -152,7 +158,7 @@ practice's files are held here at all (see the tenancy decision in CLAUDE.md).
   than stamped with today, and are named on the Alerts page for the practice to
   fill in.
 
-### 8. ~~CI is fragile to npm being down~~ — done, 1.0.2
+### 7. ~~CI is fragile to npm being down~~ — done, 1.0.2 — was item 8
 Four CI runs failed on 3–4 September because `npm audit` could not reach
 `registry.npmjs.org`, while the same commit passed on a parallel run each time.
 The gate is unchanged — a high or critical advisory still stops the build — but
@@ -161,7 +167,7 @@ an unreachable registry is now retried three times and then reported loudly as
 `scripts/audit-gate.mjs` and is tested against the shapes npm actually produces,
 including the one it printed for hours that night.
 
-### 9. Reading across from other sessions
+### 8. Reading across from other sessions
 The **App field comparison review** session produced the nine fields above. Its
 own audit ended with no repository changes and a mail-DNS fix. Nothing else has
 been pulled from it.
