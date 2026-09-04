@@ -1,5 +1,15 @@
+import type { Env } from '../types';
+import type { SettingsGroup } from './settings';
+import { getSetting } from './db';
+
 /**
- * Fee arithmetic: GST treatment, case totals and the revenue split.
+ * Money: GST treatment, line kinds, and the revenue split.
+ *
+ * Renamed from `core/fees.ts` when the Fees section was removed and money
+ * moved wholly into quotes and invoices. What is here is the arithmetic and
+ * vocabulary those two share; what left with the Fees module was the fee
+ * *line* — a quote line that could not be sent to anybody and an invoice line
+ * that nobody owed.
  *
  * Two rules drive everything here:
  *
@@ -15,7 +25,6 @@
 
 export type GstTreatment = 'exclusive' | 'inclusive' | 'none';
 export type FeeKind = 'professional' | 'disbursement' | 'third_party';
-export type FeeStatus = 'quoted' | 'invoiced' | 'paid' | 'written_off' | 'cancelled';
 
 export const GST_TREATMENTS: GstTreatment[] = ['exclusive', 'inclusive', 'none'];
 export const GST_TREATMENT_LABELS: Record<GstTreatment, string> = {
@@ -29,12 +38,6 @@ export const FEE_KIND_LABELS: Record<FeeKind, string> = {
   professional: 'Professional fee',
   disbursement: 'Disbursement (INZ fee, medical, translation)',
   third_party: 'Third-party cost',
-};
-
-export const FEE_STATUSES: FeeStatus[] = ['quoted', 'invoiced', 'paid', 'written_off', 'cancelled'];
-export const FEE_STATUS_LABELS: Record<FeeStatus, string> = {
-  quoted: 'Quoted', invoiced: 'Invoiced', paid: 'Paid',
-  written_off: 'Written off', cancelled: 'Cancelled',
 };
 
 /** What the split is calculated on. */
@@ -75,79 +78,6 @@ export function computeGst(amountCents: number, treatment: GstTreatment, rateBp:
   }
   const gst = roundCents((amount * rateBp) / 10000);
   return { net: amount, gst, gross: amount + gst };
-}
-
-export interface FeeLine {
-  kind: FeeKind;
-  net_cents: number;
-  gst_cents: number;
-  gross_cents: number;
-  include_in_split: number | boolean;
-  status: FeeStatus | string;
-}
-
-export interface FeeTotals {
-  professionalNet: number;
-  professionalGst: number;
-  professionalGross: number;
-  disbursementsNet: number;
-  disbursementsGst: number;
-  disbursementsGross: number;
-  totalNet: number;
-  totalGst: number;
-  totalGross: number;
-  /** Excludes cancelled and written-off lines. */
-  invoicedGross: number;
-  paidGross: number;
-  outstandingGross: number;
-  splitBaseCents: number;
-}
-
-/** Lines that never count toward money owed or split. */
-function isLive(line: FeeLine): boolean {
-  return line.status !== 'cancelled' && line.status !== 'written_off';
-}
-
-export function summariseFees(lines: FeeLine[], splitBase: SplitBase = 'net_professional'): FeeTotals {
-  const t: FeeTotals = {
-    professionalNet: 0, professionalGst: 0, professionalGross: 0,
-    disbursementsNet: 0, disbursementsGst: 0, disbursementsGross: 0,
-    totalNet: 0, totalGst: 0, totalGross: 0,
-    invoicedGross: 0, paidGross: 0, outstandingGross: 0,
-    splitBaseCents: 0,
-  };
-
-  for (const line of lines) {
-    if (!isLive(line)) continue;
-    if (line.kind === 'professional') {
-      t.professionalNet += line.net_cents;
-      t.professionalGst += line.gst_cents;
-      t.professionalGross += line.gross_cents;
-    } else {
-      t.disbursementsNet += line.net_cents;
-      t.disbursementsGst += line.gst_cents;
-      t.disbursementsGross += line.gross_cents;
-    }
-    t.totalNet += line.net_cents;
-    t.totalGst += line.gst_cents;
-    t.totalGross += line.gross_cents;
-
-    if (line.status === 'paid') {
-      t.paidGross += line.gross_cents;
-      t.invoicedGross += line.gross_cents;
-    } else if (line.status === 'invoiced') {
-      t.invoicedGross += line.gross_cents;
-    }
-
-    const included = line.include_in_split === 1 || line.include_in_split === true;
-    if (!included) continue;
-    if (splitBase === 'net_professional' && line.kind === 'professional') t.splitBaseCents += line.net_cents;
-    else if (splitBase === 'gross_professional' && line.kind === 'professional') t.splitBaseCents += line.gross_cents;
-    else if (splitBase === 'net_all') t.splitBaseCents += line.net_cents;
-  }
-
-  t.outstandingGross = t.invoicedGross - t.paidGross;
-  return t;
 }
 
 export interface ShareInput {
@@ -215,3 +145,81 @@ export function formatBp(bp: number): string {
 export function sumBp(shares: Array<{ percent_bp: number }>): number {
   return shares.reduce((sum, s) => sum + s.percent_bp, 0);
 }
+
+
+/**
+ * The practice's money settings.
+ *
+ * Read by quotes and invoices, which are now the only two places money is
+ * recorded. They moved here from the Fees module rather than being copied into
+ * one of them: two modules reading one set of settings from a third place is
+ * right, and two modules each keeping their own GST rate is how a practice ends
+ * up billing 15% on one document and 12.5% on the next.
+ *
+ * The keys keep their `fees.` prefix. Renaming them would mean a settings
+ * migration to change nothing a person can see — the register's rule is to
+ * change shape directly, and this is a name, not a shape.
+ */
+export interface DefaultShare { party_key: string; label: string; percent_bp: number }
+
+export async function moneySettings(env: Env): Promise<{
+  gstRateBp: number;
+  gstRegistered: boolean;
+  defaultTreatment: GstTreatment;
+  splitBase: SplitBase;
+  defaultShares: DefaultShare[];
+}> {
+  const [rate, registered, treatment, base, shares] = await Promise.all([
+    getSetting(env, 'fees.gst_rate_bp', '1500'),
+    getSetting(env, 'fees.gst_registered', 'true'),
+    getSetting(env, 'fees.default_gst_treatment', 'exclusive'),
+    getSetting(env, 'fees.split_base', 'net_professional'),
+    getSetting(env, 'fees.default_shares', '[]'),
+  ]);
+
+  let defaultShares: DefaultShare[] = [];
+  try {
+    const parsed = JSON.parse(shares);
+    if (Array.isArray(parsed)) defaultShares = parsed;
+  } catch {
+    defaultShares = [];
+  }
+  if (defaultShares.length === 0) {
+    defaultShares = [{ party_key: 'principal', label: 'Principal', percent_bp: 10000 }];
+  }
+
+  const rateBp = Number(rate);
+  return {
+    gstRateBp: Number.isFinite(rateBp) ? rateBp : 1500,
+    gstRegistered: registered === 'true',
+    defaultTreatment: (GST_TREATMENTS as string[]).includes(treatment) ? (treatment as GstTreatment) : 'exclusive',
+    splitBase: (SPLIT_BASES as string[]).includes(base) ? (base as SplitBase) : 'net_professional',
+    defaultShares,
+  };
+}
+
+/**
+ * The settings tab these belong to. Declared here and mounted by the invoices
+ * module, which is now where money is recorded — the register's rule is that a
+ * module declares its own settings, and invoices is the module that has them.
+ */
+export const MONEY_SETTINGS: SettingsGroup = {
+  id: 'fees',
+  title: 'Money and GST',
+  description: 'Defaults applied to new quote and invoice lines. Existing lines keep the rate and '
+    + 'treatment they were entered under.',
+  order: 20,
+  settings: [
+    { key: 'fees.gst_registered', type: 'boolean', label: 'The practice is GST registered',
+      default: 'true', help: 'When off, no GST is calculated on new lines.' },
+    { key: 'fees.gst_rate_bp', type: 'percent', label: 'GST rate', default: '1500',
+      min: 0, max: 10000, help: 'New Zealand GST is 15%.' },
+    { key: 'fees.default_gst_treatment', type: 'enum', label: 'Default treatment for new lines',
+      default: 'exclusive',
+      options: GST_TREATMENTS.map((t) => ({ value: t, label: GST_TREATMENT_LABELS[t] })) },
+    { key: 'fees.split_base', type: 'enum', label: 'A split is calculated on',
+      default: 'net_professional',
+      options: SPLIT_BASES.map((b) => ({ value: b, label: SPLIT_BASE_LABELS[b] })) },
+  ],
+  note: 'default-shares',
+};

@@ -64,16 +64,31 @@ describe('which matters count as unbilled', () => {
     expect(run(db, '2026-06-05', '2026-08-20')).toEqual([]);
   });
 
-  it('leaves a matter with a fee line', () => {
-    // "Charged for" is read broadly: the practice records money in more than
-    // one place, and this asks whether it was dealt with at all.
+  it('counts a voided invoice as no invoice at all', () => {
+    // Replaces "leaves a matter with a fee line", which tested a table that no
+    // longer exists. The question the alert asks is now the plain one — was
+    // this ever billed? — and a bill withdrawn is a bill not sent.
     const { db, matter } = register();
     matter('k1', 'CASE-26-901', 'approved', '2026-08-01');
-    db.prepare(`INSERT INTO fee_items (id, case_id, description, kind, amount_cents,
-                                       gst_treatment, net_cents, gst_cents, gross_cents,
-                                       currency, created_at, updated_at)
-                VALUES ('f1','k1','Professional fee','professional',250000,'inclusive',
-                        217391,32609,250000,'NZD',?,?)`)
+    db.prepare(`INSERT INTO invoices (id, ref, case_id, client_id, description, status, currency,
+                                      net_cents, gst_cents, gross_cents, paid_cents,
+                                      issued_on, voided_at, void_reason, created_at, updated_at)
+                VALUES ('i1','INV-9001','k1','c1','Professional fee','void','NZD',
+                        100,15,115,0,'2026-08-05',?,'raised in error',?,?)`)
+      .run(AT, AT, AT);
+    expect(run(db, '2026-06-05', '2026-08-20').length).toBe(1);
+  });
+
+  it('counts a draft invoice as billed, because somebody has dealt with it', () => {
+    // The alert is a prompt to look, not an accounts-receivable report. A draft
+    // says a person has been here.
+    const { db, matter } = register();
+    matter('k1', 'CASE-26-901', 'approved', '2026-08-01');
+    db.prepare(`INSERT INTO invoices (id, ref, case_id, client_id, description, status, currency,
+                                      net_cents, gst_cents, gross_cents, paid_cents,
+                                      created_at, updated_at)
+                VALUES ('i1','INV-9001','k1','c1','Professional fee','draft','NZD',
+                        100,15,115,0,?,?)`)
       .run(AT, AT);
     expect(run(db, '2026-06-05', '2026-08-20')).toEqual([]);
   });
@@ -169,7 +184,7 @@ describe('the settings that narrow it', () => {
     for (const key of ['alerts.unbilled_days', 'alerts.unbilled_grace_days']) {
       const help = setting(key)!.help!;
       expect(help.length).toBeGreaterThan(40);
-      expect(help).not.toMatch(/\bSQL\b|null|NOT EXISTS|fee_items/);
+      expect(help).not.toMatch(/\bSQL\b|null|NOT EXISTS|invoice_items/);
     }
   });
 

@@ -15,6 +15,7 @@
  */
 
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { AppContext } from '../../types';
 import type { AppModule } from '../../core/module';
 import { everyTermClausePlain } from '../../core/search';
@@ -25,20 +26,25 @@ import { newId } from '../../core/ids';
 import { FormReader } from '../../core/validate';
 import { can } from '../../core/rbac';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
-import { html, raw } from '../../ui/html';
+import { html, raw, type Raw } from '../../ui/html';
 import {
-  actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, stamp, table,
+  actionButton, badge, card, collapsibleCard, csrfField, emptyState, field, optionsFrom, pageHeader,
+  select, stamp, statusTone, table,
 } from '../../ui/components';
 import { dateShort, money } from '../../ui/format';
-import { FEE_KINDS, FEE_KIND_LABELS, GST_TREATMENTS, GST_TREATMENT_LABELS,
-         type FeeKind, type GstTreatment } from '../../core/fees';
+import {
+  allocateSplit, FEE_KINDS, FEE_KIND_LABELS, formatBp, GST_TREATMENTS, GST_TREATMENT_LABELS,
+  moneySettings, parsePercentToBp, SPLIT_BASE_LABELS, sumBp,
+  type FeeKind, type GstTreatment,
+} from '../../core/money';
 import { computeLine, formatQuantity, parseQuantityToMilli, pluraliseUnit } from '../../core/quotes';
 import { practiceDetails } from '../../core/practice';
 import { clientOptions } from '../../core/lookups';
-import { feeSettings } from '../fees';
+
 import { catalogue } from '../quotes';
 import {
-  INVOICE_STATUS_LABELS, PAYMENT_METHOD_LABELS, newInvoice, type InvoiceRow, type PaymentMethod,
+  INVOICE_STATUS_LABELS, PAYMENT_METHOD_LABELS, newInvoice, sharesFor, splitBaseFor,
+  type InvoiceRow, type PaymentMethod,
   invoiceItems, issueInvoice, isOverdue, outstanding, paymentsFor, recordPayment,
   refreshTotals, totalsFor, voidInvoice,
 } from '../../core/invoices';
@@ -52,6 +58,62 @@ const PAYMENT_METHODS: PaymentMethod[] = ['bank', 'card', 'cash', 'other', 'adju
 /** Today in New Zealand, as a plain date, for comparing with stored dates. */
 function todayNz(): string {
   return new Date(Date.now() + 12 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/**
+ * What has been billed on a matter, shown on the matter's own page.
+ *
+ * This slot used to hold the Fees panel — its own lines, its own statuses, its
+ * own totals, beside a Quotes card and an invoice module that did all three
+ * properly. The practice asked why, and there was no answer. So the slot shows
+ * the thing that actually holds the money now.
+ *
+ * It is deliberately a list and two numbers rather than a second place to edit
+ * an invoice. An invoice is edited on its own page, where the freeze on issue
+ * and the payment record live.
+ */
+export async function invoicesSection(
+  c: Context<AppContext>, caseId: string, currency: string, canWrite: boolean,
+): Promise<Raw> {
+  const rows = await all<InvoiceRow>(
+    c.env.DB,
+    `SELECT * FROM invoices WHERE case_id = ? ORDER BY created_at DESC`, caseId,
+  );
+
+  // Voided invoices count for nothing but are still shown: a gap in a sequence
+  // is the first thing an auditor asks about, and the answer should be on the
+  // page rather than in somebody's memory.
+  const live = rows.filter((r) => r.status !== 'void');
+  const billed = live.reduce((n, r) => n + (r.gross_cents ?? 0), 0);
+  const paid = live.reduce((n, r) => n + (r.paid_cents ?? 0), 0);
+
+  return collapsibleCard('Invoices', html`
+    ${rows.length === 0
+      ? emptyState('Nothing billed on this matter yet.')
+      : html`
+        <div class="fee-summary">
+          <div class="stat"><span class="stat-label">Billed</span>
+            <span class="stat-value">${money(billed, currency)}</span></div>
+          <div class="stat"><span class="stat-label">Paid</span>
+            <span class="stat-value">${money(paid, currency)}</span></div>
+          <div class="stat ${billed - paid > 0 ? 'stat-warn' : ''}">
+            <span class="stat-label">Outstanding</span>
+            <span class="stat-value">${money(billed - paid, currency)}</span></div>
+        </div>
+        <ul class="list">${rows.map((r) => html`
+          <li><a href="/invoices/${r.id}"><code>${r.ref}</code></a>
+            — ${r.description}
+            ${badge(INVOICE_STATUS_LABELS[r.status], statusTone(r.status))}
+            <div class="muted small">${money(r.gross_cents ?? 0, r.currency)}${
+              r.paid_cents ? html` · ${money(r.paid_cents, r.currency)} paid` : ''}${
+              r.issued_on ? html` · issued ${dateShort(r.issued_on)}` : ' · draft'}</div></li>`)}</ul>`}
+    ${canWrite
+      ? html`<p><a class="btn btn-secondary"
+                   href="/invoices/new?case_id=${caseId}&client_id=${
+                     (await one<{ client_id: string }>(c.env.DB,
+                       'SELECT client_id FROM cases WHERE id = ?', caseId))?.client_id ?? ''}">
+               Raise an invoice</a></p>`
+      : ''}`);
 }
 
 export const invoicesModule: AppModule = {
@@ -273,13 +335,23 @@ export const invoicesModule: AppModule = {
       );
       if (!invoice) return c.notFound();
 
-      const [items, payments, cat, fees] = await Promise.all([
-        invoiceItems(c.env, id), paymentsFor(c.env, id), catalogue(c.env), feeSettings(c.env),
+      const [items, payments, cat, fees, shares] = await Promise.all([
+        invoiceItems(c.env, id), paymentsFor(c.env, id), catalogue(c.env), moneySettings(c.env),
+        sharesFor(c.env, id),
       ]);
       const totals = totalsFor(items);
       const csrf = c.get('session')!.csrf;
-      const editable = invoice.status === 'draft' && can(c.get('user'), 'quote:write');
+      const writable = can(c.get('user'), 'quote:write');
+      const editable = invoice.status === 'draft' && writable;
       const today = todayNz();
+
+      // The split, worked out from the lines rather than stored: one fact, one
+      // owner. Change a line and the shares follow it without anything having
+      // to remember to.
+      const splitBase = fees.splitBase;
+      const splitBase_cents = splitBaseFor(items, splitBase);
+      const allocation = allocateSplit(splitBase_cents, shares);
+      const bpTotal = sumBp(shares);
 
       return page(c, { title: `Invoice ${invoice.ref}`, active: '/quotes' }, html`
         ${breadcrumbs([{ label: 'Quotes', href: '/quotes' },
@@ -410,6 +482,72 @@ export const invoicesModule: AppModule = {
                      second entry — choose <strong>Adjustment</strong> and enter a negative amount,
                      which is how a ledger stays a record rather than an opinion.</p>
                 </details>` : ''}`)}
+
+            ${'' /* The split, asked for as a control rather than a fixture:
+                     "the bill split should be a button that opens the options —
+                     I can simply issue an invoice for already split amounts if
+                     I choose to… good if they are available but not always
+                     visible - can be activated if and where needed."
+
+                     So it is a <details>, shut unless there is a split on this
+                     invoice already. No script: the disclosure is the browser's
+                     own, which is the same reason every other fold here is one.
+
+                     It divides professional fees only, GST-exclusive, by
+                     default. A disbursement is money passed through on the
+                     client's behalf, and apportioning it would hand somebody a
+                     share of INZ's fee. */}
+            ${card('Split this bill', html`
+              <details ${raw(shares.length > 0 ? 'open' : '')}>
+                <summary>${shares.length > 0
+                  ? html`Split between ${String(shares.length)} ${shares.length === 1 ? 'party' : 'parties'}`
+                  : 'Divide this bill between parties'}</summary>
+
+                <p class="muted small mt">Base for the split — ${SPLIT_BASE_LABELS[splitBase]}:
+                   <strong>${money(splitBase_cents, invoice.currency)}</strong></p>
+
+                ${shares.length === 0
+                  ? html`<p class="hint">Nothing is split. Most bills are not — leave this alone and
+                           the whole amount is the practice's.</p>`
+                  : table(['Party', 'Share', 'Amount', ''], [
+                      ...allocation.map((a) => html`
+                        <tr>
+                          <td>${a.label}<div class="muted small"><code>${a.party_key}</code></div></td>
+                          <td class="num">${formatBp(a.percent_bp)}</td>
+                          <td class="num strong">${money(a.amount_cents, invoice.currency)}</td>
+                          <td>${invoice.status === 'draft' && writable ? html`
+                            <form method="post" action="${`/invoices/${invoice.id}/shares/${a.party_key}/remove`}">
+                              ${csrfField(csrf)}
+                              <button class="linklike danger" type="submit">Remove</button>
+                            </form>` : ''}</td>
+                        </tr>`),
+                      html`<tr class="totals-row">
+                        <td class="strong">Allocated</td>
+                        <td class="num strong ${bpTotal !== 10000 ? 'warn' : ''}">${formatBp(bpTotal)}</td>
+                        <td class="num strong">${money(
+                          allocation.reduce((n, a) => n + a.amount_cents, 0), invoice.currency)}</td>
+                        <td></td>
+                      </tr>`,
+                    ], { fixed: false })}
+
+                ${bpTotal !== 0 && bpTotal !== 10000
+                  ? html`<p class="warn small">This split comes to ${formatBp(bpTotal)}. It has to
+                           come to 100% before the invoice can be issued — the database refuses
+                           otherwise.</p>`
+                  : ''}
+
+                ${invoice.status === 'draft' && writable ? html`
+                  <form method="post" action="${`/invoices/${invoice.id}/shares`}" class="row-form mt">
+                    ${csrfField(csrf)}
+                    ${field({ label: 'Who', name: 'label', required: true, maxlength: 60,
+                              placeholder: 'e.g. Admin team' })}
+                    ${field({ label: 'Share', name: 'percent', required: true, maxlength: 8,
+                              placeholder: '30%' })}
+                    <button class="btn btn-secondary" type="submit">Add</button>
+                  </form>
+                  <p class="hint">Shares are set while the invoice is a draft. Once it is issued the
+                     split is fixed with everything else on it.</p>` : ''}
+              </details>`)}
           </div>
 
           <div class="col-side">
@@ -468,16 +606,46 @@ export const invoicesModule: AppModule = {
         return redirectWith(c, `/invoices/${id}`, 'An issued invoice cannot gain a line.', 'err');
       }
 
-      const fees = await feeSettings(c.env);
+      const fees = await moneySettings(c.env);
       const f = new FormReader(await c.req.formData());
-      const description = f.text('description', { required: true, label: 'Description', max: 300 });
-      const quantityMilli = parseQuantityToMilli(f.text('quantity', { required: true, label: 'Quantity', max: 10 }));
-      const unitLabel = f.optional('unit_label', { max: 30 }) ?? 'item';
-      const unitAmount = f.money('unit_amount', { required: true, label: 'Price per unit' });
-      const kind = f.enum('kind', FEE_KINDS, { fallback: 'professional' })! as FeeKind;
-      const treatment = f.enum('gst_treatment', GST_TREATMENTS, { fallback: fees.defaultTreatment })! as GstTreatment;
-      const serviceItemId = f.optional('service_item_id', { max: 80 });
+
+      // A line chosen from the price list, if one was. The screen fills the
+      // boxes from it when scripting is on; this is what makes the choice work
+      // when it is off — and what makes the two agree, because both take the
+      // same values from the same row. The guarantee came across from the Fees
+      // panel when that was removed: the register works with scripting off, and
+      // a price list only reachable by script is a price list this practice
+      // could not use.
+      const serviceItemId = f.optional('service_item_id', { max: 80 })
+        ?? f.optional('service_item', { max: 80 });
+      const picked = serviceItemId
+        ? (await catalogue(c.env, true)).find((item) => item.id === serviceItemId) ?? null
+        : null;
+
+      const typedDescription = f.optional('description', { max: 300 });
+      const description = typedDescription || picked?.name || '';
+      const quantityMilli = parseQuantityToMilli(
+        f.optional('quantity', { max: 10 }) || '1');
+      const unitLabel = f.optional('unit_label', { max: 30 }) || picked?.unit_label || 'item';
+      // A price-list entry at zero has no price yet — most of this practice's
+      // do. Treating that as "the price is nothing" would put a $0.00 line on an
+      // invoice and call it billed, so it is treated as "not said".
+      const listed = picked?.unit_amount_cents ? picked.unit_amount_cents : null;
+      const unitAmount = f.money('unit_amount', { label: 'Price per unit' }) ?? listed;
+      const kind = f.enum('kind', FEE_KINDS,
+        { fallback: (picked?.kind as FeeKind) ?? 'professional' })! as FeeKind;
+      const treatment = f.enum('gst_treatment', GST_TREATMENTS,
+        { fallback: (picked?.gst_treatment as GstTreatment) ?? fees.defaultTreatment })! as GstTreatment;
+
+      if (!description) {
+        return redirectWith(c, `/invoices/${id}`,
+          'A line needs a description — type one or choose from the price list.', 'err');
+      }
       if (!f.valid) return redirectWith(c, `/invoices/${id}`, Object.values(f.errors)[0]!, 'err');
+      if (unitAmount === null) {
+        return redirectWith(c, `/invoices/${id}`,
+          'A line needs a price — type one, or choose something from the list that has one.', 'err');
+      }
       if (!quantityMilli) return redirectWith(c, `/invoices/${id}`, 'That quantity could not be read.', 'err');
 
       const rateBp = fees.gstRegistered ? fees.gstRateBp : 0;
@@ -525,6 +693,81 @@ export const invoicesModule: AppModule = {
       const issuedOn = f.date('issued_on', { label: 'Date of issue' }) ?? todayNz();
       const result = await issueInvoice(c.env, id, c.get('user')!.id, issuedOn);
       return redirectWith(c, `/invoices/${id}`, result.message, result.ok ? 'ok' : 'err');
+    });
+
+    /**
+     * Add a party to the split.
+     *
+     * Only while the invoice is a draft. The database says so too — three
+     * triggers refuse an insert, update or delete once the invoice leaves
+     * draft — so this is the courteous refusal and that is the real one.
+     *
+     * The key is derived from the label rather than typed. Two boxes for one
+     * answer is how "Admin team" and "admin_team" end up as different parties
+     * on different invoices.
+     */
+    r.post('/:id/shares', requirePermission('quote:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const invoice = await one<InvoiceRow>(c.env.DB, 'SELECT * FROM invoices WHERE id = ?', id);
+      if (!invoice) return c.notFound();
+      if (invoice.status !== 'draft') {
+        return redirectWith(c, `/invoices/${id}`, 'An issued invoice cannot be re-split.', 'err');
+      }
+
+      const f = new FormReader(await c.req.formData());
+      const label = f.text('label', { required: true, label: 'Who', max: 60 });
+      const percent = f.text('percent', { required: true, label: 'Share', max: 8 });
+      if (!f.valid) return redirectWith(c, `/invoices/${id}`, Object.values(f.errors)[0]!, 'err');
+
+      const bp = parsePercentToBp(percent);
+      if (bp === null || bp <= 0 || bp > 10000) {
+        return redirectWith(c, `/invoices/${id}`,
+          'A share is a percentage between 0 and 100 — "30", "30%" and "30.5%" all work.', 'err');
+      }
+
+      const partyKey = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+        || 'party';
+      const existing = await sharesFor(c.env, id);
+      if (existing.some((sh) => sh.party_key === partyKey)) {
+        return redirectWith(c, `/invoices/${id}`,
+          `${label} already has a share on this invoice. Remove it and add it again to change it.`, 'err');
+      }
+
+      const stamp = nowIso();
+      await run(
+        c.env.DB,
+        `INSERT INTO invoice_shares (id, invoice_id, party_key, label, percent_bp, position,
+                                     created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?)`,
+        newId('ish'), id, partyKey, label, bp, existing.length, stamp, stamp,
+      );
+      await auditFrom(c, {
+        action: 'invoice.share_added', entityType: 'invoice', entityId: id,
+        meta: { party: partyKey, percent_bp: bp },
+      });
+
+      const total = sumBp(await sharesFor(c.env, id));
+      return redirectWith(c, `/invoices/${id}`, total === 10000
+        ? `${label} added. The split comes to 100%.`
+        : `${label} added. The split comes to ${formatBp(total)} so far.`);
+    });
+
+    r.post('/:id/shares/:partyKey/remove', requirePermission('quote:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const partyKey = c.req.param('partyKey')!;
+      const invoice = await one<InvoiceRow>(c.env.DB, 'SELECT * FROM invoices WHERE id = ?', id);
+      if (!invoice) return c.notFound();
+      if (invoice.status !== 'draft') {
+        return redirectWith(c, `/invoices/${id}`, 'An issued invoice cannot be re-split.', 'err');
+      }
+
+      await run(c.env.DB,
+        'DELETE FROM invoice_shares WHERE invoice_id = ? AND party_key = ?', id, partyKey);
+      await auditFrom(c, {
+        action: 'invoice.share_removed', entityType: 'invoice', entityId: id,
+        meta: { party: partyKey },
+      });
+      return redirectWith(c, `/invoices/${id}`, 'Removed from the split.');
     });
 
     r.post('/:id/payments', requirePermission('quote:write'), async (c) => {

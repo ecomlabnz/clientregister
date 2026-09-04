@@ -50,7 +50,7 @@ import {
 import {
   VOCABULARY_SETTINGS, caseTypes, docCategories, isTerm, labelFor, termOptions, type Term,
 } from '../../core/vocabulary';
-import { feesSection } from '../fees';
+import { invoicesSection } from '../invoices';
 
 export interface CaseRow {
   id: string; ref: string; client_id: string; title: string; descriptor: string | null;
@@ -672,7 +672,7 @@ export const casesModule: AppModule = {
       const decided = isDecidedStatus(kase.status);
       const elapsed = elapsedLine(kase, new Date().toISOString().slice(0, 10));
 
-      const [entries, history, tasks, quotes, users, fees, caseFlags, flagKindTerms,
+      const [entries, history, tasks, quotes, users, invoicesPanel, caseFlags, flagKindTerms,
              parties, caseTags, allTags, clients,
              threads, caseFiles, docCats, linkableDocs] = await Promise.all([
         listEntries(c.env, 'case', id),
@@ -687,7 +687,7 @@ export const casesModule: AppModule = {
         all<any>(c.env.DB, `SELECT id, ref, description, amount_cents, gst_cents, disbursements_cents, currency, status
                               FROM quotes WHERE case_id = ? ORDER BY created_at DESC`, id),
         userOptions(c.env),
-        feesSection(c, id, kase.currency, writable),
+        invoicesSection(c, id, kase.currency, writable),
         flagsForCase(c.env, id, kase.client_id),
         flagKinds(c.env),
         partiesForCase(c.env, id),
@@ -856,7 +856,7 @@ export const casesModule: AppModule = {
                      their own page afterwards, which is where it belongs.</p>
                 </details>` : ''}`)}
 
-            ${fees}
+            ${invoicesPanel}
 
             ${foldingCard('Tasks', html`
               ${tasks.length === 0 ? emptyState('No tasks on this case yet.') : html`

@@ -1093,11 +1093,11 @@ export const clientsModule: AppModule = {
               gross: number; paid: number; billed: number }>(
           c.env.DB,
           `SELECT k.id AS case_id, k.ref AS case_ref, k.title AS case_title,
-                  COALESCE(SUM(f.gross_cents), 0) AS gross,
-                  COALESCE(SUM(CASE WHEN f.status = 'paid' THEN f.gross_cents ELSE 0 END), 0) AS paid,
-                  COALESCE(SUM(CASE WHEN f.status IN ('invoiced','paid') THEN f.gross_cents ELSE 0 END), 0) AS billed
-             FROM cases k JOIN fee_items f ON f.case_id = k.id
-            WHERE k.client_id = ? AND f.status != 'cancelled'
+                  COALESCE(SUM(i.gross_cents), 0) AS gross,
+                  COALESCE(SUM(i.paid_cents), 0) AS paid,
+                  COALESCE(SUM(CASE WHEN i.status <> 'draft' THEN i.gross_cents ELSE 0 END), 0) AS billed
+             FROM cases k JOIN invoices i ON i.case_id = k.id
+            WHERE k.client_id = ? AND i.status <> 'void'
             GROUP BY k.id ORDER BY k.updated_at DESC`, id),
         englishTests(c.env),
         visaTypes(c.env),

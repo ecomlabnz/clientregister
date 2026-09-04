@@ -13,7 +13,6 @@ import { dashboardModule } from './modules/dashboard';
 import { alertsModule } from './modules/alerts';
 import { clientsModule } from './modules/clients';
 import { casesModule } from './modules/cases';
-import { feesModule } from './modules/fees';
 import { inquiriesModule } from './modules/inquiries';
 import { quotesModule } from './modules/quotes';
 import { invoicesModule } from './modules/invoices';
@@ -42,7 +41,6 @@ export const registeredModules: AppModule[] = [
   inquiriesModule,
   clientsModule,
   casesModule,
-  feesModule,
   quotesModule,
   invoicesModule,
   tasksModule,

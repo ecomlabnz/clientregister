@@ -97,7 +97,10 @@ export const dashboardModule: AppModule = {
           ),
           all<{ total: number }>(
             c.env.DB,
-            `SELECT COALESCE(SUM(gross_cents), 0) AS total FROM fee_items WHERE status = 'invoiced'`,
+            // What has been billed and not yet paid. Reads invoices, which is
+            // where money lives now — a voided invoice is owed by nobody.
+            `SELECT COALESCE(SUM(gross_cents - paid_cents), 0) AS total FROM invoices
+              WHERE status IN ('issued','part_paid')`,
           ),
           documentAlerts(c.env, 90),
           // Everything with a date, merged and sorted, so the list at the top

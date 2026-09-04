@@ -4,7 +4,7 @@
  * A matter page is long — status, parties, tasks, files, notes, tags, key
  * details, the lot — and which parts matter depends on what you opened it for.
  * So each heading is a handle. They open on load, because a section you cannot
- * see is a section you forget to read; the exception is Fees, which stays shut
+ * see is a section you forget to read; the exception is the money, which stays shut
  * for the reason it always has: it is the one thing on the page a client
  * leaning over the desk should not read by accident.
  *
@@ -60,18 +60,18 @@ describe('the sections on a matter', () => {
     expect(rigid, 'these headings are not handles').toEqual([]);
   });
 
-  it('open on load, except Fees', async () => {
+  it('open on load, except the money', async () => {
     const h = mount();
     seed(h);
     const shut = sections(await page(h)).filter((s) => !s.open).map((s) => s.title);
-    expect(shut).toEqual(['Fees']);
+    expect(shut).toEqual(['Invoices']);
   });
 
-  it('names the money section Fees', async () => {
+  it('names the money section Invoices', async () => {
     // It said "Fees and split", which named the section after two of the
     // things inside it rather than after the one thing it is.
     const body = await page(mountSeeded());
-    expect(body).toContain('<h2>Fees</h2>');
+    expect(body).toContain('<h2>Invoices</h2>');
     expect(body).not.toContain('Fees and split');
   });
 

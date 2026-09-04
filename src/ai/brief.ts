@@ -72,8 +72,8 @@ export async function caseFileText(env: Env, caseId: string): Promise<{ title: s
          LEFT JOIN users u ON u.id = t.assigned_to
         WHERE t.entity_type = 'case' AND t.entity_id = ? ORDER BY COALESCE(t.due_at, '9999')`, caseId),
     all<any>(env.DB,
-      `SELECT description, kind, status, net_cents, gst_cents, gross_cents, currency
-         FROM fee_items WHERE case_id = ? ORDER BY created_at`, caseId),
+      `SELECT description, status, net_cents, gst_cents, gross_cents, paid_cents, currency
+         FROM invoices WHERE case_id = ? AND status <> 'void' ORDER BY created_at`, caseId),
     all<any>(env.DB,
       // The column is `at`; aliased rather than renamed, so the rest of this
       // file keeps reading in words. Written as `changed_at` originally, which

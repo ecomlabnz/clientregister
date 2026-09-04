@@ -37,6 +37,21 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.1.0', date: '4 September 2026',
+    notes: [
+      'The Fees section has gone. Money is in Quotes and Invoices and nowhere else \u2014 a matter '
+        + 'now shows what has been billed on it, what is paid and what is outstanding, with a '
+        + 'button to raise an invoice.',
+      'A bill can be divided between parties. Open an invoice while it is still a draft, press '
+        + '\u201cDivide this bill between parties\u201d and add who gets what. It splits '
+        + 'professional fees only \u2014 not disbursements, which are somebody else\u2019s money '
+        + 'passing through. If you set a split it has to come to 100% before the invoice will '
+        + 'issue. Most bills are not split and nothing changes for those.',
+      'Choosing from the price list now works on an invoice line, and what you type still beats '
+        + 'what the list says.',
+    ],
+  },
+  {
     version: '1.0.3', date: '4 September 2026',
     notes: [
       'You can raise an invoice without writing a quote first \u2014 Invoices \u2192 New invoice. '
