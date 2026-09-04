@@ -527,12 +527,12 @@ function renderDormant(c: Context<AppContext>, rows: DormantClient[], q: string)
         <form method="post" action="/clients/archive" id="dormant-form">
           ${csrfField(csrf)}
           ${table([
-            { label: raw('<span class="sr-only">Select</span>'), width: '4' },
-            { label: 'Client', width: '34' },
+            { label: raw('<span class="sr-only">Select</span>'), width: 'pick' },
+            { label: 'Client', width: '36' },
             { label: 'Expired', width: '14' },
             { label: 'Last expiry', width: '18' },
             { label: 'Matters', width: '14', hideOn: 'sm' },
-            { label: 'Status', width: '16', hideOn: 'sm' },
+            { label: 'Status', width: '18', hideOn: 'sm' },
           ], shown.map((r) => html`
             <tr>
               <td>${writable

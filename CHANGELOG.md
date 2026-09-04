@@ -7,6 +7,33 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 0.99.3 — 4 September 2026
+
+### Fixed
+- **Column widths that were being silently ignored.** Noticed on the inbox: the
+  tick-box column was taking a sixth of the table for a box 16 pixels wide.
+
+  A column width has to be written as a CSS class, because the content policy
+  forbids an inline style. That is fine until a table asks for a width nobody
+  wrote a class for — then the `<col>` carries a class matching nothing, the
+  browser sizes that column itself, and under a fixed table layout it takes an
+  equal share of whatever is left. Nothing warns and nothing fails.
+
+  **Eleven of the register's seventeen tables were asking for at least one width
+  that did not exist** — the inbox, the alerts list, the case list, both client
+  lists, the conversations list, three money tables, the workflow list and the
+  export preview. Every whole percent is now written out rather than the handful
+  somebody happened to need, so those tables get the proportions they were
+  always asking for.
+
+  A test now fails if any width used anywhere in the application has no matching
+  class, so the silent version of this cannot come back.
+
+- **A tick-box column is now the width of a tick box**, not a share of the
+  table. A share was the wrong tool for it: 4% of a wide screen is far more than
+  a checkbox needs and 4% of a narrow one is less. Affects the inbox and the
+  "Finished with?" client list.
+
 ## 0.99.2 — 3 September 2026
 
 ### Changed
