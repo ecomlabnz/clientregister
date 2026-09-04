@@ -9,19 +9,19 @@ fourth is the one that has to be written, and is the one to read first.
 | | What it holds | How it is kept true |
 |---|---|---|
 | [`mistakes.md`](mistakes.md) | Every fault this register has actually suffered, and the rule that now prevents it | Written by hand, added to whenever something breaks |
-| [`invariants.md`](invariants.md) | The 39 things the database refuses to do, in its own words, and the 8 uniqueness rules | Extracted from the built schema |
-| [`data-model.md`](data-model.md) | 45 tables, every column | Extracted from the built schema |
-| [`routes.md`](routes.md) | 175 routes and the permission each requires | Extracted from the module registrations, and checked against the built router by a test |
+| [`invariants.md`](invariants.md) | The 51 things the database refuses to do, in its own words, and the 8 uniqueness rules | Extracted from the built schema, and held against it by a test |
+| [`data-model.md`](data-model.md) | 45 tables, every column | Extracted from the built schema, and held against it by a test |
+| [`routes.md`](routes.md) | 178 routes and the permission each requires | Extracted from the module registrations, and checked against the built router by a test |
 
 ## Read them in this order
 
-**1. [`mistakes.md`](mistakes.md).** Nineteen faults, each with the rule that
+**1. [`mistakes.md`](mistakes.md).** Twenty-three faults, each with the rule that
 replaced it. The other three documents tell you *what* to build; this one tells
 you what will go wrong while you build it. A rebuild that skips it will
 rediscover a primary-passport collision, a search that only works in one word
 order, and a page that breaks at 250 rows — all of which cost real time here.
 
-**2. [`invariants.md`](invariants.md).** The 39 rules the database enforces. This is
+**2. [`invariants.md`](invariants.md).** The 51 rules the database enforces. This is
 the heart of the design: *invariants belong in the database, as triggers and
 constraints, not in the route that happens to write the row.* A guarantee in a
 handler lasts until somebody adds a second handler — and this register is written

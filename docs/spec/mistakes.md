@@ -310,6 +310,54 @@ phone, which is not the sort of thing that gets reported.
 says what was measured and when — and the test, which cannot measure, pins the
 *shape* the numbers must have rather than the numbers themselves.
 
+### 22. A middleware that sets a header overwrites a route that meant something by it
+
+Two routes hand back a file that came from outside the register — a client's
+document, and now an article's attachment. Both set the tightest content
+security policy there is on the response, `default-src 'none'; sandbox`,
+because what they are serving is not a page of ours and must not behave like
+one.
+
+Neither of them was. `securityHeaders` runs on every response and set the
+*page* policy — which permits same-origin script — unconditionally, after the
+handler had finished. So the one directive that existed for those two responses
+in particular was the one thing being removed from them, silently, and the code
+that set it read as though it worked.
+
+The rest of the hardening held: `nosniff`, and anything not on the short
+render-in-place list served as `application/octet-stream` with a download
+disposition. So this was a wall behind a wall, not an open door. It was still
+not doing what it said.
+
+**The rule.** A middleware that applies a default applies it *as a default*:
+`if (!h.has(...))`. Where a handler has already spoken about a header, it knew
+something the middleware does not. And the test for a header set by a route
+asserts it *through* the middleware stack, not on the handler's own response —
+this one passed for months because nothing had ever looked at the two file
+downloads from outside.
+
+### 23. "Cannot drift" is a claim until something checks it
+
+`docs/spec/README.md` says three of the four specification documents are
+generated from the code and cannot drift from it. Two of them had. `data-model.md`
+described `fee_items` and `fee_shares` — dropped a release earlier — and had
+never heard of `invoice_shares`, added in the same release. `invariants.md` said
+the database refuses 39 things when it refuses 51, and listed a uniqueness rule
+on a table that no longer existed.
+
+The cause is not laziness, it is a half-truth in the arrangement:
+`scripts/spec-schema.mjs` extracts the schema to JSON, and a person writes the
+Markdown from it. That is the right way round — the prose in those documents is
+worth more than a generator would produce — but it makes "generated" a
+description of where the facts came from, not of how they stay current.
+
+**The rule.** Where a document states a fact about the code, a test holds it
+against the code. `test/spec.test.ts` does that for the two that drifted: every
+table in the schema has a section, no section describes a table that is gone,
+every refusal is quoted in the database's own words with the right *when*, and
+the counts in the prose are the counts. What is deliberately not checked is the
+writing, which is the part worth having.
+
 ---
 
 ## Working practices that caught things

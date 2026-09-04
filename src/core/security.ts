@@ -20,7 +20,15 @@ export async function securityHeaders(c: Context<AppContext>, next: Next): Promi
   const h = c.res.headers;
   // No inline script, no third-party anything, no framing. The UI ships its
   // own CSS and JS from the same origin; there are no CDN dependencies.
-  h.set(
+  //
+  // A route that has already set its own policy keeps it. Only the two file
+  // downloads do — a client's document and an article's attachment — and both
+  // set the tightest policy there is (`default-src 'none'; sandbox`), because
+  // what they hand back came from outside. Setting this unconditionally was
+  // quietly replacing that with the *page* policy, which permits same-origin
+  // script, on a response whose whole point is that it is not a page of ours.
+  // Found on 4 September 2026 while adding the second of the two.
+  if (!h.has('Content-Security-Policy')) h.set(
     'Content-Security-Policy',
     [
       "default-src 'none'",

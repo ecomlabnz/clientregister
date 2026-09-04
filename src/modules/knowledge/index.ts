@@ -18,12 +18,13 @@
  */
 
 import { Hono } from 'hono';
-import type { AppContext } from '../../types';
+import type { AppContext, Env } from '../../types';
 import type { AppModule } from '../../core/module';
 import { everyTermClausePlain } from '../../core/search';
 import { all, count, nextYearlyRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
+import { MAX_UPLOAD_BYTES, fileResponse, putFile, safeFilename } from '../../core/files';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { cleanTagName, findOrCreateTag, TAG_COLOURS, type TagColour } from '../../core/tags';
@@ -33,13 +34,113 @@ import {
   tagArticle, tagsForArticle, tagsForArticles, untagArticle, type KbStatus,
 } from '../../core/kb';
 import { breadcrumbs, page, redirectWith } from '../../ui/layout';
-import { html, raw } from '../../ui/html';
+import { html, raw, type Raw } from '../../ui/html';
 import {
   actionButton, badge, card, csrfField, emptyState, field, pageHeader, select, stamp, table, viewTabs,
 } from '../../ui/components';
 import { dateShort, dateTime, relativeDays, truncate } from '../../ui/format';
 
 const PAGE_SIZE = 25;
+
+/**
+ * A file filed against an article.
+ *
+ * Its own table rather than a row in `documents`, and migration 0063 says at
+ * length why. The short of it: `documents` restricts what a file may hang off
+ * to a client, matter, inquiry or quote, and that restriction cannot be
+ * widened on D1 without putting five real file notes at risk.
+ */
+interface KbFileRow {
+  id: string; article_id: string; r2_key: string; filename: string;
+  content_type: string; size_bytes: number; sha256: string | null;
+  uploaded_at: string; uploaded_by: string | null; uploader_name: string | null;
+}
+
+function listArticleFiles(env: Env, articleId: string): Promise<KbFileRow[]> {
+  return all<KbFileRow>(
+    env.DB,
+    `SELECT d.*, u.name AS uploader_name
+       FROM kb_documents d LEFT JOIN users u ON u.id = d.uploaded_by
+      WHERE d.article_id = ? ORDER BY d.uploaded_at DESC`,
+    articleId,
+  );
+}
+
+/**
+ * Store the files a form arrived with against an article.
+ *
+ * Shared by the create form and the article's own upload, because "attach a
+ * file" should not mean two different things depending on which page you were
+ * standing on. Returns what could not be stored rather than throwing: an
+ * article that could not take its attachment is still an article worth
+ * keeping, which is the same call the file notes already make.
+ */
+async function attachFiles(
+  env: Env,
+  opts: { articleId: string; files: File[]; uploadedBy: string | null },
+): Promise<{ stored: string[]; problems: string[] }> {
+  const stored: string[] = [];
+  const problems: string[] = [];
+  for (const file of opts.files) {
+    if (!file || typeof file === 'string' || file.size === 0) continue;
+    if (!env.DOCS) { problems.push('file storage is not switched on'); break; }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      problems.push(`${file.name} is over ${MAX_UPLOAD_BYTES / 1024 / 1024} MB`);
+      continue;
+    }
+    const id = newId('kbf');
+    const filename = safeFilename(file.name);
+    // The key is built from the article id, and a trigger refuses a row whose
+    // key names a different article. See migration 0063.
+    const key = `kb_article/${opts.articleId}/${id}-${filename}`;
+    const put = await putFile(env.DOCS, { key, file, uploadedBy: opts.uploadedBy });
+    await run(
+      env.DB,
+      `INSERT INTO kb_documents (id, article_id, r2_key, filename, content_type, size_bytes,
+                                 sha256, uploaded_at, uploaded_by)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      id, opts.articleId, key, filename, put.contentType, put.size, put.digest,
+      nowIso(), opts.uploadedBy,
+    );
+    stored.push(filename);
+  }
+  return { stored, problems };
+}
+
+/**
+ * The file input, in both places that take one.
+ *
+ * `multiple`, because an instruction usually arrives as a set — the circular,
+ * the amended appendix and the covering letter — and making somebody upload
+ * them one at a time is asking them to do the loop by hand.
+ */
+function fileField(label: string): Raw {
+  return html`
+    <div class="field">
+      <label for="f_files">${label}</label>
+      <input id="f_files" type="file" name="files" multiple>
+      <p class="hint">The circular, the instructions, whatever this article is about.
+         ${MAX_UPLOAD_BYTES / 1024 / 1024} MB each at most.</p>
+    </div>`;
+}
+
+/** The files a multipart form arrived with, if any. */
+function filesFrom(form: FormData): File[] {
+  // The Workers type for FormData.getAll() omits File, but a multipart upload
+  // really does yield them at runtime.
+  return (form.getAll('files') as unknown[]).filter((v): v is File =>
+    typeof v === 'object' && v !== null && 'size' in v && 'name' in v);
+}
+
+/** What to add to a flash message after an upload, or nothing at all. */
+function uploadNote(result: { stored: string[]; problems: string[] }): string {
+  const parts: string[] = [];
+  if (result.stored.length) {
+    parts.push(`${result.stored.length} file${result.stored.length === 1 ? '' : 's'} attached.`);
+  }
+  if (result.problems.length) parts.push(`Not attached: ${result.problems.join('; ')}.`);
+  return parts.length ? ` ${parts.join(' ')}` : '';
+}
 
 interface ArticleRow {
   id: string; ref: string; kind: string; title: string; summary: string | null; body: string;
@@ -205,7 +306,9 @@ export const knowledgeModule: AppModule = {
       return page(c, { title: 'New article', active: '/knowledge' }, html`
         ${breadcrumbs([{ href: '/knowledge', label: 'Knowledge base' }, { label: 'New' }])}
         ${pageHeader('New article', prefill ? 'Started from an inbound message.' : null)}
-        <form method="post" action="/knowledge" class="form-grid">
+        ${'' /* multipart, because the form takes files. Everything else on it
+                 is unchanged by that; a browser sends the same fields. */}
+        <form method="post" action="/knowledge" class="form-grid" enctype="multipart/form-data">
           ${csrfField(session.csrf)}
           ${from ? html`<input type="hidden" name="from" value="${from}">` : ''}
           <div class="form-section">
@@ -231,6 +334,7 @@ export const knowledgeModule: AppModule = {
                       hint: 'Plain text. Blank lines start a paragraph, lines beginning with “- ” make a list, and web addresses become links.' })}
             ${field({ label: 'Tags', name: 'tags', maxlength: 300,
                       hint: 'Comma separated. Shares the same tags as cases.' })}
+            ${fileField('Files')}
           </div>
           <div class="form-actions">
             <button class="btn btn-primary" name="status" value="published" type="submit">Publish</button>
@@ -244,7 +348,8 @@ export const knowledgeModule: AppModule = {
       const user = c.get('user')!;
       const kinds = await kbKinds(c.env);
       const policy = await followUpPolicy(c.env);
-      const f = new FormReader(await c.req.formData());
+      const form = await c.req.formData();
+      const f = new FormReader(form);
 
       const title = f.text('title', { required: true, label: 'Title', max: 200 });
       const kind = f.text('kind', { required: true, label: 'Kind', max: 40 });
@@ -280,12 +385,19 @@ export const knowledgeModule: AppModule = {
       );
 
       await applyTagList(c, id, f.optional('tags', { max: 300 }));
+      // After the insert, because a file is filed against an article and the
+      // article has to exist to be filed against. This is also the answer to
+      // why the form could not take one before: there was nothing yet to
+      // attach it to, and no table to attach it to either.
+      const attached = await attachFiles(c.env, { articleId: id, files: filesFrom(form), uploadedBy: user.id });
       const article = await articleById(c.env, id);
       const followUps = await syncFollowUps(c.env, article, user.id, policy);
-      await auditFrom(c, { action: 'kb.created', entityType: 'kb_article', entityId: id, meta: { ref, kind, status, followUps } });
+      await auditFrom(c, { action: 'kb.created', entityType: 'kb_article', entityId: id,
+        meta: { ref, kind, status, followUps, files: attached.stored.length } });
 
       return redirectWith(c, `/knowledge/${id}`,
-        `Filed as ${ref}.${followUps.created ? ` ${followUps.created} follow-up task(s) raised.` : ''}`);
+        `Filed as ${ref}.${followUps.created ? ` ${followUps.created} follow-up task(s) raised.` : ''}`
+        + uploadNote(attached));
     });
 
     // --- Read -------------------------------------------------------------
@@ -298,7 +410,7 @@ export const knowledgeModule: AppModule = {
       const session = c.get('session')!;
       const state = effectiveState(article);
       const tags = await tagsForArticle(c.env, id);
-      const [followUps, revisions, author, editor, message, supersededBy] = await Promise.all([
+      const [followUps, revisions, author, editor, message, supersededBy, files] = await Promise.all([
         all<{ kind: string; due_at: string; task_id: string; task_title: string; task_status: string }>(
           c.env.DB,
           `SELECT f.kind, f.due_at, f.task_id, t.title AS task_title, t.status AS task_status
@@ -313,6 +425,7 @@ export const knowledgeModule: AppModule = {
           : null,
         all<{ id: string; ref: string; title: string }>(
           c.env.DB, 'SELECT id, ref, title FROM kb_articles WHERE supersedes_id = ?', id),
+        listArticleFiles(c.env, id),
       ]);
 
       return page(c, { title: article.title, active: '/knowledge' }, html`
@@ -332,6 +445,37 @@ export const knowledgeModule: AppModule = {
             ${card('Article', article.body.trim()
               ? html`<div class="kb-body">${renderBody(article.body)}</div>`
               : html`<p class="muted">No text yet. <a href="/knowledge/${article.id}/edit">Add some</a>.</p>`)}
+
+            ${'' /* Files sit with the article rather than in the side column,
+                     because they are the thing the article is about as often
+                     as they are a reference to it — an instruction is the PDF. */}
+            ${card('Files', html`
+              ${files.length === 0 ? html`<p class="muted">Nothing attached yet.</p>` : ''}
+              ${files.map((file) => html`
+                <div class="file-row">
+                  <div>
+                    <a href="/knowledge/${article.id}/files/${file.id}">${file.filename}</a>
+                    <span class="muted small"> ${Math.ceil(file.size_bytes / 1024)} KB</span>
+                    <div class="muted small">${stamp(file.uploaded_at)}${file.uploader_name ? ` · ${file.uploader_name}` : ''}</div>
+                  </div>
+                  <div class="file-row-actions">
+                    <form method="post" action="/knowledge/${article.id}/files/${file.id}/remove"
+                          data-confirm="Remove ${file.filename}? The stored file is deleted.">
+                      ${csrfField(session.csrf)}
+                      <button class="btn btn-danger btn-small" type="submit">Remove</button>
+                    </form>
+                  </div>
+                </div>`)}
+              ${c.env.DOCS ? html`
+                <details><summary>Attach a file</summary>
+                  <form method="post" action="/knowledge/${article.id}/files"
+                        enctype="multipart/form-data" class="row-form">
+                    ${csrfField(session.csrf)}
+                    ${fileField('File')}
+                    <button class="btn btn-primary" type="submit">Attach</button>
+                  </form>
+                </details>`
+                : html`<p class="hint">File storage is not switched on, so nothing can be attached yet.</p>`}`)}
           </div>
 
           <div class="col-side">
@@ -488,6 +632,70 @@ export const knowledgeModule: AppModule = {
         meta: { ref: article.ref, version: article.version + 1, status, followUps } });
 
       return redirectWith(c, `/knowledge/${id}`, 'Saved.');
+    });
+
+    // --- Files ------------------------------------------------------------
+    //
+    // Their own routes rather than the documents module's, because they are in
+    // their own table — see migration 0063. What is *not* their own is how a
+    // file is named, stored and served back: that is `core/files.ts`, and both
+    // sets of routes call it.
+
+    r.post('/:id/files', requirePermission('document:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const article = await one<{ id: string; ref: string }>(
+        c.env.DB, 'SELECT id, ref FROM kb_articles WHERE id = ?', id);
+      if (!article) return c.notFound();
+      if (!c.env.DOCS) return redirectWith(c, `/knowledge/${id}`, 'File storage is not switched on.', 'err');
+
+      const files = filesFrom(await c.req.formData());
+      if (files.length === 0) return redirectWith(c, `/knowledge/${id}`, 'Choose a file to attach.', 'err');
+
+      const attached = await attachFiles(c.env, { articleId: id, files, uploadedBy: c.get('user')!.id });
+      if (attached.stored.length === 0 && attached.problems.length === 0) {
+        return redirectWith(c, `/knowledge/${id}`, 'Choose a file to attach.', 'err');
+      }
+      await auditFrom(c, { action: 'kb.file_attached', entityType: 'kb_article', entityId: id,
+        meta: { ref: article.ref, files: attached.stored } });
+      return redirectWith(c, `/knowledge/${id}`, uploadNote(attached).trim(),
+        attached.stored.length ? 'ok' : 'err');
+    });
+
+    /**
+     * Read a file back.
+     *
+     * Streamed through the Worker rather than handed out as a public or signed
+     * URL, so the read stays inside the session and in the audit log — the same
+     * rule the documents module keeps, for the same reason.
+     *
+     * The article id is in the path and checked against the row, so a file id
+     * from one article cannot be fetched through another.
+     */
+    r.get('/:id/files/:fileId', requirePermission('register:read'), async (c) => {
+      const file = await one<KbFileRow>(
+        c.env.DB, 'SELECT * FROM kb_documents WHERE id = ? AND article_id = ?',
+        c.req.param('fileId')!, c.req.param('id')!);
+      if (!file || !c.env.DOCS) return c.notFound();
+
+      const object = await c.env.DOCS.get(file.r2_key);
+      if (!object) return c.text('The stored file is missing.', 410);
+
+      await auditFrom(c, { action: 'kb.file_downloaded', entityType: 'kb_article',
+        entityId: file.article_id, meta: { id: file.id, filename: file.filename } });
+      return fileResponse(object.body, file);
+    });
+
+    r.post('/:id/files/:fileId/remove', requirePermission('register:delete'), async (c) => {
+      const file = await one<KbFileRow>(
+        c.env.DB, 'SELECT * FROM kb_documents WHERE id = ? AND article_id = ?',
+        c.req.param('fileId')!, c.req.param('id')!);
+      if (!file) return c.notFound();
+
+      if (c.env.DOCS) await c.env.DOCS.delete(file.r2_key);
+      await run(c.env.DB, 'DELETE FROM kb_documents WHERE id = ?', file.id);
+      await auditFrom(c, { action: 'kb.file_removed', entityType: 'kb_article',
+        entityId: file.article_id, meta: { id: file.id, filename: file.filename } });
+      return redirectWith(c, `/knowledge/${file.article_id}`, `${file.filename} removed.`);
     });
 
     // --- History ----------------------------------------------------------

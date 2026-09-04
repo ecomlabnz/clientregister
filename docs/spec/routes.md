@@ -1,6 +1,6 @@
 # The routes
 
-**175 routes across 21 modules.** Generated from the module
+**178 routes across 21 modules.** Generated from the module
 registrations, so it cannot drift.
 
 ## How access control works here
@@ -256,6 +256,9 @@ inquiry becomes a client only when a person converts it.
 | GET | `/knowledge/:id` | register:read |
 | POST | `/knowledge/:id` | register:write |
 | GET | `/knowledge/:id/edit` | register:write |
+| POST | `/knowledge/:id/files` | document:write |
+| GET | `/knowledge/:id/files/:fileId` | register:read |
+| POST | `/knowledge/:id/files/:fileId/remove` | register:delete |
 | GET | `/knowledge/:id/history` | register:read |
 | POST | `/knowledge/:id/tags` | register:write |
 | POST | `/knowledge/:id/tags/:tagId/remove` | register:write |
