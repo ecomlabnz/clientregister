@@ -149,6 +149,19 @@ an unreachable registry is now retried three times and then reported loudly as
 `scripts/audit-gate.mjs` and is tested against the shapes npm actually produces,
 including the one it printed for hours that night.
 
+### 9. The top bar is close to full on a phone
+Nine sections take two rows at 360px and three at 320px, and the bar is sticky,
+so at a common phone width it holds about 155px of a 844px screen. Two rows is
+the price of a navigation that is all there, and it is the right trade today.
+The next section added is the one that makes it three rows on an ordinary
+phone — measure before adding it, and if it does, the answer is probably to
+move something into a group rather than to hide the run behind a menu again.
+
+Also noticed while measuring: the top bar takes three rows on a phone before
+the navigation starts, because the wordmark, the account controls and the
+search box cannot share one. Nothing is wrong with it; it is just where the
+height goes if it ever needs finding.
+
 ### 8. Reading across from other sessions
 The **App field comparison review** session produced the nine fields above. Its
 own audit ended with no repository changes and a mail-DNS fix. Nothing else has
@@ -160,6 +173,9 @@ been pulled from it.
 
 Kept short — the full record is in `CHANGELOG.md`.
 
+- **1.1.2** — the phone navigation shows every section again; the bar's stated
+  height re-measured at every breakpoint; the Invoices pages stop highlighting
+  Quotes.
 - **1.0.1** — one word for one thing: file notes. "File note" as a document
   category.
 - **1.0.0** — a decided matter carries its date, enforced by the database; the

@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { navEntries, type NavItem } from '../src/core/module';
 import { registeredModules } from '../src/registry';
 import { collectNav } from '../src/core/module';
@@ -153,15 +153,106 @@ describe('the menus in the bar', () => {
     expect(script).not.toMatch(/mouseout|mouseleave/);
   });
 
-  it('has no menus at all on a phone', () => {
-    // A box that scrolls sideways clips what overflows it downwards too, so a
-    // menu opened inside the swipeable strip drops behind the bar and cannot
-    // be read. The groups open out into the strip instead.
-    const phone = css.slice(css.indexOf('@media (max-width: 720px)'));
-    expect(phone).toContain('.nav-group { display: contents; }');
-    expect(phone).toContain('.nav-group > summary { display: none; }');
+  it('keeps its menus on a phone, and opens them into the bar', () => {
+    // This used to say the opposite, and said it about an arrangement that did
+    // not work. On a phone the bar was one sideways-scrolling strip and the
+    // groups were flattened into it with `display: contents` — but a browser
+    // draws nothing inside a *closed* <details> whatever its display is, so
+    // Quotes, Invoices, Knowledge and the Assistant were not rendered at all.
+    // The test passed because it checked the CSS said what it was written to
+    // say. Reported by the practice on 4 September 2026: "Where are the
+    // invoices and quotes? Cannot see them on my phone."
+    //
+    // What is pinned now is the property: nothing in the bar is hidden by CSS,
+    // and the panel is in the flow rather than floating (there is no
+    // positioning context on a phone worth floating against).
+    const phone = phoneBlocks();
+    expect(phone.length, 'no phone block in the stylesheet').toBeGreaterThan(0);
+    const all = phone.join('\n');
+    expect(all, 'a closed <details> renders nothing, display: contents or not')
+      .not.toContain('.nav-group { display: contents; }');
+    expect(all, 'the menu heading is the only way in on a phone')
+      .not.toMatch(/\.nav-group > summary \{[^}]*display:\s*none/);
+    expect(all).toMatch(/\.nav-group-items \{[^}]*position:\s*static/);
+  });
+
+  it('never lets the bar scroll sideways on a phone', () => {
+    // The strip carried no scrollbar (by design) and no fading edge, so the
+    // run simply stopped after Cases with nothing to say six more sections
+    // were past the right-hand edge. It wraps instead.
+    const all = phoneBlocks().join('\n');
+    const topnav = all.match(/\.topnav \{([^}]*)\}/);
+    expect(topnav, 'no .topnav rule in the phone block').not.toBeNull();
+    expect(topnav![1]).toContain('flex-wrap: wrap');
+    expect(topnav![1]).not.toContain('overflow-x');
+  });
+
+  /**
+   * How far down the page the bar reaches.
+   *
+   * `--topbar-h` is a stated number about a measured thing: sticky table
+   * headings and the toasts hang off it. It had gone stale at every one of its
+   * breakpoints by 4 September 2026, because the bar gained a row twice and
+   * nobody re-measured — a sticky heading on a phone was sitting 27px behind
+   * the bar.
+   *
+   * The figures themselves can only be checked in a browser. What can be
+   * checked here is the shape they must have: a bar that wraps can only get
+   * taller as the screen narrows, so the value must never fall as the
+   * breakpoint does. A careless edit shows up as a fall.
+   */
+  it('states a bar height that only grows as the screen narrows', () => {
+    const base = css.match(/--topbar-h:\s*(\d+)px/);
+    expect(base, 'no --topbar-h').not.toBeNull();
+    const steps = [...css.matchAll(
+      /@media \(max-width: (\d+)px\) \{ :root \{ --topbar-h: (\d+)px; \} \}/g,
+    )].map((m) => ({ width: Number(m[1]), height: Number(m[2]) }));
+    expect(steps.length, 'the bar wraps at more widths than this').toBeGreaterThanOrEqual(4);
+    let previous = Number(base![1]);
+    for (const step of [...steps].sort((a, b) => b.width - a.width)) {
+      expect(step.height, `--topbar-h falls at ${step.width}px`).toBeGreaterThanOrEqual(previous);
+      previous = step.height;
+    }
   });
 });
+
+/**
+ * A page says which section it is in, and it says its own.
+ *
+ * The Invoices list and every single invoice marked *Quotes* as the current
+ * section — left over from when invoices were reached only through a quote.
+ * On a wide screen it was a wrong highlight inside an open menu; on a phone,
+ * where the menu opens into the bar, it put the blue on the wrong word right
+ * next to the right one.
+ */
+describe('the section a page says it is in', () => {
+  const modules = readdirSync('src/modules');
+
+  it('is one of that module\'s own', () => {
+    let checked = 0;
+    for (const name of modules) {
+      const src = readFileSync(`src/modules/${name}/index.ts`, 'utf8');
+      const hrefs = [...src.matchAll(/nav: \[\{ href: '([^']+)'/g)].map((m) => m[1]);
+      // A module with no entry of its own borrows the section it lives under —
+      // the Inbox is part of Incoming, workflows are reached from Alerts.
+      if (hrefs.length === 0) continue;
+      const actives = new Set([...src.matchAll(/active: '([^']+)'/g)].map((m) => m[1]));
+      for (const active of actives) {
+        expect(hrefs, `${name} marks ${active} as the current section`).toContain(active);
+        checked += 1;
+      }
+    }
+    // Without this the loop above passes by finding nothing.
+    expect(checked, 'no module declared both a nav entry and an active section')
+      .toBeGreaterThan(8);
+  });
+});
+
+/** Every `@media (max-width: 720px)` block, in source order. */
+function phoneBlocks(): string[] {
+  const css = readFileSync('public/app.css', 'utf8');
+  return css.split('@media (max-width: 720px)').slice(1).map((b) => b.split('@media')[0]!);
+}
 
 function layoutSource(): string {
   return readFileSync('src/ui/layout.ts', 'utf8');

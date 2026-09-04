@@ -259,6 +259,57 @@ trigger** — `AFTER DELETE ON clients` writing the audit row itself, so no rout
 no load and no hand-run statement can remove a record quietly. Invariants belong
 in the database; so does the record that they were exercised.
 
+### 20. A test can pin a broken arrangement and keep it broken
+
+On a phone the top bar was a single strip that scrolled sideways, and the two
+menus in it — Money and Tools — were flattened into that strip with
+`display: contents`, so their items would sit in the run like any other link.
+
+Neither half worked. The strip carried no scrollbar (deliberately) and no
+fading edge, so on a 390px screen the run simply stopped after *Cases* and the
+six sections past the right-hand edge gave no sign they existed. And the
+flattening never worked at all: `display: contents` removes an element's own
+box, but a browser draws **nothing inside a closed `<details>`** whatever its
+display says, so Quotes, Invoices, Knowledge and the Assistant were not merely
+off the edge — they were never rendered. The practice found it the only way it
+could be found: *"Where are the invoices and quotes? Cannot see them on my
+phone."*
+
+There were two tests over this. One asserted the stylesheet contained
+`.nav-group { display: contents; }` and `.nav-group > summary { display: none;
+}`. The other asserted the phone block contained `flex-wrap: nowrap` and
+`overflow-x: auto`. Both passed for months. Both were describing the CSS back
+to itself.
+
+This is the source-reading fault from *The shape of a good check* in its purest
+form, with an extra turn: the tests did not merely fail to prove the behaviour,
+they **froze the broken arrangement in place**, because changing it would fail
+them. A test that names an implementation makes that implementation the thing
+under protection.
+
+**The rule.** A test over the appearance of a page pins the *property*, not the
+declarations that produce it — "every section in the bar is on the screen at
+390px", not "`.topnav` says `flex-wrap: wrap`". Where the property can only be
+seen in a browser, the browser is where it gets checked, and what goes in the
+test file is the nearest honest invariant plus a note saying what was measured
+and when. Two examples now live in `test/nav.test.ts`: the bar's stated height
+may never *fall* as the screen narrows (a wrapping bar can only grow), and a
+page may only mark its own module's section as the current one.
+
+### 21. A stated number about a measured thing goes stale in silence
+
+`--topbar-h` says how far down the page the top bar reaches, and sticky table
+headings hang off it. It was measured once, correctly. Then the bar gained a
+row at one breakpoint, and a second row at another, and the variable was not
+touched — so by 4 September 2026 every one of its four figures was wrong, and
+on a phone a sticky column heading was sitting 27px behind the bar. Nothing
+failed; it just looked slightly wrong to anyone scrolling a long table on a
+phone, which is not the sort of thing that gets reported.
+
+**The rule.** Where a constant restates a measurement, the comment beside it
+says what was measured and when — and the test, which cannot measure, pins the
+*shape* the numbers must have rather than the numbers themselves.
+
 ---
 
 ## Working practices that caught things

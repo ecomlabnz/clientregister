@@ -37,6 +37,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.1.2', date: '4 September 2026',
+    notes: [
+      'The menu on a phone shows everything again. It used to be one row you had to swipe '
+        + 'sideways, with nothing to say there was more past the edge \u2014 so Calendar, Tasks, '
+        + 'Money and Tools were out of sight, and Quotes and Invoices were not being drawn at '
+        + 'all. It now takes two rows and they are all there, with Money and Tools opening into '
+        + 'the bar when you press them.',
+      'Sticky column headings on a long table sit under the top bar instead of behind it.',
+      'The Invoices pages no longer light up Quotes in the menu.',
+    ],
+  },
+  {
     version: '1.1.1', date: '4 September 2026',
     notes: [
       'Housekeeping. The demonstration data can be loaded and removed again \u2014 it had quietly '
