@@ -189,6 +189,13 @@ been pulled from it.
 
 Kept short — the full record is in `CHANGELOG.md`.
 
+- **Not a release, 6 September** — `docs/skills/case-to-register/` for the
+  practice's own Claude project: one conversation about a matter becomes a
+  handover the Assistant's intake can read. It replaces `docs/case-note-prompt.md`,
+  which carried its own drifting copy of the case-type list. The two vocabularies
+  it copies that live in Settings (case types, visa types, flag kinds) still have
+  nothing checking them; the two that live in code (statuses, party roles) are
+  pinned by `test/skilldocs.test.ts`.
 - **1.2.0** — a knowledge base article can carry files; "General practice note"
   as a kind; file downloads keep their own security policy; the specification
   documents held against the schema by a test.
