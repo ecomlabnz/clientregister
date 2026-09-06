@@ -135,3 +135,7 @@ line in the registry — see [docs/architecture.md](docs/architecture.md).
 - [docs/marketing.md](docs/marketing.md) — what the register does, for someone who has not seen it.
 - [docs/intake-prompt.md](docs/intake-prompt.md) — a prompt for reading the practice's own folders
   into the register, and for finding out what the register cannot yet hold.
+- [docs/skills/](docs/skills/README.md) — skills the practice installs in their own Claude project.
+  The practice works cases in Claude, one conversation per matter;
+  [`case-to-register`](docs/skills/case-to-register/SKILL.md) turns one of those conversations into a
+  handover this register's **Assistant → Open a matter** can read. Nothing there runs on the Worker.
