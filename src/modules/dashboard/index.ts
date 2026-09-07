@@ -24,7 +24,8 @@ import {
 } from '../../domain';
 import { can } from '../../core/rbac';
 import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
-import { byWorkingOrder, collectAlerts, documentAlerts, type Alert } from '../alerts';
+import { byWorkingOrder, collectAlerts, documentAlerts, needsAttentionToday,
+         type Alert } from '../alerts';
 import { CHANNEL_LABELS } from '../../core/channels';
 import { preferencesFor } from '../../core/preferences';
 import { pageSizeFor } from '../../ui/pager';
@@ -214,7 +215,16 @@ export const dashboardModule: AppModule = {
        * `byWorkingOrder` separates a date that is a deadline from one that is
        * only when the record was made.
        */
-      const needsToday = [...everything, ...overdueInvoices].filter((a) => a.date <= today);
+      /*
+       * What is actually due today.
+       *
+       * `unconfirmed_expiry` is left out on purpose. Its date was worked out
+       * from an issue date nobody read off the certificate, so it cannot say
+       * anything has expired — only that nobody has checked. That is real work
+       * and it keeps its own heading on the alerts page; it is not what a
+       * morning is worked from. See `documentAlerts`.
+       */
+      const needsToday = needsAttentionToday([...everything, ...overdueInvoices], today);
 
       /*
        * Each card sorts by its own column and keeps its own place in the
