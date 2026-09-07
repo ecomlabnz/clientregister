@@ -7,6 +7,46 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.2.1 — 7 September 2026
+
+### Fixed
+- **A failed reading now says what went wrong.** The practice pasted a case
+  handover into Open a matter, waited 48 seconds and got six words: *"model
+  returned no structured output"*. They read it as having run out of quota. It
+  was not that.
+
+  What had happened: the model was cut off part-way through writing its answer,
+  because the register only allowed it 4,000 word-pieces — and the summary it is
+  asked for can be 8,000 characters on its own, before the model's own reasoning
+  is counted. The allowance is now 16,000, which is Anthropic's own
+  recommendation for a request of this kind and well inside what every model in
+  Settings permits.
+
+  More to the point, **every way a reading can fail now says which way it was**,
+  in a sentence: cut off part-way (and what to send less of), the model declined,
+  the account is out of credit, the account has been asked too much too quickly
+  (*"a limit on the Anthropic account, not a fault here"*), Anthropic is
+  overloaded, the key was refused. The provider's own words still travel on the
+  end for whoever has to work out why, along with the model that ran and the
+  request id, so a run can be traced months later.
+
+- **Certificate expiries worked out from an unconfirmed date have left "Needs
+  you today".** Asked for directly: eleven rows pasted back with *"please
+  suppress these"*.
+
+  Eight of them were the same thing — a police or medical certificate whose
+  expiry the register had calculated from an issue date nobody had read off the
+  certificate, and which said so in its own line. Measured against the live
+  register that morning, **that was every certificate alert overdue: five
+  police, three medical, not one of them confirmed.**
+
+  They are not suppressed, they are filed correctly. A date that was worked out
+  cannot tell you a certificate has expired; it can only tell you nobody has
+  checked. That is a different job with a different urgency, so it now has its
+  own heading on the Alerts page — **Worked out, never confirmed** — with its own
+  count, and it is out of the list a morning is worked from. Confirm the issue
+  date on the client page and it returns as a real expiry, on the real date.
+
 ## 1.2.0 — 4 September 2026
 
 ### Added

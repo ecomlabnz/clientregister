@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { alertTiming, byWorkingOrder, type Alert } from '../src/modules/alerts';
+import { alertTiming, byWorkingOrder, needsAttentionToday, type Alert } from '../src/modules/alerts';
 
 /**
  * The order a working morning wants.
@@ -19,6 +19,52 @@ import { alertTiming, byWorkingOrder, type Alert } from '../src/modules/alerts';
 
 const alert = (kind: Alert['kind'], date: string, title?: string): Alert => ({
   kind, date, title: title ?? kind, severity: 'urgent', detail: '', href: '#',
+});
+
+/**
+ * What "Needs you today" is allowed to contain.
+ *
+ * Asked for on 7 September 2026. The practice pasted eleven rows out of the
+ * card and said: *"please suppress these"*. Eight of them were certificate
+ * expiries worked out from an issue date nobody had read off the certificate —
+ * and measured against the live register, that was *every* certificate alert
+ * overdue that morning: five police, three medical, not one confirmed.
+ *
+ * The answer is not a mute button. A date that was guessed cannot tell you a
+ * certificate has expired; it can only tell you nobody has checked. That is a
+ * different job with a different urgency, and it keeps its own heading on the
+ * alerts page. What it stops being is a line in the list a morning is worked
+ * from.
+ */
+describe('what needs you today', () => {
+  const today = '2026-09-07';
+
+  it('leaves out an expiry worked out from a date nobody confirmed', () => {
+    const kept = needsAttentionToday([
+      alert('unconfirmed_expiry', '2025-04-13', 'Medical certificate — a guess'),
+      alert('document', '2026-09-01', 'Current visa — a real date'),
+    ], today).map((a) => a.title);
+    expect(kept).toEqual(['Current visa — a real date']);
+  });
+
+  it('keeps everything else that has arrived or gone past', () => {
+    // The rule removes one kind, not one date. A real expiry five hundred days
+    // old is exactly what this card is for.
+    const kept = needsAttentionToday([
+      alert('document', '2025-03-01', 'Current visa — 555 days ago'),
+      alert('unbilled', '2026-07-09', 'nothing charged'),
+      alert('task', today, 'due today'),
+    ], today).map((a) => a.title);
+    expect(kept).toEqual(['Current visa — 555 days ago', 'nothing charged', 'due today']);
+  });
+
+  it('leaves out what is not due yet, whatever kind it is', () => {
+    expect(needsAttentionToday([alert('task', '2026-09-08', 'tomorrow')], today)).toEqual([]);
+  });
+
+  it('does not sort as a deadline, so it cannot lead the list if it returns', () => {
+    expect(alertTiming('unconfirmed_expiry')).toBe('wrong');
+  });
 });
 
 describe('a deadline and a provenance are not the same date', () => {
