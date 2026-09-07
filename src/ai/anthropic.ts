@@ -139,6 +139,130 @@ const BriefSchema = z.object({
  */
 const DEFAULT_MODEL = 'claude-haiku-4-5';
 
+/**
+ * How much the model may write in one answer.
+ *
+ * This was 4,000, and on 7 September 2026 it cost the practice a reading. They
+ * pasted a case handover into Open a matter, waited 48 seconds, and got "model
+ * returned no structured output" — six words that could mean anything.
+ *
+ * What had happened: the model was cut off at 4,000 tokens with its JSON
+ * half-written, so nothing parsed. Two things make that easy to hit and
+ * neither is obvious. The summary this asks for is the whole of what a
+ * document says, capped at 8,000 characters — two to three thousand tokens
+ * before the rest of the fields. And on Sonnet 5, which the practice had
+ * chosen in Settings, the model reasons before answering by default, and that
+ * reasoning is spent out of the same 4,000.
+ *
+ * 16,000 is Anthropic's documented default for a request that is not streamed
+ * — high enough that the answer finishes, low enough to stay inside the HTTP
+ * timeout. It is a ceiling and not a reservation: nothing is charged for
+ * tokens the model does not write, so raising it costs nothing on the runs
+ * that were already finishing.
+ *
+ * Safe on every model the practice can choose: Haiku 4.5 allows 64,000 in one
+ * answer, Sonnet 5 and Opus 5 allow 128,000 (checked against Anthropic's model
+ * table, 7 September 2026). If a future model is added with a lower ceiling
+ * the API refuses the request outright and says so, which `noOutput` below
+ * now passes on in words.
+ */
+export const MAX_OUTPUT_TOKENS = 16_000;
+
+/**
+ * What the provider said, in words the practice can act on.
+ *
+ * Anthropic answers a refused request with JSON, and the register was putting
+ * that JSON on the screen: `400 {"type":"error","error":{"type":"invalid_...`.
+ * Nobody reads that and knows what to do next, and the one thing every reader
+ * does with an error they cannot parse is guess — on 7 September the practice
+ * guessed they had run out of quota, which was not what had happened.
+ *
+ * So each kind is named. The original text still travels on the end, because
+ * the plain sentence is for the person and the raw text is for whoever has to
+ * work out why it says that.
+ */
+export function inPlainWords(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const status = err instanceof Anthropic.APIError ? err.status : undefined;
+
+  // Running out of credit is a 400, not a 402, and its message is the only
+  // thing that separates it from a malformed request.
+  if (/credit balance is too low/i.test(raw)) {
+    return 'the Anthropic account has run out of credit. Nothing was read. '
+      + `Top it up and try again — ${raw}`;
+  }
+
+  const named = ((): string | null => {
+    switch (status) {
+      case 400: return 'the register asked for something the model would not accept';
+      case 401: return 'the API key was refused. Check ANTHROPIC_API_KEY';
+      case 403: return 'the API key is not allowed to use this model';
+      case 404: return 'the model or workspace named here does not exist';
+      case 413: return 'what was sent is larger than the model will take. Send fewer files';
+      case 429: return 'too much has been asked of the account in a short time. '
+        + 'This is a limit on the Anthropic account, not a fault here — wait a minute';
+      case 500: return 'Anthropic had a problem at their end. Nothing was read; try again';
+      case 529: return 'Anthropic is overloaded at the moment. Try again shortly';
+      default: return null;
+    }
+  })();
+
+  if (named) return `${named} — ${raw}`;
+  // Not an API error at all: a network failure, a timeout, a bug here.
+  return err instanceof Anthropic.APIError ? raw : `the reading did not complete — ${raw}`;
+}
+
+/**
+ * Why the model returned nothing this register could use.
+ *
+ * A missing `parsed_output` is a symptom, and it has several causes that want
+ * opposite responses from whoever is standing at the screen. Until this was
+ * written they all read the same: "model returned no structured output". A
+ * practice cannot act on that, and — as happened here — will reasonably guess
+ * at something else entirely, such as having run out of quota.
+ *
+ * The response says which cause it was. `stop_reason` is the field, it is on
+ * every message, and it is what this turns into a sentence. The request id
+ * goes on the end so a run months old can still be traced with Anthropic.
+ */
+export function noOutput(response: {
+  stop_reason?: string | null;
+  stop_details?: { category?: string | null } | null;
+  id?: string;
+  usage?: { output_tokens?: number } | null;
+}, model: string): Error {
+  const wrote = response.usage?.output_tokens;
+  const trace = ` [model ${model}${response.id ? `, request ${response.id}` : ''}]`;
+
+  switch (response.stop_reason) {
+    case 'max_tokens':
+      return new Error(
+        'the answer was cut off before it finished — it reached the '
+        + `${MAX_OUTPUT_TOKENS.toLocaleString('en-NZ')} word-pieces allowed for one reading`
+        + `${wrote ? ` after writing ${wrote.toLocaleString('en-NZ')}` : ''}. `
+        + 'Send less at once: fewer files, or the notes without the ones already covered.'
+        + trace,
+      );
+    case 'refusal':
+      return new Error(
+        'the model declined to answer this'
+        + (response.stop_details?.category ? ` (${response.stop_details.category})` : '')
+        + '. Nothing was read. If this looks wrong, the text can be entered by hand.'
+        + trace,
+      );
+    case 'pause_turn':
+      return new Error(
+        'the model paused part-way through and the register does not resume a '
+        + 'paused reading. Try it again.' + trace,
+      );
+    default:
+      return new Error(
+        'the model answered, but not in the shape the register asked for '
+        + `(it stopped because: ${response.stop_reason ?? 'no reason given'}).` + trace,
+      );
+  }
+}
+
 export function createAnthropicProvider(
   env: Env,
   opts: { model?: string; workspaceId?: string } = {},
@@ -167,11 +291,10 @@ export function createAnthropicProvider(
     try {
       return await work();
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
       const sent = opts.workspaceId
         ? `sent workspace ${opts.workspaceId}`
         : 'sent no workspace header';
-      throw new Error(`${message} [model ${model}, ${sent}]`);
+      throw new Error(`${inPlainWords(err)} [model ${model}, ${sent}]`);
     }
   };
 
@@ -181,7 +304,7 @@ export function createAnthropicProvider(
     async triage(input): Promise<TriageResult> {
       const response = await withContext(() => client.messages.parse({
         model,
-        max_tokens: 4000,
+        max_tokens: MAX_OUTPUT_TOKENS,
         system: TRIAGE_SYSTEM_PROMPT,
         output_config: { format: zodOutputFormat(triageSchema(input.caseTypes)) },
         messages: [
@@ -192,7 +315,7 @@ export function createAnthropicProvider(
         ],
       }));
 
-      if (!response.parsed_output) throw new Error('model returned no structured output');
+      if (!response.parsed_output) throw noOutput(response, model);
       return normaliseTriage(response.parsed_output as Partial<TriageResult>);
     },
 
@@ -228,20 +351,20 @@ export function createAnthropicProvider(
 
       const response = await withContext(() => client.messages.parse({
         model,
-        max_tokens: 4000,
+        max_tokens: MAX_OUTPUT_TOKENS,
         system: INTAKE_SYSTEM_PROMPT,
         output_config: { format: zodOutputFormat(intakeSchema(input.caseTypes)) },
         messages: [{ role: 'user', content }],
       }));
 
-      if (!response.parsed_output) throw new Error('model returned no structured output');
+      if (!response.parsed_output) throw noOutput(response, model);
       return normaliseIntake(response.parsed_output as Partial<IntakeResult>);
     },
 
     async sweep(input): Promise<SweepResult> {
       const response = await withContext(() => client.messages.parse({
         model,
-        max_tokens: 2000,
+        max_tokens: MAX_OUTPUT_TOKENS,
         system: SWEEP_SYSTEM_PROMPT,
         output_config: { format: zodOutputFormat(sweepSchema(input.caseStatuses)) },
         messages: [
@@ -257,21 +380,21 @@ export function createAnthropicProvider(
           },
         ],
       }));
-      if (!response.parsed_output) throw new Error('model returned no structured output');
+      if (!response.parsed_output) throw noOutput(response, model);
       return normaliseSweep(response.parsed_output as Partial<SweepResult>);
     },
 
     async brief(input): Promise<BriefResult> {
       const response = await withContext(() => client.messages.parse({
         model,
-        max_tokens: 4000,
+        max_tokens: MAX_OUTPUT_TOKENS,
         system: BRIEF_SYSTEM_PROMPT,
         output_config: { format: zodOutputFormat(BriefSchema) },
         messages: [
           { role: 'user', content: `File: ${input.title}\n\n${input.file.slice(0, 60_000)}` },
         ],
       }));
-      if (!response.parsed_output) throw new Error('model returned no structured output');
+      if (!response.parsed_output) throw noOutput(response, model);
       const parsed = response.parsed_output as BriefResult;
       return {
         summary: parsed.summary ?? '',

@@ -18,7 +18,7 @@
 import { describe, expect, it } from 'vitest';
 import { mountModule } from './support/d1';
 import { clientsModule } from '../src/modules/clients';
-import { documentAlerts } from '../src/modules/alerts';
+import { alertTiming, documentAlerts } from '../src/modules/alerts';
 
 const at = '2026-08-29T00:00:00Z';
 
@@ -85,7 +85,26 @@ describe('a deadline computed from an unverified date says so', () => {
     const alerts = await documentAlerts(h.env as any);
     const row = alerts.find((a) => a.title.startsWith('Police certificate'));
     expect(row).toBeDefined();
-    expect(row!.detail).toContain('never confirmed against the certificate');
+    expect(row!.detail, 'the row does not say the date was never checked')
+      .toMatch(/nobody has checked|never confirmed/);
+  });
+
+  it('and is not a deadline, because a worked-out date cannot be one', async () => {
+    // The wording above used to be the whole of this. It was not enough: the
+    // row said the date had never been checked and then sat in "Needs you
+    // today" as though it were an expiry somebody had to act on. On
+    // 7 September 2026 the practice pasted eight of them back and asked for
+    // them to be suppressed — and every certificate alert overdue in the live
+    // register that morning was one of these.
+    //
+    // So what is pinned is the classification, not the sentence: a date nobody
+    // read off the certificate is its own kind of problem, and the dashboard
+    // leaves that kind out of the list a morning is worked from.
+    const h = await withCertificate('from_filename');
+    const alerts = await documentAlerts(h.env as any);
+    const row = alerts.find((a) => a.title.startsWith('Police certificate'));
+    expect(row!.kind).toBe('unconfirmed_expiry');
+    expect(alertTiming(row!.kind), 'it would still sort as a deadline').toBe('wrong');
   });
 
   it('but not when it was read off the certificate itself', async () => {
@@ -93,7 +112,8 @@ describe('a deadline computed from an unverified date says so', () => {
     const alerts = await documentAlerts(h.env as any);
     const row = alerts.find((a) => a.title.startsWith('Police certificate'));
     expect(row).toBeDefined();
-    expect(row!.detail).not.toContain('never confirmed');
+    expect(row!.detail).not.toMatch(/nobody has checked|never confirmed/);
+    expect(row!.kind, 'a confirmed expiry stopped being a deadline').toBe('document');
   });
 
   it('and on the client page, until somebody checks the paper', async () => {

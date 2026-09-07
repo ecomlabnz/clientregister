@@ -358,6 +358,56 @@ every refusal is quoted in the database's own words with the right *when*, and
 the counts in the prose are the counts. What is deliberately not checked is the
 writing, which is the part worth having.
 
+### 24. An error message that names no cause is read as any cause
+
+The assistant failed on a case handover and said, in full: *"model returned no
+structured output"*. The practice read it as having run out of quota. It was
+not that — the model had been cut off part-way through its answer because the
+register only allowed it 4,000 word-pieces for a summary that can run to 8,000
+characters, on a model that also spends part of that allowance reasoning.
+
+Four different failures shared that one sentence, and they want opposite
+responses: send less, wait a minute, top up the account, try again later. The
+person best placed to act had nothing to act on, so they guessed — which is what
+anybody does with an error that rules nothing out.
+
+The provider had said which it was, in `stop_reason`, on every response. Nobody
+was reading it.
+
+**The rule.** Every failure a person can see names its own cause in a sentence
+they can act on, and carries the raw text on the end for whoever has to find out
+why it says that. Not a code, not the provider's JSON — those are for the second
+reader, not the first. Where the provider already distinguishes causes
+(`stop_reason`, HTTP status), the application distinguishes them too; passing
+four failures through as one is throwing away information that was handed over.
+
+And the smaller half, worth its own line: **a limit the application sets is a
+limit the application must justify.** 4,000 was chosen once and never measured
+against the thing it had to hold.
+
+### 25. A guessed date in a list of deadlines is read as a deadline
+
+The register calculated certificate expiries from issue dates, and recorded
+honestly whether the issue date had been read off the certificate or inferred
+from a filename. A row built on an inferred date said so, in its own detail
+line — and then sat in "Needs you today" beside real expiries, sorted by date,
+looking exactly like something that had gone past.
+
+Measured on 7 September 2026, every certificate alert overdue in the live
+register was one of these: five police, three medical, not one confirmed. The
+practice pasted them back and asked for them to be suppressed.
+
+Suppressing was the wrong answer and so was leaving them. A date that was worked
+out cannot support the claim the list makes about every row in it. It supports a
+different claim — *nobody has checked this* — which is real work with a different
+urgency and no due date at all.
+
+**The rule.** Where a value's provenance is recorded, the provenance decides
+which list it belongs in, not just what the row says about itself. A caveat
+printed inside a row does not change what the row's position claims. If it
+cannot be acted on the way its neighbours can, it is a different kind of thing
+and gets its own heading.
+
 ---
 
 ## Working practices that caught things

@@ -37,6 +37,22 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.2.1', date: '7 September 2026',
+    notes: [
+      'When the assistant cannot read something, it now tells you why in a sentence \u2014 whether '
+        + 'it was cut off part-way, the model declined, the account is out of credit, or Anthropic '
+        + 'is busy. It used to say only \u201cmodel returned no structured output\u201d, which '
+        + 'could mean any of those.',
+      'It also gets more room to answer than it had, which is what caused the failure that '
+        + 'prompted this: a long handover ran past the space allowed and was cut off mid-sentence.',
+      'Certificate expiries that were worked out from an issue date nobody checked have left '
+        + '\u201cNeeds you today\u201d. They are on the Alerts page under \u201cWorked out, never '
+        + 'confirmed\u201d instead \u2014 a guessed date cannot tell you a certificate has expired, '
+        + 'only that nobody has looked. Confirm the date on the client and it comes back as a real '
+        + 'expiry.',
+    ],
+  },
+  {
     version: '1.2.0', date: '4 September 2026',
     notes: [
       'A knowledge base article can carry files. The New article form takes them \u2014 several at '

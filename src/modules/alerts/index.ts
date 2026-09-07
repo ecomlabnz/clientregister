@@ -42,7 +42,16 @@ export type AlertKind =
   /** An open matter for someone whose immigration status is not recorded. */
   | 'status_unknown'
   /** A visa whose expiry waits on an event that has not happened yet. */
-  | 'expiry_unfixed';
+  | 'expiry_unfixed'
+  /**
+   * A certificate whose expiry was worked out from an issue date nobody read
+   * off the certificate.
+   *
+   * Its own kind because it is its own question. The date is a guess, so it is
+   * not a deadline and does not belong in a list of them — what it asks for is
+   * five minutes with the certificate, not a renewal.
+   */
+  | 'unconfirmed_expiry';
 export type AlertSeverity = 'overdue' | 'urgent' | 'soon';
 
 export interface Alert {
@@ -90,6 +99,20 @@ export function alertTiming(kind: AlertKind): 'due' | 'wrong' {
 }
 
 /**
+ * What a morning is actually worked from: everything dated today or earlier,
+ * minus the kinds whose date is not a claim about when anything is due.
+ *
+ * Exported for the same reason `byWorkingOrder` is — the dashboard and the
+ * alerts page must not drift into two ideas of what "today" holds. And it is a
+ * function rather than a line inside the dashboard because the one thing it
+ * does is a rule the practice asked for by name, and a rule inside a route is
+ * a rule nobody can test without rendering a page.
+ */
+export function needsAttentionToday(alerts: Alert[], today: string): Alert[] {
+  return alerts.filter((a) => a.date <= today && a.kind !== 'unconfirmed_expiry');
+}
+
+/**
  * The order a working morning wants: what is late or due today, then what is
  * merely wrong. Exported so the dashboard and the alerts page cannot drift into
  * two different ideas of what "first" means.
@@ -114,6 +137,7 @@ const KIND_LABELS: Record<AlertKind, string> = {
   no_slack: 'No room to act',
   status_unknown: 'Status not recorded',
   expiry_unfixed: 'Expiry not yet fixed',
+  unconfirmed_expiry: 'Worked out, never confirmed',
 };
 
 /** Exposed for the tests, which check that every kind is named. */
@@ -243,18 +267,40 @@ export async function documentAlerts(env: Env, horizonDays = 90): Promise<Alert[
     horizon,
   );
 
-  return rows.map((row) => ({
-    kind: 'document' as const,
-    severity: severityFor(row.expires, today, noticeDays),
-    date: row.expires,
-    title: `${row.document} — ${row.full_name}`,
-    // A deadline computed from a date nobody confirmed says so in the row
-    // itself, not on a page somebody would have to think to open.
-    detail: row.provenance && row.provenance !== 'verified'
-      ? `${row.ref} · worked out from an issue date never confirmed against the certificate`
-      : row.ref,
-    href: `/clients/${row.id}`,
-  }));
+  return rows.map((row) => {
+    /*
+     * A date that was worked out is not a deadline.
+     *
+     * Until 7 September 2026 these sat in "Needs you today" alongside real
+     * expiries, saying in their own detail line that the date behind them had
+     * never been read off the certificate. The practice pasted eight of them
+     * back and asked for them to be suppressed — and measured against the live
+     * register, *every* certificate alert overdue that morning was one of
+     * these: five police, three medical, not one of them from a date anybody
+     * had confirmed.
+     *
+     * So they are not suppressed, they are filed correctly. A guessed date
+     * cannot tell you a certificate has expired; what it can tell you is that
+     * nobody has checked. That is a different job, it is not due today, and it
+     * gets its own heading on the alerts page rather than a line in the list a
+     * morning is worked from.
+     *
+     * They come back the moment the issue date is confirmed — as a real expiry,
+     * on the real date, in the real list.
+     */
+    const guessed = !!row.provenance && row.provenance !== 'verified';
+    return {
+      kind: guessed ? 'unconfirmed_expiry' as const : 'document' as const,
+      severity: severityFor(row.expires, today, noticeDays),
+      date: row.expires,
+      title: `${row.document} — ${row.full_name}`,
+      detail: guessed
+        ? `${row.ref} · would expire ${row.expires} on an issue date nobody has `
+          + 'checked against the certificate'
+        : row.ref,
+      href: `/clients/${row.id}`,
+    };
+  });
 }
 
 /**
