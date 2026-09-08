@@ -7,6 +7,29 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.16.0 — 8 September 2026
+
+### Changed
+- **Incoming opens on the Inbox, and the Inbox tab comes first.** Asked for:
+  *"move the Inbox before the Inquiries and default it to Inbox."* The figures
+  agree — 122 pieces have come through the inbox against 4 open inquiries, so
+  the tab you land on is now the one with the work in it. Inquiries and
+  Conversations are one click away, as before.
+
+  A role that may not triage still lands on Inquiries: `/inbox` sends it there
+  rather than refusing, so the one menu entry serves both.
+
+- **File selected and Delete selected have moved above the list, and appear
+  only once something is ticked.** Asked for: *"these two buttons need to move
+  up and appear only when user selects an item or items."* Below seventy
+  messages they were a scroll away from the boxes they act on, which is the
+  wrong way round.
+
+  The bar now says how many are selected, and it is not there at all until one
+  is. With scripting switched off it is simply always visible, exactly as it was
+  — a control that exists only when a script runs is a control a blocked script
+  takes away.
+
 ## 1.15.1 — 8 September 2026
 
 ### Fixed

@@ -160,9 +160,13 @@ export function incomingTabs(
   // not do. Their tabs are absent rather than disabled — a tab that refuses to
   // open is worse than one that was never offered.
   const triage = can(user, 'ingest:triage');
+  // The inbox first, and it is where Incoming opens. Asked for on 8 September
+  // 2026, and the figures say the same thing: 122 pieces have come through the
+  // inbox against 4 open inquiries. The tab you land on should be the one with
+  // the work in it.
   const tabs = [
-    { id: 'inquiries', label: 'Inquiries', href: '/inquiries', count: counts.inquiries, show: true },
     { id: 'inbox', label: 'Inbox', href: '/inbox', count: counts.inbox, show: triage },
+    { id: 'inquiries', label: 'Inquiries', href: '/inquiries', count: counts.inquiries, show: true },
     { id: 'threads', label: 'Conversations', href: '/inbox/threads', count: counts.threads, show: triage },
   ].filter((t) => t.show);
 
@@ -177,7 +181,12 @@ export const inquiriesModule: AppModule = {
   basePaths: ['/inquiries'],
   // One entry for the whole family. The inbox declares none of its own: the
   // bar on these pages is how you get between them.
-  nav: [{ href: '/inquiries', label: 'Incoming', permission: 'register:read', order: 95 }],
+  // Incoming opens on the inbox. `/inbox` sends anybody who may not triage on
+  // to the inquiries list rather than refusing them, so one nav entry serves
+  // both — see the route. A second entry guarded the other way round is not
+  // something `NavItem` can express, and two entries with one label would show
+  // twice to an owner.
+  nav: [{ href: '/inbox', label: 'Incoming', permission: 'register:read', order: 95 }],
 
   register(app) {
     const r = new Hono<AppContext>();
@@ -208,7 +217,7 @@ export const inquiriesModule: AppModule = {
       const csrf = c.get('session')!.csrf;
       const deletable = can(c.get('user'), 'register:delete');
 
-      return page(c, { title: 'Inquiries', active: '/inquiries' }, html`
+      return page(c, { title: 'Inquiries', active: '/inbox' }, html`
         ${pageHeader('Inquiries', 'New work coming in, from every channel.',
           can(c.get('user'), 'register:write') ? html`<a class="btn btn-primary" href="/inquiries/new">Record an inquiry</a>` : undefined)}
         ${incomingTabs(c.get('user'), 'inquiries', counts)}
@@ -266,7 +275,7 @@ export const inquiriesModule: AppModule = {
       const pre = (name: string, max = 320) => (c.req.query(name) ?? '').slice(0, max);
       const prefilled = Boolean(pre('contact_name') || pre('contact_email') || pre('subject'));
 
-      return page(c, { title: 'Record an inquiry', active: '/inquiries' }, html`
+      return page(c, { title: 'Record an inquiry', active: '/inbox' }, html`
         ${breadcrumbs([{ href: '/inquiries', label: 'Inquiries' }, { label: 'New' }])}
         ${pageHeader('Record an inquiry')}
         ${prefilled
@@ -356,7 +365,7 @@ export const inquiriesModule: AppModule = {
         ? await filingTargetLabel(c.env, filedTarget, (filedTarget === 'case' ? inq.case_id : inq.client_id)!)
         : null;
 
-      return page(c, { title: inq.ref, active: '/inquiries' }, html`
+      return page(c, { title: inq.ref, active: '/inbox' }, html`
         ${breadcrumbs([{ href: '/inquiries', label: 'Inquiries' }, { label: inq.ref }])}
         ${pageHeader(inq.subject || `Inquiry ${inq.ref}`,
           html`${inq.ref} · ${INQUIRY_SOURCE_LABELS[inq.source]} · received ${stamp(inq.received_at)}`,
@@ -530,7 +539,7 @@ export const inquiriesModule: AppModule = {
       const [clients, users] = await Promise.all([clientOptions(c.env), userOptions(c.env)]);
       const csrf = c.get('session')!.csrf;
 
-      return page(c, { title: `Edit ${inq.ref}`, active: '/inquiries' }, html`
+      return page(c, { title: `Edit ${inq.ref}`, active: '/inbox' }, html`
         ${breadcrumbs([{ href: '/inquiries', label: 'Inquiries' }, { href: `/inquiries/${inq.id}`, label: inq.ref }, { label: 'Edit' }])}
         ${pageHeader(`Edit ${inq.ref}`)}
         <form method="post" action="/inquiries/${inq.id}" class="form-grid">

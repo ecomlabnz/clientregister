@@ -577,6 +577,36 @@
     });
   })();
 
+  // The bulk bar on Incoming appears once something is ticked.
+  //
+  // Hidden here rather than in the markup, and that is the whole point: with
+  // scripting off nothing runs, the bar stays where the server drew it, and the
+  // buttons work exactly as they did before. A control that exists only when a
+  // script runs is a control a blocked script takes away.
+  Array.prototype.forEach.call(document.querySelectorAll('.js-bulk'), function (form) {
+    var bar = form.querySelector('.js-bulk-bar');
+    var count = form.querySelector('.js-bulk-count');
+    if (!bar) return;
+    var boxes = function () {
+      return Array.prototype.filter.call(
+        document.querySelectorAll('input[type="checkbox"][name="id"]'),
+        function (box) { return box.form === form || box.getAttribute('form') === form.id; });
+    };
+    var sync = function () {
+      var picked = boxes().filter(function (box) { return box.checked; }).length;
+      bar.hidden = picked === 0;
+      if (count) {
+        count.textContent = picked === 1 ? '1 selected' : picked + ' selected';
+      }
+    };
+    // Delegated, so a row arriving from the live search is covered too.
+    document.addEventListener('change', function (event) {
+      var target = event.target;
+      if (target && target.type === 'checkbox' && target.name === 'id') sync();
+    });
+    sync();
+  });
+
   // "/" focuses the first search box on the page.
   document.addEventListener('keydown', function (event) {
     if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;

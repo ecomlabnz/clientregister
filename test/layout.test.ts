@@ -126,17 +126,24 @@ describe('one menu entry for the incoming family', () => {
     // Three menu entries made you choose a screen before you knew what had
     // arrived; the bar between them does that job now.
     expect(inbox).toContain('nav: [],');
-    expect(inquiries).toMatch(/nav: \[\{ href: '\/inquiries', label: 'Incoming'/);
+    // The entry points at the inbox since 8 September 2026 — "move the Inbox
+    // before the Inquiries and default it to Inbox" — which is where the work
+    // is: 122 pieces have come through it against 4 open inquiries. Still one
+    // entry; only its destination moved.
+    expect(inquiries).toMatch(/nav: \[\{ href: '\/inbox', label: 'Incoming'/);
   });
 
   it('highlights that entry from every page in the family', () => {
     // `active` is matched against the entry's href, so a page setting anything
-    // else leaves the menu with nothing lit while you are standing on it.
-    expect(inbox, 'an inbox page still claims a menu entry of its own')
-      .not.toContain("active: '/inbox'");
-    for (const page of inbox.matchAll(/active: '([^']+)'/g)) {
-      expect(page[1]).toBe('/inquiries');
+    // else leaves the menu with nothing lit while you are standing on it. That
+    // includes the inquiries pages, which no longer name themselves.
+    for (const source of [inbox, inquiries]) {
+      for (const page of source.matchAll(/active: '([^']+)'/g)) {
+        expect(page[1]).toBe('/inbox');
+      }
     }
+    expect(inbox.match(/active: '([^']+)'/g)?.length, 'no pages were read')
+      .toBeGreaterThan(3);
   });
 
   it('hides triage tabs from a role that cannot triage', () => {
