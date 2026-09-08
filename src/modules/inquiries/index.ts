@@ -21,7 +21,7 @@ import {
 } from '../../ui/components';
 import { dateInputValue, dateOrDateTime, dateShort, dateTime, truncate } from '../../ui/format';
 import {
-  CASE_STATUS_LABELS, ENTRY_KIND_LABELS, ENTRY_KINDS,
+  CASE_STATUS_LABELS, CHOOSABLE_ENTRY_KINDS, ENTRY_KIND_LABELS, ENTRY_KINDS,
   INQUIRY_SOURCE_LABELS, INQUIRY_SOURCES, INQUIRY_STATUS_LABELS, INQUIRY_STATUSES,
   type InquirySource, type InquiryStatus,
 } from '../../domain';
@@ -473,7 +473,7 @@ export const inquiriesModule: AppModule = {
                 <form method="post" action="/inquiries/${inq.id}/entries" class="entry-form">
                   ${csrfField(csrf)}
                   ${select({ label: 'Kind', name: 'kind', value: 'note', includeBlank: false,
-                             options: optionsFrom(ENTRY_KINDS.filter((k) => k !== 'system') as any, ENTRY_KIND_LABELS as any) })}
+                             options: optionsFrom(CHOOSABLE_ENTRY_KINDS as any, ENTRY_KIND_LABELS as any) })}
                   ${field({ label: 'Entry', name: 'body', type: 'textarea', rows: 3, required: true, maxlength: 5000 })}
                   <button class="btn btn-primary" type="submit">Add</button>
                 </form>` : ''}
@@ -487,7 +487,7 @@ export const inquiriesModule: AppModule = {
                     correction: writable && correctable(e, c.get('user')?.id ?? null)
                       ? { csrf, minutes: CORRECTION_WINDOW_MINUTES,
                           kindOptions: optionsFrom(
-                            ENTRY_KINDS.filter((k) => k !== 'system') as any,
+                            CHOOSABLE_ENTRY_KINDS as any,
                             ENTRY_KIND_LABELS as any) }
                       : null,
                   })}`)}</ul>`}`)}

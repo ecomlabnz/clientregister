@@ -103,8 +103,14 @@ export function badAddresses(list: string | null | undefined): string[] {
     .filter((entry) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry));
 }
 
-/** The columns the bulk delete needs: enough to show it and to refuse it. */
-interface DeletionCandidate {
+/** One selected message, as the confirmation page shows it. */
+const describeSelected = (m: BulkCandidate) =>
+  html`<li><strong>${truncate(m.subject, 80) || '(no subject)'}</strong>
+         <div class="muted small">${m.sender_display ?? m.sender ?? 'unknown sender'}
+            · ${m.channel} · ${stamp(m.received_at)}</div></li>`;
+
+/** The columns a bulk action needs: enough to show each one and to refuse it. */
+interface BulkCandidate {
   id: string; sender: string | null; sender_display: string | null;
   subject: string | null; channel: string; received_at: string;
   inquiry_id: string | null; filed_at: string | null;
@@ -235,10 +241,10 @@ export const inboxModule: AppModule = {
       // What the last sweep made of each of these, if one has been run. Read
       // for the whole page in one query rather than per row.
       const sweeps = await latestSweeps(c.env, rows.map((row) => row.id));
-      // Whether this page has anything the bulk button could act on. A Delete
-      // selected button under a list of filed messages does nothing, and the
-      // reader has to work out why.
-      const deletable = rows.filter((row) => !row.inquiry_id && !row.filed_at).length;
+      // Whether this page has anything the bulk buttons could act on. A row of
+      // buttons under a list of filed messages does nothing, and the reader has
+      // to work out why.
+      const selectable = rows.filter((row) => !row.filed_at).length;
       const canRunAi = isAiEnabled(c.env) && can(c.get('user'), 'ai:run');
 
       const views = [
@@ -287,11 +293,16 @@ export const inboxModule: AppModule = {
                  mail client uses, and the order the eye wants: what is this,
                  who sent it, how old is it. The date led before, which put the
                  least useful column where the eye lands. */}
-        ${'' /* The whole list is one form, so the checkboxes and the button that
-                 acts on them are the same submission. Junk arrives in runs —
-                 the same sender, the same hour — and deleting it one page at a
-                 time was the job the inbox made hardest. */}
-        <form method="post" action="/inbox/delete" id="inbox-bulk">
+        ${'' /* The whole list is one form, so the checkboxes and the buttons that
+                 act on them are the same submission. Post arrives in runs — the
+                 same sender, the same hour, the same matter — and dealing with
+                 it one page at a time was the job the inbox made hardest.
+
+                 Two buttons, one form: the form's own action is the filing one,
+                 and Delete carries a `formaction` instead. That way the press
+                 that happens by accident — Enter in the form — is the one that
+                 writes a note rather than the one that destroys a message. */}
+        <form method="post" action="/inbox/file" id="inbox-bulk">
           ${csrfField(csrf)}
           <input type="hidden" name="back" value="${keep({})}">
         ${table([
@@ -303,12 +314,17 @@ export const inboxModule: AppModule = {
           { label: 'Status', width: '15' },
         ], rows.map((row) => html`
           <tr>
-            <td>${'' /* A message that became an inquiry, or that has been filed,
-                        offers no checkbox: the inquiry and the file note both
-                        point at it. Absent rather than disabled — a control you
-                        cannot use is a question the reader has to answer. */}
-              ${row.inquiry_id || row.filed_at
-                ? html`<span class="muted small" title="Kept: something on the file points at this">—</span>`
+            <td>${'' /* A message already filed offers no checkbox: the note on
+                        the record points at it, and filing it twice writes a
+                        second note that can never be taken off. Absent rather
+                        than disabled — a control you cannot use is a question
+                        the reader has to answer.
+
+                        One that became an inquiry still gets one. It can be
+                        filed; it just cannot be deleted, and the delete
+                        confirmation names it and leaves it alone. */}
+              ${row.filed_at
+                ? html`<span class="muted small" title="Already filed on a record">—</span>`
                 : html`<input type="checkbox" name="id" value="${row.id}"
                               form="inbox-bulk" aria-label="Select this message">`}</td>
             <td><a class="clamp-2" href="/inbox/${row.id}">${
@@ -350,11 +366,13 @@ export const inboxModule: AppModule = {
             <td>${badge(row.status, statusTone(row.status === 'processed' ? 'approved' : row.status))}
                 ${row.inquiry_id ? html`<div class="small"><a href="/inquiries/${row.inquiry_id}">inquiry</a></div>` : ''}</td>
           </tr>`), { sticky: true, fixed: true, empty: 'Nothing here.' })}
-          ${deletable > 0 ? html`
+          ${selectable > 0 ? html`
             <div class="filters mt">
-              <button class="btn btn-danger" type="submit">Delete selected</button>
-              <span class="hint">Tick what should not be here, then delete it. You will be shown
-                 exactly what is about to go before anything happens.</span>
+              <button class="btn btn-primary" type="submit">File selected</button>
+              <button class="btn btn-danger" type="submit" formaction="/inbox/delete">Delete selected</button>
+              <span class="hint">Tick the ones that belong together, then file them on the matter
+                 or client in one go — or delete what should not be here. Either way you are shown
+                 exactly what is about to happen before anything does.</span>
             </div>` : ''}
         </form>
         </div>`);
@@ -384,8 +402,8 @@ export const inboxModule: AppModule = {
      * message would make that sentence untrue. They are dropped from the
      * selection and named in the confirmation, rather than failing the batch.
      */
-    const gatherForDeletion = async (env: AppContext['Bindings'], ids: string[]) =>
-      ids.length === 0 ? [] : await allByIds<DeletionCandidate>(
+    const gatherSelected = async (env: AppContext['Bindings'], ids: string[]) =>
+      ids.length === 0 ? [] : await allByIds<BulkCandidate>(
         env.DB, ids,
         (placeholders) => `SELECT id, sender, sender_display, subject, channel, received_at,
                                   inquiry_id, filed_at, filed_to_type, filed_to_id
@@ -471,7 +489,7 @@ export const inboxModule: AppModule = {
         return redirectWith(c, backHref, 'Nothing was selected.', 'err');
       }
 
-      const found = await gatherForDeletion(c.env, ids);
+      const found = await gatherSelected(c.env, ids);
       const kept = found.filter((m) => m.inquiry_id || m.filed_at);
       const going = found.filter((m) => !m.inquiry_id && !m.filed_at);
 
@@ -482,22 +500,18 @@ export const inboxModule: AppModule = {
       }
 
       const csrf = c.get('session')!.csrf;
-      const describe = (m: DeletionCandidate) =>
-        html`<li><strong>${truncate(m.subject, 80) || '(no subject)'}</strong>
-               <div class="muted small">${m.sender_display ?? m.sender ?? 'unknown sender'}
-                  · ${m.channel} · ${stamp(m.received_at)}</div></li>`;
 
       return page(c, { title: 'Delete these messages?', active: '/inquiries' }, html`
         ${pageHeader('Delete these messages?',
           'They go for good. The audit log keeps the record that each one arrived.')}
 
         ${card(`${going.length} ${going.length === 1 ? 'message' : 'messages'} will be deleted`,
-          html`<ul class="list">${going.map(describe)}</ul>`)}
+          html`<ul class="list">${going.map(describeSelected)}</ul>`)}
 
         ${kept.length ? card(`${kept.length} will be kept`, html`
           <p class="small">Each of these became an inquiry or has been filed onto a record, and
              that record points back at the message. They are left alone.</p>
-          <ul class="list">${kept.map(describe)}</ul>`) : ''}
+          <ul class="list">${kept.map(describeSelected)}</ul>`) : ''}
 
         <form method="post" action="/inbox/delete/confirm" class="filters">
           ${csrfField(csrf)}
@@ -521,7 +535,7 @@ export const inboxModule: AppModule = {
       // sent back. Between the two steps somebody may have filed one of them,
       // and the hidden fields in a form the user still has open are a claim
       // about the past.
-      const found = await gatherForDeletion(c.env, ids);
+      const found = await gatherSelected(c.env, ids);
       const going = found.filter((m) => !m.inquiry_id && !m.filed_at);
       if (going.length === 0) {
         return redirectWith(c, backHref,
@@ -544,6 +558,151 @@ export const inboxModule: AppModule = {
         `Deleted ${changed} ${changed === 1 ? 'message' : 'messages'}.`
         + (skipped ? ` ${skipped} kept, because something on the file points at ${skipped === 1 ? 'it' : 'them'}.` : '')
         + ' The audit log keeps the record that they arrived.');
+    });
+
+    /**
+     * File several messages at once, onto one matter or client.
+     *
+     * The practice's ask, 8 September 2026, and the word used was critical: the
+     * post arrives in runs. Six documents for one application land in six
+     * emails, and filing them one at a time meant six searches for the same
+     * matter — which is the moment somebody stops filing at all and the matter
+     * stops being the place the file lives.
+     *
+     * Two steps, the same shape as the bulk delete: the first says what is
+     * about to be filed and asks where, the second writes. One destination for
+     * the whole selection, deliberately — a picker per message is the one-at-a
+     * -time job again with extra scrolling. Messages that belong on different
+     * matters are two presses of File selected, which is honest about what is
+     * being decided.
+     *
+     * Each message gets **its own note** on the record rather than one note
+     * listing six. A file note is evidence of one thing that happened, and a
+     * summary of six is evidence of none of them.
+     *
+     * Both steps are POSTs, including the search — the selection travels as
+     * hidden fields, and two hundred message ids do not belong in a URL.
+     */
+    r.post('/file', requirePermission('register:write'), async (c) => {
+      const form = await c.req.formData();
+      const ids = selectedIds(form);
+      const back = String(form.get('back') ?? '');
+      const backHref = `/inbox${back ? `?${back}` : ''}`;
+      if (ids.length === 0) {
+        return redirectWith(c, backHref, 'Nothing was selected.', 'err');
+      }
+
+      const found = await gatherSelected(c.env, ids);
+      // Already filed is the only refusal. One that became an inquiry can still
+      // be filed — the inquiry says what was made of it, the note says what
+      // arrived, and they are different facts.
+      const going = found.filter((m) => !m.filed_at);
+      const kept = found.filter((m) => m.filed_at);
+      if (going.length === 0) {
+        return redirectWith(c, backHref,
+          'Every one of those is already filed on a record.', 'err');
+      }
+
+      // Empty on the way in from the list, filled when Find is pressed on this
+      // same page — which is why this route renders as well as receives.
+      const query = String(form.get('find') ?? '').trim();
+      const hits = query ? await filingSearch(c.env, query) : [];
+      const csrf = c.get('session')!.csrf;
+      const many = going.length !== 1;
+
+      return page(c, { title: 'File these messages', active: '/inquiries' }, html`
+        ${pageHeader(`File ${String(going.length)} ${many ? 'messages' : 'message'}`,
+          'They all go on the same matter or client. Each one is written as its own note.')}
+
+        ${card(`What is about to be filed`,
+          html`<ul class="list">${going.map(describeSelected)}</ul>`)}
+
+        ${kept.length ? card(`${String(kept.length)} already filed`, html`
+          <p class="small">These are already on a record, and filing them again would write a
+             second note that could never be taken off. They are left alone.</p>
+          <ul class="list">${kept.map(describeSelected)}</ul>`) : ''}
+
+        ${card('Where do they go?', filingPicker({
+          action: '/inbox/file/confirm',
+          findAction: '/inbox/file',
+          csrf, query, hits,
+          carry: [{ name: 'back', value: back }, ...going.map((m) => ({ name: 'id', value: m.id }))],
+          submitLabel: `File ${String(going.length)} ${many ? 'messages' : 'message'}`,
+          hint: html`<p class="hint">A note is written on that record for each message, saying
+             where it came from and what it said. Nothing is deleted and nothing moves — the
+             messages stay in the inbox under Filed, and each one can be put back.</p>`,
+        }))}
+
+        <p><a class="btn btn-secondary" href="${backHref}">Cancel</a></p>`);
+    });
+
+    r.post('/file/confirm', requirePermission('register:write'), async (c) => {
+      const form = await c.req.formData();
+      const ids = selectedIds(form);
+      const back = String(form.get('back') ?? '');
+      const backHref = `/inbox${back ? `?${back}` : ''}`;
+      if (ids.length === 0) return redirectWith(c, backHref, 'Nothing was selected.', 'err');
+
+      const choice = parseFilingChoice(String(form.get('onto') ?? ''));
+      if (!choice) {
+        return redirectWith(c, backHref, 'Choose a matter or a client to file them on.', 'err');
+      }
+      const { target, targetId } = choice;
+      // Checked once, before anything is written. A destination that does not
+      // exist would otherwise be found out one message at a time, halfway
+      // through a batch.
+      const label = await filingTargetLabel(c.env, target, targetId);
+      if (!label) {
+        return redirectWith(c, backHref, 'That matter or client no longer exists.', 'err');
+      }
+
+      // Re-read rather than trusting what the page sent back: between the two
+      // steps somebody may have filed one of these, and filing twice writes a
+      // second note that can never be removed.
+      const found = await gatherSelected(c.env, ids);
+      const going = found.filter((m) => !m.filed_at);
+      if (going.length === 0) {
+        return redirectWith(c, backHref,
+          'Nothing was filed — every one of those is now filed already.', 'err');
+      }
+
+      const user = c.get('user')!;
+      let filed = 0;
+      for (const row of going) {
+        // Read one at a time: the note carries the whole message, and two
+        // hundred of those held in memory at once is a different kind of
+        // problem. The last look at `filed_at` happens here, closest to the
+        // write that depends on it.
+        const msg = await one<IngestRow>(
+          c.env.DB, 'SELECT * FROM ingest_messages WHERE id = ?', row.id);
+        if (!msg || msg.filed_at) continue;
+        const done = await fileOntoRecord(c.env, {
+          target, targetId, userId: user.id,
+          origin: `the ${msg.channel} inbox`,
+          source: {
+            channel: msg.channel, receivedAt: msg.received_at,
+            from: msg.sender_display ?? msg.sender, subject: msg.subject, body: msg.body_text,
+          },
+        }, markIngestFiled(c.env, msg.id, target, targetId, user.id));
+        if (!done) continue;
+        filed += 1;
+        // One audit row per message, as the single filing writes, so the log
+        // says which messages went where rather than that six of them did.
+        await auditFrom(c, {
+          action: 'inbox.filed', entityType: 'ingest_message', entityId: msg.id,
+          meta: { target, targetId, entryId: done.entryId, bulk: true },
+        });
+      }
+
+      if (filed === 0) {
+        return redirectWith(c, backHref, 'Nothing was filed.', 'err');
+      }
+      const skipped = found.length - filed;
+      return redirectWith(c, `/${target === 'case' ? 'cases' : 'clients'}/${targetId}`,
+        `Filed ${String(filed)} ${filed === 1 ? 'message' : 'messages'} on ${label}.`
+        + (skipped
+          ? ` ${String(skipped)} left alone, because ${skipped === 1 ? 'it was' : 'they were'} already filed.`
+          : ''));
     });
 
     // --- Conversations ------------------------------------------------------

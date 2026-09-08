@@ -37,6 +37,26 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.3.0', date: '8 September 2026',
+    notes: [
+      'Several messages in Incoming can be filed onto a matter or client in one go. Tick them, '
+        + 'press File selected, pick the matter, and each one is written onto the file as its own '
+        + 'note. Nothing is deleted \u2014 the messages stay in the inbox under Filed and any of '
+        + 'them can be put back.',
+      'A message that has already been filed cannot be filed again, and one that became an '
+        + 'inquiry can be filed but still cannot be deleted. You are shown exactly what is about '
+        + 'to happen before anything does.',
+      'File notes have a \u201cStatus query\u201d kind, and \u201cPreliminary consultation\u201d '
+        + 'is now called \u201cConsult\u201d. \u201cEmail sent\u201d and \u201cEmail '
+        + 'received\u201d are no longer offered when writing a note by hand.',
+      'Whether somebody is a lead or a client is now the first thing on the New client form, '
+        + 'under \u201cWho this is\u201d. It was on the fifth tab, where nobody would look for it.',
+      'One of those note kinds never worked: \u201cPreliminary consultation\u201d had been on the '
+        + 'form for a week and the register refused it every time. It is fixed, and the list is no '
+        + 'longer something the database has an opinion about.',
+    ],
+  },
+  {
     version: '1.2.2', date: '8 September 2026',
     notes: [
       'Quotes now point clients at www.immigration.kiwi/terms \u2014 the same address your letter '
