@@ -37,6 +37,19 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.4.0', date: '8 September 2026',
+    notes: [
+      'A quotation can now name everybody the engagement is with, not just the client \u2014 the '
+        + 'other applicants, the partner and children whose details the application needs, and '
+        + 'anybody at an agency who may be told how it is going. Each with their relationship in '
+        + 'your words and their date of birth.',
+      'One of them can be nominated to instruct on everybody\u2019s behalf. If nobody is, it is '
+        + 'the client, which is what your letter of engagement already says.',
+      'This is the first piece of the letter of engagement. The letter will name nobody itself: '
+        + 'the quotation is the substance and the letter refers to it.',
+    ],
+  },
+  {
     version: '1.3.1', date: '8 September 2026',
     notes: [
       'Reminder emails now link to app.immigration.kiwi \u2014 the address you sign in on. They '
