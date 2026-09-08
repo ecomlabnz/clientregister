@@ -374,12 +374,28 @@ them by itself:
   the workers.dev name is deliberately kept as the way back in if the domain
   breaks, and is one switch (`workers_dev` in `wrangler.jsonc`) whenever the
   practice decides two doors is one too many.
-- **The practice's own letter-of-engagement wording**, into Settings → Letter of
-  engagement and Quotes → Letter clauses. Both went live empty in 1.5.0.
+- ~~The practice's own letter-of-engagement wording~~ — done 8 September 2026,
+  see the hand changes below. **It has not been read back by the practice**, and
+  it is a contract: three passages were adapted, and the whole of it is theirs
+  to correct in Settings and Quotes → Letter clauses.
 
 **Production data changes made by hand**, each rehearsed on a copy first and
 recorded here because they are not in any migration:
 
+- 8 September 2026 — the practice's letter-of-engagement wording entered for
+  them, at their request: *"can you please populate it from what you have read
+  in my LoE?? no time right now."* Seven settings and five clauses, transcribed
+  from the Partner RV letter they supplied — **transcribed, not composed**.
+  Three passages were adapted, because the quotation now carries what the letter
+  used to restate: the covering letter points at the quotation instead of
+  listing the parties and the work; the fee clause says the rates are stated in
+  the quotation instead of repeating the figures; and the acknowledgements refer
+  to accepting the quotation rather than signing a page. The clause about how
+  INZ assesses a partnership is limited to `vv_partner sv_partner wv_partner
+  rv_partner`, which are the practice's real case-type keys — the first draft
+  guessed `rv_partnership` and `rv_dependent_child`, neither of which exists.
+  Rehearsed on a scratch database and the letter rendered from it before it ran.
+  Audit row `aud_loewording_20260908`. **Not yet read back by the practice.**
 - 8 September 2026 — `consult@thelawfirm.nz` changed from Specialist (`adviser`)
   to Owner. The practice asked for it: that login is the principal lawyer and is
   not meant to be limited. As a Specialist it could not open Settings, read the
