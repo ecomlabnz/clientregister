@@ -114,3 +114,53 @@ describe('invariants.md', () => {
     expect(Number(stated![2])).toBe(withRefusals.size);
   });
 });
+
+/**
+ * The counts on the specification's own front page.
+ *
+ * `docs/spec/README.md` introduces the other documents by number: so many
+ * refusals, so many tables, so many routes. Those numbers had drifted to 51, 45
+ * and 178 against a schema holding 67, 48 and 195 — while the documents they
+ * describe were each being held against the code by a test.
+ *
+ * That is fault 21's shape (a stated number about a measured thing goes stale in
+ * silence) and fault 23's (a document that "cannot drift" needs something to say
+ * so). The index escaped both because it is prose about documents rather than a
+ * document about the schema.
+ */
+describe('the numbers on the front page of the specification', () => {
+  const readme = readFileSync('docs/spec/README.md', 'utf8');
+  const stated = (label: string): number => {
+    const found = readme.match(new RegExp(`(\\d+) ${label}`));
+    expect(found, `the README no longer states a number of ${label}`).toBeTruthy();
+    return Number(found![1]);
+  };
+
+  it('says how many things the database refuses, and agrees with the document', () => {
+    // Held against `invariants.md` rather than re-counted from the schema,
+    // because that document is itself held against the schema by the test
+    // above — and it counts distinct rules where the triggers contain 71
+    // RAISE statements, several of which are the same refusal written for an
+    // insert and again for an update. Two independent counts of one thing is
+    // how a front page comes to disagree with the page behind it.
+    const inInvariants = readFileSync('docs/spec/invariants.md', 'utf8')
+      .match(/\*\*(\d+) refusals\*\*/);
+    expect(inInvariants, 'invariants.md no longer states its own count').toBeTruthy();
+    expect(stated('things the database refuses')).toBe(Number(inInvariants![1]));
+  });
+
+  it('says how many tables there are, and is right', () => {
+    const db = schema();
+    const tables = (db.prepare(
+      `SELECT COUNT(*) AS n FROM sqlite_master
+        WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> 'd1_migrations'`) as any)
+      .get() as { n: number };
+    expect(stated('tables, every column')).toBe(tables.n);
+  });
+
+  it('says how many routes there are, and is right', () => {
+    const routes = (readFileSync('docs/spec/routes.md', 'utf8')
+      .match(/^\| (?:GET|POST|PUT|DELETE) /gm) ?? []).length;
+    expect(stated('routes and the permission')).toBe(routes);
+  });
+});
