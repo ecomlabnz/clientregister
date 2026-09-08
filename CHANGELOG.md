@@ -7,6 +7,44 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.12.0 — 8 September 2026
+
+### Added
+- **Every client carries their own INZ client number.** Asked for urgently:
+  *"every individual client must have INZ Client Number - implement for all now
+  please."* There was no column for it on a client at all. It lived on the
+  matter, so the same person's number was typed again on every file they had —
+  and the bulk export already gave the game away, reassembling a client's number
+  by collecting the distinct values off their matters. A value that has to be
+  reassembled from four rows has the wrong owner.
+
+  INZ issues one client number per person and it does not change, so it now
+  lives on the person: entered on their page, read from there by every matter,
+  and searchable, so a letter quoting nothing but a client number finds the
+  file. The matter form no longer offers a box for it.
+  `inz_application_number` genuinely is per-application and stays where it is.
+
+- **Alerts lists everybody still missing one.** The instruction cannot be a
+  column that refuses to be empty — a first-time applicant has no number until
+  INZ issues one, and a database refusing such a record would turn "every client
+  must have one" into "no new client may be entered". So it is a list that can
+  be worked through: every individual with a live matter and no number, clearing
+  as each is entered.
+
+### Changed
+- **The database now refuses a client number that is not one.** Six to twelve
+  digits and nothing else, so "N/A" and a pasted line of a letter cannot become
+  one, and no two clients may hold the same number — which is how the same
+  person entered twice gets caught. Typed with the spaces it is read aloud in,
+  it is stored without them.
+
+### Fixed
+- Migration 0073 carried 64 of the 67 numbers in the register across. **Three
+  could not be, and are flagged on the file rather than guessed at:** two
+  clients whose own matters disagree, and two records sharing one number, which
+  turn out to be one person entered twice. Every number that could not be
+  carried is written into an append-only file note first, so nothing was lost.
+
 ## 1.11.0 — 8 September 2026
 
 ### Added

@@ -29,12 +29,15 @@ function register() {
                                    date_of_birth, status, created_at, updated_at)
               VALUES ('c1','CL-9001','individual','Chidi Amaka OKONKWO','Chidi Amaka','OKONKWO',
                       '1990-04-11','active',?,?)`).run(AT, AT);
-  const matter = (id: string, ref: string, inz: string | null) =>
+  const matter = (id: string, ref: string) =>
     db.prepare(`INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
-                                   inz_client_number, created_at, updated_at)
-                VALUES (?, ?, 'c1', 'A matter', 'wv_aewv', 'lodged', 'u1', ?, ?, ?)`)
-      .run(id, ref, inz, AT, AT);
-  return { db, matter };
+                                   created_at, updated_at)
+                VALUES (?, ?, 'c1', 'A matter', 'wv_aewv', 'lodged', 'u1', ?, ?)`)
+      .run(id, ref, AT, AT);
+  // The number is the person's since 0073, so it is set on the client.
+  const numberIs = (inz: string | null) =>
+    db.prepare('UPDATE clients SET inz_client_number = ? WHERE id = ?').run(inz, 'c1');
+  return { db, matter, numberIs };
 }
 
 const sqlFor = (key: string) => DATASETS.find((d) => d.key === key)!.sql;
@@ -50,32 +53,33 @@ describe('the clients export carries what the intake asks for', () => {
     }
   });
 
-  it('carries the INZ client number, taken from the person’s matters', () => {
-    const { db, matter } = register();
-    matter('k1', 'CASE-26-901', '600123456');
-    expect(rows(db, sqlFor('clients'))[0]!.inz_client_number).toBe('600123456');
+  it('carries the INZ client number, which is the person’s own', () => {
+    const { db, numberIs } = register();
+    numberIs('60012345');
+    expect(rows(db, sqlFor('clients'))[0]!.inz_client_number).toBe('60012345');
   });
 
-  it('says the number once for a person with two matters carrying it', () => {
-    const { db, matter } = register();
-    matter('k1', 'CASE-26-901', '600123456');
-    matter('k2', 'CASE-26-902', '600123456');
-    expect(rows(db, sqlFor('clients'))[0]!.inz_client_number).toBe('600123456');
+  it('says it once however many matters the person has', () => {
+    // It used to be collected off the matters and joined, so two matters
+    // produced "60012345 60012345" the moment either was typed differently.
+    const { db, matter, numberIs } = register();
+    numberIs('60012345');
+    matter('k1', 'CASE-26-901');
+    matter('k2', 'CASE-26-902');
+    expect(rows(db, sqlFor('clients'))[0]!.inz_client_number).toBe('60012345');
   });
 
-  it('shows both when two matters disagree, rather than picking one', () => {
+  it('is blank, not empty-string noise, when the person has none', () => {
     const { db, matter } = register();
-    matter('k1', 'CASE-26-901', '600123456');
-    matter('k2', 'CASE-26-902', '600999999');
-    const got = rows(db, sqlFor('clients'))[0]!.inz_client_number!;
-    expect(got.split(' ').sort()).toEqual(['600123456', '600999999']);
-  });
-
-  it('is blank, not empty-string noise, when no matter carries one', () => {
-    const { db, matter } = register();
-    matter('k1', 'CASE-26-901', null);
-    matter('k2', 'CASE-26-902', '   ');
+    matter('k1', 'CASE-26-901');
     expect(rows(db, sqlFor('clients'))[0]!.inz_client_number).toBe(null);
+  });
+
+  it('carries it on the matters export too, named as the client’s', () => {
+    const { db, matter, numberIs } = register();
+    numberIs('60012345');
+    matter('k1', 'CASE-26-901');
+    expect(rows(db, sqlFor('cases'))[0]!.inz_client_number).toBe('60012345');
   });
 
   it('still keeps passport numbers out', () => {

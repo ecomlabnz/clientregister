@@ -1,6 +1,6 @@
 # The data model
 
-**45 tables**, as the schema finally stands after all 59 migrations.
+**49 tables**, as the schema finally stands after all 73 migrations.
 Generated from the built database rather than the migration files, so a rule
 later replaced does not appear twice.
 
@@ -68,6 +68,7 @@ Two conventions hold throughout:
 | `english_test_date` | TEXT |  |  |
 | `medical_certificate_type` | TEXT |  |  |
 | `current_visa_expiry_rule` | TEXT |  |  |
+| `inz_client_number` | TEXT |  |  |
 
 ### `cases`
 
@@ -82,7 +83,6 @@ Two conventions hold throughout:
 | `priority` | TEXT | NOT NULL | 'normal' |
 | `assigned_to` | TEXT |  |  |
 | `inz_application_number` | TEXT |  |  |
-| `inz_client_number` | TEXT |  |  |
 | `lodged_at` | TEXT |  |  |
 | `decision_due_at` | TEXT |  |  |
 | `decided_at` | TEXT |  |  |

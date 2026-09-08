@@ -23,16 +23,21 @@ function register() {
   }
   db.prepare(`INSERT INTO users (id, email, name, password_hash, role, created_at, updated_at)
               VALUES ('u1','a@b.test','A Lawyer','x','owner',?,?)`).run(AT, AT);
-  const client = (id: string, ref: string, name: string, email: string | null) =>
-    db.prepare(`INSERT INTO clients (id, ref, kind, full_name, email, status, created_at, updated_at)
-                VALUES (?, ?, 'individual', ?, ?, 'active', ?, ?)`).run(id, ref, name, email, AT, AT);
+  // The INZ client number is the person's since 0073, so it is seeded on the
+  // client and a matter is matched through them.
+  const client = (id: string, ref: string, name: string, email: string | null,
+                  inzClient: string | null = null) =>
+    db.prepare(`INSERT INTO clients (id, ref, kind, full_name, email, inz_client_number,
+                                     status, created_at, updated_at)
+                VALUES (?, ?, 'individual', ?, ?, ?, 'active', ?, ?)`)
+      .run(id, ref, name, email, inzClient, AT, AT);
   const matter = (id: string, ref: string, clientId: string,
-                  o: { app?: string | null; inzClient?: string | null; closed?: string | null } = {}) =>
+                  o: { app?: string | null; closed?: string | null } = {}) =>
     db.prepare(`INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
-                                   inz_application_number, inz_client_number, closed_at,
+                                   inz_application_number, closed_at,
                                    created_at, updated_at)
-                VALUES (?, ?, ?, 'A matter', 'wv_aewv', 'lodged', 'u1', ?, ?, ?, ?, ?)`)
-      .run(id, ref, clientId, o.app ?? null, o.inzClient ?? null, o.closed ?? null, AT, AT);
+                VALUES (?, ?, ?, 'A matter', 'wv_aewv', 'lodged', 'u1', ?, ?, ?, ?)`)
+      .run(id, ref, clientId, o.app ?? null, o.closed ?? null, AT, AT);
   return { db, client, matter };
 }
 
@@ -90,15 +95,27 @@ describe('which matter a letter belongs to', () => {
   });
 
   it('reports every matter when a number matches more than one, and calls it not sole', async () => {
-    // One number on two matters is a question, not a match. The reader is shown
-    // both rather than the first.
+    // A client number identifies the *person*, so it finds every matter they
+    // have. That is a question, not a match: the reader is shown both rather
+    // than the first. Since 0073 this is the shape of the identifier rather
+    // than an accident of two matters carrying the same string.
     const { db, client, matter } = register();
-    client('c1', 'CL-9001', 'Hemi Rangi TAWHAI', null);
-    matter('k1', 'CASE-26-901', 'c1', { inzClient: '900111' });
-    matter('k2', 'CASE-26-902', 'c1', { inzClient: '900111' });
+    client('c1', 'CL-9001', 'Hemi Rangi TAWHAI', null, '900111');
+    matter('k1', 'CASE-26-901', 'c1', {});
+    matter('k2', 'CASE-26-902', 'c1', {});
     const found = await matchMatters(envFor(db), ids({ inz_client_number: '900111' }), null);
     expect(found.map((m) => m.ref).sort()).toEqual(['CASE-26-901', 'CASE-26-902']);
     expect(found.every((m) => m.sole === false)).toBe(true);
+  });
+
+  it('matches one matter on the client number when the person has only one', async () => {
+    const { db, client, matter } = register();
+    client('c1', 'CL-9001', 'Hemi Rangi TAWHAI', null, '900111');
+    matter('k1', 'CASE-26-901', 'c1', {});
+    const found = await matchMatters(envFor(db), ids({ inz_client_number: '900111' }), null);
+    expect(found.map((m) => m.ref)).toEqual(['CASE-26-901']);
+    expect(found[0]!.on).toBe('inz_client_number');
+    expect(found[0]!.sole).toBe(true);
   });
 
   it('prefers the application number over anything weaker', async () => {

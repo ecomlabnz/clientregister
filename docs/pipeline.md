@@ -98,16 +98,11 @@ Researched in another session, checked against the live register on 4 September
    comma-separated box cannot be searched one at a time. Same shape as
    `client_passports` and `client_certificates`: the name, what kind it is,
    where it was seen.
-4. **Move `inz_client_number` from the matter to the client**, and **allow
-   mononyms**. Both need rehearsing on a copy first. The INZ number is a fact
-   about the person and the CSV export already quietly agrees — it gathers the
-   numbers up from the matters into one client-level column. But **86 matters
-   carry a number across 66 clients, and two of those clients have two different
-   numbers**, so it is not a clean lift: those two need a human decision.
-   Mononyms are a one-line change to make the family name optional and a wide
-   audit of everywhere that assumes a person has one — display name, sorting,
-   search, CSV, the AI brief. **Two individuals already have an empty family
-   name**, and sorting already copes.
+4. ~~**Move `inz_client_number` from the matter to the client**~~ — done, 1.12.0,
+   migration 0073. Still open here: **allow mononyms**. A one-line change to
+   make the family name optional and a wide audit of everywhere that assumes a
+   person has one — display name, sorting, search, CSV, the AI brief. **Two
+   individuals already have an empty family name**, and sorting already copes.
 
 **Two of the nine were pushed back on and the answer stands unless the practice
 says otherwise:** `middle_names` is not worth adding, because the column is
@@ -306,6 +301,21 @@ edition they meant.
 
 Migration 0072 added `client_tags`, sharing the one tag list with matters. What
 is left of it is the consolidation, recorded with the file tables in item 10a.
+
+### 14a. Three INZ client numbers the practice has to settle
+
+Migration 0073 moved the number onto the person and carried 64 of the 67 across.
+Three could not be, and each is flagged on its client with a file note naming
+every number its matters carried:
+
+- **CL-0041** — three matters say one number, a fourth says another.
+- **CL-0231** — two matters, two numbers.
+- **CL-0068 and CL-0252** — the same surname, the same date of birth and the
+  same INZ client number: one person entered twice. CL-0068 keeps the number
+  because it had it first; the two records need merging, alongside the
+  CL-0257/CL-0259 merge already waiting.
+
+Nothing to build. Each is one look at the file and one box.
 
 ### 15. Somebody within the practice is not a client
 

@@ -57,15 +57,12 @@ export const DATASETS: Dataset[] = [
                       JOIN countries co ON co.code = cn.code
                      WHERE cn.client_id = c.id ORDER BY cn.position, cn.code) n) AS nationality,
                  c.date_of_birth,
-                 -- The INZ client number belongs to the person but is recorded
-                 -- on their matters, which is where INZ writes it. A person with
-                 -- two matters should have one number; where two disagree, both
-                 -- come out separated by a space, because that disagreement is
-                 -- the point. The intake asks for this column by name.
-                 (SELECT GROUP_CONCAT(n.num, ' ') FROM (
-                    SELECT DISTINCT k.inz_client_number AS num FROM cases k
-                     WHERE k.client_id = c.id AND k.inz_client_number IS NOT NULL
-                       AND trim(k.inz_client_number) <> '' ORDER BY 1) n) AS inz_client_number,
+                 -- One column again since 0073. This used to collect the
+                 -- distinct numbers off the person's matters and join them with
+                 -- a space, because that is where the number was stored — and a
+                 -- value that has to be reassembled from four rows has the wrong
+                 -- owner. It is the person's now.
+                 c.inz_client_number,
                  CASE WHEN c.passport_number IS NULL THEN 'no' ELSE 'yes' END AS passport_on_file,
                  c.passport_country, c.passport_expiry, c.current_visa_type, c.current_visa_expiry,
                  c.english_test_type, c.english_test_score, c.english_test_date,
@@ -78,7 +75,10 @@ export const DATASETS: Dataset[] = [
     description: 'Every case, its type, status, INZ numbers and dates.',
     sql: `SELECT k.ref, cl.ref AS client_ref, cl.full_name AS client, k.title, k.case_type,
                  k.status, k.priority, u.name AS owner, k.inz_application_number,
-                 k.inz_client_number, k.lodged_at, k.decision_due_at, k.decided_at, k.outcome,
+                 -- The client's, so a matter export still carries it, but named
+                 -- as what it is: one number per person, not per application.
+                 cl.inz_client_number,
+                 k.lodged_at, k.decision_due_at, k.decided_at, k.outcome,
                  k.next_action, k.next_action_due, k.summary, k.created_at, k.updated_at
             FROM cases k
             LEFT JOIN clients cl ON cl.id = k.client_id

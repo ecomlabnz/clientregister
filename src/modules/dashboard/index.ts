@@ -503,9 +503,9 @@ export const dashboardModule: AppModule = {
         </form>`);
 
       // Every word, in any order — the same rule as the rest of the register.
-      const cli = everyTermClausePlain(['full_name', 'email', 'phone', 'ref'], q);
+      const cli = everyTermClausePlain(['full_name', 'email', 'phone', 'ref', 'inz_client_number'], q);
       const kase = everyTermClausePlain(
-        ['k.title', 'k.ref', 'k.inz_application_number', 'k.inz_client_number',
+        ['k.title', 'k.ref', 'k.inz_application_number', 'cl.inz_client_number',
          'cl.full_name'], q);
       const inq = everyTermClausePlain(
         ['subject', 'body', 'ref', 'contact_name', 'contact_email'], q);
