@@ -37,6 +37,22 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.10.0', date: '8 September 2026',
+    notes: [
+      'The letter of engagement exists. When you make a quotation you are now asked \u2014 and must '
+        + 'answer \u2014 whether it goes out with a letter, and where it does there is a letter to '
+        + 'read, print and send.',
+      'The letter names no parties, no work and no fees. It refers to the quotation, which carries '
+        + 'all three, so the two documents cannot end up disagreeing with each other.',
+      'Your own wording has been entered for you from the letter you sent \u2014 the opening, the '
+        + 'acknowledgements, the closing and five clauses. Please read it before you send one: it '
+        + 'is your contract, and three passages were adapted because the quotation now carries '
+        + 'what the letter used to repeat.',
+      'Quotations, invoices and the letter were all being drawn in a narrow column about the width '
+        + 'of the sign-in box, on any size of screen. They now use the width they have.',
+    ],
+  },
+  {
     version: '1.9.0', date: '8 September 2026',
     notes: [
       'The assistant now fills in everything it read. An address for each person or company, a '

@@ -43,7 +43,7 @@ import { asInteger, readSettings, type SettingsGroup } from '../../core/settings
 import { caseTypes, labelFor, type Term } from '../../core/vocabulary';
 import { practiceDetails } from '../../core/practice';
 import {
-  ENGAGEMENT_SETTINGS, allClauses, clauseTypes, type ClauseRow,
+  ENGAGEMENT_SETTINGS, allClauses, clauseTypes, clausesFor, engagementText, type ClauseRow,
 } from '../../core/engagement';
 import { invoiceFromQuote } from '../../core/invoices';
 import { renderEmailHtml } from '../../core/richtext';
@@ -182,6 +182,8 @@ export interface QuoteRow {
   currency: string; status: QuoteStatus; valid_until: string | null; sent_at: string | null;
   responded_at: string | null; notes: string | null; created_at: string; updated_at: string;
   issued_on: string | null; validity_days: number | null; stage_note: string | null;
+  /** 1, 0, or null when nobody has yet decided. See migration 0067. */
+  with_letter: number | null;
 }
 
 function quoteTotal(q: Pick<QuoteRow, 'amount_cents' | 'gst_cents' | 'disbursements_cents'>): number {
@@ -405,6 +407,23 @@ export const quotesModule: AppModule = {
                       placeholder: 'e.g. Partnership work visa — preparation and lodgement',
                       hint: 'One line describing the work. The itemisation comes next.' })}
           </div>
+          ${'' /* A mandatory choice, with no default, at the moment the
+                   quotation is composed. The practice's instruction on
+                   8 September 2026: a letter must never be omitted by oversight
+                   and never sent by one. `quotes.with_letter` is nullable for
+                   the same reason — NULL means nobody has decided yet. */}
+          <div class="form-section">
+            <h3>Does this go out with a letter of engagement?</h3>
+            ${select({ label: 'Letter of engagement', name: 'with_letter', value: '',
+                       includeBlank: '— choose —', required: true,
+                       options: [
+                         { value: '1', label: 'Yes — send the letter with this quotation' },
+                         { value: '0', label: 'No — the quotation on its own' },
+                       ],
+                       hint: 'The letter states no parties, no scope and no fees: those are on '
+                         + 'this quotation, and the letter refers to it. What the letter says is '
+                         + 'under Settings → Letter of engagement and Quotes → Letter clauses.' })}
+          </div>
           <div class="form-section">
             <h3>Validity</h3>
             ${field({ label: 'Date of issue', name: 'issued_on', type: 'date', value: today })}
@@ -434,6 +453,11 @@ export const quotesModule: AppModule = {
       const issuedOn = f.date('issued_on') ?? nowIso().slice(0, 10);
       const days = f.int('validity_days', { min: 1, max: 365 }) ?? qs.validityDays;
       const notes = f.optional('notes', { max: 4000 });
+      // Answered, either way, before the quotation exists. Refused rather than
+      // defaulted: a default is how a letter gets omitted by oversight, or sent
+      // by one, and either is a mistake in front of a client.
+      const withLetter = f.enum('with_letter', ['0', '1'] as const, { required: true,
+        label: 'Whether a letter of engagement goes with this quotation' });
       if (!f.valid) return redirectWith(c, '/quotes/new', Object.values(f.errors)[0] ?? 'Invalid quote.', 'err');
 
       // The date is worked out and stored now. A quote that says "valid for
@@ -447,10 +471,11 @@ export const quotesModule: AppModule = {
         c.env.DB,
         `INSERT INTO quotes (id, ref, client_id, case_id, inquiry_id, description, amount_cents, gst_cents,
             disbursements_cents, currency, status, issued_on, validity_days, valid_until, notes,
-            created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?, 0, 0, 0, 'NZD', 'draft', ?,?,?,?,?,?,?)`,
+            with_letter, created_at, updated_at, created_by)
+         VALUES (?,?,?,?,?,?, 0, 0, 0, 'NZD', 'draft', ?,?,?,?,?,?,?,?)`,
         id, ref, clientId || null, caseId || null, inquiryId || null, description,
-        issuedOn, days, until, notes, nowIso(), nowIso(), user.id,
+        issuedOn, days, until, notes, withLetter === '1' ? 1 : 0,
+        nowIso(), nowIso(), user.id,
       );
       await addEntry(c.env, { entityType: 'quote', entityId: id, kind: 'system',
         body: `Quote ${ref} started — valid until ${until}.`, createdBy: user.id });
@@ -761,6 +786,10 @@ export const quotesModule: AppModule = {
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { label: q.ref }])}
         ${pageHeader(q.description, `${q.ref} · ${QUOTE_STATUS_LABELS[q.status]}`, html`
           <a class="btn btn-secondary" href="/quotes/${q.id}/print" target="_blank" rel="noopener">Print</a>
+          ${q.with_letter === 1
+            ? html`<a class="btn btn-secondary" href="/quotes/${q.id}/letter" target="_blank"
+                      rel="noopener">Letter of engagement</a>`
+            : ''}
           ${writable ? html`
             <a class="btn btn-secondary" href="/quotes/${q.id}/edit">Edit</a>
             <a class="btn btn-primary" href="/quotes/${q.id}/email">Email to client</a>
@@ -1134,6 +1163,27 @@ export const quotesModule: AppModule = {
                   <button class="btn btn-secondary" type="submit">Update</button>
                 </form>` : ''}`)}
 
+            ${card('Letter of engagement', html`
+              ${q.with_letter === 1
+                ? html`<p class="small">This quotation goes out <strong>with</strong> a letter of
+                         engagement. The letter states no parties, scope or fees — it refers to
+                         this quotation, which carries all three.</p>
+                       <a class="btn btn-secondary btn-block" href="/quotes/${q.id}/letter"
+                          target="_blank" rel="noopener">Read the letter</a>`
+                : q.with_letter === 0
+                  ? html`<p class="small">This quotation goes out <strong>on its own</strong>.</p>`
+                  : html`<p class="small">Nobody has said yet whether this goes out with a letter.
+                           Quotations made before the question existed are in this state.</p>`}
+              ${writable ? html`
+                <form method="post" action="/quotes/${q.id}/letter" class="mt">
+                  ${csrfField(csrf)}
+                  ${select({ label: 'Send with a letter of engagement?', name: 'with_letter',
+                             value: q.with_letter === null ? '' : String(q.with_letter),
+                             includeBlank: '— choose —', required: true,
+                             options: [{ value: '1', label: 'Yes' }, { value: '0', label: 'No' }] })}
+                  <button class="btn btn-secondary btn-small" type="submit">Save</button>
+                </form>` : ''}`)}
+
             ${card('Linked to', html`
               <dl class="kv">
                 <dt>Client</dt><dd>${q.client_id ? html`<a href="/clients/${q.client_id}">${q.client_name}</a>` : '—'}</dd>
@@ -1168,6 +1218,153 @@ export const quotesModule: AppModule = {
      * A printable quote. Rendered without the application chrome so that what
      * comes out of the printer is the document, not the screen around it.
      */
+    /**
+     * The letter of engagement, as the client reads it.
+     *
+     * A covering letter and nothing else. It states no parties, no scope and no
+     * fees — the practice's decision on 8 September 2026 — because the quotation
+     * attached to it states all three, and a covering letter that restates a fee
+     * schedule is a document that can disagree with its own attachment.
+     *
+     * So what is on this page is: who it is to, what it is about, the practice's
+     * standing words, the clauses that belong on this kind of matter, what the
+     * client confirms by accepting, and a signature. Everything particular to
+     * this engagement is a reference to the quotation.
+     */
+    r.get('/:id/letter', requirePermission('register:read'), async (c) => {
+      const id = c.req.param('id')!;
+      const q = await one<QuoteRow & { client_name: string | null; client_address: string | null;
+                                       client_email: string | null; case_ref: string | null }>(
+        c.env.DB,
+        `SELECT q.*, cl.full_name AS client_name, cl.address AS client_address,
+                cl.email AS client_email, k.ref AS case_ref
+           FROM quotes q
+           LEFT JOIN clients cl ON cl.id = q.client_id
+           LEFT JOIN cases k ON k.id = q.case_id
+          WHERE q.id = ?`,
+        id,
+      );
+      if (!q) return c.notFound();
+
+      const [practice, text, lines, parties, types] = await Promise.all([
+        practiceDetails(c.env), engagementText(c.env), quoteLines(c.env, id),
+        quoteParties(c.env, id), caseTypes(c.env),
+      ]);
+
+      // Which clauses belong on this letter depends on the work, and the work
+      // is the quotation's. A quotation covering more than one kind of matter
+      // gets the clauses of all of them — see `clausesFor`.
+      const kinds = [...new Set(lines.map((l) => l.service_item_id).filter(Boolean))];
+      const caseType = q.case_id
+        ? (await one<{ case_type: string }>(
+            c.env.DB, 'SELECT case_type FROM cases WHERE id = ?', q.case_id))?.case_type ?? null
+        : null;
+      const clauses = await clausesFor(c.env, caseType ? [caseType] : kinds as string[]);
+
+      const issuedOn = q.issued_on ?? q.created_at.slice(0, 10);
+      const representative = parties.find((p) => p.is_representative === 1) ?? null;
+      await auditFrom(c, { action: 'quote.letter_printed', entityType: 'quote', entityId: id });
+
+      /** Blank lines separate paragraphs; a line starting "- " is a bullet. */
+      const prose = (body: string) => {
+        const blocks = body.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
+        return html`${blocks.map((block) => {
+          const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
+          return lines.every((line) => line.startsWith('- '))
+            ? html`<ul>${lines.map((line) => html`<li>${line.slice(2)}</li>`)}</ul>`
+            : html`<p>${lines.join(' ')}</p>`;
+        })}`;
+      };
+
+      return page(c, { title: `Letter of engagement — ${q.ref}`, bare: true }, html`
+        <article class="quote-doc letter-doc">
+          <header class="quote-doc-head">
+            <div>
+              <h1>${practice.legalName}</h1>
+              ${practice.adviserDetails ? html`<p class="prewrap small">${practice.adviserDetails}</p>` : ''}
+              ${practice.postalAddress ? html`<p class="prewrap small">${practice.postalAddress}</p>` : ''}
+              <p class="small">
+                ${practice.contactEmail ? html`${practice.contactEmail}<br>` : ''}
+                ${practice.contactPhone ? html`${practice.contactPhone}` : ''}
+              </p>
+            </div>
+            <div class="quote-doc-ref">
+              <h2>Letter of engagement</h2>
+              <dl class="quote-doc-meta">
+                <dt>Date</dt><dd>${dateShort(issuedOn)}</dd>
+                <dt>Our reference</dt><dd class="strong">${q.ref}</dd>
+                ${q.case_ref ? html`<dt>Matter</dt><dd>${q.case_ref}</dd>` : ''}
+              </dl>
+            </div>
+          </header>
+
+          ${'' /* To whom, and how they are being written to. */}
+          <section class="letter-to">
+            <p class="strong">${q.client_name ?? '—'}</p>
+            ${q.client_address ? html`<p class="prewrap small">${q.client_address}</p>` : ''}
+            ${q.client_email ? html`<p class="small">By email: ${q.client_email}</p>` : ''}
+          </section>
+
+          ${text.subject ? html`<p class="letter-re"><strong>RE: ${text.subject}</strong></p>` : ''}
+
+          ${text.configured
+            ? prose(text.opening)
+            : html`<p class="alert alert-error">This letter has no wording yet. It is set under
+                     Settings → Letter of engagement, and the clauses under Quotes → Letter
+                     clauses. Nothing is supplied by the register: the words a client is asked to
+                     accept are the practice's own.</p>`}
+
+          ${'' /* The one thing the letter says about the work: where to find it.
+                   The quotation carries the parties, the scope and the fees, and
+                   is attached. */}
+          <section class="letter-brief">
+            <h3>The work, the parties and the fees</h3>
+            <p>These are set out in <strong>quotation ${q.ref}</strong>, which accompanies this
+               letter and forms part of it${representative
+                 ? html`, and in which <strong>${representative.full_name}</strong> is nominated to
+                        give instructions on behalf of all parties named`
+                 : ''}. Please read it alongside this letter.</p>
+          </section>
+
+          ${clauses.map((clause) => html`
+            <section>
+              <h3>${clause.heading}</h3>
+              ${prose(clause.body)}
+            </section>`)}
+
+          ${practice.termsUrl ? html`
+            <section>
+              <h3>Standard terms of engagement</h3>
+              <p>This engagement is on the ${practice.termsLabel}, whose current edition is
+                 published at <span class="break-url">${practice.termsUrl}</span>. Please read them
+                 before accepting.</p>
+            </section>` : ''}
+
+          ${text.acknowledgements.length ? html`
+            <section>
+              <h3>What you confirm by accepting</h3>
+              ${text.acknowledgementsIntro ? html`<p>${text.acknowledgementsIntro}</p>` : ''}
+              <ol class="letter-acknowledgements">
+                ${text.acknowledgements.map((line) => html`<li>${line}</li>`)}
+              </ol>
+            </section>` : ''}
+
+          ${text.closing ? html`<section>${prose(text.closing)}</section>` : ''}
+
+          <section class="letter-signature">
+            <p>Yours faithfully,</p>
+            <p class="strong">${text.signatureName || practice.legalName}</p>
+            ${text.signatureTitle ? html`<p class="small">${text.signatureTitle}</p>` : ''}
+          </section>
+
+          <footer class="quote-doc-foot no-print">
+            <button class="btn btn-primary" data-print type="button">Print this letter</button>
+            <a class="btn btn-secondary" href="/quotes/${q.id}/print">The quotation</a>
+            <a class="btn btn-secondary" href="/quotes/${q.id}">Back to the quote</a>
+          </footer>
+        </article>`);
+    });
+
     r.get('/:id/print', requirePermission('register:read'), async (c) => {
       const id = c.req.param('id')!;
       const q = await one<QuoteRow & { client_name: string | null; case_ref: string | null }>(
@@ -1641,6 +1838,24 @@ export const quotesModule: AppModule = {
     /** Turn an accepted quote into fee lines on its case. */
 
     // --- Quote lines --------------------------------------------------------
+
+    /** Answer, or change the answer to, the letter question. */
+    r.post('/:id/letter', requirePermission('quote:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const f = new FormReader(await c.req.formData());
+      const choice = f.enum('with_letter', ['0', '1'] as const, { required: true,
+        label: 'Whether a letter of engagement goes with this quotation' });
+      if (!f.valid) {
+        return redirectWith(c, `/quotes/${id}`, Object.values(f.errors)[0]!, 'err');
+      }
+      await run(c.env.DB, 'UPDATE quotes SET with_letter = ?, updated_at = ? WHERE id = ?',
+        choice === '1' ? 1 : 0, nowIso(), id);
+      await auditFrom(c, { action: 'quote.letter_choice', entityType: 'quote', entityId: id,
+        meta: { withLetter: choice === '1' } });
+      return redirectWith(c, `/quotes/${id}`,
+        choice === '1' ? 'This quotation goes out with a letter of engagement.'
+                       : 'This quotation goes out on its own.');
+    });
 
     r.post('/:id/items', requirePermission('quote:write'), async (c) => {
       const id = c.req.param('id')!;

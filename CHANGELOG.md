@@ -7,6 +7,38 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.10.0 — 8 September 2026
+
+### Added
+- **The letter of engagement.** A quotation now carries a mandatory choice when
+  it is made — does this go out with a letter? — and where the answer is yes,
+  there is a letter to read, print and send.
+
+  The letter states **no parties, no scope and no fees**. Those are the
+  quotation's, and the letter refers to it: *"These are set out in quotation
+  Q-0001, which accompanies this letter and forms part of it."* A covering
+  letter that restates a fee schedule is a document that can disagree with its
+  own attachment.
+
+  What it carries instead: who it is to, the practice's own opening, the clauses
+  that belong on this kind of matter, the terms of engagement, what the client
+  confirms by accepting, and a signature.
+
+  The choice has no default and cannot be skipped. A letter must never be
+  omitted by oversight, nor sent by one.
+
+### Fixed
+- **Every document page was being printed in a 400-pixel column.** The layout
+  used for pages with no navigation — the sign-in screens, and also the
+  quotation, the invoice and now the letter — capped itself at the width of a
+  sign-in card. So a quotation on a laptop screen was set in a narrow ribbon
+  down the middle, and had been since the print view was built. Found by opening
+  the new letter in a browser.
+
+- **Three buttons under a document no longer scroll it sideways on a phone.**
+  The row had two and gained a third; 468 pixels of buttons in a 390-pixel
+  window moved the whole page.
+
 ## 1.9.0 — 8 September 2026
 
 ### Added
