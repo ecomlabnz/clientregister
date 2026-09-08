@@ -111,12 +111,12 @@ describe('a name arriving from a chat message', () => {
     // style like any other: given names in ordinary case, family name in
     // capitals. Before 8 September the given names were stored exactly as the
     // message had them.
-    expect(asStored('thi thu thuy truong')).toBe('[retired example 5]');
-    expect(asStored('[retired example 5]')).toBe('[retired example 5]');
+    expect(asStored('thi kim oanh doan')).toBe('Thi Kim Oanh DOAN');
+    expect(asStored('THI KIM OANH DOAN')).toBe('Thi Kim Oanh DOAN');
   });
 
   it('reads "Family, Given" the way it is written', () => {
-    expect(asStored('TRUONG, Thi Thu Thuy')).toBe('[retired example 5]');
+    expect(asStored('DOAN, Thi Kim Oanh')).toBe('Thi Kim Oanh DOAN');
   });
 
   it('treats a single word as the family name, so the list can be sorted', () => {

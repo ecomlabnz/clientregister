@@ -27,8 +27,8 @@ function mount() {
   h.db.prepare(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
                 VALUES (?,?,?,'x',?,'active',?,?)`).run(USER.id, USER.email, USER.name, USER.role, AT, AT);
   h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,status,created_at,updated_at)
-             VALUES ('cl1','CL-0001','individual','[retired example 2]','Anh Tan','NGUYEN','active','${AT}','${AT}'),
-                    ('cl2','CL-0002','individual','[retired example 6]','Van Chien','HOANG','active','${AT}','${AT}')`);
+             VALUES ('cl1','CL-0001','individual','Duc Manh BUI','Duc Manh','NGUYEN','active','${AT}','${AT}'),
+                    ('cl2','CL-0002','individual','Van Hung DINH','Van Hung','HOANG','active','${AT}','${AT}')`);
   return h;
 }
 
@@ -90,16 +90,16 @@ describe('finding clients by tag', () => {
     const h = mount();
     await h.post('/clients/cl1/tags', { tag: 'Vietnamese' });
     const body = await (await h.request('/clients?tag=Vietnamese')).text();
-    expect(body).toContain('[retired example 2]');
-    expect(body, 'a client without the tag was listed').not.toContain('[retired example 6]');
+    expect(body).toContain('Duc Manh BUI');
+    expect(body, 'a client without the tag was listed').not.toContain('Van Hung DINH');
   });
 
   it('shows every client when no tag is asked for', async () => {
     const h = mount();
     await h.post('/clients/cl1/tags', { tag: 'Vietnamese' });
     const body = await (await h.request('/clients')).text();
-    expect(body).toContain('[retired example 2]');
-    expect(body).toContain('[retired example 6]');
+    expect(body).toContain('Duc Manh BUI');
+    expect(body).toContain('Van Hung DINH');
   });
 
   it('shows the tags on the rows themselves', async () => {

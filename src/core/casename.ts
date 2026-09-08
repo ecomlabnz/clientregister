@@ -5,8 +5,8 @@
  * Migration 0026 separated them for that reason: the name says which matter
  * this is when it appears in a list of two hundred, and the description says
  * what makes it different from the next matter of the same kind for the same
- * person. "Partner Resident Visa — [retired example 1]" is the first;
- * "Meat Process Worker, Canterbury, South Pacific Meats" is the second.
+ * person. "Partner Resident Visa — Bao Long VUONG" is the first;
+ * "Meat Process Worker, Canterbury, Northern Ranges Abattoir" is the second.
  *
  * That separation was then quietly undone. The New matter form asked one
  * question — *what this matter is about* — and wrote the answer into both

@@ -44,7 +44,7 @@ function mount() {
   h.db.prepare(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
                 VALUES (?,?,?,'x',?,'active',?,?)`).run(USER.id, USER.email, USER.name, USER.role, AT, AT);
   h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,status,created_at,updated_at)
-             VALUES ('cl1','CL-0001','individual','[retired example 3]','active','${AT}','${AT}'),
+             VALUES ('cl1','CL-0001','individual','Larisa MIKHAILOVA','active','${AT}','${AT}'),
                     ('cl2','CL-0002','individual','Quang Truong DO','active','${AT}','${AT}')`);
   h.db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES ('vocab.case_types', ?, ?)
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
@@ -63,20 +63,20 @@ describe('what a quotation is called', () => {
   it('composes the name from the type and the client, type first', () => {
     // Type first is load-bearing, for the same reason it is on a matter: the
     // practice sorts by name to group by kind of work.
-    expect(quoteName('RV. Partner', null, '[retired example 3]')).toBe('RV. Partner — [retired example 3]');
+    expect(quoteName('RV. Partner', null, 'Larisa MIKHAILOVA')).toBe('RV. Partner — Larisa MIKHAILOVA');
   });
 
   it('joins the extra words to the type, not to the person', () => {
-    // "VV. Parent Grandparent — [retired example 3]", not
-    // "VV. Parent — [retired example 3] Grandparent". The extra words say what the
+    // "VV. Parent Grandparent — Larisa MIKHAILOVA", not
+    // "VV. Parent — Larisa MIKHAILOVA Grandparent". The extra words say what the
     // work is, so they must stay on the sorting side of the dash.
-    expect(quoteName('VV. Parent', 'Grandparent', '[retired example 3]'))
-      .toBe('VV. Parent Grandparent — [retired example 3]');
+    expect(quoteName('VV. Parent', 'Grandparent', 'Larisa MIKHAILOVA'))
+      .toBe('VV. Parent Grandparent — Larisa MIKHAILOVA');
   });
 
   it('reads the type through the vocabulary', () => {
-    expect(quoteNameFrom(TYPES, 'rv_partner', null, '[retired example 3]'))
-      .toBe('RV. Partner — [retired example 3]');
+    expect(quoteNameFrom(TYPES, 'rv_partner', null, 'Larisa MIKHAILOVA'))
+      .toBe('RV. Partner — Larisa MIKHAILOVA');
   });
 
   it('still says something when there is no client yet', () => {
@@ -90,7 +90,7 @@ describe('creating a quotation', () => {
     const h = mount();
     await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '0' });
     expect(h.get<{ description: string }>('SELECT description FROM quotes')!.description)
-      .toBe('RV. Partner — [retired example 3]');
+      .toBe('RV. Partner — Larisa MIKHAILOVA');
   });
 
   it('adds the extra words where they are given', async () => {
@@ -98,7 +98,7 @@ describe('creating a quotation', () => {
     await h.post('/quotes', { client_id: 'cl1', case_type: 'vv_parent_grandparent',
                               descriptor: 'second application', with_letter: '0' });
     expect(h.get<{ description: string }>('SELECT description FROM quotes')!.description)
-      .toBe('VV. Parent Grandparent second application — [retired example 3]');
+      .toBe('VV. Parent Grandparent second application — Larisa MIKHAILOVA');
   });
 
   it('takes the matter’s own name when a matter is chosen', async () => {
@@ -149,7 +149,7 @@ describe('creating a quotation', () => {
     await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '0' });
     const id = h.get<{ id: string }>('SELECT id FROM quotes')!.id;
     const body = await (await h.request(`/quotes/${id}/print`)).text();
-    expect(body).toContain('RV. Partner — [retired example 3]');
+    expect(body).toContain('RV. Partner — Larisa MIKHAILOVA');
     expect(body).not.toContain('<h3>Scope</h3>');
   });
 });

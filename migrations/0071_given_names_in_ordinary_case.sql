@@ -1,13 +1,13 @@
--- Given names in ordinary case: Van Chien, not VAN CHIEN.
+-- Given names in ordinary case: Van Hung, not VAN HUNG.
 --
 -- The mirror of the surname rule, asked for on 8 September 2026 in the same
 -- breath as it: *"the reverse is true for given names — they should be
--- normalised. Not VAN CHIEN but Van Chien."*
+-- normalised. Not VAN HUNG but Van Hung."*
 --
 -- The two together are the point. A passport prints the whole name in capitals
 -- and so does an INZ letter, so anything read out of a document arrives shouted
 -- end to end. Capitalising only the family name is what makes it legible at a
--- glance which part is which: "[retired example 5]" tells you, "THI THU THUY
+-- glance which part is which: "Thi Kim Oanh DOAN" tells you, "THI THU THUY
 -- TRUONG" does not, and half this practice's caseload has names whose order is
 -- not the English one.
 --
@@ -25,7 +25,7 @@
 --
 -- ## Only a name entirely in one case is touched
 --
--- "VAN CHIEN" is somebody's shift key. "McKenzie", "de Jong", "Anne-Marie" and
+-- "VAN HUNG" is somebody's shift key. "McKenzie", "de Jong", "Anne-Marie" and
 -- "d'Angelo" are decisions, and re-casing those would be the register inventing
 -- a style the person did not use. So the condition is `= UPPER(...)` and
 -- nothing else qualifies.

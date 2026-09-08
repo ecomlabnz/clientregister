@@ -6,7 +6,7 @@
  * company IS A COMPANY and not an individual — how come??"*
  *
  * Because every party the assistant proposed was created as an individual. The
- * word was hard-coded. So [retired example 7] LIMITED arrived on the register
+ * word was hard-coded. So HARBOURSIDE PROTEINS LIMITED arrived on the register
  * as a person with a very long family name, no way to say otherwise on the
  * form, and the only remedy was to notice afterwards and edit the record —
  * which is exactly what the practice had to do.
@@ -49,13 +49,13 @@ const applyForm = (over: Record<string, string> = {}) => ({
   // The employer.
   p0_create: '1',
   p0_kind: 'organisation',
-  p0_family_name: 'Land Meat New Zealand Limited',
+  p0_family_name: 'Harbourside Proteins Limited',
   p0_role: 'employer',
   // The employer's immigration manager.
   p1_create: '1',
   p1_kind: 'individual',
-  p1_given_names: 'James',
-  p1_family_name: 'McFarlane',
+  p1_given_names: 'Gordon',
+  p1_family_name: 'Ashworth',
   p1_role: 'agent',
   ...over,
 });
@@ -72,13 +72,13 @@ describe('an employer named in a document', () => {
   it('is created as a company, not as a person with a long surname', async () => {
     const h = seeded();
     await h.post('/assistant/intake/apply', applyForm());
-    const employer = rowFor(h, 'LAND MEAT')!;
+    const employer = rowFor(h, 'HARBOURSIDE PROTEINS')!;
     expect(employer.kind).toBe('organisation');
     // As typed, not shouted: a company's registered name is copied from the
     // register that holds it and is not the practice's to restyle. The stored
     // family name is still capitalised, like every other, which is what the
     // client form does — the two routes have to make the same shape of company.
-    expect(employer.full_name).toBe('Land Meat New Zealand Limited');
+    expect(employer.full_name).toBe('Harbourside Proteins Limited');
   });
 
   it('is still a person when the form says a person', async () => {
@@ -97,7 +97,7 @@ describe('an employer named in a document', () => {
       p0_date_of_birth: '1990-01-01', p0_current_visa_type: 'aewv',
       p0_current_visa_expiry: '2027-01-01', p0_nationality_1: 'NZ',
     }));
-    const employer = rowFor(h, 'LAND MEAT')!;
+    const employer = rowFor(h, 'HARBOURSIDE PROTEINS')!;
     expect(employer.date_of_birth).toBeNull();
     expect(employer.given_names).toBeNull();
     expect(h.count(
@@ -112,8 +112,8 @@ describe('who to ring at the company', () => {
     // silent about it.
     const h = seeded();
     await h.post('/assistant/intake/apply', applyForm({ p0_organisation_id: 'p1' }));
-    const employer = rowFor(h, 'LAND MEAT')!;
-    const manager = rowFor(h, 'MCFARLANE')!;
+    const employer = rowFor(h, 'HARBOURSIDE PROTEINS')!;
+    const manager = rowFor(h, 'ASHWORTH')!;
     expect(employer.primary_contact_id).toBe(manager.id);
     expect(manager.organisation_id).toBe(employer.id);
   });
@@ -122,8 +122,8 @@ describe('who to ring at the company', () => {
     const h = seeded();
     await h.post('/assistant/intake/apply', applyForm({
       p1_organisation_id: 'p0', p1_organisation_role: 'Immigration Manager' }));
-    const manager = rowFor(h, 'MCFARLANE')!;
-    expect(manager.organisation_id).toBe(rowFor(h, 'LAND MEAT')!.id);
+    const manager = rowFor(h, 'ASHWORTH')!;
+    expect(manager.organisation_id).toBe(rowFor(h, 'HARBOURSIDE PROTEINS')!.id);
     expect(manager.organisation_role).toBe('Immigration Manager');
   });
 
@@ -131,16 +131,16 @@ describe('who to ring at the company', () => {
     // "Or at least be able to link a name from clients/contacts."
     const h = seeded();
     h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,status,created_at,updated_at)
-               VALUES ('org1','CL-0025','organisation','[retired example 9] NEW ZEALAND LIMITED','active','${AT}','${AT}')`);
+               VALUES ('org1','CL-0025','organisation','WAIRAU VALLEY PACKERS LIMITED','active','${AT}','${AT}')`);
     await h.post('/assistant/intake/apply', applyForm({ p1_organisation_id: 'org1' }));
-    expect(rowFor(h, 'MCFARLANE')!.organisation_id).toBe('org1');
+    expect(rowFor(h, 'ASHWORTH')!.organisation_id).toBe('org1');
   });
 
   it('ignores a link to a record that no longer exists', async () => {
     // The review page can sit open while somebody else archives a client.
     const h = seeded();
     await h.post('/assistant/intake/apply', applyForm({ p1_organisation_id: 'cli_gone' }));
-    expect(rowFor(h, 'MCFARLANE')!.organisation_id).toBeNull();
+    expect(rowFor(h, 'ASHWORTH')!.organisation_id).toBeNull();
   });
 
   it('ignores a link to somebody who was not ticked', async () => {
@@ -148,14 +148,14 @@ describe('who to ring at the company', () => {
     const h = seeded();
     const { p1_create: _dropped, ...withoutTheManager } = applyForm({ p0_organisation_id: 'p1' });
     await h.post('/assistant/intake/apply', withoutTheManager);
-    expect(rowFor(h, 'LAND MEAT')!.primary_contact_id).toBeNull();
-    expect(rowFor(h, 'MCFARLANE'), 'somebody unticked was created anyway').toBeNull();
+    expect(rowFor(h, 'HARBOURSIDE PROTEINS')!.primary_contact_id).toBeNull();
+    expect(rowFor(h, 'ASHWORTH'), 'somebody unticked was created anyway').toBeNull();
   });
 
   it('does not link somebody to themselves', async () => {
     const h = seeded();
     await h.post('/assistant/intake/apply', applyForm({ p0_organisation_id: 'p0' }));
-    expect(rowFor(h, 'LAND MEAT')!.primary_contact_id).toBeNull();
+    expect(rowFor(h, 'HARBOURSIDE PROTEINS')!.primary_contact_id).toBeNull();
   });
 
   it('leaves an employer the person already has alone', async () => {
@@ -166,9 +166,9 @@ describe('who to ring at the company', () => {
                VALUES ('org1','CL-0025','organisation','ANOTHER EMPLOYER LIMITED','active','${AT}','${AT}')`);
     await h.post('/assistant/intake/apply', applyForm({
       p1_organisation_id: 'org1', p0_organisation_id: 'p1' }));
-    expect(rowFor(h, 'MCFARLANE')!.organisation_id,
+    expect(rowFor(h, 'ASHWORTH')!.organisation_id,
       'an employer already recorded was overwritten').toBe('org1');
-    expect(rowFor(h, 'LAND MEAT')!.primary_contact_id).toBe(rowFor(h, 'MCFARLANE')!.id);
+    expect(rowFor(h, 'HARBOURSIDE PROTEINS')!.primary_contact_id).toBe(rowFor(h, 'ASHWORTH')!.id);
   });
 });
 
@@ -191,7 +191,7 @@ describe('what the reading itself proposes', () => {
   it('carries whether each party is a person or a company', () => {
     const read = normaliseIntake({
       applicant: { kind: 'individual', family_name: 'LE' },
-      other_parties: [{ kind: 'organisation', family_name: 'Land Meat New Zealand Limited' }],
+      other_parties: [{ kind: 'organisation', family_name: 'Harbourside Proteins Limited' }],
     } as never);
     expect(read.applicant.kind).toBe('individual');
     expect(read.other_parties[0]!.kind).toBe('organisation');
@@ -211,7 +211,7 @@ describe('what the reading itself proposes', () => {
  * The same company, read twice.
  *
  * Reported on 8 September 2026 with a screenshot of the client list showing
- * CL-0257 and CL-0259, both [retired example 7] LIMITED, forty minutes apart:
+ * CL-0257 and CL-0259, both HARBOURSIDE PROTEINS LIMITED, forty minutes apart:
  * *"the assistant just created a duplicate organisation. Does it check if it
  * already exists??? Same needs to be true for clients so as to avoid
  * duplication."*
@@ -233,21 +233,21 @@ describe('somebody the reading names who is already on the register', () => {
 
   it('is offered as a choice rather than created again — a company', async () => {
     const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,family_name,status,created_at,updated_at)
-      VALUES ('org1','CL-0257','organisation','[retired example 7] LIMITED',
-              '[retired example 7] LIMITED','active','${AT}','${AT}')`);
+      VALUES ('org1','CL-0257','organisation','HARBOURSIDE PROTEINS LIMITED',
+              'HARBOURSIDE PROTEINS LIMITED','active','${AT}','${AT}')`);
     const run = h.get<{ id: string }>('SELECT 1 AS id');
     expect(run).toBeTruthy();
     const matched = await matchExisting(h.env as any,
-      { kind: 'organisation', family_name: 'Land Meat New Zealand Limited' } as never);
+      { kind: 'organisation', family_name: 'Harbourside Proteins Limited' } as never);
     expect(matched?.ref, 'a company read twice is a second company').toBe('CL-0257');
   });
 
   it('is matched however the document capitalised it', async () => {
     const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,family_name,status,created_at,updated_at)
-      VALUES ('org1','CL-0257','organisation','Land Meat New Zealand Limited',
-              '[retired example 7] LIMITED','active','${AT}','${AT}')`);
+      VALUES ('org1','CL-0257','organisation','Harbourside Proteins Limited',
+              'HARBOURSIDE PROTEINS LIMITED','active','${AT}','${AT}')`);
     expect((await matchExisting(h.env as any,
-      { kind: 'organisation', family_name: '[retired example 7] LIMITED' } as never))?.ref)
+      { kind: 'organisation', family_name: 'HARBOURSIDE PROTEINS LIMITED' } as never))?.ref)
       .toBe('CL-0257');
   });
 
@@ -256,24 +256,24 @@ describe('somebody the reading names who is already on the register', () => {
     const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,status,created_at,updated_at)
       VALUES ('cl9','CL-0300','individual','Land MEAT','Land','MEAT','active','${AT}','${AT}')`);
     expect(await matchExisting(h.env as any,
-      { kind: 'organisation', family_name: 'Land Meat' } as never)).toBeNull();
+      { kind: 'organisation', family_name: 'Harbourside Proteins' } as never)).toBeNull();
   });
 
   it('is left alone when it has been archived', async () => {
     const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,family_name,status,created_at,updated_at)
-      VALUES ('org1','CL-0257','organisation','[retired example 7] LIMITED',
-              '[retired example 7] LIMITED','archived','${AT}','${AT}')`);
+      VALUES ('org1','CL-0257','organisation','HARBOURSIDE PROTEINS LIMITED',
+              'HARBOURSIDE PROTEINS LIMITED','archived','${AT}','${AT}')`);
     expect(await matchExisting(h.env as any,
-      { kind: 'organisation', family_name: '[retired example 7] LIMITED' } as never)).toBeNull();
+      { kind: 'organisation', family_name: 'HARBOURSIDE PROTEINS LIMITED' } as never)).toBeNull();
   });
 
   it('is linked to the matter instead of duplicated, when the choice is kept', async () => {
     const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,family_name,status,created_at,updated_at)
-      VALUES ('org1','CL-0257','organisation','[retired example 7] LIMITED',
-              '[retired example 7] LIMITED','active','${AT}','${AT}')`);
+      VALUES ('org1','CL-0257','organisation','HARBOURSIDE PROTEINS LIMITED',
+              'HARBOURSIDE PROTEINS LIMITED','active','${AT}','${AT}')`);
     await h.post('/assistant/intake/apply', applyForm({ p0_existing_client_id: 'org1' }));
 
-    expect(h.count(`SELECT COUNT(*) AS n FROM clients WHERE full_name LIKE '%LAND MEAT%'`),
+    expect(h.count(`SELECT COUNT(*) AS n FROM clients WHERE full_name LIKE '%HARBOURSIDE PROTEINS%'`),
       'the company was created a second time').toBe(1);
     const caseId = h.get<{ id: string }>('SELECT id FROM cases')!.id;
     expect(h.count(
@@ -284,17 +284,17 @@ describe('somebody the reading names who is already on the register', () => {
   it('is still created when the choice is refused', async () => {
     // The page offers; the person decides. "Create a new record" has to work.
     const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,family_name,status,created_at,updated_at)
-      VALUES ('org1','CL-0257','organisation','[retired example 7] LIMITED',
-              '[retired example 7] LIMITED','active','${AT}','${AT}')`);
+      VALUES ('org1','CL-0257','organisation','HARBOURSIDE PROTEINS LIMITED',
+              'HARBOURSIDE PROTEINS LIMITED','active','${AT}','${AT}')`);
     await h.post('/assistant/intake/apply', applyForm({ p0_existing_client_id: '' }));
-    expect(h.count(`SELECT COUNT(*) AS n FROM clients WHERE full_name LIKE '%LAND MEAT%'`)).toBe(2);
+    expect(h.count(`SELECT COUNT(*) AS n FROM clients WHERE full_name LIKE '%HARBOURSIDE PROTEINS%'`)).toBe(2);
   });
 
   it('does not fail the whole press when the same person is named twice', async () => {
     // One row per client per matter — the database refuses a second, and a
     // reading that named somebody twice would have taken the matter with it.
     const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,status,created_at,updated_at)
-      VALUES ('p9','CL-0400','individual','[retired example 4]','James','MCFARLANE','active','${AT}','${AT}')`);
+      VALUES ('p9','CL-0400','individual','Gordon ASHWORTH','James','ASHWORTH','active','${AT}','${AT}')`);
     const res = await h.post('/assistant/intake/apply', applyForm({
       p0_existing_client_id: 'p9', p1_existing_client_id: 'p9' }));
     expect(res.status).toBe(303);
@@ -343,7 +343,7 @@ describe('what the reading fills in', () => {
       p0_nzbn: '9429040971940',
     }));
     expect(rowFor(h, 'THI NGOC ANH')!.address).toBe('12 Example Street, Whanganui 4501');
-    const employer = rowFor(h, 'LAND MEAT')!;
+    const employer = rowFor(h, 'HARBOURSIDE PROTEINS')!;
     expect(employer.address).toBe('Horotiu, Private Bag 3301, Hamilton 3240');
     expect(employer.nzbn).toBe('9429040971940');
   });
@@ -351,7 +351,7 @@ describe('what the reading fills in', () => {
   it('takes an NZBN however the document spaced it', async () => {
     const h = seeded();
     await h.post('/assistant/intake/apply', applyForm({ p0_nzbn: '9429 0409 71940' }));
-    expect(rowFor(h, 'LAND MEAT')!.nzbn).toBe('9429040971940');
+    expect(rowFor(h, 'HARBOURSIDE PROTEINS')!.nzbn).toBe('9429040971940');
   });
 
   it('drops one that is not an NZBN rather than storing it', async () => {
@@ -360,13 +360,13 @@ describe('what the reading fills in', () => {
     // on the screen beside it.
     const h = seeded();
     await h.post('/assistant/intake/apply', applyForm({ p0_nzbn: 'NZBN pending' }));
-    expect(rowFor(h, 'LAND MEAT')!.nzbn).toBeNull();
+    expect(rowFor(h, 'HARBOURSIDE PROTEINS')!.nzbn).toBeNull();
   });
 
   it('gives a person no NZBN, whatever the form carried', async () => {
     const h = seeded();
     await h.post('/assistant/intake/apply', applyForm({ p1_nzbn: '9429040971940' }));
-    expect(rowFor(h, 'MCFARLANE')!.nzbn).toBeNull();
+    expect(rowFor(h, 'ASHWORTH')!.nzbn).toBeNull();
   });
 
   it('records what happens next, and its date, on the matter', async () => {

@@ -1,7 +1,7 @@
 /**
  * Family names in capitals, including the ones loaded before the rule.
  *
- * The practice records family names in capitals — NGUYEN, ANH TAN — and applies
+ * The practice records family names in capitals — BUI, DUC MANH — and applies
  * it on the way in rather than in the templates, so the client, the matter
  * named from it, the export and any search all agree without each of them
  * remembering to.
@@ -51,7 +51,7 @@ function seed(db: any) {
   // Already right, and must not be touched.
   client.run('cl2', 'CL-0002', 'individual', 'Minh Duc TRAN', 'Minh Duc', 'TRAN');
   // A company: its registered name is not the practice's to restyle.
-  client.run('cl3', 'CL-0003', 'organisation', 'Land Meat New Zealand Limited', null, null);
+  client.run('cl3', 'CL-0003', 'organisation', 'Harbourside Proteins Limited', null, null);
   // And a company that does carry a family name. Every one of the 26 in the
   // live register has none, so a repair that shouted at organisations would
   // have passed unnoticed — the guard has to be tested against a row that
@@ -91,7 +91,7 @@ describe('the surnames already in the register', () => {
     const db = seed(upTo(MIGRATION));
     applyRepair(db);
     expect(one(db, `SELECT full_name AS n FROM clients WHERE id = 'cl3'`).n)
-      .toBe('Land Meat New Zealand Limited');
+      .toBe('Harbourside Proteins Limited');
     const withName = one(db, `SELECT full_name AS n, family_name AS f FROM clients WHERE id = 'cl4'`);
     expect(withName.n, 'a company was restyled').toBe('Anzco Foods Canterbury Limited');
     expect(withName.f).toBe('Anzco Foods Canterbury Limited');
@@ -226,11 +226,11 @@ describe('a client record the assistant reuses', () => {
   it('does not restyle a company', async () => {
     const h = withOldRecord();
     h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,family_name,status,created_at,updated_at)
-               VALUES ('org1','CL-0200','organisation','Land Meat New Zealand Limited',
-                       'Land Meat New Zealand Limited','active','${AT}','${AT}')`);
+               VALUES ('org1','CL-0200','organisation','Harbourside Proteins Limited',
+                       'Harbourside Proteins Limited','active','${AT}','${AT}')`);
     expect(await normaliseClientName(h.env as any, 'org1', TYPES)).toBeNull();
     expect(h.get<{ full_name: string }>(`SELECT full_name FROM clients WHERE id = 'org1'`)!.full_name)
-      .toBe('Land Meat New Zealand Limited');
+      .toBe('Harbourside Proteins Limited');
   });
 
   it('happens when a matter is opened onto that record, and is noted on the file', async () => {
@@ -260,7 +260,7 @@ describe('a client record the assistant reuses', () => {
  * Given names in ordinary case, which is the other half of the same rule.
  *
  * Asked for on 8 September 2026, immediately after the surnames: *"the reverse
- * is true for given names — they should be normalised. Not VAN CHIEN but Van
+ * is true for given names — they should be normalised. Not VAN HUNG but Van
  * Chien."*
  *
  * The pair is the point. A passport prints the whole name in capitals and so
@@ -271,13 +271,13 @@ describe('a client record the assistant reuses', () => {
  */
 describe('a given name', () => {
   it('is put into ordinary case when it is shouted', () => {
-    expect(givenNamesFor('VAN CHIEN')).toBe('Van Chien');
+    expect(givenNamesFor('VAN HUNG')).toBe('Van Hung');
     expect(givenNamesFor('THI NGOC ANH')).toBe('Thi Ngoc Anh');
-    expect(givenNamesFor('van chien')).toBe('Van Chien');
+    expect(givenNamesFor('van hung')).toBe('Van Hung');
   });
 
   it('is left exactly as it is when somebody has styled it', () => {
-    // "VAN CHIEN" is a shift key. These are decisions, and re-casing them would
+    // "VAN HUNG" is a shift key. These are decisions, and re-casing them would
     // be the register inventing a style the person did not use — MacLeod would
     // come back Macleod and nothing here could know better.
     for (const name of ['McKenzie', 'de Jong', 'Anne-Marie', "d'Angelo", 'MacLeod', 'Jo-Ann']) {
@@ -297,10 +297,10 @@ describe('a given name', () => {
 
   it('is what the whole name and the formal name are built from', () => {
     // Both of those are what appears on a matter, a file label and an export.
-    expect(composeFullName('individual', { givenNames: 'VAN CHIEN', familyName: 'nguyen' }))
-      .toBe('Van Chien NGUYEN');
-    expect(formalName({ givenNames: 'VAN CHIEN', familyName: 'nguyen' }))
-      .toBe('NGUYEN, Van Chien');
+    expect(composeFullName('individual', { givenNames: 'VAN HUNG', familyName: 'nguyen' }))
+      .toBe('Van Hung NGUYEN');
+    expect(formalName({ givenNames: 'VAN HUNG', familyName: 'nguyen' }))
+      .toBe('NGUYEN, Van Hung');
   });
 
   it('is applied by the form a person actually uses', async () => {
@@ -308,13 +308,13 @@ describe('a given name', () => {
     h.db.prepare(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
                   VALUES (?,?,?,'x',?,'active',?,?)`).run(USER.id, USER.email, USER.name, USER.role, AT, AT);
     await h.post('/clients', {
-      kind: 'individual', given_names: 'VAN CHIEN', family_name: 'nguyen', status: 'prospect',
+      kind: 'individual', given_names: 'VAN HUNG', family_name: 'nguyen', status: 'prospect',
     });
     const row = h.get<{ given_names: string; full_name: string; family_name: string }>(
       'SELECT given_names, full_name, family_name FROM clients')!;
-    expect(row.given_names).toBe('Van Chien');
+    expect(row.given_names).toBe('Van Hung');
     expect(row.family_name).toBe('NGUYEN');
-    expect(row.full_name).toBe('Van Chien NGUYEN');
+    expect(row.full_name).toBe('Van Hung NGUYEN');
   });
 });
 
@@ -328,13 +328,13 @@ describe('the shouted given names already in the register', () => {
     const client = db.prepare(
       `INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,status,created_at,updated_at)
        VALUES (?,?,?,?,?,?,'active','${AT}','${AT}')`);
-    client.run('cl1', 'CL-0001', 'individual', 'VAN CHIEN NGUYEN', 'VAN CHIEN', 'NGUYEN');
+    client.run('cl1', 'CL-0001', 'individual', 'VAN HUNG NGUYEN', 'VAN HUNG', 'NGUYEN');
     // Already right, and must not be touched.
     client.run('cl2', 'CL-0002', 'individual', 'Thi Ngoc Anh LE', 'Thi Ngoc Anh', 'LE');
     // Somebody's own styling.
     client.run('cl3', 'CL-0003', 'individual', 'de Jong VAN DAM', 'de Jong', 'VAN DAM');
     db.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
-             VALUES ('k1','CASE-26-901','cl1','RV. Partner — VAN CHIEN NGUYEN','A description',
+             VALUES ('k1','CASE-26-901','cl1','RV. Partner — VAN HUNG NGUYEN','A description',
                      'rv_partner','lodged','u1','${AT}','${AT}')`);
     return db;
   }
@@ -343,15 +343,15 @@ describe('the shouted given names already in the register', () => {
     const db = seededShouting();
     db.exec(readFileSync(`migrations/${REPAIR}`, 'utf8'));
     const row = one(db, `SELECT given_names AS g, full_name AS n FROM clients WHERE id = 'cl1'`);
-    expect(row.g).toBe('Van Chien');
-    expect(row.n).toBe('Van Chien NGUYEN');
+    expect(row.g).toBe('Van Hung');
+    expect(row.n).toBe('Van Hung NGUYEN');
   });
 
   it('carries the correction into the matters named after them', () => {
     const db = seededShouting();
     db.exec(readFileSync(`migrations/${REPAIR}`, 'utf8'));
     expect(one(db, `SELECT title AS t FROM cases WHERE id = 'k1'`).t)
-      .toBe('RV. Partner — Van Chien NGUYEN');
+      .toBe('RV. Partner — Van Hung NGUYEN');
   });
 
   it('leaves alone the ones that were already right, and the ones somebody styled', () => {
@@ -369,7 +369,7 @@ describe('the shouted given names already in the register', () => {
     const db = seededShouting();
     db.exec(readFileSync(`migrations/${REPAIR}`, 'utf8'));
     expect(one(db, `SELECT given_names AS g FROM clients WHERE id = 'cl1'`).g)
-      .toBe(givenNamesFor('VAN CHIEN'));
+      .toBe(givenNamesFor('VAN HUNG'));
   });
 
   it('leaves nothing behind for a second run to find', () => {

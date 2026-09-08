@@ -37,11 +37,11 @@ describe('formalName', () => {
 
   it('capitalises the family name, as a passport does', () => {
     // Half this practice's clients have names whose order is not the English
-    // one. "TRUONG, Thi Thu Thuy" says which part is the family name;
-    // "Truong, Thi Thu Thuy" leaves it to be guessed, and guessing wrong on a
+    // one. "TRUONG, Thi Kim Oanh" says which part is the family name;
+    // "Truong, Thi Kim Oanh" leaves it to be guessed, and guessing wrong on a
     // form comes back as a request for evidence.
-    expect(formalName({ givenNames: 'Thi Thu Thuy', familyName: 'Truong' }))
-      .toBe('TRUONG, Thi Thu Thuy');
+    expect(formalName({ givenNames: 'Thi Kim Oanh', familyName: 'Truong' }))
+      .toBe('TRUONG, Thi Kim Oanh');
     // Only the family name. Given names keep the capitalisation they were
     // entered with, because that is how the person writes them.
     expect(formalName({ givenNames: 'Hemi Rangi', familyName: 'tawhai' })).toBe('TAWHAI, Hemi Rangi');
@@ -125,8 +125,8 @@ describe('plainAscii', () => {
     expect(familyNameFor('Rāwiri')).toBe('RAWIRI');
     expect(composeFullName('individual', { givenNames: 'Hiné', familyName: 'Rāwiri' }))
       .toBe('Hine RAWIRI');
-    expect(formalName({ givenNames: 'Thi Thu Thuy', familyName: 'Trương' }))
-      .toBe('TRUONG, Thi Thu Thuy');
+    expect(formalName({ givenNames: 'Thi Kim Oanh', familyName: 'Trương' }))
+      .toBe('TRUONG, Thi Kim Oanh');
   });
 
   it('leaves a registered company name as the register holds it', () => {

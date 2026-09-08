@@ -85,7 +85,7 @@ five had nowhere to live and were retyped into Word every time.
 `title = descriptor`: the New matter form asked one question and wrote the answer
 into both columns, so every matter in the register was named by a sentence
 averaging 84 characters, and 161 of them ran past sixty. Names are derived again
-from the type and the client — *"RV. Partner — [retired example 1]"* — with the
+from the type and the client — *"RV. Partner — Bao Long VUONG"* — with the
 type first, which the practice then confirmed was the useful order: *"I like the
 case naming where the visa type precedes the name — it allows me to sort the
 cases by visa type."*
@@ -131,7 +131,7 @@ than the data it stood for.
 
 ### 1.8.0, 1.9.0 — the assistant fills in everything it read
 
-Given names normalised (*Van Chien*, not *VAN CHIEN*). Address, NZBN and
+Given names normalised (*Van Hung*, not *VAN HUNG*). Address, NZBN and
 next-action extracted, which the model could already see and had nowhere to put.
 `COALESCE(NULLIF(column, ''), ?)` throughout: what the practice recorded always
 wins over what a document said once. Passport numbers deliberately still not

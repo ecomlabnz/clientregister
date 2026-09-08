@@ -57,7 +57,7 @@ wv_aewv_local | Accredited Employer Work Visa`;
  * Saved from a browser, so every line ends CRLF. This is not a detail: the
  * fixture above ends its lines with \n, and that is precisely why the tests
  * guarding migration 0066 all passed while 190 of the 194 names in the live
- * register came out as "RV. Partner\r — NGUYEN, ANH TAN". SQLite's `trim()`
+ * register came out as "RV. Partner\r — BUI, DUC MANH". SQLite's `trim()`
  * strips spaces and nothing else; JavaScript's `.trim()` strips carriage
  * returns, so the application's parser was right and the SQL copy of it was
  * wrong, and a fixture tidier than the data agreed with the code instead of
@@ -94,7 +94,7 @@ function seed(db: any) {
     addClient.run(`cl${i}`, `CL-${String(i).padStart(4, '0')}`, `PERSON ${i} O'BRIEN`);
     // The real ones are sentences at this length, with the punctuation that
     // breaks a naive copy.
-    const sentence = `Meat Process Worker, Canterbury, South Pacific Meats — batch item ${i} `
+    const sentence = `Meat Process Worker, Canterbury, Northern Ranges Abattoir — batch item ${i} `
       + `of the cohort lodged together, O'Brien's "second" attempt`;
     addCase.run(`k${i}`, `CASE-26-${String(i).padStart(3, '0')}`, `cl${i}`,
                 sentence, sentence, types[i % 3]!);
@@ -190,8 +190,8 @@ describe('repairing the names of matters already in the register', () => {
 
 describe('the name itself', () => {
   it('is the type and the person, the way the practice writes it', () => {
-    expect(caseName('Partner Resident Visa', '[retired example 1]'))
-      .toBe('Partner Resident Visa — [retired example 1]');
+    expect(caseName('Partner Resident Visa', 'Bao Long VUONG'))
+      .toBe('Partner Resident Visa — Bao Long VUONG');
   });
 
   it('is never empty, whatever it is given', () => {
@@ -199,7 +199,7 @@ describe('the name itself', () => {
     // a refused write.
     expect(caseName('', '')).toBeTruthy();
     expect(caseName('Partner Resident Visa', null)).toBe('Partner Resident Visa');
-    expect(caseName('', '[retired example 1]')).toBe('[retired example 1]');
+    expect(caseName('', 'Bao Long VUONG')).toBe('Bao Long VUONG');
   });
 
   it('puts the type first, so sorting by name groups by kind of work', () => {
@@ -240,7 +240,7 @@ describe('the name follows what it is made of', () => {
     // composes `full_name` from the two halves — a seed that set only the whole
     // name would look like a rename the moment anything else was saved.
     h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,status,created_at,updated_at)
-               VALUES ('cl1','CL-0001','individual','[retired example 2]','Anh Tan','NGUYEN','active','${AT}','${AT}')`);
+               VALUES ('cl1','CL-0001','individual','Duc Manh BUI','Duc Manh','BUI','active','${AT}','${AT}')`);
     return h;
   }
 
@@ -252,7 +252,7 @@ describe('the name follows what it is made of', () => {
     });
     expect(res.status).toBe(303);
     const row = h.get<{ title: string; descriptor: string }>('SELECT title, descriptor FROM cases')!;
-    expect(row.title).toBe('Partner Resident Visa — [retired example 2]');
+    expect(row.title).toBe('Partner Resident Visa — Duc Manh BUI');
     expect(row.descriptor, 'the description must survive unchanged')
       .toBe('Partner RV based on an existing partnership, second attempt after a refusal');
     expect(row.title === row.descriptor, 'named by its own description again').toBe(false);
@@ -270,7 +270,7 @@ describe('the name follows what it is made of', () => {
       descriptor: 'The description',
     });
     expect(h.get<{ title: string }>('SELECT title FROM cases')!.title)
-      .toBe('Accredited Employer Work Visa — [retired example 2]');
+      .toBe('Accredited Employer Work Visa — Duc Manh BUI');
   });
 
   it('renames every matter when the client’s name is corrected', async () => {
@@ -279,13 +279,13 @@ describe('the name follows what it is made of', () => {
     // door.
     const h = seeded(clientsModule);
     h.db.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
-               VALUES ('k1','CASE-26-001','cl1','Partner Resident Visa — [retired example 2]',
+               VALUES ('k1','CASE-26-001','cl1','Partner Resident Visa — Duc Manh BUI',
                        'The description','rv_partner_local','lodged','${USER.id}','${AT}','${AT}'),
-                      ('k2','CASE-26-002','cl1','Accredited Employer Work Visa — [retired example 2]',
+                      ('k2','CASE-26-002','cl1','Accredited Employer Work Visa — Duc Manh BUI',
                        'Another description','wv_aewv_local','lodged','${USER.id}','${AT}','${AT}')`);
 
     await h.post('/clients/cl1', {
-      kind: 'individual', given_names: 'ANH TAN', family_name: 'NGUYEN (CORRECTED)',
+      kind: 'individual', given_names: 'DUC MANH', family_name: 'BUI (CORRECTED)',
       status: 'active',
     });
 
@@ -294,8 +294,8 @@ describe('the name follows what it is made of', () => {
     // The register composes the full name from the two halves, so the corrected
     // spelling arrives here in the form the client record now holds.
     expect(titles.map((t) => t.title)).toEqual([
-      'Partner Resident Visa — [retired example 2] (CORRECTED)',
-      'Accredited Employer Work Visa — [retired example 2] (CORRECTED)',
+      'Partner Resident Visa — Duc Manh BUI (CORRECTED)',
+      'Accredited Employer Work Visa — Duc Manh BUI (CORRECTED)',
     ]);
   });
 
@@ -304,10 +304,10 @@ describe('the name follows what it is made of', () => {
     // the kind of thing somebody spends an afternoon on in a year's time.
     const h = seeded(clientsModule);
     h.db.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
-               VALUES ('k1','CASE-26-001','cl1','Partner Resident Visa — [retired example 2]',
+               VALUES ('k1','CASE-26-001','cl1','Partner Resident Visa — Duc Manh BUI',
                        'The description','rv_partner_local','lodged','${USER.id}','${AT}','${AT}')`);
     await h.post('/clients/cl1', {
-      kind: 'individual', given_names: 'ANH TAN', family_name: 'NGUYEN (CORRECTED)',
+      kind: 'individual', given_names: 'DUC MANH', family_name: 'BUI (CORRECTED)',
       status: 'active',
     });
     const note = h.get<{ body: string }>(
@@ -321,7 +321,7 @@ describe('the name follows what it is made of', () => {
                VALUES ('k1','CASE-26-001','cl1','A NAME SOMEBODY CHOSE',
                        'The description','rv_partner_local','lodged','${USER.id}','${AT}','${AT}')`);
     await h.post('/clients/cl1', {
-      kind: 'individual', given_names: 'ANH TAN', family_name: 'NGUYEN',
+      kind: 'individual', given_names: 'DUC MANH', family_name: 'BUI',
       status: 'active', phone: '021 000 0000',
     });
     expect(h.get<{ title: string }>('SELECT title FROM cases')!.title).toBe('A NAME SOMEBODY CHOSE');

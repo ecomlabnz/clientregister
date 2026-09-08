@@ -80,7 +80,7 @@ decision_due_on: YYYY-MM-DD (or omit)
 
 **`descriptor` is the most-read line in the register** — it is what the practice
 sees in every list. Write what this matter is about the way a colleague would
-say it: *"AEWV for a boner at [retired example 9] Manawatu, employer already accredited"*, not
+say it: *"AEWV for a boner at WAIRAU VALLEY PACKERS Manawatu, employer already accredited"*, not
 *"SURNAME, Given — Work Visa"*. The client's name and the matter type are
 already in the columns beside it; do not repeat them.
 
@@ -473,7 +473,7 @@ Not a real matter — the shape only.
 
 ```
 ### 1. Matter
-descriptor: AEWV for a boner at [retired example 9] Manawatu, employer already accredited
+descriptor: AEWV for a boner at WAIRAU VALLEY PACKERS Manawatu, employer already accredited
 case_type: wv_aewv
 status: gathering_documents
 inz_client_number: 12345678

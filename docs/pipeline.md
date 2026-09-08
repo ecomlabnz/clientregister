@@ -383,7 +383,7 @@ Kept short — the full record is in `CHANGELOG.md`.
 **Waiting to be done by hand**, because the register will not and should not do
 them by itself:
 
-- **Merge `CL-0259` into `CL-0257`** — two records for [retired example 7]
+- **Merge `CL-0259` into `CL-0257`** — two records for HARBOURSIDE PROTEINS NEW ZEALAND
   LIMITED, created forty minutes apart on 8 September 2026 before the assistant
   could match a company at all (fixed in 1.8.0). Which to keep is a judgement:
   CL-0257 carries the NZBN and the contact, CL-0259 carries whatever the second
