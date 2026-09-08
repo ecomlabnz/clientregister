@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { composeFullName, familyNameFor, plainAscii, splitFullName } from '../src/core/names';
+import { composeFullName, familyNameFor, givenNamesFor, splitFullName } from '../src/core/names';
 
 /**
  * Converting an inquiry creates a client, so it must create the same kind of
@@ -100,14 +100,19 @@ describe('a name arriving from a chat message', () => {
   // directly rather than described.
   const asStored = (contactName: string) => {
     const split = splitFullName(contactName);
-    const given = plainAscii(split.givenNames);
+    const given = givenNamesFor(split.givenNames);
     const family = familyNameFor(split.familyName);
     return composeFullName('individual', { givenNames: given, familyName: family });
   };
 
   it('is stored the way the register stores every other name', () => {
     expect(asStored('Nguyễn Văn An')).toBe('Nguyen Van AN');
-    expect(asStored('thi thu thuy truong')).toBe('thi thu thuy TRUONG');
+    // Shouted or whispered, a name arriving from a chat is put into the house
+    // style like any other: given names in ordinary case, family name in
+    // capitals. Before 8 September the given names were stored exactly as the
+    // message had them.
+    expect(asStored('thi thu thuy truong')).toBe('Thi Thu Thuy TRUONG');
+    expect(asStored('THI THU THUY TRUONG')).toBe('Thi Thu Thuy TRUONG');
   });
 
   it('reads "Family, Given" the way it is written', () => {

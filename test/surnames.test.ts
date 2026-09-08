@@ -17,7 +17,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
-import { familyNameFor, composeFullName } from '../src/core/names';
+import { familyNameFor, givenNamesFor, composeFullName, formalName } from '../src/core/names';
 import { mountModule, fakeUser } from './support/d1';
 import { clientsModule } from '../src/modules/clients';
 import { assistantModule } from '../src/modules/assistant';
@@ -253,5 +253,130 @@ describe('a client record the assistant reuses', () => {
     const note = h.get<{ body: string }>(
       `SELECT body FROM entries WHERE entity_type = 'client' AND body LIKE '%capitals%'`);
     expect(note?.body, 'a name changed with nothing on the file to say why').toContain('Thi Ngoc Anh LE');
+  });
+});
+
+/**
+ * Given names in ordinary case, which is the other half of the same rule.
+ *
+ * Asked for on 8 September 2026, immediately after the surnames: *"the reverse
+ * is true for given names — they should be normalised. Not VAN CHIEN but Van
+ * Chien."*
+ *
+ * The pair is the point. A passport prints the whole name in capitals and so
+ * does an INZ letter, so anything read out of a document arrives shouted end to
+ * end. Capitalising only the family name is what makes it legible at a glance
+ * which half is which — and half this practice's caseload has names whose order
+ * is not the English one.
+ */
+describe('a given name', () => {
+  it('is put into ordinary case when it is shouted', () => {
+    expect(givenNamesFor('VAN CHIEN')).toBe('Van Chien');
+    expect(givenNamesFor('THI NGOC ANH')).toBe('Thi Ngoc Anh');
+    expect(givenNamesFor('van chien')).toBe('Van Chien');
+  });
+
+  it('is left exactly as it is when somebody has styled it', () => {
+    // "VAN CHIEN" is a shift key. These are decisions, and re-casing them would
+    // be the register inventing a style the person did not use — MacLeod would
+    // come back Macleod and nothing here could know better.
+    for (const name of ['McKenzie', 'de Jong', 'Anne-Marie', "d'Angelo", 'MacLeod', 'Jo-Ann']) {
+      expect(givenNamesFor(name)).toBe(name);
+    }
+  });
+
+  it('capitalises after a hyphen and an apostrophe when it does act', () => {
+    expect(givenNamesFor('ANNE-MARIE')).toBe('Anne-Marie');
+    expect(givenNamesFor("O'BRIEN")).toBe("O'Brien");
+  });
+
+  it('leaves nothing to trip over', () => {
+    expect(givenNamesFor(null)).toBe('');
+    expect(givenNamesFor('   ')).toBe('');
+  });
+
+  it('is what the whole name and the formal name are built from', () => {
+    // Both of those are what appears on a matter, a file label and an export.
+    expect(composeFullName('individual', { givenNames: 'VAN CHIEN', familyName: 'nguyen' }))
+      .toBe('Van Chien NGUYEN');
+    expect(formalName({ givenNames: 'VAN CHIEN', familyName: 'nguyen' }))
+      .toBe('NGUYEN, Van Chien');
+  });
+
+  it('is applied by the form a person actually uses', async () => {
+    const h = mountModule(clientsModule, { user: USER });
+    h.db.prepare(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
+                  VALUES (?,?,?,'x',?,'active',?,?)`).run(USER.id, USER.email, USER.name, USER.role, AT, AT);
+    await h.post('/clients', {
+      kind: 'individual', given_names: 'VAN CHIEN', family_name: 'nguyen', status: 'prospect',
+    });
+    const row = h.get<{ given_names: string; full_name: string; family_name: string }>(
+      'SELECT given_names, full_name, family_name FROM clients')!;
+    expect(row.given_names).toBe('Van Chien');
+    expect(row.family_name).toBe('NGUYEN');
+    expect(row.full_name).toBe('Van Chien NGUYEN');
+  });
+});
+
+describe('the shouted given names already in the register', () => {
+  const REPAIR = '0071_given_names_in_ordinary_case.sql';
+
+  function seededShouting() {
+    const db = upTo(REPAIR);
+    db.exec(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
+             VALUES ('u1','t@example.test','A Tester','x','admin','active','${AT}','${AT}')`);
+    const client = db.prepare(
+      `INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,status,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,'active','${AT}','${AT}')`);
+    client.run('cl1', 'CL-0001', 'individual', 'VAN CHIEN NGUYEN', 'VAN CHIEN', 'NGUYEN');
+    // Already right, and must not be touched.
+    client.run('cl2', 'CL-0002', 'individual', 'Thi Ngoc Anh LE', 'Thi Ngoc Anh', 'LE');
+    // Somebody's own styling.
+    client.run('cl3', 'CL-0003', 'individual', 'de Jong VAN DAM', 'de Jong', 'VAN DAM');
+    db.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
+             VALUES ('k1','CASE-26-901','cl1','RV. Partner — VAN CHIEN NGUYEN','A description',
+                     'rv_partner','lodged','u1','${AT}','${AT}')`);
+    return db;
+  }
+
+  it('are put into ordinary case, and the whole name rebuilt', () => {
+    const db = seededShouting();
+    db.exec(readFileSync(`migrations/${REPAIR}`, 'utf8'));
+    const row = one(db, `SELECT given_names AS g, full_name AS n FROM clients WHERE id = 'cl1'`);
+    expect(row.g).toBe('Van Chien');
+    expect(row.n).toBe('Van Chien NGUYEN');
+  });
+
+  it('carries the correction into the matters named after them', () => {
+    const db = seededShouting();
+    db.exec(readFileSync(`migrations/${REPAIR}`, 'utf8'));
+    expect(one(db, `SELECT title AS t FROM cases WHERE id = 'k1'`).t)
+      .toBe('RV. Partner — Van Chien NGUYEN');
+  });
+
+  it('leaves alone the ones that were already right, and the ones somebody styled', () => {
+    const db = seededShouting();
+    db.exec(readFileSync(`migrations/${REPAIR}`, 'utf8'));
+    expect(one(db, `SELECT given_names AS g FROM clients WHERE id = 'cl2'`).g).toBe('Thi Ngoc Anh');
+    expect(one(db, `SELECT given_names AS g FROM clients WHERE id = 'cl3'`).g).toBe('de Jong');
+  });
+
+  it('produces exactly what the application’s own rule would', () => {
+    // The migration is a second implementation of `givenNamesFor`, written in
+    // SQL because a migration cannot call the first one. Two implementations of
+    // one rule is how 190 matter names picked up a carriage return, so the two
+    // are held against each other here.
+    const db = seededShouting();
+    db.exec(readFileSync(`migrations/${REPAIR}`, 'utf8'));
+    expect(one(db, `SELECT given_names AS g FROM clients WHERE id = 'cl1'`).g)
+      .toBe(givenNamesFor('VAN CHIEN'));
+  });
+
+  it('leaves nothing behind for a second run to find', () => {
+    const db = seededShouting();
+    db.exec(readFileSync(`migrations/${REPAIR}`, 'utf8'));
+    expect(one(db, `SELECT COUNT(*) AS n FROM clients
+                     WHERE kind = 'individual' AND given_names IS NOT NULL
+                       AND TRIM(given_names) <> '' AND given_names = UPPER(given_names)`).n).toBe(0);
   });
 });
