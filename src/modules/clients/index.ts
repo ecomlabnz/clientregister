@@ -36,7 +36,8 @@ import {
 } from '../../ui/format';
 import {
   CASE_STATUS_LABELS, CLIENT_STATUSES, CLIENT_STATUS_LABELS,
-  ENTRY_KINDS, ENTRY_KIND_LABELS, PARTY_ROLE_LABELS, QUOTE_STATUS_LABELS, type ClientStatus,
+  CHOOSABLE_ENTRY_KINDS, ENTRY_KINDS, ENTRY_KIND_LABELS, PARTY_ROLE_LABELS,
+  QUOTE_STATUS_LABELS, type ClientStatus,
 } from '../../domain';
 import { organisationOptions, userOptions } from '../../core/lookups';
 import {
@@ -181,6 +182,22 @@ function clientForm(
         ${select({ label: 'Record type', name: 'kind', value: kind, includeBlank: false,
                    options: [{ value: 'individual', label: 'Individual' },
                              { value: 'organisation', label: 'Company or organisation' }] })}
+        ${'' /* Lead or client, on the first panel, because it is part of who
+                 somebody is rather than how their file is run.
+
+                 It has always been on this form — as "Status", fifth tab along,
+                 under a heading called "File management" — and the practice
+                 reported on 8 September that they could not choose it when
+                 creating a client. They were right about the thing that
+                 matters: a control you cannot find is a control you do not
+                 have, and the first question about a new record is which of the
+                 two it is. */}
+        ${select({ label: 'Lead or client', name: 'status', value: values.status ?? 'prospect',
+                   includeBlank: false,
+                   options: optionsFrom(CLIENT_STATUSES, CLIENT_STATUS_LABELS),
+                   hint: values.id
+                     ? 'Change this when a lead engages, or when a file goes quiet.'
+                     : 'A lead is somebody who has enquired. Change it to Client when they engage.' })}
 
         ${'' /* Marked hidden by the server, not only by the script: a company
                  has no passport and a person has no NZBN, and the wrong half of
@@ -364,8 +381,9 @@ function clientForm(
 
       <div class="form-section" data-panel="file">
         <h3>File management</h3>
-        ${select({ label: 'Status', name: 'status', value: values.status ?? 'prospect', includeBlank: false,
-                   options: optionsFrom(CLIENT_STATUSES, CLIENT_STATUS_LABELS) })}
+        ${'' /* Lead or client used to be here. It moved to "Who this is" on
+                 8 September — see the note there. What is left is how the file
+                 is run, which is what this panel is for. */}
         ${select({ label: 'Assigned to', name: 'assigned_to', value: values.assigned_to ?? '', options: users, includeBlank: 'Unassigned' })}
         ${field({ label: 'General notes', name: 'notes', type: 'textarea', value: values.notes, rows: 4, maxlength: 4000 })}
       </div>
@@ -1182,7 +1200,7 @@ export const clientsModule: AppModule = {
               <form method="post" action="/clients/${client.id}/entries" class="entry-form">
                 ${csrfField(csrf)}
                 ${select({ label: 'Kind', name: 'kind', value: 'note', includeBlank: false,
-                           options: optionsFrom(ENTRY_KINDS.filter((k) => k !== 'system') as any, ENTRY_KIND_LABELS as any) })}
+                           options: optionsFrom(CHOOSABLE_ENTRY_KINDS as any, ENTRY_KIND_LABELS as any) })}
                 ${field({ label: 'Note', name: 'body', type: 'textarea', rows: 3, required: true, maxlength: 5000,
                           placeholder: 'What happened, what was advised, what was agreed.' })}
                 <button class="btn btn-primary" type="submit">Add a note</button>
@@ -1197,7 +1215,7 @@ export const clientsModule: AppModule = {
                     correction: writable && correctable(e, c.get('user')?.id ?? null)
                       ? { csrf, minutes: CORRECTION_WINDOW_MINUTES,
                           kindOptions: optionsFrom(
-                            ENTRY_KINDS.filter((k) => k !== 'system') as any,
+                            CHOOSABLE_ENTRY_KINDS as any,
                             ENTRY_KIND_LABELS as any) }
                       : null,
                   }))}

@@ -46,11 +46,17 @@ describe('the bulk delete refuses what something else points at', () => {
 
   it('re-reads the rows before deleting rather than trusting the form', () => {
     const confirm = source.slice(source.indexOf("r.post('/delete/confirm'"));
-    expect(confirm.slice(0, 1400)).toMatch(/gatherForDeletion/);
+    expect(confirm.slice(0, 1400)).toMatch(/gatherSelected/);
   });
 
-  it('offers no checkbox on a row it would refuse', () => {
-    expect(source).toMatch(/row\.inquiry_id \|\| row\.filed_at/);
+  it('names what it is leaving alone rather than dropping it silently', () => {
+    // The checkbox rule widened on 8 September: a message that became an
+    // inquiry can now be selected, because it can be *filed* even though it
+    // cannot be deleted. So the delete route is the only thing standing
+    // between that message and deletion, and it is exercised for real in
+    // test/inboxbulkfile.test.ts. What is held here is that the page says so.
+    const bulk = source.slice(source.indexOf("r.post('/delete'"), source.indexOf("r.post('/delete/confirm'"));
+    expect(bulk).toMatch(/will be kept/);
   });
 
   it('audits each message before its row goes', () => {
