@@ -229,6 +229,12 @@ Kept short — the full record is in `CHANGELOG.md`.
 **Production data changes made by hand**, each rehearsed on a copy first and
 recorded here because they are not in any migration:
 
+- 8 September 2026 — `consult@thelawfirm.nz` changed from Specialist (`adviser`)
+  to Owner. The practice asked for it: that login is the principal lawyer and is
+  not meant to be limited. As a Specialist it could not open Settings, read the
+  audit log, archive a record, or manage users. Both of the principal's logins
+  are now Owner, deliberately — kept separate so each keeps its own audit trail.
+  One row; no client data touched. Audit row `aud_ownerrole_20260908`.
 - 8 September 2026 — `practice.terms_url` changed from the PDF at
   `www.immigration.kiwi/_files/ugd/796b4b_09e26…pdf` to
   `https://www.immigration.kiwi/terms`, which is where the practice's Letter of
