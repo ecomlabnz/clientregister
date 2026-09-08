@@ -87,6 +87,13 @@ contact. Work from what people wrote.`;
  * keystrokes saved.
  */
 export interface IntakePerson {
+  /**
+   * A person or a company. The register keeps both in `clients`, told apart by
+   * `kind`, and a company recorded as a person is wrong in every list it
+   * appears in — and in the letter of engagement, which names its parties.
+   */
+  kind: 'individual' | 'organisation';
+  /** The whole name of an organisation goes in `family_name`, as elsewhere. */
   given_names: string | null;
   family_name: string | null;
   /** A name they actually go by, where the document says so ("aka Teera"). */
@@ -145,6 +152,15 @@ capitalisation the document uses.
 Do not extract passport numbers even when they appear — that field is entered by
 a person.
 
+A party may be a company rather than a person. Set "kind" to "organisation"
+where the name is a company, trust, partnership or agency — a name ending in
+Limited or Ltd, one given with an NZBN or company number, or one the document
+treats as an employer rather than as somebody with a date of birth. Put the
+whole of a company's name in "family_name" and leave "given_names" null. Set
+"kind" to "individual" for everybody else. An employer is very often a company
+and the person who writes on its behalf is not: both may appear, and they are
+separate parties.
+
 For every person named, return their nationalities as a list of country names,
 one entry per country. A document that says "Vietnam and New Zealand" or "dual
 Vietnamese/New Zealand citizen" is naming two, and both must come back.
@@ -174,6 +190,10 @@ export function normaliseIntake(input: Partial<IntakeResult>): IntakeResult {
   const person = (raw: unknown): IntakePerson => {
     const p = (raw ?? {}) as Partial<IntakePerson>;
     return {
+      // Anything but the one word means a person: a reading that produced
+      // something unexpected here must not quietly turn a client into a
+      // company.
+      kind: p.kind === 'organisation' ? 'organisation' : 'individual',
       given_names: str(p.given_names, 120),
       family_name: str(p.family_name, 120),
       preferred_name: str(p.preferred_name, 80),

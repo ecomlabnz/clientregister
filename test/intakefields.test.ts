@@ -132,16 +132,25 @@ describe('opening the matter', () => {
     expect(notes[0].body).toContain('read by the assistant');
   });
 
-  it('names the matter by what it is about, and derives the title from it', async () => {
+  it('keeps what the matter is about, and names it the way every matter is named', async () => {
+    // Two faults, a week apart, in the same two columns.
+    //
     // This form was still asking for a title after the rest of the register
     // stopped, so a matter opened from a document arrived with no description
     // at all — found on the live register on 1 September 2026, one matter in.
+    // The fix wrote the description into both columns, and that is what made
+    // every matter in the register named by an 84-character sentence.
+    //
+    // The New matter form was corrected on 8 September and this route was
+    // missed, which is what a second writer of a derived value costs. The name
+    // is now composed in one place for both.
     const h = mount();
     seed(h);
     await apply(h);
     const kase = (rows(h, 'SELECT title, descriptor FROM cases')[0] as any);
     expect(kase.descriptor).toBe('Partnership information');
-    expect(kase.title).toBe(kase.descriptor);
+    expect(kase.title).toBe('WV. AEWV — Minh Duc TRAN');
+    expect(kase.title === kase.descriptor, 'named by its own description again').toBe(false);
   });
 
   it('writes no note when there is nothing to say', async () => {

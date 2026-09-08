@@ -7,6 +7,42 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.7.0 — 8 September 2026
+
+### Added
+- **A company read out of a document is created as a company.** Reported by the
+  practice after opening a matter from a Peak Seasonal Work Visa file: *"I
+  cannot even ensure that the employer company IS A COMPANY and not an
+  individual — how come??"*
+
+  Because every party the assistant proposed was created as an individual — the
+  word was hard-coded. So LAND MEAT NEW ZEALAND LIMITED arrived on the register
+  as a person with a very long family name, with no way to say otherwise on the
+  form, and the only remedy was to notice afterwards and edit the record.
+
+  The reading now says which each party is, and the form has a **Person or
+  company** box on every one of them, so it can be corrected before anything is
+  written. A company gets no date of birth, nationality or visa, whatever the
+  boxes carried. Its registered name is kept as written rather than shouted,
+  which is what the client form has always done.
+
+- **Who to ring at the company.** The other half of the same report: *"for a
+  company I need a contact person's name as well, or at least be able to link a
+  name from clients/contacts."* Every party now has a **Works for** box — or
+  **Main contact there**, for a company — offering the other people named in the
+  same reading and every organisation already on the register.
+
+  Choosing one writes both directions: the company records who to ring, and the
+  person records where they work and what they do there. Those columns have
+  existed since migration 0008 and nothing on this form could reach them.
+
+### Fixed
+- **A matter opened by the assistant is named the way every other matter is
+  named.** The naming fix in 1.4.1 corrected the New matter form and missed this
+  route, which was writing the description into the name as well — carrying a
+  comment claiming that was done "from one place", which it was not. Both now
+  compose the name from the same function.
+
 ## 1.6.0 — 8 September 2026
 
 ### Added
