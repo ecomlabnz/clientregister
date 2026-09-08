@@ -269,3 +269,96 @@ describe('adding people through the page', () => {
       .toContain('the letter will say the client');
   });
 });
+
+/**
+ * The quotation as the client reads it.
+ *
+ * This is the half that matters legally: the practice's decision is that the
+ * Letter of Engagement states no parties, no scope and no fees — it refers to
+ * the quotation, and the quotation is what says who the engagement is with. A
+ * quotation that holds the parties but does not print them would leave the
+ * letter referring to nothing.
+ */
+describe('the printed quotation states who the engagement is with', () => {
+  function seeded() {
+    const h = mountModule(quotesModule, { user: USER });
+    h.db.prepare(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
+                  VALUES (?,?,?,'x',?,'active',?,?)`).run(USER.id, USER.email, USER.name, USER.role, AT, AT);
+    h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,status,created_at,updated_at)
+               VALUES ('cl1','CL-0001','individual','NGUYEN, ANH TAN','active','${AT}','${AT}')`);
+    h.db.exec(`INSERT INTO quotes (id,ref,client_id,description,amount_cents,status,created_at,updated_at)
+               VALUES ('q1','Q-0001','cl1','Partner Resident Visa',700000,'draft','${AT}','${AT}')`);
+    return h;
+  }
+
+  /**
+   * The document, with its whitespace flattened.
+   *
+   * The templates wrap, so a sentence in the source arrives with newlines and
+   * indentation inside it. A test matching the sentence as written would fail
+   * on correct output — and, worse, a test that avoided the problem by matching
+   * three words would pass on a sentence that had lost its meaning.
+   */
+  const printed = async (h: ReturnType<typeof seeded>) =>
+    (await (await h.request('/quotes/q1/print')).text()).replace(/\s+/g, ' ');
+
+  it('names the client, the applicants and the associated parties', async () => {
+    const h = seeded();
+    await h.post('/quotes/q1/parties', {
+      full_name: 'CHAU, THI BICH TAM', role: 'associated', relationship: 'partner',
+      date_of_birth: '1987-04-18',
+    });
+    await h.post('/quotes/q1/parties', { full_name: 'NGUYEN, MINH THANH', role: 'applicant' });
+
+    const doc = await printed(h);
+    expect(doc).toContain('The parties');
+    expect(doc).toContain('NGUYEN, ANH TAN');
+    expect(doc).toContain('CHAU, THI BICH TAM');
+    expect(doc).toContain('NGUYEN, MINH THANH');
+    expect(doc, 'their relationship is what makes the row mean anything').toContain('partner');
+    expect(doc, 'a date of birth is read off this document by INZ').toContain('18 Apr 1987');
+  });
+
+  it('says the client instructs when nobody else is nominated', async () => {
+    // The default in the practice's own letter: "The Client is Nominated
+    // Representative". Silence here would leave a contract that does not say
+    // whose instructions bind it.
+    const h = seeded();
+    await h.post('/quotes/q1/parties', { full_name: 'CHAU, THI BICH TAM', role: 'associated' });
+    expect(await printed(h)).toContain('Nominated representative for all parties');
+  });
+
+  it('names the nominated person instead, when there is one', async () => {
+    const h = seeded();
+    await h.post('/quotes/q1/parties', {
+      full_name: 'CHAU, THI BICH TAM', role: 'associated', is_representative: '1',
+    });
+    const doc = await printed(h);
+    expect(doc).toMatch(/CHAU, THI BICH TAM<\/strong> is nominated to give/);
+    expect(doc, 'two people cannot both be said to instruct')
+      .not.toContain('Nominated representative for all parties');
+  });
+
+  it('sets out what an administrative contact may and may not do', async () => {
+    // The clause exists because the contact is often an overseas agency. A
+    // contract that names them without limiting them is a contract that lets
+    // them look like the lawyer.
+    const h = seeded();
+    await h.post('/quotes/q1/parties', {
+      full_name: 'Ms My (Megan) Nguyen', role: 'admin_contact',
+      organisation: 'Oceania Immigration', email: 'my@example.test',
+    });
+    const doc = await printed(h);
+    expect(doc).toContain('Day-to-day administrative contact');
+    expect(doc).toContain('Oceania Immigration');
+    expect(doc).toContain('not authorised to give legal advice');
+    expect(doc).toContain('All legal advice and all decisions come from the lawyer');
+  });
+
+  it('says nothing about administrative contacts when there are none', async () => {
+    // A paragraph limiting the authority of nobody is a paragraph raising a
+    // question the client did not have.
+    const h = seeded();
+    expect(await printed(h)).not.toContain('Day-to-day administrative contact');
+  });
+});
