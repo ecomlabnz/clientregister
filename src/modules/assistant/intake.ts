@@ -38,12 +38,13 @@ import {
   setNationalityStatements,
 } from '../../core/nationalities';
 import { CASE_STATUSES, CASE_STATUS_LABELS, PARTY_ROLES, PARTY_ROLE_LABELS,
-         type PartyRole } from '../../domain';
+         PRIORITIES, PRIORITY_LABELS, type PartyRole } from '../../domain';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import { card, csrfField, emptyState, field, optionsFrom, pageHeader, select } from '../../ui/components';
 import { isAiEnabled } from '../../ai/provider';
 import { attachStagedTo, stageUpload, stagedFor } from '../../core/intakefiles';
+import { isValidNzbnFormat, normaliseNzbn } from '../../integrations/nzbn';
 import { caseNameFrom, normaliseClientName } from '../../core/casename';
 import type { IntakePerson, IntakeResult } from '../../ai/provider';
 import {
@@ -149,6 +150,18 @@ function personFields(prefix: string, person: IntakePerson, roleFixed: PartyRole
       value: person.phone ?? '', maxlength: 40 })}</div>
     <div class="settings-cell">${field({ label: 'Date of birth', name: `${prefix}date_of_birth`,
       type: 'date', value: person.date_of_birth ?? '' })}</div>
+    ${'' /* Everything else the document states that the register has a box for.
+             They were extracted and thrown away: the reading found the
+             employer's registered office and its NZBN on the first page of an
+             employment agreement, and there was nowhere on this screen to put
+             them — so somebody typed them again from the same document. */}
+    ${isOrganisation ? html`
+      <div class="settings-cell">${field({ label: 'NZBN', name: `${prefix}nzbn`,
+        value: person.nzbn ?? '', maxlength: 20,
+        hint: '13 digits, starting 9429.' })}</div>` : ''}
+    <div class="settings-cell-wide">${field({ label: 'Address', name: `${prefix}address`,
+      type: 'textarea', rows: 2, value: person.address ?? '', maxlength: 400,
+      hint: isOrganisation ? 'The registered office or trading address.' : '' })}</div>
     ${roleFixed ? '' : html`
       <div class="settings-cell">${select({ label: 'Role on this matter', name: `${prefix}role`,
         value: (PARTY_ROLES as readonly string[]).includes(person.role ?? '')
@@ -399,6 +412,18 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
             <div class="settings-cell">${select({ label: 'Owner', name: 'assigned_to',
               value: c.get('user')!.id, includeBlank: 'Nobody yet',
               options: users.map((u) => ({ value: u.id, label: u.name })) })}</div>
+            ${'' /* The rest of what a matter holds, so a matter opened from a
+                     document arrives as complete as one opened by hand. What
+                     happens next is read from the document where it says so —
+                     "employer to provide the signed IEA" — and left empty
+                     otherwise, on the same principle as the decision date. */}
+            <div class="settings-cell">${select({ label: 'Priority', name: 'priority',
+              value: 'normal', includeBlank: false,
+              options: optionsFrom(PRIORITIES, PRIORITY_LABELS) })}</div>
+            <div class="settings-cell-wide">${field({ label: 'What happens next',
+              name: 'next_action', value: reading.next_action ?? '', maxlength: 200 })}</div>
+            <div class="settings-cell">${field({ label: 'By when', name: 'next_action_due',
+              type: 'date', value: '' })}</div>
             ${'' /* Twelve rows and eight thousand characters, because this is
                      now the whole of what the document said and it is saved
                      twice over: to the matter's summary, which somebody edits,
@@ -538,9 +563,10 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     await run(
       c.env.DB,
       `INSERT INTO cases (id, ref, client_id, title, descriptor, case_type, status, priority, assigned_to,
-          inz_application_number, inz_client_number, lodged_at, decision_due_at, summary,
+          inz_application_number, inz_client_number, lodged_at, decision_due_at,
+          next_action, next_action_due, summary,
           currency, created_at, updated_at, created_by)
-       VALUES (?,?,?,?,?,?,?, 'normal', ?,?,?,?,?,?, 'NZD', ?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'NZD', ?,?,?)`,
       // The matter's name is composed the same way as everywhere else, from
       // the type and the client. This route wrote `descriptor` into both
       // columns and carried a comment saying so was "written from one place" —
@@ -549,10 +575,12 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       // of a derived value is a second convention. See `core/casename.ts`.
       caseId, caseRef, clientId, caseNameFrom(types, caseType, clientName), descriptor,
       caseType, status,
+      f.enum('priority', PRIORITIES, { fallback: 'normal' })!,
       f.optional('assigned_to', { max: 80 }),
       f.optional('inz_application_number', { max: 40 }),
       f.optional('inz_client_number', { max: 40 }),
       f.date('lodged_at'), f.date('decision_due_at'),
+      f.optional('next_action', { max: 200 }), f.date('next_action_due'),
       f.optional('summary', { max: 8000 }),
       stamp, stamp, user.id,
     );
@@ -701,17 +729,30 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
 async function fillEmptyFields(
   c: Parameters<typeof auditFrom>[0], f: FormReader, prefix: string, clientId: string,
 ): Promise<void> {
-  const visaType = f.optional(`${prefix}current_visa_type`, { max: 120 });
-  const visaExpiry = f.date(`${prefix}current_visa_expiry`);
-  if (visaType || visaExpiry) {
+  // Every box the reading filled that the record has left empty, not just the
+  // visa. A document states an address, an email, a date of birth and a
+  // company's NZBN as readily as it states a visa, and a record that keeps only
+  // one of them is a record somebody has to retype the rest into from the same
+  // document. `COALESCE(NULLIF(…, ''), ?)` is the whole rule: what is there
+  // wins, always.
+  const filling: Array<[string, string | null]> = [
+    ['current_visa_type', f.optional(`${prefix}current_visa_type`, { max: 120 })],
+    ['current_visa_expiry', f.date(`${prefix}current_visa_expiry`)],
+    ['email', f.email(`${prefix}email`)],
+    ['phone', f.optional(`${prefix}phone`, { max: 40 })],
+    ['address', f.optional(`${prefix}address`, { max: 400 })],
+    ['date_of_birth', f.date(`${prefix}date_of_birth`)],
+    ['preferred_name', f.optional(`${prefix}preferred_name`, { max: 80 })],
+    ['nzbn', normalisedNzbn(f.optional(`${prefix}nzbn`, { max: 20 }))],
+  ];
+  const offered = filling.filter(([, value]) => value !== null && value !== '');
+  if (offered.length) {
     await run(
       c.env.DB,
-      `UPDATE clients
-          SET current_visa_type = COALESCE(NULLIF(current_visa_type, ''), ?),
-              current_visa_expiry = COALESCE(NULLIF(current_visa_expiry, ''), ?),
-              updated_at = ?
+      `UPDATE clients SET ${offered.map(([column]) =>
+          `${column} = COALESCE(NULLIF(${column}, ''), ?)`).join(', ')}, updated_at = ?
         WHERE id = ?`,
-      visaType, visaExpiry, nowIso(), clientId,
+      ...offered.map(([, value]) => value), nowIso(), clientId,
     );
   }
   // Nationalities are all-or-nothing rather than merged: a person who holds
@@ -806,6 +847,20 @@ async function linkOrganisations(
   return written;
 }
 
+/**
+ * An NZBN the register would accept, or nothing.
+ *
+ * A number read off a document can arrive spaced, hyphenated or simply wrong.
+ * Stored as read, it is rejected the first time somebody opens the client and
+ * saves — which is a worse place to find out than here, where the reading is
+ * still on the screen beside it.
+ */
+function normalisedNzbn(value: string | null): string | null {
+  if (!value) return null;
+  const clean = normaliseNzbn(value);
+  return isValidNzbnFormat(clean) ? clean : null;
+}
+
 /** Create one person or company from the prefixed fields, or nothing unnamed. */
 async function createPerson(
   c: Parameters<typeof auditFrom>[0], f: FormReader, prefix: string, stamp: string,
@@ -836,13 +891,18 @@ async function createPerson(
   await run(
     c.env.DB,
     `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name, preferred_name,
-        email, phone, date_of_birth, current_visa_type, current_visa_expiry,
+        email, phone, address, nzbn, date_of_birth, current_visa_type, current_visa_expiry,
         status, assigned_to, created_at, updated_at, created_by)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'active', ?,?,?,?)`,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'active', ?,?,?,?)`,
     id, ref, kind, fullName, given, family,
     f.optional(`${prefix}preferred_name`, { max: 80 }),
     f.email(`${prefix}email`),
     f.optional(`${prefix}phone`, { max: 40 }),
+    f.optional(`${prefix}address`, { max: 400 }),
+    // Only a company has one, and only in the shape the register accepts —
+    // otherwise it is stored and rejected the first time somebody edits the
+    // record, which is a worse place to find out.
+    kind === 'organisation' ? normalisedNzbn(f.optional(`${prefix}nzbn`, { max: 20 })) : null,
     // A company has no birthday and holds no visa. The boxes are on the form
     // for everybody, so anything typed into them for a company is dropped here
     // rather than stored as a fact about a legal entity.

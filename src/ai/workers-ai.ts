@@ -72,7 +72,7 @@ Reply with a single JSON object and nothing else, using exactly these keys:
 Reply with a single JSON object and nothing else, using exactly these keys:
 {"applicant":{"kind":"individual"|"organisation","given_names":string|null,"family_name":string|null,"preferred_name":string|null,
   "email":string|null,"phone":string|null,"nationalities":string[],
-  "current_visa_type":string|null,"current_visa_expiry":string|null,"occupation":string|null,
+  "current_visa_type":string|null,"current_visa_expiry":string|null,"occupation":string|null,"address":string|null,"nzbn":string|null,
   "date_of_birth":string|null,"role":string|null},
  "other_parties":[same shape as applicant],
  "case_type":one of [${input.caseTypes.join(', ')}] or null,

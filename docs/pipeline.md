@@ -227,6 +227,104 @@ belongs on the list of things to settle before one does, alongside the naming in
 quote simply omits the sentence, which it already does correctly when the
 setting is blank (there is a test).
 
+### 12. The letter of engagement, the rest of it
+
+The frame is built and live (1.5.0): **Settings → Letter of engagement** holds
+the words every letter says, and **Quotes → Letter clauses** holds the headed
+sections, each limitable to certain matter types. Both are empty — the register
+ships no wording for a contract between a lawyer and a client.
+
+The practice settled the shape on 8 September 2026, and it is what makes the
+rest small: **the letter states no parties, no scope and no fees.** Those are
+the quotation's, and the letter refers to it. What is left to build, in order:
+
+1. **The mandatory choice**, at composition: does this quotation go out with a
+   letter? `quotes.with_letter` exists and is deliberately nullable — NULL means
+   nobody has decided, so a letter is never omitted by oversight nor sent by one.
+2. **The letter itself**, rendered from the settings and the clauses, referring
+   to the quotation rather than repeating it.
+3. **Frozen at issue.** A contract must not change when a setting does. The
+   whole letter is rendered once, stored, and every later view reads the stored
+   copy. A PDF goes into `documents`, so it sits on the file beside everything
+   else.
+4. **Acceptance without paper.** A link in the email, a page with no login, and
+   a deliberate act: the client types a five-character code from the same email
+   and their full name, then presses Accept. Recorded: the name, the moment, the
+   address they came from, and a fingerprint of the exact document they saw. A
+   confirmation goes to the practice and to the client, and both are kept as
+   file notes.
+
+   The code is in the same email as the link, so it is **not** a second factor
+   and must not be described as one. Its job is to make acceptance a deliberate
+   act rather than a mis-click, which is what an electronic signature has to
+   show. Said plainly to the practice when it was proposed, and kept anyway on
+   that basis.
+5. **Acceptance creates the work**: the matters, and the parties as client
+   records. **No invoices** — the practice's explicit instruction, because a
+   stage falling due in six months should not sit on the books from today.
+
+Not being built: variations. A scope change is a new quotation, or an invoice,
+or an email that lands on the file as a note. The practice's decision.
+
+### 13. Which edition of the terms a client actually accepted
+
+**Raised 8 September 2026, deferred by the practice the same day:** *"will decide
+it later — not a major now."* Recorded because the reasoning will not survive
+otherwise.
+
+The letter incorporates the practice's Standard Terms of Engagement by reference
+to `https://www.immigration.kiwi/terms`. That page holds the current edition as a
+PDF with a hashed filename, so republishing the terms replaces what the address
+resolves to. A client who accepted in September and a dispute in two years would
+be looking at different words.
+
+The practice's own instinct when it was raised: keep a copy, *"in the knowledge
+base potentially"* — which is the right shape. An article holding the current
+edition as a file, each issued letter recording which edition it went out with,
+and the acceptance record naming that document. `kb_documents` already does the
+storage.
+
+It is not urgent while the terms are stable. It becomes urgent the first time
+they are republished, and by then the letters already sent cannot be told which
+edition they meant.
+
+### 14. Tags on clients
+
+**Asked 8 September 2026:** *"we need tags for clients and cases — if not yet
+implemented. For cases they exist I believe but not for clients — why?"*
+
+No reason. `tags` and `case_tags` were built in migration 0007 and `client_tags`
+simply never was. The same tag list would serve both — the table exists, it is
+the join that is missing, along with the raiser on the client page and the
+filter on the client list.
+
+### 15. Somebody within the practice is not a client
+
+**Raised 8 September 2026, unanswered.** The principal is on the register as
+`CL-0255`, status Lead, which puts him in the same bucket as somebody who
+enquired last week and never came back — and into the three-lead count on the
+dashboard.
+
+A client record can only be Lead, Client, Inactive or Archived. Nothing marks a
+person as *the practice*, or as an agency the practice works with rather than
+acts for. The likely shape is a fifth status shown in the client list but left
+out of the places that treat a row as work: lead-chasing, client counts,
+dormancy and expiry alerts, the bulk export.
+
+Two questions were put and neither has been answered: whether this is just the
+principal or staff and regular associates generally, and whether such a person
+should still be a party on a matter (probably yes, and free either way).
+`clients.status` carries a CHECK, so it needs a migration, and roughly forty
+queries say "active" or "not archived" and each needs a decision.
+
+### 16. Two-factor authentication is switched off
+
+**Flagged 8 September 2026, not acted on.** The support is built. Neither of the
+practice's two owner logins has it enabled, on a register holding live client
+files and now answering on a public address.
+
+Nothing to build. It is a decision and five minutes.
+
 ### 8. Reading across from other sessions
 The **App field comparison review** session produced the nine fields above. Its
 own audit ended with no repository changes and a mail-DNS fix. Nothing else has
@@ -262,6 +360,22 @@ Kept short — the full record is in `CHANGELOG.md`.
 - **0.99.1** — calendar controls: Week · Month · Year · Today.
 - **0.99.0** — Finished with?: find and archive the clients the practice is done
   with. 43 waiting, 50 alerts silenced.
+
+**Waiting to be done by hand**, because the register will not and should not do
+them by itself:
+
+- **Merge `CL-0259` into `CL-0257`** — two records for [retired example 7]
+  LIMITED, created forty minutes apart on 8 September 2026 before the assistant
+  could match a company at all (fixed in 1.8.0). Which to keep is a judgement:
+  CL-0257 carries the NZBN and the contact, CL-0259 carries whatever the second
+  reading attached to it. Nothing in the register merges two clients.
+- **Turn off `clientregister.workers.dev`**, once nothing important still points
+  at it. The custom domain has been the address in outbound links since 1.3.1;
+  the workers.dev name is deliberately kept as the way back in if the domain
+  breaks, and is one switch (`workers_dev` in `wrangler.jsonc`) whenever the
+  practice decides two doors is one too many.
+- **The practice's own letter-of-engagement wording**, into Settings → Letter of
+  engagement and Quotes → Letter clauses. Both went live empty in 1.5.0.
 
 **Production data changes made by hand**, each rehearsed on a copy first and
 recorded here because they are not in any migration:

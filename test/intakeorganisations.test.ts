@@ -63,9 +63,10 @@ const applyForm = (over: Record<string, string> = {}) => ({
 const rowFor = (h: ReturnType<typeof seeded>, name: string) =>
   h.get<{ id: string; kind: string; full_name: string; given_names: string | null;
           date_of_birth: string | null; organisation_id: string | null;
-          organisation_role: string | null; primary_contact_id: string | null }>(
+          organisation_role: string | null; primary_contact_id: string | null;
+          address: string | null; nzbn: string | null }>(
     'SELECT id, kind, full_name, given_names, date_of_birth, organisation_id, organisation_role, '
-    + 'primary_contact_id FROM clients WHERE full_name LIKE ?', `%${name}%`);
+    + 'primary_contact_id, address, nzbn FROM clients WHERE full_name LIKE ?', `%${name}%`);
 
 describe('an employer named in a document', () => {
   it('is created as a company, not as a person with a long surname', async () => {
@@ -312,5 +313,95 @@ describe('somebody the reading names who is already on the register', () => {
     const caseId = h.get<{ id: string }>('SELECT id FROM cases')!.id;
     expect(h.count('SELECT COUNT(*) AS n FROM case_parties WHERE case_id = ? AND client_id = ?',
       caseId, 'cl9')).toBe(1);
+  });
+});
+
+/**
+ * Everything the document said, into the boxes the register already has.
+ *
+ * Asked for on 8 September 2026: *"the assistant should be populating all the
+ * known details it extracted from the brief for the client and case, including
+ * contacts and other details — as seen in the respective pages for clients and
+ * cases."*
+ *
+ * The gap was at both ends. Some of it was never extracted — an address, a
+ * company's NZBN, what the document says happens next. Some of it was extracted
+ * and then had nowhere to go: the reading found the employer's registered office
+ * on the first page of the employment agreement, and this form had no box for
+ * it, so somebody typed it again from the same document.
+ *
+ * Passport numbers stay out, deliberately and separately. That is not an
+ * oversight in this list: extracting one would write it into the run log on the
+ * way past, and it belongs in one place only.
+ */
+describe('what the reading fills in', () => {
+  it('records an address and a company’s NZBN', async () => {
+    const h = seeded();
+    await h.post('/assistant/intake/apply', applyForm({
+      a_address: '12 Example Street, Whanganui 4501',
+      p0_address: 'Horotiu, Private Bag 3301, Hamilton 3240',
+      p0_nzbn: '9429040971940',
+    }));
+    expect(rowFor(h, 'THI NGOC ANH')!.address).toBe('12 Example Street, Whanganui 4501');
+    const employer = rowFor(h, 'LAND MEAT')!;
+    expect(employer.address).toBe('Horotiu, Private Bag 3301, Hamilton 3240');
+    expect(employer.nzbn).toBe('9429040971940');
+  });
+
+  it('takes an NZBN however the document spaced it', async () => {
+    const h = seeded();
+    await h.post('/assistant/intake/apply', applyForm({ p0_nzbn: '9429 0409 71940' }));
+    expect(rowFor(h, 'LAND MEAT')!.nzbn).toBe('9429040971940');
+  });
+
+  it('drops one that is not an NZBN rather than storing it', async () => {
+    // Stored as read, it is refused the first time somebody opens the client
+    // and saves — a worse place to find out than here, with the document still
+    // on the screen beside it.
+    const h = seeded();
+    await h.post('/assistant/intake/apply', applyForm({ p0_nzbn: 'NZBN pending' }));
+    expect(rowFor(h, 'LAND MEAT')!.nzbn).toBeNull();
+  });
+
+  it('gives a person no NZBN, whatever the form carried', async () => {
+    const h = seeded();
+    await h.post('/assistant/intake/apply', applyForm({ p1_nzbn: '9429040971940' }));
+    expect(rowFor(h, 'MCFARLANE')!.nzbn).toBeNull();
+  });
+
+  it('records what happens next, and its date, on the matter', async () => {
+    const h = seeded();
+    await h.post('/assistant/intake/apply', applyForm({
+      next_action: 'Employer to provide the signed IEA',
+      next_action_due: '2026-10-01',
+      priority: 'high',
+    }));
+    const row = h.get<{ next_action: string; next_action_due: string; priority: string }>(
+      'SELECT next_action, next_action_due, priority FROM cases')!;
+    expect(row.next_action).toBe('Employer to provide the signed IEA');
+    expect(row.next_action_due).toBe('2026-10-01');
+    expect(row.priority).toBe('high');
+  });
+
+  it('fills what an existing record has left empty, and never what it has', async () => {
+    // The rule the whole intake rests on: a document is evidence of what
+    // somebody wrote once; the record is what the practice knows now.
+    const h = seeded();
+    h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,
+                                    email,address,status,created_at,updated_at)
+               VALUES ('cl9','CL-0500','individual','Thi Ngoc Anh LE','Thi Ngoc Anh','LE',
+                       'already@on.file',NULL,'active','${AT}','${AT}')`);
+    await h.post('/assistant/intake/apply', applyForm({
+      existing_client_id: 'cl9',
+      a_email: 'read@from.document',
+      a_address: '12 Example Street, Whanganui 4501',
+      a_phone: '021 000 0000',
+    }));
+    const row = h.get<{ email: string; address: string; phone: string }>(
+      `SELECT email, address, phone FROM clients WHERE id = 'cl9'`)!;
+    expect(row.email, 'a document overwrote what the practice already knew')
+      .toBe('already@on.file');
+    expect(row.address).toBe('12 Example Street, Whanganui 4501');
+    expect(row.phone).toBe('021 000 0000');
   });
 });

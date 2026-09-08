@@ -102,6 +102,10 @@ const PersonSchema = z.object({
   current_visa_expiry: z.string().nullable(),
   occupation: z.string().nullable(),
   date_of_birth: z.string().nullable(),
+  /** Where they live, or where a company has its registered office. */
+  address: z.string().nullable(),
+  /** A company's New Zealand Business Number, where the document prints one. */
+  nzbn: z.string().nullable(),
   role: z.enum(PARTY_ROLE_VALUES).nullable(),
 });
 
@@ -117,6 +121,8 @@ function intakeSchema(caseTypes: string[]) {
     inz_application_number: z.string().nullable(),
     lodged_on: z.string().nullable(),
     decision_due_on: z.string().nullable(),
+    /** What the document says happens next, where it says so. */
+    next_action: z.string().nullable(),
     summary: z.string(),
     missing: z.array(z.string()),
   });
