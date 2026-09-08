@@ -577,6 +577,28 @@ sentence, not whether it happens to exist.
 Commit messages are the part that cannot easily be undone: a protected branch
 will refuse the force-push needed to rewrite them.
 
+**And it happened again, on 8 September 2026, at nine times the size — with this
+rule already written down.** Six live clients and three live companies were used
+as worked examples across 25 files: test fixtures, migration comments 0069–0071,
+`core/names.ts`, `core/casename.ts`, the Help page, the changelog, the progress
+report and the commit messages. Every one of them looked invented. That is the
+whole difficulty: a plausible name *is* what a real name looks like, and the
+rule's own instruction — "check them against the register before using them" —
+was skipped every single time, because at no point did it feel like a check
+worth making.
+
+It was found by an audit, not by anything in the register, which is the part
+that had to change. **`test/norealnames.test.ts` now fails if any of the nine
+appears anywhere outside itself.** That is narrow on purpose: a test cannot
+reach the production database, so it cannot tell you whether tomorrow's invented
+name belongs to somebody. It can only stop these nine coming back — the fault
+repeating, rather than a new one.
+
+The general form stays a human check, and it is one query, run before the name
+is used rather than after: send the candidate to the register and ask whether it
+matches. Do it in that direction. Pulling the client list out to compare against
+is itself an extract of client data, and it is refused.
+
 ---
 
 ## The shape of a good check

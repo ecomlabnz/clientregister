@@ -285,7 +285,7 @@ describe('the printed quotation states who the engagement is with', () => {
     h.db.prepare(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
                   VALUES (?,?,?,'x',?,'active',?,?)`).run(USER.id, USER.email, USER.name, USER.role, AT, AT);
     h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,status,created_at,updated_at)
-               VALUES ('cl1','CL-0001','individual','NGUYEN, ANH TAN','active','${AT}','${AT}')`);
+               VALUES ('cl1','CL-0001','individual','BUI, DUC MANH','active','${AT}','${AT}')`);
     h.db.exec(`INSERT INTO quotes (id,ref,client_id,description,amount_cents,status,created_at,updated_at)
                VALUES ('q1','Q-0001','cl1','Partner Resident Visa',700000,'draft','${AT}','${AT}')`);
     return h;
@@ -312,7 +312,7 @@ describe('the printed quotation states who the engagement is with', () => {
 
     const doc = await printed(h);
     expect(doc).toContain('The parties');
-    expect(doc).toContain('NGUYEN, ANH TAN');
+    expect(doc).toContain('BUI, DUC MANH');
     expect(doc).toContain('CHAU, THI BICH TAM');
     expect(doc).toContain('NGUYEN, MINH THANH');
     expect(doc, 'their relationship is what makes the row mean anything').toContain('partner');

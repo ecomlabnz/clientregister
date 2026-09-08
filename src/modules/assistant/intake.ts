@@ -86,7 +86,7 @@ function personFields(prefix: string, person: IntakePerson, roleFixed: PartyRole
   return html`
     ${'' /* First, because it decides what the rest of the boxes mean. Until
              8 September every party a reading proposed was created as an
-             individual, whatever the document said, so LAND MEAT NEW ZEALAND
+             individual, whatever the document said, so HARBOURSIDE PROTEINS NEW ZEALAND
              LIMITED arrived as a person with a very long family name and the
              only remedy was to notice and edit the record afterwards. The
              practice found it by trying to open a matter. */}
@@ -226,7 +226,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
                 ${field({ label: 'Or type or paste what you know', name: 'text', type: 'textarea',
                           rows: 10, maxlength: 40000,
                           placeholder: 'Submitted 20 August 2026. TAWHAI, Hemi Rangi — Partner Work Visa '
-                            + '(partner of TRUONG, Thi Thu Thuy aka Teera). A4374768' })}
+                            + '(partner of TRUONG, Thi Kim Oanh aka Teera). A4374768' })}
                 <button class="btn btn-primary" type="submit" ${enabled ? '' : raw('disabled')}>
                   Read it
                 </button>
@@ -291,7 +291,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       // Everybody else, checked the same way. Until 8 September 2026 only the
       // applicant was looked for, so every employer, partner and adviser a
       // reading named was created afresh however many times they had been read
-      // before — which is how two LAND MEAT NEW ZEALAND LIMITEDs came to be in
+      // before — which is how two HARBOURSIDE PROTEINS LIMITEDs came to be in
       // the list within forty minutes.
       Promise.all(parties.map((person) => matchExisting(c.env, person))),
     ]);
@@ -977,7 +977,7 @@ export async function matchExisting(
     // A company has one name, and it is the whole of it. The clause below wants
     // both halves of a person's name to agree, which a company can never
     // satisfy — so until 8 September 2026 an employer was never matched and a
-    // second LAND MEAT NEW ZEALAND LIMITED was created every time one was read.
+    // second HARBOURSIDE PROTEINS LIMITED was created every time one was read.
     // Reported by the practice on seeing two of them in the list.
     //
     // A whole company name matching exactly is not the coincidence a shared

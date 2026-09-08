@@ -28,10 +28,10 @@ function mount() {
              VALUES ('vocab.case_types','rv_partner | RV. Partner
 wv_aewv | WV. AEWV','${AT}')`);
   h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,email,address,status,created_at,updated_at)
-             VALUES ('cl1','CL-0001','individual','Anh Tan NGUYEN','Anh Tan','NGUYEN',
+             VALUES ('cl1','CL-0001','individual','Duc Manh BUI','Duc Manh','NGUYEN',
                      'client@example.test','12 Example Street, Auckland','active','${AT}','${AT}')`);
   h.db.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
-             VALUES ('k1','CASE-26-001','cl1','RV. Partner — Anh Tan NGUYEN','A partnership application',
+             VALUES ('k1','CASE-26-001','cl1','RV. Partner — Duc Manh BUI','A partnership application',
                      'rv_partner','lodged','${USER.id}','${AT}','${AT}')`);
   return h;
 }
@@ -90,10 +90,10 @@ describe('the letter says nothing the quotation says', () => {
     withWording(h);
     quote(h);
     h.db.exec(`INSERT INTO quote_parties (id,quote_id,position,role,kind,full_name,is_representative,created_at,updated_at)
-               VALUES ('p1','q1',0,'applicant','person','Anh Tan NGUYEN',1,'${AT}','${AT}')`);
+               VALUES ('p1','q1',0,'applicant','person','Duc Manh BUI',1,'${AT}','${AT}')`);
     const body = await (await h.request('/quotes/q1/letter')).text();
     expect(body).toContain('nominated to');
-    expect(body).toContain('Anh Tan NGUYEN');
+    expect(body).toContain('Duc Manh BUI');
   });
 });
 
@@ -103,7 +103,7 @@ describe('what the letter carries', () => {
     withWording(h);
     quote(h);
     const body = await (await h.request('/quotes/q1/letter')).text();
-    expect(body).toContain('Anh Tan NGUYEN');
+    expect(body).toContain('Duc Manh BUI');
     expect(body).toContain('12 Example Street, Auckland');
     expect(body).toContain('client@example.test');
   });

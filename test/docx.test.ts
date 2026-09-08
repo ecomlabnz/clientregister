@@ -67,8 +67,8 @@ const wordFile = (body: string) => zip([
 
 describe('opening the archive', () => {
   it('reads the words out of a Word document', async () => {
-    const read = await docxToText(wordFile(paragraph('Nguyen Anh Tan') + paragraph('Partner work visa')));
-    expect(read).toEqual({ text: 'Nguyen Anh Tan\nPartner work visa' });
+    const read = await docxToText(wordFile(paragraph('Nguyen Duc Manh') + paragraph('Partner work visa')));
+    expect(read).toEqual({ text: 'Nguyen Duc Manh\nPartner work visa' });
   });
 
   it('knows a Word document from any other zipped file', () => {

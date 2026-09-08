@@ -7,6 +7,27 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.15.1 — 8 September 2026
+
+### Fixed
+- **Nine real names had been used as examples in the code, and are gone.** Found
+  by an audit of the last two days' work, not by anything in the register.
+
+  Six clients and three companies on your register had been used as worked
+  examples — in test fixtures, in migration comments, on the Help page, in this
+  changelog and in commit messages. Every one of them looked like an invented
+  name, which is exactly the difficulty: a plausible name is what a real name
+  looks like. They have been replaced with names checked against the register
+  first, and a test now fails if any of the nine comes back.
+
+  **The commit messages cannot be cleaned the same way.** Rewriting them means
+  rewriting published history on a protected branch, which is a decision for the
+  practice rather than something to do quietly.
+
+  The rule this broke was already written down, which is the part worth saying
+  plainly: it is recorded in the mistakes ledger as having happened twice
+  before.
+
 ## 1.15.0 — 8 September 2026
 
 ### Fixed
@@ -51,7 +72,7 @@ The user-facing version of this list, one line per release, is in the app under
   invoice raised from it and the bulk export all read it. So it stays — and
   stops being typed. It is composed the same way a matter's name is: **a visa
   type, an optional word or two, and the client**, giving *"VV. Parent
-  Grandparent — Elena TOROPOVA"*. Type first, so sorting by name still groups by
+  Grandparent — Larisa MIKHAILOVA"*. Type first, so sorting by name still groups by
   kind of work.
 
   The New quote form can also be pointed at a **matter** now. Choose one and the
@@ -247,7 +268,7 @@ The user-facing version of this list, one line per release, is in the app under
 
 ### Added
 - **The assistant now recognises everybody it has seen before, not just the
-  client.** Reported with a screenshot of two LAND MEAT NEW ZEALAND LIMITEDs
+  client.** Reported with a screenshot of two HARBOURSIDE PROTEINS LIMITEDs
   forty minutes apart: *"the assistant just created a duplicate organisation.
   Does it check if it already exists??? Same needs to be true for clients so as
   to avoid duplication."*
@@ -269,12 +290,12 @@ The user-facing version of this list, one line per release, is in the app under
   to the matter.
 
 ### Fixed
-- **Given names are recorded in ordinary case: Van Chien, not VAN CHIEN.** Asked
+- **Given names are recorded in ordinary case: Van Hung, not VAN HUNG.** Asked
   for, and the mirror of the surname rule. A passport prints the whole name in
   capitals and so does an INZ letter, so everything the assistant reads arrives
   shouted end to end — and capitalising only the family name is what makes it
-  legible at a glance which half is which. "Thi Thu Thuy TRUONG" tells you;
-  "THI THU THUY TRUONG" does not.
+  legible at a glance which half is which. "Thi Kim Oanh DOAN" tells you;
+  "THI KIM OANH DOAN" does not.
 
   Only a name entirely in one case is touched. *McKenzie*, *de Jong*,
   *Anne-Marie* and *d'Angelo* are decisions somebody made, and re-casing them
@@ -316,7 +337,7 @@ The user-facing version of this list, one line per release, is in the app under
   morning's renaming read the case-type list with a database function that
   strips spaces and *only* spaces; the list is saved from a browser, so every
   label came through with a line ending still attached — `RV. Partner⏎ —
-  NGUYEN, ANH TAN`.
+  BUI, DUC MANH`.
 
   Nothing showed it: that character is invisible on a web page. It was in the
   CSV export, in searches, and would have been in the letter of engagement. The
@@ -334,7 +355,7 @@ The user-facing version of this list, one line per release, is in the app under
   individual — how come??"*
 
   Because every party the assistant proposed was created as an individual — the
-  word was hard-coded. So LAND MEAT NEW ZEALAND LIMITED arrived on the register
+  word was hard-coded. So HARBOURSIDE PROTEINS LIMITED arrived on the register
   as a person with a very long family name, with no way to say otherwise on the
   form, and the only remedy was to notice afterwards and edit the record.
 
@@ -448,7 +469,7 @@ The user-facing version of this list, one line per release, is in the app under
   that showed a matter's name and its description showed the same sentence
   twice, and then ran out of room for the reference and why the row was there.
 
-  A matter is now named **"Partner Resident Visa — Dinh Dai Phu PHAN"**, from
+  A matter is now named **"Partner Resident Visa — Bao Long VUONG"**, from
   its type and the person it is for, and the description you wrote is the line
   underneath. Nobody has to rename anything: migration 0066 rebuilds the names
   of the matters already in the register and does not touch one word of the
@@ -3358,7 +3379,7 @@ about. AI as the scout, rules as the guard.
   works with JavaScript off, and the sorted list has an address that can be
   bookmarked and shared.
 - Sorting by name sorts by **family name**, matching the way the register writes
-  them: *TRUONG, Thi Thu Thuy* sits under T for Truong, not under T for Thi. An
+  them: *TRUONG, Thi Kim Oanh* sits under T for Truong, not under T for Thi. An
   organisation has no family name and sorts under its registered one.
 - The name and title sorts use `COLLATE NOCASE`. SQLite compares text by byte
   otherwise, which puts `TRUONG` ahead of `Tagata` because capitals sort before
@@ -3686,8 +3707,8 @@ about. AI as the scout, rules as the guard.
 ### Changed
 - **Surnames are capitalised in a matter name**, as a passport prints them and
   as INZ writes them. Many of this practice's clients have names whose order is
-  not the English one: `TRUONG, Thi Thu Thuy` says which part is the family
-  name where `Truong, Thi Thu Thuy` leaves it to be guessed, and guessing wrong
+  not the English one: `TRUONG, Thi Kim Oanh` says which part is the family
+  name where `Truong, Thi Kim Oanh` leaves it to be guessed, and guessing wrong
   on a form comes back as a request for evidence.
 - The cases list showed the case type under the title. With the title naming
   the matter by its type, that said nothing; it shows what the matter is about

@@ -115,7 +115,7 @@ invoices, the audit log. There is no export fee and no exit interview.
 **Clients** — people and organisations, with nationality, contact details across
 Telegram, WhatsApp and email, English test results, multiple passports, and
 relationships between them (partner, employer, family group). Surnames are
-written the way a passport writes them: `TRUONG, Thi Thu Thuy`, in capitals,
+written the way a passport writes them: `TRUONG, Thi Kim Oanh`, in capitals,
 in plain English letters however they were typed.
 
 **Matters** — the full New Zealand lifecycle: lead, engaged, gathering

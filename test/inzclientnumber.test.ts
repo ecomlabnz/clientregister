@@ -36,14 +36,14 @@ function mount() {
   h.db.prepare(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
                 VALUES (?,?,?,'x',?,'active',?,?)`).run(USER.id, USER.email, USER.name, USER.role, AT, AT);
   h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,status,created_at,updated_at)
-             VALUES ('cl1','CL-0001','individual','Anh Tan NGUYEN','Anh Tan','NGUYEN','active','${AT}','${AT}'),
-                    ('cl2','CL-0002','individual','Van Chien HOANG','Van Chien','HOANG','active','${AT}','${AT}')`);
+             VALUES ('cl1','CL-0001','individual','Duc Manh BUI','Duc Manh','NGUYEN','active','${AT}','${AT}'),
+                    ('cl2','CL-0002','individual','Van Hung DINH','Van Hung','HOANG','active','${AT}','${AT}')`);
   return h;
 }
 
 /** The form posts every box, so a partial post would blank the rest. */
 const clientForm = (over: Record<string, string> = {}) => ({
-  kind: 'individual', given_names: 'Anh Tan', family_name: 'NGUYEN',
+  kind: 'individual', given_names: 'Duc Manh', family_name: 'NGUYEN',
   status: 'active', ...over,
 });
 
