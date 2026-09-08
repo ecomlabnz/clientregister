@@ -37,6 +37,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.2.2', date: '8 September 2026',
+    notes: [
+      'Quotes now point clients at www.immigration.kiwi/terms \u2014 the same address your letter '
+        + 'of engagement sends them to. They had been pointing at a PDF at a different address on '
+        + 'the same site, so a client reading both was shown two documents to accept.',
+      'And the quote asks clients to \u201cread\u201d the terms rather than \u201cdownload\u201d '
+        + 'them, which is what actually happens when they press the link.',
+    ],
+  },
+  {
     version: '1.2.1', date: '7 September 2026',
     notes: [
       'When the assistant cannot read something, it now tells you why in a sentence \u2014 whether '
