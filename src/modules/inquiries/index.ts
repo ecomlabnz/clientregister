@@ -28,7 +28,7 @@ import {
 import { countryCodeFor, countryOptions } from '../../core/countries';
 import { setNationalityStatements } from '../../core/nationalities';
 import { clientOptions, isAssignable, userOptions } from '../../core/lookups';
-import { composeFullName, familyNameFor, plainAscii, splitFullName } from '../../core/names';
+import { composeFullName, familyNameFor, givenNamesFor, plainAscii, splitFullName } from '../../core/names';
 import {
   CORRECTION_WINDOW_MINUTES, addEntry, correctable, listEntries,
 } from '../../core/timeline';
@@ -727,7 +727,7 @@ export const inquiriesModule: AppModule = {
         const split = givenNames || familyName
           ? { givenNames: givenNames ?? '', familyName: familyName ?? '' }
           : splitFullName(inq.contact_name ?? inq.contact_email ?? 'Unnamed client');
-        const given = kind === 'individual' ? plainAscii(split.givenNames) : '';
+        const given = kind === 'individual' ? givenNamesFor(split.givenNames) : '';
         const family = kind === 'individual' ? familyNameFor(split.familyName) : '';
         // An organisation is named by its registered name and nothing else. If
         // the box was left empty the inquiry's own contact name stands in,

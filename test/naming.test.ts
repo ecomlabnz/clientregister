@@ -241,7 +241,7 @@ describe('creating a party from the matter', () => {
     const route = cases.slice(cases.indexOf("r.post('/:id/parties/new'"),
                               cases.indexOf("r.post('/:id/parties',"));
     expect(route).toContain('familyNameFor(familyName)');
-    expect(route).toContain('plainAscii(givenNames');
+    expect(route).toContain('givenNamesFor(givenNames');
     expect(route).toContain("composeFullName('individual'");
   });
 

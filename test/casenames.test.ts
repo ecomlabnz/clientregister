@@ -240,7 +240,7 @@ describe('the name follows what it is made of', () => {
     // composes `full_name` from the two halves — a seed that set only the whole
     // name would look like a rename the moment anything else was saved.
     h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,status,created_at,updated_at)
-               VALUES ('cl1','CL-0001','individual','ANH TAN NGUYEN','ANH TAN','NGUYEN','active','${AT}','${AT}')`);
+               VALUES ('cl1','CL-0001','individual','Anh Tan NGUYEN','Anh Tan','NGUYEN','active','${AT}','${AT}')`);
     return h;
   }
 
@@ -252,7 +252,7 @@ describe('the name follows what it is made of', () => {
     });
     expect(res.status).toBe(303);
     const row = h.get<{ title: string; descriptor: string }>('SELECT title, descriptor FROM cases')!;
-    expect(row.title).toBe('Partner Resident Visa — ANH TAN NGUYEN');
+    expect(row.title).toBe('Partner Resident Visa — Anh Tan NGUYEN');
     expect(row.descriptor, 'the description must survive unchanged')
       .toBe('Partner RV based on an existing partnership, second attempt after a refusal');
     expect(row.title === row.descriptor, 'named by its own description again').toBe(false);
@@ -270,7 +270,7 @@ describe('the name follows what it is made of', () => {
       descriptor: 'The description',
     });
     expect(h.get<{ title: string }>('SELECT title FROM cases')!.title)
-      .toBe('Accredited Employer Work Visa — ANH TAN NGUYEN');
+      .toBe('Accredited Employer Work Visa — Anh Tan NGUYEN');
   });
 
   it('renames every matter when the client’s name is corrected', async () => {
@@ -279,9 +279,9 @@ describe('the name follows what it is made of', () => {
     // door.
     const h = seeded(clientsModule);
     h.db.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
-               VALUES ('k1','CASE-26-001','cl1','Partner Resident Visa — ANH TAN NGUYEN',
+               VALUES ('k1','CASE-26-001','cl1','Partner Resident Visa — Anh Tan NGUYEN',
                        'The description','rv_partner_local','lodged','${USER.id}','${AT}','${AT}'),
-                      ('k2','CASE-26-002','cl1','Accredited Employer Work Visa — ANH TAN NGUYEN',
+                      ('k2','CASE-26-002','cl1','Accredited Employer Work Visa — Anh Tan NGUYEN',
                        'Another description','wv_aewv_local','lodged','${USER.id}','${AT}','${AT}')`);
 
     await h.post('/clients/cl1', {
@@ -294,8 +294,8 @@ describe('the name follows what it is made of', () => {
     // The register composes the full name from the two halves, so the corrected
     // spelling arrives here in the form the client record now holds.
     expect(titles.map((t) => t.title)).toEqual([
-      'Partner Resident Visa — ANH TAN NGUYEN (CORRECTED)',
-      'Accredited Employer Work Visa — ANH TAN NGUYEN (CORRECTED)',
+      'Partner Resident Visa — Anh Tan NGUYEN (CORRECTED)',
+      'Accredited Employer Work Visa — Anh Tan NGUYEN (CORRECTED)',
     ]);
   });
 
@@ -304,7 +304,7 @@ describe('the name follows what it is made of', () => {
     // the kind of thing somebody spends an afternoon on in a year's time.
     const h = seeded(clientsModule);
     h.db.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
-               VALUES ('k1','CASE-26-001','cl1','Partner Resident Visa — ANH TAN NGUYEN',
+               VALUES ('k1','CASE-26-001','cl1','Partner Resident Visa — Anh Tan NGUYEN',
                        'The description','rv_partner_local','lodged','${USER.id}','${AT}','${AT}')`);
     await h.post('/clients/cl1', {
       kind: 'individual', given_names: 'ANH TAN', family_name: 'NGUYEN (CORRECTED)',

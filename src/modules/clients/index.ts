@@ -68,7 +68,7 @@ import {
   addPassport, passportById, passportStatusLabel, passportsFor, removePassport,
   setPrimaryPassport, updatePassport,
 } from '../../core/passports';
-import { composeFullName, familyNameFor, plainAscii, splitFullName, type ClientKind } from '../../core/names';
+import { composeFullName, familyNameFor, givenNamesFor, plainAscii, splitFullName, type ClientKind } from '../../core/names';
 import { dormantClients, stillDormant, type DormantClient } from '../../core/dormant';
 import {
   fetchEntity, isValidNzbnFormat, normaliseNzbn, nzbnConfigured, searchEntities,
@@ -405,7 +405,7 @@ function readClientForm(f: FormReader) {
 
   // Names are recorded in plain English letters and the family name in
   // capitals. Applied here, once, rather than left to whoever typed the record.
-  const givenNames = plainAscii(f.optional('given_names', { max: 120 })) || null;
+  const givenNames = givenNamesFor(f.optional('given_names', { max: 120 })) || null;
   const familyName = kind === 'individual'
     ? f.text('family_name', { required: true, label: 'Family name', max: 120 })
     : f.optional('family_name', { max: 120 }) ?? '';
@@ -430,7 +430,8 @@ function readClientForm(f: FormReader) {
     company_number: f.optional('company_number', { max: 30 }),
     organisation_id: f.optional('organisation_id', { max: 60 }),
     organisation_role: f.optional('organisation_role', { max: 100 }),
-    preferred_name: plainAscii(f.optional('preferred_name', { max: 120 })) || null,
+    // What somebody is actually called, in ordinary case like a given name.
+    preferred_name: givenNamesFor(f.optional('preferred_name', { max: 120 })) || null,
     email: f.email('email'),
     phone: f.optional('phone', { max: 60 }),
     whatsapp: f.optional('whatsapp', { max: 60 }),

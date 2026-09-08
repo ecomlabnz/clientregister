@@ -12,7 +12,7 @@ import type { AppModule } from '../../core/module';
 import { everyTermClause } from '../../core/search';
 import { all, nextRef, nextYearlyRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
-import { composeFullName, familyNameFor, formalName, plainAscii } from '../../core/names';
+import { composeFullName, familyNameFor, givenNamesFor, formalName, plainAscii } from '../../core/names';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
@@ -1287,7 +1287,7 @@ export const casesModule: AppModule = {
       // is written exactly as one created there — family name in capitals, in
       // plain English letters, however it was typed.
       const family = familyNameFor(familyName);
-      const given = plainAscii(givenNames ?? '');
+      const given = givenNamesFor(givenNames ?? '');
       const clientId = newId('cli');
       const ref = await nextRef(c.env.DB, 'client', 'CL');
       const stamp = nowIso();
