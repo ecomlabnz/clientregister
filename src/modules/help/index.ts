@@ -47,6 +47,10 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
         + 'every list showed the same sentence twice and then ran out of room for the reference.',
       'If you correct the spelling of a client\u2019s name, their matters are renamed to match, '
         + 'and a note on their file says so.',
+      'The people you record on a quotation are now printed on it, under \u201cThe parties\u201d '
+        + '\u2014 with who is nominated to give instructions, and what an agency contact may and '
+        + 'may not do. Your letter of engagement can refer to the quotation instead of restating '
+        + 'any of it.',
       'Nothing on the dashboard or the alerts list is cut off any more. Rows were limited to two '
         + 'lines, so narrowing the window hid the end of them. A row that needs three lines now '
         + 'takes three lines.',
