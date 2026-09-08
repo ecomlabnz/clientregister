@@ -7,6 +7,55 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.14.0 — 8 September 2026
+
+### Changed
+- **A quotation is now named, not described.** Asked on looking at the New quote
+  form: *"this field called Scope seems superfluous. why do i need to enter
+  details in it when that will be in the quotation?"*
+
+  Half right, and the halves are worth separating. The *paragraph* it printed on
+  the quotation was superfluous — the items are the scope, and a sentence beside
+  them can only repeat them or disagree with them. That section is gone, and the
+  name now heads the document as **Re**, the way a letter's subject line does.
+
+  But the value itself is the quotation's **name**: the quotes list, the quote's
+  own heading, the dashboard, search, the expiry alert, the email subject, the
+  invoice raised from it and the bulk export all read it. So it stays — and
+  stops being typed. It is composed the same way a matter's name is: **a visa
+  type, an optional word or two, and the client**, giving *"VV. Parent
+  Grandparent — Elena TOROPOVA"*. Type first, so sorting by name still groups by
+  kind of work.
+
+  The New quote form can also be pointed at a **matter** now. Choose one and the
+  quotation takes its name, its type and its client from the matter — so a
+  quotation can no longer name one person and bill another.
+
+- **One list of the work the practice does.** Asked a moment later: *"the field
+  From the catalogue — where does it feed from? ... quotation is for precisely
+  visa types or case types we are working on so why not?"* and *"these two lists
+  may create confusion — should they not be the same?"*
+
+  They should. The catalogue held a **copy** of the case types made once by
+  hand: 67 of its 74 rows were a name the register already had, none of them
+  carried a price, and the copy had already drifted — **two live case types had
+  no catalogue row**, one of them the very work being quoted when the question
+  was asked. The case types are now read straight from the vocabulary, so a type
+  added under Settings → Vocabulary is quotable the same minute.
+
+  Not merged both ways, deliberately. The seven rows that stay are two fee items
+  and five disbursements — Police certificate, Translation, Immigration New
+  Zealand fee and levy and so on. Those are things you charge for, not kinds of
+  matter, and offering them when opening a new matter would be wrong.
+
+### Fixed
+- **The letter of engagement was silently dropping its work-specific clauses**
+  on any quotation not attached to a matter — which is all five of them. The
+  clauses are chosen by the kind of work, and the quotation's lines were
+  carrying a catalogue id (`svc_t_vv_partner`) where the clause list holds the
+  vocabulary's own key (`vv_partner`). They could never match. The duplication
+  above was the cause, so the same change fixes it.
+
 ## 1.13.0 — 8 September 2026
 
 ### Added

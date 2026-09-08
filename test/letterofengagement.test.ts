@@ -167,7 +167,7 @@ describe('whether a quotation goes out with a letter', () => {
     // The practice's instruction: a mandatory choice at composition, so a
     // letter is never omitted by oversight and never sent by one.
     const h = mount();
-    const res = await h.post('/quotes', { client_id: 'cl1', description: 'Partner Resident Visa' });
+    const res = await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner' });
     expect(res.status).toBe(303);
     expect(res.headers.get('location')).toContain('/quotes/new');
     expect(h.count('SELECT COUNT(*) AS n FROM quotes')).toBe(0);
@@ -175,9 +175,9 @@ describe('whether a quotation goes out with a letter', () => {
 
   it('is stored as the answer given', async () => {
     const h = mount();
-    await h.post('/quotes', { client_id: 'cl1', description: 'A', with_letter: '1' });
+    await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '1' });
     expect(h.get<{ with_letter: number }>('SELECT with_letter FROM quotes')!.with_letter).toBe(1);
-    await h.post('/quotes', { client_id: 'cl1', description: 'B', with_letter: '0' });
+    await h.post('/quotes', { client_id: 'cl1', case_type: 'wv_aewv', with_letter: '0' });
     expect(h.count('SELECT COUNT(*) AS n FROM quotes WHERE with_letter = 0')).toBe(1);
   });
 

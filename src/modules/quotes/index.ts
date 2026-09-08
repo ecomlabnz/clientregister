@@ -26,7 +26,7 @@ import {
   QUOTE_STATUS_LABELS, QUOTE_STATUSES,
   type QuotePartyKind, type QuotePartyRole, type QuoteStatus,
 } from '../../domain';
-import { clientOptions } from '../../core/lookups';
+import { clientOptions, openCaseOptions } from '../../core/lookups';
 import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
 import {
@@ -41,6 +41,7 @@ import {
 import { asInteger, readSettings, type SettingsGroup } from '../../core/settings';
 
 import { caseTypes, labelFor, type Term } from '../../core/vocabulary';
+import { quoteNameFrom } from '../../core/casename';
 import { practiceDetails } from '../../core/practice';
 import {
   ENGAGEMENT_SETTINGS, allClauses, clauseTypes, clausesFor, engagementText, type ClauseRow,
@@ -95,6 +96,8 @@ export interface ServiceItemRow {
 
 export interface QuoteItemRow {
   id: string; quote_id: string; position: number; service_item_id: string | null;
+  /** The kind of work, as the vocabulary's own key. See migration 0074. */
+  case_type: string | null;
   description: string; kind: FeeKind; unit_label: string; quantity_milli: number;
   unit_amount_cents: number; gst_treatment: GstTreatment; gst_rate_bp: number;
   net_cents: number; gst_cents: number; gross_cents: number;
@@ -387,7 +390,9 @@ export const quotesModule: AppModule = {
 
     r.get('/new', requirePermission('quote:write'), async (c) => {
       const csrf = c.get('session')!.csrf;
-      const [clients, qs] = await Promise.all([clientOptions(c.env), quoteSettings(c.env)]);
+      const [clients, qs, matters, types] = await Promise.all([
+        clientOptions(c.env), quoteSettings(c.env), openCaseOptions(c.env), caseTypes(c.env),
+      ]);
       const presetClient = c.req.query('client_id') ?? '';
       const presetCase = c.req.query('case_id') ?? '';
       const presetInquiry = c.req.query('inquiry_id') ?? '';
@@ -398,14 +403,30 @@ export const quotesModule: AppModule = {
         ${pageHeader('New quote', 'Start with who it is for and what it covers. The items go on next.')}
         <form method="post" action="/quotes" class="form-grid">
           ${csrfField(csrf)}
-          <input type="hidden" name="case_id" value="${presetCase}">
           <input type="hidden" name="inquiry_id" value="${presetInquiry}">
+          ${'' /* The quotation is named rather than described. The practice, on
+                   the old free-text box: "this field called Scope seems
+                   superfluous. why do i need to enter details in it when that
+                   will be in the quotation?" The items are the scope; this is
+                   the name, and it is composed the same way a matter's is —
+                   type first, so sorting by name groups by kind of work. */}
           <div class="form-section">
             <h3>Who and what</h3>
-            ${select({ label: 'Client', name: 'client_id', value: presetClient, options: clients, includeBlank: 'No client yet' })}
-            ${field({ label: 'Scope', name: 'description', required: true, maxlength: 500,
-                      placeholder: 'e.g. Partnership work visa — preparation and lodgement',
-                      hint: 'One line describing the work. The itemisation comes next.' })}
+            ${select({ label: 'Matter', name: 'case_id', value: presetCase, options: matters,
+                       includeBlank: 'No matter yet',
+                       hint: 'Choose one and the quotation takes its name, its type and its '
+                         + 'client from the matter \u2014 the other three boxes are then ignored.' })}
+            ${select({ label: 'Client', name: 'client_id', value: presetClient, options: clients,
+                       includeBlank: 'No client yet' })}
+            ${select({ label: 'Visa type', name: 'case_type', value: '',
+                       options: types.map((t) => ({ value: t.key, label: t.label })),
+                       includeBlank: '\u2014 choose \u2014',
+                       hint: 'What the work is. The same list the matters use, editable under '
+                         + 'Settings \u2192 Vocabulary.' })}
+            ${field({ label: 'Anything to add', name: 'descriptor', maxlength: 120,
+                      placeholder: 'e.g. Grandparent',
+                      hint: 'Only what tells this quotation apart from another of the same kind '
+                        + 'for the same person. It joins the type in the name.' })}
           </div>
           ${'' /* A mandatory choice, with no default, at the moment the
                    quotation is composed. The practice's instruction on
@@ -449,7 +470,11 @@ export const quotesModule: AppModule = {
       const clientId = f.optional('client_id', { max: 60 });
       const caseId = f.optional('case_id', { max: 60 });
       const inquiryId = f.optional('inquiry_id', { max: 60 });
-      const description = f.text('description', { required: true, label: 'Scope', max: 500 });
+      // The name is composed, never typed. Three ways in, one place that
+      // decides — `core/casename.ts`, the same place a matter's name comes
+      // from, so the two cannot drift into different conventions.
+      const caseType = f.optional('case_type', { max: 80 });
+      const descriptor = f.optional('descriptor', { max: 120 });
       const issuedOn = f.date('issued_on') ?? nowIso().slice(0, 10);
       const days = f.int('validity_days', { min: 1, max: 365 }) ?? qs.validityDays;
       const notes = f.optional('notes', { max: 4000 });
@@ -459,6 +484,30 @@ export const quotesModule: AppModule = {
       const withLetter = f.enum('with_letter', ['0', '1'] as const, { required: true,
         label: 'Whether a letter of engagement goes with this quotation' });
       if (!f.valid) return redirectWith(c, '/quotes/new', Object.values(f.errors)[0] ?? 'Invalid quote.', 'err');
+
+      // A matter answers all three questions at once, and its answer wins: the
+      // quotation takes the matter's name, and its client, so a quotation
+      // cannot end up naming one person and billing another.
+      const matter = caseId
+        ? await one<{ title: string; client_id: string }>(
+            c.env.DB, 'SELECT title, client_id FROM cases WHERE id = ?', caseId)
+        : null;
+      if (caseId && !matter) {
+        return redirectWith(c, '/quotes/new', 'That matter no longer exists.', 'err');
+      }
+      const forClient = matter ? matter.client_id : (clientId || null);
+      if (!matter && !caseType) {
+        return redirectWith(c, '/quotes/new',
+          'Choose a matter, or a visa type for the quotation to be named after.', 'err');
+      }
+      const types = await caseTypes(c.env);
+      const client = forClient
+        ? await one<{ full_name: string }>(
+            c.env.DB, 'SELECT full_name FROM clients WHERE id = ?', forClient)
+        : null;
+      const description = matter
+        ? matter.title
+        : quoteNameFrom(types, caseType, descriptor, client?.full_name ?? null);
 
       // The date is worked out and stored now. A quote that says "valid for
       // 7 days" makes the reader do arithmetic from a date they have to find
@@ -473,14 +522,14 @@ export const quotesModule: AppModule = {
             disbursements_cents, currency, status, issued_on, validity_days, valid_until, notes,
             with_letter, created_at, updated_at, created_by)
          VALUES (?,?,?,?,?,?, 0, 0, 0, 'NZD', 'draft', ?,?,?,?,?,?,?,?)`,
-        id, ref, clientId || null, caseId || null, inquiryId || null, description,
+        id, ref, forClient, caseId || null, inquiryId || null, description,
         issuedOn, days, until, notes, withLetter === '1' ? 1 : 0,
         nowIso(), nowIso(), user.id,
       );
       await addEntry(c.env, { entityType: 'quote', entityId: id, kind: 'system',
         body: `Quote ${ref} started — valid until ${until}.`, createdBy: user.id });
-      if (clientId) {
-        await addEntry(c.env, { entityType: 'client', entityId: clientId, kind: 'system',
+      if (forClient) {
+        await addEntry(c.env, { entityType: 'client', entityId: forClient, kind: 'system',
           body: `Quote ${ref} drafted: ${description}.`, createdBy: user.id });
       }
       if (inquiryId) {
@@ -762,11 +811,12 @@ export const quotesModule: AppModule = {
       );
       if (!q) return c.notFound();
 
-      const [entries, terms, lines, items, fees, qSettings, stages, parties, quoteInvoices] = await Promise.all([
+      const [entries, terms, lines, items, lineTypes, fees, qSettings, stages, parties, quoteInvoices] = await Promise.all([
         listEntries(c.env, 'quote', id),
         practiceDetails(c.env),
         quoteLines(c.env, id),
         catalogue(c.env),
+        caseTypes(c.env),
         moneySettings(c.env),
         quoteSettings(c.env),
         quoteStages(c.env, id),
@@ -900,15 +950,31 @@ export const quotesModule: AppModule = {
                     ${csrfField(csrf)}
                     <div class="field">
                       <label for="f_service_item_id">From the catalogue</label>
+                      ${'' /* One list, in two groups. The case types are read live
+                               from the vocabulary rather than copied into the
+                               catalogue — the copy had already drifted by two
+                               types within a week, and one of the two was the
+                               work being quoted when the practice noticed.
+                               See migration 0074. */}
                       <select id="f_service_item_id" name="service_item_id" class="js-catalogue">
                         <option value="">— type it in below —</option>
-                        ${items.map((it) => html`<option value="${it.id}"
-                            data-description="${it.description || it.name}"
-                            data-kind="${it.kind}"
-                            data-unit="${it.unit_label}"
-                            data-amount="${(it.unit_amount_cents / 100).toFixed(2)}"
-                            data-gst="${it.gst_treatment}">${it.name}${it.unit_amount_cents
-                              ? ` — ${money(it.unit_amount_cents, q.currency)}/${it.unit_label}` : ''}</option>`)}
+                        <optgroup label="Visa and case types">
+                          ${lineTypes.map((t) => html`<option value="${`type:${t.key}`}"
+                              data-description="${t.label}"
+                              data-kind="professional"
+                              data-unit="${qSettings.defaultUnitLabel}"
+                              data-amount=""
+                              data-gst="exclusive">${t.label}</option>`)}
+                        </optgroup>
+                        <optgroup label="Standard items">
+                          ${items.map((it) => html`<option value="${it.id}"
+                              data-description="${it.description || it.name}"
+                              data-kind="${it.kind}"
+                              data-unit="${it.unit_label}"
+                              data-amount="${(it.unit_amount_cents / 100).toFixed(2)}"
+                              data-gst="${it.gst_treatment}">${it.name}${it.unit_amount_cents
+                                ? ` — ${money(it.unit_amount_cents, q.currency)}/${it.unit_label}` : ''}</option>`)}
+                        </optgroup>
                       </select>
                     </div>
                     ${field({ label: 'Description', name: 'description', required: true, maxlength: 300 })}
@@ -1254,7 +1320,11 @@ export const quotesModule: AppModule = {
       // Which clauses belong on this letter depends on the work, and the work
       // is the quotation's. A quotation covering more than one kind of matter
       // gets the clauses of all of them — see `clausesFor`.
-      const kinds = [...new Set(lines.map((l) => l.service_item_id).filter(Boolean))];
+      // `case_type`, not `service_item_id`. Before 0074 this read the catalogue
+      // id — `svc_t_vv_partner` against a clause listing `vv_partner` — so a
+      // quotation with no matter attached silently got no work-specific
+      // clauses at all.
+      const kinds = [...new Set(lines.map((l) => l.case_type).filter(Boolean))];
       const caseType = q.case_id
         ? (await one<{ case_type: string }>(
             c.env.DB, 'SELECT case_type FROM cases WHERE id = ?', q.case_id))?.case_type ?? null
@@ -1432,8 +1502,14 @@ export const quotesModule: AppModule = {
             </div>
             <div class="quote-doc-ref">
               <h2>Fee quote</h2>
+              ${'' /* "Re", not a Scope paragraph. The name says what the
+                       quotation is for in one line, the way a letter's subject
+                       does; the items below say what that means. Taking the old
+                       Scope section out left the document saying only "Fee
+                       quote" and a reference, which a client cannot place. */}
               <dl class="quote-doc-meta">
                 <dt>Quote</dt><dd class="strong">${q.ref}</dd>
+                <dt>Re</dt><dd>${q.description}</dd>
                 <dt>Issued</dt><dd>${dateShort(issuedOn)}</dd>
                 <dt>Valid until</dt><dd class="strong">${dateShort(validTo)}</dd>
                 ${q.case_ref ? html`<dt>Matter</dt><dd>${q.case_ref}</dd>` : ''}
@@ -1486,11 +1562,12 @@ export const quotesModule: AppModule = {
                  above.</p>` : ''}
           </section>
 
-          ${q.description ? html`
-            <section>
-              <h3>Scope</h3>
-              <p class="prewrap">${q.description}</p>
-            </section>` : ''}
+          ${'' /* No Scope section. The practice, on the box that fed it: "this
+                   field called Scope seems superfluous. why do i need to enter
+                   details in it when that will be in the quotation?" Right about
+                   the paragraph — the items below are the scope, and a sentence
+                   beside them can only repeat them or disagree with them. The
+                   value itself stays as the quotation's name, at the top. */}
 
           ${lines.length === 0
             ? html`<p class="muted">No items have been added to this quote yet.</p>`
@@ -1957,7 +2034,14 @@ export const quotesModule: AppModule = {
       const quantity = parseQuantityToMilli(f.text('quantity', { max: 10 }) || '1');
       const kind = f.enum('kind', FEE_KINDS, { fallback: 'professional' })!;
       const treatment = f.enum('gst_treatment', GST_TREATMENTS, { fallback: 'exclusive' })!;
-      const serviceItemId = f.optional('service_item_id', { max: 40 });
+      // One box, two kinds of answer. A "type:" value is a kind of work from the
+      // vocabulary and goes in `case_type`; anything else is a catalogue row.
+      // Kept apart in the database rather than sharing one column, because the
+      // letter's clauses are chosen from the first and would never match the
+      // second — which is exactly the bug 0074 fixed.
+      const chosen = f.optional('service_item_id', { max: 80 });
+      const caseTypeChosen = chosen?.startsWith('type:') ? chosen.slice(5) : null;
+      const serviceItemId = caseTypeChosen ? null : chosen;
       if (!f.valid) return redirectWith(c, `/quotes/${id}`, Object.values(f.errors)[0]!, 'err');
       if (quantity === null) {
         return redirectWith(c, `/quotes/${id}`, 'Give the quantity as a number, e.g. 1, 2 or 0.25.', 'err');
@@ -1976,11 +2060,11 @@ export const quotesModule: AppModule = {
       const now = nowIso();
       await run(
         c.env.DB,
-        `INSERT INTO quote_items (id, quote_id, position, service_item_id, description, kind, unit_label,
+        `INSERT INTO quote_items (id, quote_id, position, service_item_id, case_type, description, kind, unit_label,
             quantity_milli, unit_amount_cents, gst_treatment, gst_rate_bp,
             net_cents, gst_cents, gross_cents, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        newId('qit'), id, nextPosition, serviceItemId || null, description, kind,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        newId('qit'), id, nextPosition, serviceItemId || null, caseTypeChosen, description, kind,
         f.optional('unit_label', { max: 30 }) || qs.defaultUnitLabel,
         quantity, unitAmount, fees.gstRegistered ? treatment : 'none', gstRateBp,
         amounts.netCents, amounts.gstCents, amounts.grossCents, now, now,
