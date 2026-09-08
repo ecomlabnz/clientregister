@@ -773,6 +773,19 @@ attachments at risk.
 | `created_at` | TEXT | NOT NULL |  |
 | `updated_at` | TEXT | NOT NULL |  |
 
+### `engagement_clauses`
+
+| Column | Type | | Default |
+|---|---|---|---|
+| `id` | TEXT | PK |  |
+| `position` | INTEGER | NOT NULL | 0 |
+| `heading` | TEXT | NOT NULL |  |
+| `body` | TEXT | NOT NULL |  |
+| `case_types` | TEXT | NOT NULL | '' |
+| `active` | INTEGER | NOT NULL | 1 |
+| `created_at` | TEXT | NOT NULL |  |
+| `updated_at` | TEXT | NOT NULL |  |
+
 ### `quote_parties`
 
 | Column | Type | | Default |
