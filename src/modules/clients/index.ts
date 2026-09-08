@@ -515,7 +515,7 @@ function certificateDateUnverified(
 export const CLIENT_SORTS: Record<string, string[]> = {
   ref: ['c.ref'],
   // A register that writes surnames in capitals sorts by them too: "TRUONG,
-  // Thi Thu Thuy" belongs under T for Truong, not under T for Thi. An
+  // Thi Kim Oanh" belongs under T for Truong, not under T for Thi. An
   // organisation has no family name, so it sorts under its registered one.
   //
   // COLLATE NOCASE because SQLite compares text by byte otherwise, which puts

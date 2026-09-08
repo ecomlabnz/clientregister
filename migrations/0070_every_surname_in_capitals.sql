@@ -1,6 +1,6 @@
 -- Put the older surnames in capitals, like every one saved since.
 --
--- The practice records family names in capitals: NGUYEN, ANH TAN. It is a house
+-- The practice records family names in capitals: BUI, DUC MANH. It is a house
 -- style, applied on the way in rather than in the templates — `familyNameFor`
 -- in `core/names.ts` — so the client, the matter named from it, the export and
 -- any search all agree without each of them remembering to.

@@ -7,7 +7,7 @@
 -- **SQLite's `trim()` strips spaces. Only spaces.** The settings row was saved
 -- from a browser, so its lines end CRLF, and every label came out of that
 -- parser with a carriage return still on the end. 190 of the 194 names are
--- "RV. Partner\r — NGUYEN, ANH TAN".
+-- "RV. Partner\r — BUI, DUC MANH".
 --
 -- Nothing showed it. A carriage return is whitespace in HTML and collapses, so
 -- the pages looked right; it is in the CSV export, in a search for the label,

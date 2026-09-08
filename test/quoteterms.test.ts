@@ -31,7 +31,7 @@ const quote = {
   valid_until: null, sent_at: null, responded_at: null, notes: null,
   issued_on: '2026-09-08', validity_days: 30, stage_note: null,
   created_at: '2026-09-08T00:00:00Z', updated_at: '2026-09-08T00:00:00Z', created_by: 'u1',
-  client_name: 'NGUYEN, ANH TAN',
+  client_name: 'BUI, DUC MANH',
 } as unknown as QuoteRow & { client_name: string | null };
 
 const practice = {

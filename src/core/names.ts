@@ -92,16 +92,16 @@ export function familyNameFor(value: string | null | undefined): string {
 }
 
 /**
- * Given names in ordinary case: Van Chien, not VAN CHIEN.
+ * Given names in ordinary case: Van Hung, not VAN HUNG.
  *
  * The mirror of `familyNameFor`, and asked for on 8 September 2026 for the same
  * reason the surname is shouted: *"the reverse is true for given names — they
- * should be normalised. Not VAN CHIEN but Van Chien."* A passport prints the
+ * should be normalised. Not VAN HUNG but Van Hung."* A passport prints the
  * whole name in capitals and so does an INZ letter, so anything read out of a
  * document arrives that way; capitalising only the family name is what makes it
  * legible at a glance which part is which.
  *
- * **Only a name that is entirely in one case is touched.** "VAN CHIEN" and
+ * **Only a name that is entirely in one case is touched.** "VAN HUNG" and
  * "van chien" are somebody's shift key, not a decision. "McKenzie", "de Jong",
  * "Anne-Marie" and "d'Angelo" are decisions, and re-casing them would be this
  * function inventing a style the person did not use — the exact fault the
@@ -127,8 +127,8 @@ export function givenNamesFor(value: string | null | undefined): string {
  *
  * The family name is capitalised, as a passport prints it and as INZ writes it.
  * That is not decoration: half this practice's clients have names whose order
- * is not the English one, and "Thi Thu Thuy TRUONG" tells you which part is the
- * family name where "Thi Thu Thuy Truong" leaves you guessing. Guessing wrong
+ * is not the English one, and "Thi Kim Oanh DOAN" tells you which part is the
+ * family name where "Thi Kim Oanh Truong" leaves you guessing. Guessing wrong
  * on a form is the sort of mistake that comes back as a request for evidence.
  */
 export function formalName(parts: NameParts, fallback = ''): string {

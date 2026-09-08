@@ -37,6 +37,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.15.1', date: '8 September 2026',
+    notes: [
+      'Nine real names \u2014 six of your clients and three companies \u2014 had been used as '
+        + 'worked examples inside the code, and have been replaced with invented ones. An audit '
+        + 'found them; nothing in the register did.',
+      'A check now runs on every build and fails if any of the nine appears again.',
+      'The names are still in the commit history, which cannot be cleaned without rewriting '
+        + 'published history. That is your decision rather than ours to make quietly.',
+    ],
+  },
+  {
     version: '1.15.0', date: '8 September 2026',
     notes: [
       'The summary at the top of a matter is a summary again \u2014 four sentences at most \u2014 '
@@ -55,7 +66,7 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
     notes: [
       'A quotation is named rather than described. You pick the visa type, add a word or two if '
         + 'it needs one, and the name is written for you \u2014 "VV. Parent Grandparent \u2014 '
-        + 'Elena TOROPOVA" \u2014 the same way a matter is named.',
+        + 'Larisa MIKHAILOVA" \u2014 the same way a matter is named.',
       'The Scope paragraph is off the printed quotation, because the items are the scope. The '
         + 'name now heads the document as "Re", the way a letter\u2019s subject line does.',
       'A quotation can be pointed at a matter. Choose one and it takes the matter\u2019s name, '
@@ -157,7 +168,7 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
         + 'agree, and a company has one name \u2014 and everybody other than the client was '
         + 'created afresh on every reading. Each person now offers the same choice: use the record '
         + 'already there, or create a new one.',
-      'Given names are recorded in ordinary case: Van Chien, not VAN CHIEN. Documents print the '
+      'Given names are recorded in ordinary case: Van Hung, not VAN HUNG. Documents print the '
         + 'whole name in capitals, so everything read out of one arrived shouted \u2014 and '
         + 'capitalising only the surname is what shows at a glance which half is which.',
       'A name somebody has styled themselves \u2014 McKenzie, de Jong, Anne-Marie \u2014 is left '
@@ -240,7 +251,7 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
     version: '1.4.1', date: '8 September 2026',
     notes: [
       'Matters are named again instead of being described twice. A matter now reads '
-        + '\u201cPartner Resident Visa \u2014 Dinh Dai Phu PHAN\u201d, with the description you '
+        + '\u201cPartner Resident Visa \u2014 Bao Long VUONG\u201d, with the description you '
         + 'wrote on the line underneath. Every matter already in the register has been renamed '
         + 'this way and not one description was changed.',
       'The New matter form had been putting your description into the name as well, which is why '
@@ -1281,7 +1292,7 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
       'Column headings in Cases and Clients now sort. Click one to sort by it, click it '
         + 'again to reverse. The sort is part of the address, so a sorted list can be '
         + 'bookmarked and comes back sorted.',
-      'Sorting by name sorts by family name — TRUONG, Thi Thu Thuy sits under T for '
+      'Sorting by name sorts by family name — TRUONG, Thi Kim Oanh sits under T for '
         + 'Truong — and ignores capitals, so a name entered any way lands in the right '
         + 'place.',
     ],
@@ -1762,8 +1773,8 @@ function sections(origin: string): Section[] {
         <p class="prewrap"><code>AEWV. TAGATA, Sione</code><br>
            <code>S.61. TAWHAI, Hemi Rangi</code></p>
         <p>Capitals on the surname are not decoration. Many clients have names whose order is not
-           the English one, and <em>TRUONG, Thi Thu Thuy</em> says which part is the family name
-           where <em>Truong, Thi Thu Thuy</em> leaves it to be guessed — and guessing wrong on a
+           the English one, and <em>TRUONG, Thi Kim Oanh</em> says which part is the family name
+           where <em>Truong, Thi Kim Oanh</em> leaves it to be guessed — and guessing wrong on a
            form comes back as a request for evidence.</p>
         <p>Pick the client and the type and the name is filled in for you, taking the short form
            of the type from the dropdown. Type in the box and it stops proposing, for good.</p>
