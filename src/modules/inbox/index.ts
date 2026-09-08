@@ -199,7 +199,12 @@ export const inboxModule: AppModule = {
       }, 200, { 'cache-control': 'no-store' });
     });
 
-    r.get('/', requirePermission('ingest:triage'), async (c) => {
+    // Incoming opens here, so this is the one route in the family that redirects
+    // rather than refuses. A read-only account cannot triage, and a 403 on the
+    // page the top bar sends you to is a dead end; the inquiries list is what
+    // such an account came for anyway.
+    r.get('/', requirePermission('register:read'), async (c) => {
+      if (!can(c.get('user'), 'ingest:triage')) return c.redirect('/inquiries', 302);
       const status = ['pending', 'processed', 'ignored', 'failed', 'filed', 'all'].includes(c.req.query('status') ?? '')
         ? c.req.query('status')! : 'pending';
       const channel = c.req.query('channel') ?? '';
@@ -255,7 +260,7 @@ export const inboxModule: AppModule = {
       const keep = (extra: Record<string, string>): string =>
         new URLSearchParams({ status, channel, q, ...extra }).toString();
 
-      return page(c, { title: 'Inbox', active: '/inquiries' }, html`
+      return page(c, { title: 'Inbox', active: '/inbox' }, html`
         ${pageHeader('Inbox', 'Everything that arrived from a channel, before anybody has decided about it.')}
         ${incomingTabs(c.get('user'), 'inbox', family)}
 
@@ -302,9 +307,29 @@ export const inboxModule: AppModule = {
                  and Delete carries a `formaction` instead. That way the press
                  that happens by accident — Enter in the form — is the one that
                  writes a note rather than the one that destroys a message. */}
-        <form method="post" action="/inbox/file" id="inbox-bulk">
+        <form method="post" action="/inbox/file" id="inbox-bulk" class="js-bulk">
           ${csrfField(csrf)}
           <input type="hidden" name="back" value="${keep({})}">
+          ${'' /* Above the list, and only once something is ticked. Asked for on
+                   8 September 2026: "these two buttons need to move up and
+                   appear only when user selects an item or items".
+
+                   Below a list of seventy it was a scroll away from the boxes
+                   it acts on, which is the wrong way round — you tick at the
+                   top and then have to go looking for the button. Not sticky:
+                   the table header already sticks, and two bars claiming one
+                   line is worse than neither doing it. See `.bulk-bar`.
+
+                   `hidden` is set by `app.js` on load, never in the markup: with
+                   scripting off the bar is simply always there, which is what it
+                   was before. A control that only exists when a script runs is
+                   a control a blocked script takes away. */}
+          ${selectable > 0 ? html`
+            <div class="bulk-bar js-bulk-bar">
+              <span class="bulk-count js-bulk-count">Tick the ones that belong together</span>
+              <button class="btn btn-primary" type="submit">File selected</button>
+              <button class="btn btn-danger" type="submit" formaction="/inbox/delete">Delete selected</button>
+            </div>` : ''}
         ${table([
           { label: raw('<span class="sr-only">Select</span>'), width: 'pick' },
           { label: 'Subject', width: '38' },
@@ -367,13 +392,9 @@ export const inboxModule: AppModule = {
                 ${row.inquiry_id ? html`<div class="small"><a href="/inquiries/${row.inquiry_id}">inquiry</a></div>` : ''}</td>
           </tr>`), { sticky: true, fixed: true, empty: 'Nothing here.' })}
           ${selectable > 0 ? html`
-            <div class="filters mt">
-              <button class="btn btn-primary" type="submit">File selected</button>
-              <button class="btn btn-danger" type="submit" formaction="/inbox/delete">Delete selected</button>
-              <span class="hint">Tick the ones that belong together, then file them on the matter
-                 or client in one go — or delete what should not be here. Either way you are shown
-                 exactly what is about to happen before anything does.</span>
-            </div>` : ''}
+            <p class="hint mt">File them on the matter or client in one go — or delete what should
+               not be here. Either way you are shown exactly what is about to happen before
+               anything does.</p>` : ''}
         </form>
         </div>`);
     });
@@ -501,7 +522,7 @@ export const inboxModule: AppModule = {
 
       const csrf = c.get('session')!.csrf;
 
-      return page(c, { title: 'Delete these messages?', active: '/inquiries' }, html`
+      return page(c, { title: 'Delete these messages?', active: '/inbox' }, html`
         ${pageHeader('Delete these messages?',
           'They go for good. The audit log keeps the record that each one arrived.')}
 
@@ -610,7 +631,7 @@ export const inboxModule: AppModule = {
       const csrf = c.get('session')!.csrf;
       const many = going.length !== 1;
 
-      return page(c, { title: 'File these messages', active: '/inquiries' }, html`
+      return page(c, { title: 'File these messages', active: '/inbox' }, html`
         ${pageHeader(`File ${String(going.length)} ${many ? 'messages' : 'message'}`,
           'They all go on the same matter or client. Each one is written as its own note.')}
 
@@ -731,7 +752,7 @@ export const inboxModule: AppModule = {
         incomingCounts(c.env),
       ]);
 
-      return page(c, { title: 'Conversations', active: '/inquiries' }, html`
+      return page(c, { title: 'Conversations', active: '/inbox' }, html`
         ${pageHeader('Conversations',
           'Each channel as a two-way thread: what they sent, and what the practice sent back.')}
         ${incomingTabs(c.get('user'), 'threads', family)}
@@ -848,7 +869,7 @@ export const inboxModule: AppModule = {
       const threadTargets = canFileThread && !(thread as any).filed_at
         ? await filingSearch(c.env, threadFind) : [];
 
-      return page(c, { title: thread.peer_label ?? thread.peer_id, active: '/inquiries' }, html`
+      return page(c, { title: thread.peer_label ?? thread.peer_id, active: '/inbox' }, html`
         ${breadcrumbs([{ label: 'Inbox', href: '/inbox' },
                        { label: 'Conversations', href: '/inbox/threads' },
                        { label: thread.peer_label ?? thread.peer_id }])}
@@ -1113,7 +1134,7 @@ export const inboxModule: AppModule = {
         dateLabel: dateTime(found.entry.at),
       });
 
-      return page(c, { title: 'Forward', active: '/inquiries' }, html`
+      return page(c, { title: 'Forward', active: '/inbox' }, html`
         ${breadcrumbs([{ label: 'Conversations', href: '/inbox/threads' },
                        { label: thread.peer_label ?? thread.peer_id, href: here },
                        { label: 'Forward' }])}
@@ -1349,7 +1370,7 @@ ${quote}</textarea>
         ? await filingTargetLabel(c.env, msg.filed_to_type as 'case' | 'client', msg.filed_to_id)
         : null;
 
-      return page(c, { title: 'Inbox message', active: '/inquiries' }, html`
+      return page(c, { title: 'Inbox message', active: '/inbox' }, html`
         ${breadcrumbs([{ href: '/inbox', label: 'Inbox' }, { label: msg.channel }])}
         ${pageHeader(msg.subject || '(no subject)',
           html`${msg.channel} · from ${msg.sender_display ?? msg.sender ?? 'unknown'} · ${stamp(msg.received_at)}`)}

@@ -880,6 +880,34 @@ textarea { resize: vertical; min-height: 70px; }
 .filters input[type="search"] { flex: 1; min-width: 220px; }
 .filters select, .filters input[type="date"] { width: auto; }
 
+/* The bulk bar on Incoming: what happens to the ticked rows.
+ *
+ * Above the list rather than below it, where it was a scroll away from the
+ * boxes it acts on. Asked for on 8 September 2026.
+ *
+ * **Deliberately not sticky.** It was, for one draft: you tick as you read down
+ * seventy messages and the button should still be there at the end. But the
+ * table's own header already sticks at `--topbar-h`, and a second sticky bar at
+ * the same offset is two things fighting for one line — one covers the other,
+ * and which one wins depends on scroll direction. A bar that moves under the
+ * column headings is worse than one that stays put.
+ *
+ * `hidden` is set by app.js once nothing is ticked; with scripting off the bar
+ * is simply always visible, which is what it was before. The accent border is
+ * the only loud thing on it, because the bar appearing at all is the signal.
+ */
+.bulk-bar {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 12px; padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--accent);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.bulk-count { font-weight: 600; margin-right: auto; }
+@media (max-width: 560px) {
+  .bulk-count { margin-right: 0; width: 100%; }
+  .bulk-bar .btn { flex: 1; }
+}
+
 /* A tick box is a tick box at every width.
    Inputs are full-width by default, which is right for a text field and wrong
    for a control the browser draws at a fixed size: stretched, the inbox's
