@@ -70,7 +70,7 @@ Reply with a single JSON object and nothing else, using exactly these keys:
       const instruction = `${INTAKE_SYSTEM_PROMPT}
 
 Reply with a single JSON object and nothing else, using exactly these keys:
-{"applicant":{"given_names":string|null,"family_name":string|null,"preferred_name":string|null,
+{"applicant":{"kind":"individual"|"organisation","given_names":string|null,"family_name":string|null,"preferred_name":string|null,
   "email":string|null,"phone":string|null,"nationalities":string[],
   "current_visa_type":string|null,"current_visa_expiry":string|null,"occupation":string|null,
   "date_of_birth":string|null,"role":string|null},

@@ -76,6 +76,19 @@ const PARTY_ROLE_VALUES = [
 ] as const;
 
 const PersonSchema = z.object({
+  /**
+   * A person or a company.
+   *
+   * Asked for, rather than assumed. Every party a reading proposed used to be
+   * created as an individual, so [retired example 7] LIMITED arrived on the
+   * register as a person with a very long family name, and the only way to fix
+   * it was to notice and edit the record afterwards. The document says which it
+   * is — a name ending in Limited, an NZBN, a trading name — and this is the
+   * field that carries the answer through to the form, where a person can
+   * change it before anything is written.
+   */
+  kind: z.enum(['individual', 'organisation']),
+  /** Empty for an organisation: a company has one name, in `family_name`. */
   given_names: z.string().nullable(),
   family_name: z.string().nullable(),
   preferred_name: z.string().nullable(),
