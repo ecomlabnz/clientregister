@@ -37,6 +37,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.16.0', date: '8 September 2026',
+    notes: [
+      'Incoming opens on the Inbox now, and the Inbox tab is first. That is where the work is: '
+        + '122 pieces have come through it against 4 open inquiries.',
+      'File selected and Delete selected have moved above the list, and only appear once you '
+        + 'tick something. The bar tells you how many you have picked.',
+      'With scripting switched off the two buttons are simply always there, as before.',
+    ],
+  },
+  {
     version: '1.15.1', date: '8 September 2026',
     notes: [
       'Nine real names \u2014 six of your clients and three companies \u2014 had been used as '
