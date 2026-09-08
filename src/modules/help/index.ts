@@ -37,6 +37,20 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.9.0', date: '8 September 2026',
+    notes: [
+      'The assistant now fills in everything it read. An address for each person or company, a '
+        + 'company\u2019s NZBN, and what the document says happens next on the matter \u2014 all '
+        + 'of which it could see and had nowhere to put, so you typed them again from the same '
+        + 'document.',
+      'An NZBN is checked before it is stored. One read off a document can arrive spaced out or '
+        + 'not be an NZBN at all, and stored as read it would be refused the next time you opened '
+        + 'that client.',
+      'For somebody already on the register, all of this fills in only what their record has left '
+        + 'empty. Nothing you have recorded is ever written over by a reading.',
+    ],
+  },
+  {
     version: '1.8.0', date: '8 September 2026',
     notes: [
       'The assistant now recognises everybody it has seen before, not only the client. An employer '
