@@ -343,12 +343,17 @@ export const dashboardModule: AppModule = {
               { label: 'What', width: '50', sort: 'what' },
               { label: 'Detail', width: '34', hideOn: 'sm', sort: 'detail' },
             ], needsCard.rows.slice(0, needsRows).map((a) => html`
+              ${'' /* Nothing clamped. Reported by the practice, 8 September 2026:
+                       narrowing the window made the text disappear, because a
+                       two-line clamp holds fewer characters as the column gets
+                       narrower and there is nothing to say the rest exists. A
+                       row that needs three lines takes three lines. */}
               <tr class="${a.date < today ? 'row-urgent' : ''}">
                 <td class="small ${a.date < today ? 'warn' : ''}">${dateShort(a.date)}
                   <div class="muted">${relativeDays(a.date)}</div></td>
-                <td><a class="clamp-2" href="${a.href}">${a.title}</a>
+                <td><a href="${a.href}">${a.title}</a>
                   <div class="row-meta show-sm"><span class="muted">${a.detail}</span></div></td>
-                <td class="small muted col-sm-hide clamp-2">${a.detail}</td>
+                <td class="small muted col-sm-hide">${a.detail}</td>
               </tr>`), { fixed: true, sort: needsCard.table })}`)}
 
         <div class="cols">

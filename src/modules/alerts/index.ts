@@ -582,7 +582,7 @@ async function unbilledAlerts(env: Env, today: string): Promise<Alert[]> {
     severity: (daysBetween(String(k.done_on), today) >= grace * 3 ? 'overdue' : 'urgent') as AlertSeverity,
     date: String(k.done_on),
     title: k.title,
-    detail: `${k.descriptor ? `${k.descriptor} · ` : ''}${k.client_name} · ${k.ref} · `
+    detail: `${k.descriptor ? `${k.descriptor} · ` : ''}${k.ref} · `
       + `finished ${dateShort(String(k.done_on))}, nothing charged`,
     href: `/cases/${k.id}`,
   }));
@@ -659,11 +659,14 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
       kind: 'case_deadline' as const,
       severity: severityFor(k.decision_due_at, today),
       date: k.decision_due_at,
-      // The title names the matter by its type and client, so appending the
-      // client again said it twice. The client moves to the detail line, where
-      // it is still there for a title somebody wrote their own way.
+      // The title names the matter — its type and the person it is for — so
+      // the detail line says only what the title cannot: what makes this matter
+      // different, its reference, and why the row is here. Naming the client
+      // again spent the line's whole width restating the line above it, and cut
+      // off the reference to do it. Reported by the practice, 8 September 2026.
+      // See `src/core/casename.ts`.
       title: k.title,
-      detail: `${k.descriptor ? `${k.descriptor} · ` : ''}${k.client_name} · ${k.ref} · `
+      detail: `${k.descriptor ? `${k.descriptor} · ` : ''}${k.ref} · `
         + `${CASE_STATUS_LABELS[k.status as keyof typeof CASE_STATUS_LABELS] ?? k.status}`
         + (DEADLINE_CASE_STATUSES.includes(k.status) ? ' · response required' : ''),
       href: `/cases/${k.id}`,
@@ -696,7 +699,7 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
         severity: (daysBetween(on, today) >= quietDays * 2 ? 'overdue' : 'urgent') as AlertSeverity,
         date: on,
         title: k.title,
-        detail: `${k.descriptor ? `${k.descriptor} · ` : ''}${k.client_name} · ${k.ref} · `
+        detail: `${k.descriptor ? `${k.descriptor} · ` : ''}${k.ref} · `
           + `nothing since ${dateShort(on)}`,
         href: `/cases/${k.id}`,
       };
@@ -709,7 +712,7 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
       severity: 'urgent' as AlertSeverity,
       date: String(k.lodged_at ?? k.updated_at ?? today).slice(0, 10),
       title: k.title,
-      detail: `${k.client_name} · ${k.ref} · ${describeContradiction(k, today)}`,
+      detail: `${k.ref} · ${describeContradiction(k, today)}`,
       href: `/cases/${k.id}`,
     })),
     ...unacknowledged.map((k: any) => {
@@ -721,7 +724,7 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
         severity: (daysBetween(on, today) >= ackDays * 2 ? 'overdue' : 'urgent') as AlertSeverity,
         date: on,
         title: k.title,
-        detail: `${k.descriptor ? `${k.descriptor} · ` : ''}${k.client_name} · ${k.ref} · `
+        detail: `${k.descriptor ? `${k.descriptor} · ` : ''}${k.ref} · `
           + `lodged ${dateShort(on)}, no INZ application number recorded`,
         href: `/cases/${k.id}`,
       };
@@ -744,7 +747,7 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
         ? 'urgent' : 'soon') as AlertSeverity,
       date: String(k.decision_due_at ?? k.created_at ?? today).slice(0, 10),
       title: k.title,
-      detail: `${k.descriptor ? `${k.descriptor} · ` : ''}${k.client_name} · ${k.client_ref} · `
+      detail: `${k.descriptor ? `${k.descriptor} · ` : ''}${k.client_ref} · `
         + 'no current visa recorded',
       // To the client, not the matter: the visa is recorded on the person, and
       // the row exists to be cleared.
@@ -940,7 +943,10 @@ export const alertsModule: AppModule = {
                 <td class="small ${alert.severity === 'overdue' ? 'warn' : ''}">
                   ${dateShort(alert.date)}
                   <div class="muted">${relativeDays(alert.date)}</div></td>
-                <td><a class="clamp-2" href="${alert.href}">${alert.title}</a>
+                ${'' /* Not clamped, for the same reason as the dashboard: two
+                         lines hold fewer characters as the column narrows, and
+                         nothing says the rest is there. */}
+                <td><a href="${alert.href}">${alert.title}</a>
                     <div class="row-meta show-sm">
                       ${badge(KIND_LABELS[alert.kind], SEVERITY_TONES[alert.severity])}
                       <span class="muted">${alert.detail}</span>
