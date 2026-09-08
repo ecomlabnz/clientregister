@@ -178,6 +178,18 @@ Related and unfixed: an article deleted through the database takes its file rows
 with it, but nothing removes the objects from R2. No route deletes an article
 today, so there are no orphans yet.
 
+### 11. The shipped defaults name this practice
+`practice.terms_url` defaults to `https://www.immigration.kiwi/terms` — this
+practice's own site. Right for them, wrong for the second practice, who would
+be shipping their clients somebody else's terms until they noticed.
+
+The same is true of anything in `core/practice.ts` that carries a real value
+rather than an empty one. Not urgent — nobody else has a database yet — but it
+belongs on the list of things to settle before one does, alongside the naming in
+`docs/skills/README.md`. The fix is probably that these default to empty and the
+quote simply omits the sentence, which it already does correctly when the
+setting is blank (there is a test).
+
 ### 8. Reading across from other sessions
 The **App field comparison review** session produced the nine fields above. Its
 own audit ended with no repository changes and a mail-DNS fix. Nothing else has
@@ -217,6 +229,12 @@ Kept short — the full record is in `CHANGELOG.md`.
 **Production data changes made by hand**, each rehearsed on a copy first and
 recorded here because they are not in any migration:
 
+- 8 September 2026 — `practice.terms_url` changed from the PDF at
+  `www.immigration.kiwi/_files/ugd/796b4b_09e26…pdf` to
+  `https://www.immigration.kiwi/terms`, which is where the practice's Letter of
+  Engagement sends clients. One setting row; no client data touched. Audit row
+  `aud_termsurl_20260908`. The shipped default was changed to match in 1.2.2, so
+  a fresh database starts on the right one.
 - 4 September 2026 — all 150 of Tai's matters reassigned to Taymuraz Zaseev
   (he now holds 194; Tai holds none). **Clients and tasks were not moved** —
   175 clients and 89 open tasks remain with Tai. Audit row `aud_reassign_20260904`.
