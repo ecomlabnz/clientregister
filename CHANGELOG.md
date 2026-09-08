@@ -7,6 +7,34 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.13.0 — 8 September 2026
+
+### Added
+- **Two more ways to say who somebody is on a matter: Partner, and Family
+  member.** Asked for while looking at the assistant's intake screen: *"someone
+  who is partner but not party to the application, not a supporting partner,
+  just partner"*, and then *"and one more — Family member"*.
+
+  The list had only **Supporting partner**, which means something narrower than
+  it looks: the partner an application actually turns on, whose relationship
+  Immigration New Zealand will assess. A partner who is simply on the file, and
+  a parent or sibling named in the documents, had nowhere to go but "Other
+  party" — which loses the one fact the role exists to record.
+
+  So there are now three, and they sit next to each other in the list because
+  choosing between them is the point:
+
+  | Role | What it means |
+  |---|---|
+  | Supporting partner | The application turns on this relationship, and INZ will assess it |
+  | Partner | The applicant's partner. Not applying, not relied on |
+  | Family member | Any other relative in the same position |
+
+  The assistant can propose them too, and is told the difference: where a
+  document does not show the relationship is being relied on, it takes the
+  weaker of the two, because a person correcting it can see the document and it
+  cannot.
+
 ## 1.12.0 — 8 September 2026
 
 ### Added

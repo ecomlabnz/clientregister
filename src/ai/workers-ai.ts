@@ -79,7 +79,11 @@ Reply with a single JSON object and nothing else, using exactly these keys:
  "suggested_title":string|null,"inz_client_number":string|null,"inz_application_number":string|null,
  "lodged_on":string|null,"decision_due_on":string|null,"summary":string,"missing":string[]}
 Party roles must be one of: principal_applicant, secondary_applicant, supporting_partner,
-dependent_child, employer, sponsor, agent, other.`;
+partner, dependent_child, family_member, employer, sponsor, agent, other.
+supporting_partner is the partner an application turns on and whose relationship INZ will
+assess; partner is simply the applicant's partner, named in the document but not part of
+the application. Use supporting_partner only where the document shows the relationship is
+being relied on.`;
 
       const result = (await env.AI!.run(model as never, {
         messages: [
