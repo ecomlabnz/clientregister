@@ -40,7 +40,11 @@ import {
 } from '../../core/quotes';
 import { asInteger, readSettings, type SettingsGroup } from '../../core/settings';
 
+import { caseTypes, labelFor, type Term } from '../../core/vocabulary';
 import { practiceDetails } from '../../core/practice';
+import {
+  ENGAGEMENT_SETTINGS, allClauses, clauseTypes, type ClauseRow,
+} from '../../core/engagement';
 import { invoiceFromQuote } from '../../core/invoices';
 import { renderEmailHtml } from '../../core/richtext';
 import { mailConfigured } from '../../mail/provider';
@@ -248,13 +252,16 @@ export function defaultQuoteEmail(
 
   if (practice.termsUrl) {
     lines.push(
-      // "read", not "download": the terms are a page on the practice's own
-      // site, and a client told to download something that opens in a browser
-      // wonders whether they got the right thing.
-      `This quote is given on the ${practice.termsLabel}, which you can read here:`,
+      // The address is a page, and the page holds the current edition as a
+      // file to download. Both halves are said, because either alone misleads:
+      // "download" sends somebody looking for a file at a page address, and
+      // "read" leaves them on a page wondering where the terms are. Corrected
+      // 8 September 2026 after the practice pointed out what is actually at
+      // that address — 1.2.2 had guessed, and guessed half right.
+      `This quote is given on the ${practice.termsLabel}. The current edition is at`,
       practice.termsUrl,
       '',
-      'Please read those terms before accepting this quote.',
+      'Please read them before accepting this quote.',
       '',
     );
   }
@@ -276,7 +283,7 @@ export const quotesModule: AppModule = {
   title: 'Quotes',
   basePaths: ['/quotes'],
   nav: [{ href: '/quotes', label: 'Quotes', permission: 'register:read', order: 60, group: 'Money' }],
-  settings: [QUOTE_SETTINGS],
+  settings: [QUOTE_SETTINGS, ENGAGEMENT_SETTINGS],
 
   register(app) {
     const r = new Hono<AppContext>();
@@ -571,6 +578,152 @@ export const quotesModule: AppModule = {
       return redirectWith(c, '/quotes/catalogue', 'Updated.');
     });
 
+    // --- The clauses a letter of engagement carries --------------------------
+
+    /**
+     * The body of the letter, edited by an administrator.
+     *
+     * Under `admin:settings` rather than `quote:write`, and the difference is
+     * deliberate: writing a quotation is daily work, and rewriting the terms a
+     * client is asked to accept is not. A specialist can send a letter; only an
+     * administrator decides what it says.
+     *
+     * Nothing is seeded. The register ships no wording for a contract between a
+     * lawyer and a client — a letter carrying terms the register invented would
+     * be worse than one that went out empty, because the empty one is obvious.
+     */
+    r.get('/clauses', requirePermission('admin:settings'), async (c) => {
+      const [clauses, types] = await Promise.all([allClauses(c.env), caseTypes(c.env)]);
+      const csrf = c.get('session')!.csrf;
+      const editing = c.req.query('edit');
+      const clause = editing ? clauses.find((cl) => cl.id === editing) ?? null : null;
+      const chosen = new Set(clause ? clauseTypes(clause) : []);
+
+      const named = (cl: ClauseRow) => {
+        const keys = clauseTypes(cl);
+        return keys.length === 0
+          ? html`<span class="muted small">every matter</span>`
+          : html`<span class="small">${keys.map((k) => labelFor(types, k)).join(', ')}</span>`;
+      };
+
+      return page(c, { title: 'Letter clauses', active: '/quotes' }, html`
+        ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { label: 'Letter clauses' }])}
+        ${pageHeader('Letter clauses',
+          'The headed sections in the middle of a letter of engagement. The parties, the work and '
+          + 'the fees are not here — they are on the quotation the letter goes out with. A clause '
+          + 'can be limited to certain kinds of matter, so the partnership assessment does not '
+          + 'appear on an employer accreditation.')}
+
+        ${clauses.length === 0
+          ? card('Nothing yet', emptyState(
+              'A letter of engagement will print with no clauses in it until you add some. '
+              + 'Nothing is supplied: this is your wording, not the register’s.'))
+          : table(['Order', 'Clause', 'On which matters', ''], clauses.map((cl: ClauseRow) => html`
+              <tr class="${cl.active ? '' : 'row-muted'}">
+                <td class="num small">${String(cl.position)}</td>
+                <td><span class="strong">${cl.heading}</span>
+                  <div class="muted small clamp-2">${cl.body}</div></td>
+                <td>${named(cl)}</td>
+                <td>
+                  <a class="btn btn-small btn-secondary" href="/quotes/clauses?edit=${cl.id}">Edit</a>
+                  ${actionButton(`/quotes/clauses/${cl.id}/toggle`, csrf,
+                    cl.active ? 'Switch off' : 'Switch on', { className: 'btn btn-small btn-link' })}
+                </td>
+              </tr>`))}
+
+        ${card(clause ? `Edit “${clause.heading}”` : 'Add a clause', html`
+          <form method="post" action="${clause ? `/quotes/clauses/${clause.id}` : '/quotes/clauses'}" class="stack">
+            ${csrfField(csrf)}
+            ${field({ label: 'Heading', name: 'heading', required: true, maxlength: 200,
+                      value: clause?.heading ?? '',
+                      hint: 'Printed as the section heading, in your own numbering if you use one.' })}
+            ${field({ label: 'What it says', name: 'body', type: 'textarea', rows: 10,
+                      required: true, maxlength: 8000, value: clause?.body ?? '',
+                      hint: 'Blank lines separate paragraphs. A line beginning with “- ” is printed '
+                        + 'as a bullet.' })}
+            ${field({ label: 'Order', name: 'position', value: String(clause?.position ?? clauses.length),
+                      maxlength: 4, hint: 'Lowest first. Clauses sharing a number keep the order they were added in.' })}
+            ${'' /* Tick boxes rather than a multiple-selection list: there are
+                     sixty-seven case types, and a multiple-selection list needs
+                     a modifier key nobody has on a phone. */}
+            <div class="field">
+              <label>On which matters</label>
+              <p class="hint">Tick none for every matter. Tick some, and the clause is printed only
+                 when the quotation covers one of them.</p>
+              <div class="pick-grid">
+                ${types.map((t: Term) => html`
+                  <label class="check small">
+                    <input type="checkbox" name="case_types" value="${t.key}"
+                           ${chosen.has(t.key) ? raw('checked') : ''}>
+                    ${t.label}
+                  </label>`)}
+              </div>
+            </div>
+            <div class="filters">
+              <button class="btn btn-primary" type="submit">${clause ? 'Save the clause' : 'Add the clause'}</button>
+              ${clause ? html`<a class="btn btn-secondary" href="/quotes/clauses">Cancel</a>` : ''}
+            </div>
+          </form>`)}`);
+    });
+
+    /** Add a clause, or save an edit to one. Both go through here. */
+    const saveClause = async (c: any, id: string | null) => {
+      const form = await c.req.formData();
+      const f = new FormReader(form);
+      const heading = f.text('heading', { required: true, label: 'Heading', max: 200 });
+      const body = f.text('body', { required: true, label: 'What it says', max: 8000 });
+      const position = f.int('position', { min: 0, max: 9999 }) ?? 0;
+      const back = id ? `/quotes/clauses?edit=${id}` : '/quotes/clauses';
+      if (!f.valid) {
+        return redirectWith(c, back, Object.values(f.errors)[0] ?? 'Give the clause a heading and a body.', 'err');
+      }
+      // Space-separated, because that is how the column stores it and a comma
+      // inside a key would be indistinguishable from a separator.
+      const chosen = [...new Set(form.getAll('case_types').map(String).filter(Boolean))].join(' ');
+      const now = nowIso();
+      try {
+        if (id) {
+          await run(
+            c.env.DB,
+            `UPDATE engagement_clauses SET heading = ?, body = ?, case_types = ?, position = ?,
+                updated_at = ? WHERE id = ?`,
+            heading, body, chosen, position, now, id);
+        } else {
+          await run(
+            c.env.DB,
+            `INSERT INTO engagement_clauses (id, position, heading, body, case_types, active,
+                created_at, updated_at)
+             VALUES (?,?,?,?,?,1,?,?)`,
+            newId('ecl'), position, heading, body, chosen, now, now);
+        }
+      } catch (err) {
+        // The database refuses an empty heading or body whoever is writing.
+        const text = err instanceof Error ? err.message : String(err);
+        const at = text.indexOf(': ');
+        return redirectWith(c, back, (at >= 0 ? text.slice(at + 2) : text).trim(), 'err');
+      }
+      await auditFrom(c, { action: id ? 'engagement.clause_updated' : 'engagement.clause_added',
+        entityType: 'engagement_clause', entityId: id ?? heading, meta: { heading, types: chosen } });
+      return redirectWith(c, '/quotes/clauses', id ? 'Clause saved.' : 'Clause added.');
+    };
+
+    r.post('/clauses', requirePermission('admin:settings'), (c) => saveClause(c, null));
+    r.post('/clauses/:clauseId', requirePermission('admin:settings'), (c) =>
+      saveClause(c, c.req.param('clauseId')!));
+
+    r.post('/clauses/:clauseId/toggle', requirePermission('admin:settings'), async (c) => {
+      const clauseId = c.req.param('clauseId')!;
+      // Switched off, never deleted: a clause withdrawn from new letters must
+      // not vanish from the letters already sent, and somebody will want it
+      // back.
+      await run(c.env.DB,
+        'UPDATE engagement_clauses SET active = 1 - active, updated_at = ? WHERE id = ?',
+        nowIso(), clauseId);
+      await auditFrom(c, { action: 'engagement.clause_toggled',
+        entityType: 'engagement_clause', entityId: clauseId });
+      return redirectWith(c, '/quotes/clauses', 'Updated.');
+    });
+
     r.get('/:id', requirePermission('register:read'), async (c) => {
       const id = c.req.param('id')!;
       const q = await one<QuoteRow & { client_name: string | null; case_ref: string | null; inquiry_ref: string | null }>(
@@ -622,8 +775,8 @@ export const quotesModule: AppModule = {
             ${terms.termsUrl
               ? html`<div class="alert alert-ok">
                        This quote is given on the
-                       <a href="${terms.termsUrl}" target="_blank" rel="noopener noreferrer">${terms.termsLabel}</a>,
-                       which the client can read at that link.
+                       <a href="${terms.termsUrl}" target="_blank" rel="noopener noreferrer">${terms.termsLabel}</a>.
+                       That address is where the client gets the current edition.
                      </div>`
               : ''}
 
@@ -1225,8 +1378,9 @@ export const quotesModule: AppModule = {
                 : ''}
               ${practice.termsUrl
                 ? html`<li>This quote is given on the
-                           <a href="${practice.termsUrl}" rel="noopener"><strong>${practice.termsLabel}</strong></a>.
-                           Please read those terms before accepting.
+                           <a href="${practice.termsUrl}" rel="noopener"><strong>${practice.termsLabel}</strong></a>,
+                           whose current edition is published at the address below. Please read
+                           them before accepting.
                            <span class="print-only break-url">${practice.termsUrl}</span></li>`
                 : ''}
             </ul>
