@@ -1,6 +1,6 @@
 # The data model
 
-**49 tables**, as the schema finally stands after all 73 migrations.
+**49 tables**, as the schema finally stands after all 74 migrations.
 Generated from the built database rather than the migration files, so a rule
 later replaced does not appear twice.
 
@@ -287,6 +287,7 @@ Two conventions hold throughout:
 | `quote_id` | TEXT | NOT NULL |  |
 | `position` | INTEGER | NOT NULL | 0 |
 | `service_item_id` | TEXT |  |  |
+| `case_type` | TEXT |  |  |
 | `description` | TEXT | NOT NULL |  |
 | `kind` | TEXT | NOT NULL | 'professional' |
 | `unit_label` | TEXT | NOT NULL | 'item' |
