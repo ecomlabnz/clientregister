@@ -44,7 +44,7 @@ import { html, raw } from '../../ui/html';
 import { card, csrfField, emptyState, field, optionsFrom, pageHeader, select } from '../../ui/components';
 import { isAiEnabled } from '../../ai/provider';
 import { attachStagedTo, stageUpload, stagedFor } from '../../core/intakefiles';
-import { caseNameFrom } from '../../core/casename';
+import { caseNameFrom, normaliseClientName } from '../../core/casename';
 import type { IntakePerson, IntakeResult } from '../../ai/provider';
 import {
   ACCEPTED_UPLOADS, MAX_UPLOADS, describeAccepted, latestIntake, readUpload, runIntake,
@@ -485,6 +485,25 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       clientName = row.full_name;
       clientKind = row.kind === 'organisation' ? 'organisation' : 'individual';
       await fillEmptyFields(c, f, 'a_', row.id);
+      // Reusing a record is the moment to put its name into the house style.
+      // Kept apart from `fillEmptyFields`, which deliberately never writes over
+      // anything a person recorded: `LE` and `Le` are the same surname, which
+      // is why this one is safe to do without asking. Reported by the practice
+      // after a matter opened this way carried a 1 September record's old
+      // spelling into its name.
+      const tidied = await normaliseClientName(c.env, row.id, await caseTypes(c.env));
+      if (tidied) {
+        clientName = tidied.now;
+        await addEntry(c.env, {
+          entityType: 'client', entityId: row.id, kind: 'system',
+          body: `Surname put into capitals, as the practice records them: `
+            + `${tidied.was} is now ${tidied.now}.`
+            + (tidied.matters
+              ? ` ${tidied.matters} ${tidied.matters === 1 ? 'matter was' : 'matters were'} renamed to match.`
+              : ''),
+          createdBy: user.id,
+        });
+      }
     } else {
       const made = await createPerson(c, f, 'a_', stamp);
       if (!made) return redirectWith(c, '/assistant/intake', 'The client needs a name.', 'err');
