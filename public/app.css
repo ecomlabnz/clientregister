@@ -389,8 +389,18 @@ body.bare {
   display: flex; align-items: center; justify-content: center;
   min-height: 100vh; min-height: 100dvh; padding: 20px;
 }
-.bare-main { width: 100%; max-width: 400px; }
+/* The bare layout: no chrome, used by the sign-in pages and by the documents a
+   client is sent — a quotation, an invoice, a letter of engagement.
+ *
+ * It capped at 400px, which is right for a sign-in card and wrong for
+ * everything else: a quotation printed in a 400px column on a 900px screen, and
+ * had done since the print view was built. The width belongs on the thing that
+ * wants to be narrow, not on the wrapper that holds both. Found on 8 September
+ * 2026 while looking at the letter of engagement in a browser — every document
+ * page had it. */
+.bare-main { width: 100%; }
 .auth-card {
+  max-width: 400px; margin: 0 auto;
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
   padding: 28px; box-shadow: var(--shadow);
 }
@@ -1207,6 +1217,22 @@ details[open] > summary { margin-bottom: 12px; }
   max-width: 720px; margin: 0 auto; padding: 32px;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
 }
+/* The letter of engagement. A document a client reads and is asked to accept,
+   so it is set as prose rather than as a page of the application: a measured
+   line length, room between paragraphs, and headings that do not shout. */
+.letter-doc { max-width: 46rem; }
+.letter-doc p { margin: 0 0 12px; line-height: 1.6; }
+.letter-doc section { margin-bottom: 20px; }
+.letter-doc ul, .letter-doc ol { margin: 0 0 12px; padding-left: 22px; line-height: 1.6; }
+.letter-doc li { margin-bottom: 6px; }
+.letter-to { margin: 24px 0 16px; }
+.letter-to p { margin: 0 0 2px; }
+.letter-re { margin: 0 0 20px; }
+.letter-brief { padding: 12px 14px; border-left: 3px solid var(--accent); background: var(--surface-2); }
+.letter-acknowledgements li { margin-bottom: 8px; }
+.letter-signature { margin-top: 32px; }
+.letter-signature p { margin: 0 0 2px; }
+
 .quote-doc h1 { font-size: 1.3rem; margin-bottom: 4px; }
 .quote-doc h2 { font-size: 1rem; }
 .quote-doc h3 {
@@ -1248,7 +1274,11 @@ details[open] > summary { margin-bottom: 12px; }
 .quote-doc-subhead { margin: 14px 0 6px; font-size: 0.95rem; }
 .quote-doc-terms { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); }
 .break-url { word-break: break-all; font-size: 0.85rem; }
-.quote-doc-foot { margin-top: 28px; display: flex; gap: 8px; }
+/* Wraps. The row had two buttons and gained a third when the letter of
+   engagement arrived beside the quotation, and three did not fit a phone —
+   468px of buttons in a 390px window, which scrolls the whole document
+   sideways. A row of actions has no reason to be one line. */
+.quote-doc-foot { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* Shown only on paper: a hyperlink is no use to somebody holding a printout,
    so the address itself appears there and nowhere else. */
