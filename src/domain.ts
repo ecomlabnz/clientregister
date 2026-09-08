@@ -336,6 +336,38 @@ export const APPLICANT_ROLES: PartyRole[] = [
   'principal_applicant', 'secondary_applicant', 'dependent_child',
 ];
 
+/**
+ * How somebody stands on a quotation.
+ *
+ * Deliberately shorter than `PARTY_ROLES` above, and about a different thing.
+ * A party role says what somebody is on a *matter*; this says what they are on
+ * the *engagement* — and the engagement makes exactly three distinctions, each
+ * of which changes what the letter says about them:
+ *
+ *  - an **applicant** is somebody the work is for;
+ *  - an **associated party** is somebody whose details the application needs —
+ *    a partner, a child — who is not themselves applying;
+ *  - an **administrative contact** may be told things and may not instruct.
+ *
+ * Their own word for the connection ("partner", "Son") is free text on the row.
+ * That is the part that varies; this list is not.
+ */
+export const QUOTE_PARTY_ROLES = ['applicant', 'associated', 'admin_contact'] as const;
+export type QuotePartyRole = (typeof QUOTE_PARTY_ROLES)[number];
+
+export const QUOTE_PARTY_ROLE_LABELS: Record<QuotePartyRole, string> = {
+  applicant: 'Applicant',
+  associated: 'Associated party',
+  admin_contact: 'Administrative contact',
+};
+
+export const QUOTE_PARTY_KINDS = ['person', 'organisation'] as const;
+export type QuotePartyKind = (typeof QUOTE_PARTY_KINDS)[number];
+
+export const QUOTE_PARTY_KIND_LABELS: Record<QuotePartyKind, string> = {
+  person: 'A person', organisation: 'An organisation',
+};
+
 export function isPartyRole(value: string): value is PartyRole {
   return (PARTY_ROLES as readonly string[]).includes(value);
 }
