@@ -140,7 +140,26 @@ export interface IntakeResult {
   decision_due_on: string | null;
   /** What the document says happens next, where it says so. */
   next_action: string | null;
+  /**
+   * A few sentences, for the matter's Summary card.
+   *
+   * Separate from `file_note` since 8 September 2026, because the two were one
+   * field written to two places and the practice saw the result: *"the summary
+   * and the note are identical - this should not be the case - it does need to
+   * be a summary. for full details i can go to notes or ask the ai to read this
+   * file and brief me."* Quite right — a summary that is the whole document is
+   * not a summary, and a card showing it pushes everything else off the screen.
+   */
   summary: string;
+  /**
+   * The whole of what the document says, for the append-only file note.
+   *
+   * Most of what this carries has no column to go in — a relationship history,
+   * two previous marriages and their dates, where a child lives, an assault
+   * reported to Police — and without it that was read once, shown on a form,
+   * and lost the moment the matter was opened.
+   */
+  file_note: string;
   /**
    * What the document does not say and a person will have to supply. More
    * useful than a confidence score: it names the empty boxes.
@@ -199,13 +218,20 @@ Return next_action where the document says what happens next — "employer to
 provide the signed IEA", "await the job check outcome". Not a guess about what
 should happen: what the document says will.
 
-The summary must be the whole of what the document says about these people and
-their situation, written as continuous prose a colleague could read instead of
-the document — relationship history, previous marriages and their dates,
-children and where they are, addresses, employment, any character or health
-matter stated, and what the document says is expected to happen next. It is a
-file note, not a caption: leave out nothing the document states, and add
-nothing it does not.
+Return two pieces of prose, and they are different things.
+
+"file_note" is the whole of what the document says about these people and their
+situation, written as continuous prose a colleague could read instead of the
+document — relationship history, previous marriages and their dates, children
+and where they are, addresses, employment, any character or health matter
+stated, and what the document says is expected to happen next. Leave out nothing
+the document states, and add nothing it does not. This is kept as a file note
+and never edited.
+
+"summary" is at most four sentences: who this is for, what they are applying
+for, and the one thing that decides it. It heads the matter and is read at a
+glance beside everything else on the page, so it must not restate the file note.
+Somebody who needs the detail opens the note.
 
 Do not give immigration advice and do not draft correspondence.`;
 
@@ -254,11 +280,17 @@ export function normaliseIntake(input: Partial<IntakeResult>): IntakeResult {
     lodged_on: isoDate(input.lodged_on),
     decision_due_on: isoDate(input.decision_due_on),
     next_action: str(input.next_action, 200),
-    // Eight thousand, not two. The summary is now the file note — the whole of
-    // what a document says about a family, a relationship and its history —
-    // and two thousand characters cut a three-page partnership summary off
-    // mid-sentence.
-    summary: str(input.summary, 8000) ?? '',
+    // Short, because it is a summary: it heads the matter and has to be
+    // readable at a glance beside everything else on the page.
+    summary: str(input.summary, 1200) ?? '',
+    // Long, because it is the record. Eight thousand rather than two: two
+    // thousand cut a three-page partnership history off mid-sentence.
+    //
+    // Falls back to the summary only for a reading stored before the two were
+    // separated, so an old run can still be opened and checked. Removable once
+    // no `ai_runs` row predates 8 September 2026 — which is to say, once the
+    // seven-day sweep has been round.
+    file_note: str(input.file_note, 8000) ?? str(input.summary, 8000) ?? '',
     missing: Array.isArray(input.missing)
       ? input.missing.filter((x): x is string => typeof x === 'string').slice(0, 12)
       : [],

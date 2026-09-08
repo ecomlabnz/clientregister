@@ -37,6 +37,20 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.15.0', date: '8 September 2026',
+    notes: [
+      'The summary at the top of a matter is a summary again \u2014 four sentences at most \u2014 '
+        + 'rather than the whole file note repeated. The full reading is still kept, in the file '
+        + 'note underneath, which cannot be edited and is the record.',
+      'The assistant now writes the two separately, and the check-it form has a box for each, so '
+        + 'you can see what will head the matter and what will go on the file before you press.',
+      'Matters opened before today still hold the long text in both places. The summary can be '
+        + 'shortened by editing the matter; the note stays as it was written.',
+      'Quotes and Invoices now sit together on a matter, quotes first. They were in different '
+        + 'columns for no reason anybody had written down.',
+    ],
+  },
+  {
     version: '1.14.0', date: '8 September 2026',
     notes: [
       'A quotation is named rather than described. You pick the visa type, add a word or two if '

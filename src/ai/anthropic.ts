@@ -123,7 +123,10 @@ function intakeSchema(caseTypes: string[]) {
     decision_due_on: z.string().nullable(),
     /** What the document says happens next, where it says so. */
     next_action: z.string().nullable(),
+    /** At most four sentences, for the matter's Summary card. */
     summary: z.string(),
+    /** The whole of what the document says, for the append-only file note. */
+    file_note: z.string(),
     missing: z.array(z.string()),
   });
 }
@@ -167,7 +170,7 @@ const DEFAULT_MODEL = 'claude-haiku-4-5';
  *
  * What had happened: the model was cut off at 4,000 tokens with its JSON
  * half-written, so nothing parsed. Two things make that easy to hit and
- * neither is obvious. The summary this asks for is the whole of what a
+ * neither is obvious. The file note this asks for is the whole of what a
  * document says, capped at 8,000 characters — two to three thousand tokens
  * before the rest of the fields. And on Sonnet 5, which the practice had
  * chosen in Settings, the model reasons before answering by default, and that
