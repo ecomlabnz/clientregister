@@ -71,8 +71,8 @@ function sweepSchema(caseStatuses: string[]) {
  * than inventing a word the parties table would reject.
  */
 const PARTY_ROLE_VALUES = [
-  'principal_applicant', 'secondary_applicant', 'supporting_partner', 'dependent_child',
-  'employer', 'sponsor', 'agent', 'other',
+  'principal_applicant', 'secondary_applicant', 'supporting_partner', 'partner',
+  'dependent_child', 'family_member', 'employer', 'sponsor', 'agent', 'other',
 ] as const;
 
 const PersonSchema = z.object({

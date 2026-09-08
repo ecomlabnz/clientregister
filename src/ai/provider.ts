@@ -178,6 +178,17 @@ Return current_visa_type and current_visa_expiry for anybody the document says
 holds a visa, including a supporting partner. Return occupation where it is
 stated.
 
+Three roles are close together and the difference matters, so read the document
+rather than the relationship. A **supporting_partner** is the partner an
+application turns on, whose relationship Immigration New Zealand will assess. A
+**partner** is simply the applicant's partner, named in the document but not
+part of the application and not relied on. A **family_member** is any other
+relative the document names who is neither applying nor being relied on — a
+parent, a sibling, an adult child. Choose supporting_partner only where the
+document shows the relationship is being relied on; where it is unclear, the
+weaker of the two is the safer answer, because a person correcting it can see
+the document and you cannot.
+
 Return everything else the document states about each party that the register
 has a box for, and null for the rest: an address (a person's home address, or a
 company's registered office or trading address), and for a company its NZBN
