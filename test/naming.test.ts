@@ -161,10 +161,30 @@ describe('a matter has a name and a thing it is about', () => {
     expect(migration).not.toMatch(/descriptor[^;]*NOT NULL/);
   });
 
-  it('feeds the title from the description, from one place', () => {
-    // `title` is NOT NULL and pages still read it. Derived rather than typed,
-    // so the two cannot drift into being two different names for one matter.
-    expect(cases).toContain('title: descriptor,');
+  it('does not name a matter after its own description', () => {
+    // What this replaced: `title: descriptor` in the form reader, on the
+    // reasoning that a name fed from the description could not drift away from
+    // it. True, and the wrong trade — it made the name and the description the
+    // same string on all 194 matters in the register, averaging 84 characters,
+    // and every list that showed both showed the same words twice.
+    //
+    // The name is derived on every save from the type and the client, so it
+    // cannot go stale either — which was the objection to the *typed* title the
+    // practice removed on 31 August: pre-filled once, it arrived looking
+    // complete and was never corrected.
+    expect(cases).not.toContain('title: descriptor');
+    expect(cases).toContain('caseNameFrom(types,');
+  });
+
+  it('writes that name only from the one function that composes it', () => {
+    // Both writes — opening a matter and editing one — go through the same
+    // derivation. A second place composing a name is a second convention, and
+    // the two disagree the first time either changes.
+    const writes = cases.match(/title=\?|title, descriptor/g) ?? [];
+    expect(writes.length, 'cases no longer writes a title at all').toBeGreaterThan(0);
+    const derived = cases.match(/caseNameFrom\(types,/g) ?? [];
+    expect(derived.length, 'a title is being written without being derived')
+      .toBeGreaterThanOrEqual(2);
   });
 });
 
