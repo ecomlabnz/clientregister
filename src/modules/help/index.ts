@@ -37,6 +37,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.3.1', date: '8 September 2026',
+    notes: [
+      'Reminder emails now link to app.immigration.kiwi \u2014 the address you sign in on. They '
+        + 'were still pointing at the address the register was first put up on, which works but '
+        + 'is not yours. That older address still answers, on purpose: it is the way back in if '
+        + 'the domain ever has a problem.',
+    ],
+  },
+  {
     version: '1.3.0', date: '8 September 2026',
     notes: [
       'Several messages in Incoming can be filed onto a matter or client in one go. Tick them, '

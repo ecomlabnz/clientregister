@@ -55,7 +55,12 @@
     "APP_ENV": "production",
     // Public origin, used for absolute links in outbound email.
     // Override per-environment; must be https in production.
-    "APP_ORIGIN": "https://clientregister.workers.dev"
+    //
+    // The practice's own address, added 8 September 2026. It was the
+    // workers.dev name, which still answers and is still the way back in if
+    // the domain ever breaks — but a reminder about a client's deadline should
+    // open the register at the address the practice actually signs in on.
+    "APP_ORIGIN": "https://app.immigration.kiwi"
   },
 
   // Housekeeping: flush the outbound mail queue and expire stale quotes.
