@@ -39,6 +39,7 @@ import {
 } from '../../core/money';
 import { computeLine, formatQuantity, parseQuantityToMilli, pluraliseUnit } from '../../core/quotes';
 import { practiceDetails } from '../../core/practice';
+import { caseTypes } from '../../core/vocabulary';
 import { clientOptions } from '../../core/lookups';
 
 import { catalogue } from '../quotes';
@@ -335,8 +336,9 @@ export const invoicesModule: AppModule = {
       );
       if (!invoice) return c.notFound();
 
-      const [items, payments, cat, fees, shares] = await Promise.all([
-        invoiceItems(c.env, id), paymentsFor(c.env, id), catalogue(c.env), moneySettings(c.env),
+      const [items, payments, cat, lineTypes, fees, shares] = await Promise.all([
+        invoiceItems(c.env, id), paymentsFor(c.env, id), catalogue(c.env), caseTypes(c.env),
+        moneySettings(c.env),
         sharesFor(c.env, id),
       ]);
       const totals = totalsFor(items);
@@ -424,13 +426,27 @@ export const invoicesModule: AppModule = {
                     ${csrfField(csrf)}
                     <div class="field">
                       <label for="f_service_item_id">From the catalogue</label>
+                      ${'' /* The same one list as the quotation's, in the same two
+                               groups, so the two screens cannot disagree about
+                               what the practice does. An invoice line records no
+                               kind of work of its own — nothing chooses clauses
+                               from it — so a type here fills in the description
+                               and nothing more. See migration 0074. */}
                       <select id="f_service_item_id" name="service_item_id" class="js-catalogue">
                         <option value="">— type it in below —</option>
-                        ${cat.map((it) => html`<option value="${it.id}"
-                            data-description="${it.description || it.name}"
-                            data-kind="${it.kind}" data-unit="${it.unit_label}"
-                            data-amount="${(it.unit_amount_cents / 100).toFixed(2)}"
-                            data-gst="${it.gst_treatment}">${it.name}</option>`)}
+                        <optgroup label="Visa and case types">
+                          ${lineTypes.map((t) => html`<option value=""
+                              data-description="${t.label}"
+                              data-kind="professional" data-unit="item"
+                              data-amount="" data-gst="exclusive">${t.label}</option>`)}
+                        </optgroup>
+                        <optgroup label="Standard items">
+                          ${cat.map((it) => html`<option value="${it.id}"
+                              data-description="${it.description || it.name}"
+                              data-kind="${it.kind}" data-unit="${it.unit_label}"
+                              data-amount="${(it.unit_amount_cents / 100).toFixed(2)}"
+                              data-gst="${it.gst_treatment}">${it.name}</option>`)}
+                        </optgroup>
                       </select>
                     </div>
                     ${field({ label: 'Description', name: 'description', required: true, maxlength: 300 })}

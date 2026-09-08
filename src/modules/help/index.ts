@@ -37,6 +37,26 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.14.0', date: '8 September 2026',
+    notes: [
+      'A quotation is named rather than described. You pick the visa type, add a word or two if '
+        + 'it needs one, and the name is written for you \u2014 "VV. Parent Grandparent \u2014 '
+        + '[retired example 3]" \u2014 the same way a matter is named.',
+      'The Scope paragraph is off the printed quotation, because the items are the scope. The '
+        + 'name now heads the document as "Re", the way a letter\u2019s subject line does.',
+      'A quotation can be pointed at a matter. Choose one and it takes the matter\u2019s name, '
+        + 'type and client, so a quotation can no longer name one person and bill another.',
+      'The catalogue no longer keeps its own copy of your visa types. It reads your own list, so '
+        + 'a type you add under Settings stays quotable straight away \u2014 two of yours had '
+        + 'already fallen out of the old copy, including the one you were quoting when you asked.',
+      'Your standard items are untouched: Initial consultation, Professional time, and the five '
+        + 'disbursements. Those are things you charge for rather than kinds of matter, so they '
+        + 'stay in their own group.',
+      'The letter of engagement was quietly leaving out the clauses that belong to the kind of '
+        + 'work, on every quotation not attached to a matter. That is fixed.',
+    ],
+  },
+  {
     version: '1.13.0', date: '8 September 2026',
     notes: [
       'Two more roles on a matter: Partner and Family member. Both sit next to Supporting '

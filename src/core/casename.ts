@@ -55,6 +55,46 @@ export function caseName(typeLabel: string, clientName: string | null | undefine
   return type || who || 'Matter';
 }
 
+/**
+ * What a quotation is called.
+ *
+ * The same convention, for the same reason. The New quote form asked for a
+ * free-text "Scope", and the practice, on looking at it: *"this field called
+ * Scope seems superfluous. why do i need to enter details in it when that will
+ * be in the quotation?"* Half right, and worth separating the halves.
+ *
+ * The *paragraph* it printed on the quotation was superfluous — the items are
+ * the scope, and a sentence beside them can only repeat them or disagree with
+ * them. That section is gone.
+ *
+ * The value itself is not: it is the quotation's **name**, and it appears in
+ * the quotes list, the quote's own heading, the dashboard, search, the expiry
+ * alert, the email subject, the invoice raised from it and the bulk export.
+ * Delete it and all eight become a column of Q-numbers. So it stays, and stops
+ * being typed: the practice was writing the visa type by hand into it, which is
+ * exactly what this file exists to stop.
+ *
+ * `extra` is the quotation's equivalent of a matter's descriptor — the words
+ * that tell two quotations of the same kind for the same person apart. It sits
+ * with the type rather than after the name, because the type and the extra
+ * words together are what the work *is*, and sorting by name must still group
+ * by kind of work.
+ */
+export function quoteName(
+  typeLabel: string, extra: string | null | undefined, clientName: string | null | undefined,
+): string {
+  const type = [(typeLabel || '').trim(), (extra || '').trim()].filter(Boolean).join(' ');
+  return caseName(type, clientName);
+}
+
+/** The same, taking the raw type key and the vocabulary to read it with. */
+export function quoteNameFrom(
+  types: Term[], caseType: string | null | undefined,
+  extra: string | null | undefined, clientName: string | null | undefined,
+): string {
+  return quoteName(labelFor(types, caseType), extra, clientName);
+}
+
 /** The same, taking the raw type key and the vocabulary to read it with. */
 export function caseNameFrom(
   types: Term[], caseType: string | null | undefined, clientName: string | null | undefined,

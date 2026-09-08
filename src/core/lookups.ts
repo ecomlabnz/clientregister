@@ -39,6 +39,27 @@ export async function clientOptions(
   }));
 }
 
+/**
+ * Live matters, for a form that attaches something to one.
+ *
+ * Named by the matter's own name, which since migration 0066 already carries
+ * the type and the client — so the option reads "WV. AEWV — Quang Truong DO"
+ * and needs nothing composed here. Closed and withdrawn matters are left out:
+ * a quotation is for work that is going to happen.
+ */
+export async function openCaseOptions(
+  env: Env, limit = 500,
+): Promise<Array<{ value: string; label: string; clientId: string }>> {
+  const rows = await all<{ id: string; ref: string; title: string; client_id: string }>(
+    env.DB,
+    `SELECT id, ref, title, client_id FROM cases
+      WHERE status NOT IN ('closed', 'withdrawn')
+      ORDER BY title LIMIT ?`,
+    limit,
+  );
+  return rows.map((r) => ({ value: r.id, label: `${r.title} (${r.ref})`, clientId: r.client_id }));
+}
+
 /** Organisation clients, for linking a person to the company they work for. */
 export async function organisationOptions(env: Env): Promise<Array<{ value: string; label: string }>> {
   const rows = await all<ClientOption>(
