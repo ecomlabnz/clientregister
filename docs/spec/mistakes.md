@@ -437,6 +437,36 @@ configuration rather than a rule about the shape of the world, the constraint
 is the wrong place for it: `entries.kind` no longer has one (migration 0064),
 for the same reason `kb_articles.kind` never did.
 
+### 27. A sentence on a page is not checked by anything
+
+"Open a matter from what you already have" carried this, in bold, beside the
+upload box:
+
+> **The file is not kept.** It is read and dropped, because there is nowhere to
+> keep it until R2 is switched on.
+
+R2 was switched on on 29 August 2026. Five documents had been stored through it
+since, by two other features. The sentence stayed true-sounding and false for ten
+days, and the practice found it by *reading the page* — not by losing a document,
+which is luck rather than a safety net.
+
+The interesting part is not that a comment went stale. It is what the stale
+sentence was doing: it was **load-bearing**. Somebody had read it, believed the
+constraint was real, and built the feature around it — the file was genuinely
+being dropped, on the strength of a reason that had expired. A wrong sentence in
+prose becomes a wrong decision in code the next time anybody trusts it.
+
+Three faults in this register have now had the same shape: a number nobody
+re-measured (21), a set of documents that "cannot drift" (23), and this. All
+three were statements about the world, written once, in a place nothing
+re-checks.
+
+**The rule.** A statement about the state of the system, shown to a user, is
+derived from the system or it is not shown. The notice now reads
+`Boolean(env.DOCS)` and says whichever is true — which cannot go stale, because
+there is no longer a sentence to go stale. Where a claim genuinely cannot be
+derived, it carries the date it was checked, so a reader can weigh it.
+
 ---
 
 ## Working practices that caught things

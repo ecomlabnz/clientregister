@@ -7,6 +7,37 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.6.0 — 8 September 2026
+
+### Added
+- **The assistant keeps the file it read, and puts it on the matter.** Reported
+  by the practice, who noticed the notice: *"I think the notice to the right is
+  outdated — and we should be storing the files for the cases and clients it
+  proposes to create."*
+
+  They were right on both counts. "Open a matter from what you already have"
+  read an upload, opened a matter from it, and dropped the document — the IEA
+  letter, the job token, the decision letter. The page explained why: there was
+  nowhere to keep it until file storage was switched on. **Storage was switched
+  on on 29 August**, and five documents had been stored through it since. The
+  sentence had been untrue for ten days, and nothing checks a claim written on a
+  page.
+
+  Now: the upload is stored the moment it is read, the review page lists what is
+  about to go on the file, and pressing **Open the matter** puts it there — the
+  same file, not a copy. Read something and never press the button, and the copy
+  is deleted a week later, because a client's document sitting in storage with
+  nothing pointing at it is not something to keep by accident.
+
+  The file has to wait in between because at the moment of reading there is
+  nothing to attach it to: the client and the matter do not exist until the
+  press. That waiting room is what the register now has, and what the nightly
+  housekeeping clears.
+
+  The stored type is what the bytes say rather than what the browser claimed —
+  a Word document usually arrives claiming nothing at all, and a file stored
+  under a type it is not is a file that is handed back wrongly one day.
+
 ## 1.5.0 — 8 September 2026
 
 ### Added
