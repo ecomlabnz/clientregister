@@ -44,6 +44,7 @@ import { html, raw } from '../../ui/html';
 import { card, csrfField, emptyState, field, optionsFrom, pageHeader, select } from '../../ui/components';
 import { isAiEnabled } from '../../ai/provider';
 import { attachStagedTo, stageUpload, stagedFor } from '../../core/intakefiles';
+import { caseNameFrom } from '../../core/casename';
 import type { IntakePerson, IntakeResult } from '../../ai/provider';
 import {
   ACCEPTED_UPLOADS, MAX_UPLOADS, describeAccepted, latestIntake, readUpload, runIntake,
@@ -77,12 +78,47 @@ function notConfigured(): ReturnType<typeof html> {
  * screen to put it — so it is lost at the last step, on the way in.
  */
 function personFields(prefix: string, person: IntakePerson, roleFixed: PartyRole | null,
-                      visaTypeOptions: Array<{ value: string; label: string }>): ReturnType<typeof html> {
+                      visaTypeOptions: Array<{ value: string; label: string }>,
+                      organisations: Array<{ value: string; label: string }> = [],
+                      ): ReturnType<typeof html> {
+  const isOrganisation = person.kind === 'organisation';
   return html`
-    <div class="settings-cell">${field({ label: 'Given names', name: `${prefix}given_names`,
-      value: person.given_names ?? '', maxlength: 120 })}</div>
-    <div class="settings-cell">${field({ label: 'Family name', name: `${prefix}family_name`,
-      value: person.family_name ?? '', maxlength: 120 })}</div>
+    ${'' /* First, because it decides what the rest of the boxes mean. Until
+             8 September every party a reading proposed was created as an
+             individual, whatever the document said, so LAND MEAT NEW ZEALAND
+             LIMITED arrived as a person with a very long family name and the
+             only remedy was to notice and edit the record afterwards. The
+             practice found it by trying to open a matter. */}
+    <div class="settings-cell">${select({ label: 'Person or company', name: `${prefix}kind`,
+      value: person.kind, includeBlank: false,
+      options: [{ value: 'individual', label: 'A person' },
+                { value: 'organisation', label: 'A company or organisation' }],
+      hint: isOrganisation
+        ? 'The whole name goes in the name box. A company has no date of birth or nationality.'
+        : undefined })}</div>
+    <div class="settings-cell">${field({
+      label: isOrganisation ? 'Given names (leave empty for a company)' : 'Given names',
+      name: `${prefix}given_names`, value: person.given_names ?? '', maxlength: 120 })}</div>
+    <div class="settings-cell">${field({
+      label: isOrganisation ? 'Company name' : 'Family name',
+      name: `${prefix}family_name`, value: person.family_name ?? '', maxlength: 120 })}</div>
+    ${'' /* Who to ring at the company, and who they work for. Both directions
+             are columns the register has had since migration 0008 and neither
+             was reachable from this form: an employer arrived with nobody
+             attached to it, and the person who writes on its behalf arrived
+             unattached to the employer. */}
+    ${organisations.length ? html`
+      <div class="settings-cell">${select({
+        label: isOrganisation ? 'Main contact there' : 'Works for',
+        name: `${prefix}organisation_id`, value: '',
+        options: organisations, includeBlank: 'Nobody yet',
+        hint: isOrganisation
+          ? 'Somebody named on this same reading, or already on the register.'
+          : 'The company they work for, where the document says so.' })}</div>
+      ${isOrganisation ? '' : html`
+        <div class="settings-cell">${field({ label: 'Role there',
+          name: `${prefix}organisation_role`, value: person.occupation ?? '', maxlength: 100,
+          hint: 'For example Immigration Manager.' })}</div>`}` : ''}
     <div class="settings-cell">${field({ label: 'Known as', name: `${prefix}preferred_name`,
       value: person.preferred_name ?? '', maxlength: 80 })}</div>
     ${'' /* The model returns whatever the document said — "Vietnamese", "Viet
@@ -137,6 +173,17 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     // the file. Shown rather than assumed: a person about to press a button
     // that writes to a client's file should see everything it will write.
     const staged = runId ? await stagedFor(c.env, runId) : [];
+    // Everywhere a company on this reading could be, or already is.
+    //
+    // Two kinds of value, because at this moment half of them do not exist yet:
+    // `p3` is the fourth party on this same page, and anything else is a client
+    // already on the register. Both are resolved after everybody is created —
+    // see `linkOrganisations`.
+    const organisationClients = await all<{ id: string; ref: string; full_name: string }>(
+      c.env.DB,
+      `SELECT id, ref, full_name FROM clients
+        WHERE kind = 'organisation' AND status <> 'archived'
+        ORDER BY full_name LIMIT 300`);
 
     if (!reading) {
       return page(c, { title: 'Open a matter', active: '/assistant' }, html`
@@ -203,6 +250,27 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     const visaTypeOptions = termOptions(await visaTypes(c.env));
     const applicant = reading.applicant;
     const parties = reading.other_parties;
+
+    /**
+     * Everything a "works for" or "main contact" box may point at.
+     *
+     * Two kinds of value, because at this moment half of them do not exist:
+     * `p3` is the fourth party on this same page, and anything else is a client
+     * already on the register. Both are resolved after everybody is created.
+     * The people on this page come first — a document that names an employer
+     * and its immigration manager is naming the pair, and that is nearly always
+     * the link being made.
+     */
+    const organisationChoices = [
+      ...parties.map((person, i) => ({
+        value: `p${i}`,
+        label: `${[person.given_names, person.family_name].filter(Boolean).join(' ')
+                 || `Person ${i + 1}`} — on this page`,
+      })),
+      ...organisationClients.map((org) => ({
+        value: org.id, label: `${org.full_name} (${org.ref})`,
+      })),
+    ];
     const [users, existing] = await Promise.all([
       all<{ id: string; name: string }>(c.env.DB,
         `SELECT id, name FROM users WHERE status = 'active' ORDER BY name`),
@@ -248,6 +316,9 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
                     ${file.content_type}</span></li>`)}
             </ul>`) : ''}
 
+        ${'' /* Built here rather than in `personFields`, so every party on the
+                 page offers the same list and the indices mean the same thing
+                 in the form as they do in the handler. */}
         ${card('The client', html`
           ${existing ? html`
             <div class="field">
@@ -260,7 +331,8 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
                  ignored, and nothing about ${existing.full_name} is overwritten by this reading.</p>
             </div>` : ''}
           <div class="settings-form">
-            ${personFields('a_', applicant, 'principal_applicant', visaTypeOptions)}
+            ${personFields('a_', applicant, 'principal_applicant', visaTypeOptions,
+                            organisationChoices)}
           </div>`)}
 
         ${parties.length ? card('Other people named', html`
@@ -270,7 +342,8 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
               <label class="checkbox-field"><input type="checkbox" name="p${i}_create" value="1" checked>
                 Add them to the register and link them to this matter</label>
               <div class="settings-form">
-                ${personFields(`p${i}_`, person, null, visaTypeOptions)}
+                ${personFields(`p${i}_`, person, null, visaTypeOptions,
+                                organisationChoices)}
               </div>
             </fieldset>`)}
           <input type="hidden" name="party_count" value="${parties.length}">`) : ''}
@@ -398,18 +471,27 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     const existingId = f.optional('existing_client_id', { max: 80 });
     let clientId: string;
     let clientRef: string;
+    let clientName = '';
+    // The client can be a company too — an accreditation matter is opened for
+    // the employer — so which end of a link they are is read rather than
+    // assumed.
+    let clientKind: 'individual' | 'organisation' = 'individual';
     if (existingId) {
-      const row = await one<{ id: string; ref: string }>(
-        c.env.DB, `SELECT id, ref FROM clients WHERE id = ?`, existingId);
+      const row = await one<{ id: string; ref: string; full_name: string; kind: string }>(
+        c.env.DB, `SELECT id, ref, full_name, kind FROM clients WHERE id = ?`, existingId);
       if (!row) return redirectWith(c, '/assistant/intake', 'That client no longer exists.', 'err');
       clientId = row.id;
       clientRef = row.ref;
+      clientName = row.full_name;
+      clientKind = row.kind === 'organisation' ? 'organisation' : 'individual';
       await fillEmptyFields(c, f, 'a_', row.id);
     } else {
       const made = await createPerson(c, f, 'a_', stamp);
       if (!made) return redirectWith(c, '/assistant/intake', 'The client needs a name.', 'err');
       clientId = made.id;
       clientRef = made.ref;
+      clientName = made.fullName;
+      clientKind = made.kind;
     }
 
     const caseId = newId('cas');
@@ -420,9 +502,14 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
           inz_application_number, inz_client_number, lodged_at, decision_due_at, summary,
           currency, created_at, updated_at, created_by)
        VALUES (?,?,?,?,?,?,?, 'normal', ?,?,?,?,?,?, 'NZD', ?,?,?)`,
-      // Derived, not typed, and written from one place: the description is the
-      // name, and `title` follows it.
-      caseId, caseRef, clientId, descriptor, descriptor, caseType, status,
+      // The matter's name is composed the same way as everywhere else, from
+      // the type and the client. This route wrote `descriptor` into both
+      // columns and carried a comment saying so was "written from one place" —
+      // which it was not: the New matter form was the other place, and when
+      // that was corrected on 8 September this one was missed. A second writer
+      // of a derived value is a second convention. See `core/casename.ts`.
+      caseId, caseRef, clientId, caseNameFrom(types, caseType, clientName), descriptor,
+      caseType, status,
       f.optional('assigned_to', { max: 80 }),
       f.optional('inz_application_number', { max: 40 }),
       f.optional('inz_client_number', { max: 40 }),
@@ -439,12 +526,20 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     );
 
     // Everybody else the reading named, for whoever was left ticked.
+    //
+    // Two passes, because the links between them point both ways: the employer
+    // may be created after the manager who works for it. So everybody is made
+    // first, the slot each one filled is remembered, and the links are written
+    // once every slot has an id.
     const partyCount = Math.min(8, Number(form.get('party_count') ?? '0') || 0);
     const added: string[] = [];
+    const madeInSlot = new Map<string, { id: string; kind: 'individual' | 'organisation' }>();
+    madeInSlot.set('a', { id: clientId, kind: clientKind });
     for (let i = 0; i < partyCount; i++) {
       if (!form.has(`p${i}_create`)) continue;
       const made = await createPerson(c, f, `p${i}_`, stamp);
       if (!made) continue;
+      madeInSlot.set(`p${i}`, { id: made.id, kind: made.kind });
       const role = f.enum(`p${i}_role`, PARTY_ROLES, { fallback: 'other' })! as PartyRole;
       await run(
         c.env.DB,
@@ -454,6 +549,8 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       );
       added.push(`${made.ref} as ${PARTY_ROLE_LABELS[role].toLowerCase()}`);
     }
+
+    const linked = await linkOrganisations(c, f, madeInSlot, partyCount, stamp);
 
     await run(
       c.env.DB,
@@ -518,7 +615,8 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     return redirectWith(c, `/cases/${caseId}`,
       `Case ${caseRef} opened for ${clientRef}.`
       + (added.length ? ` ${added.length} other ${added.length === 1 ? 'party' : 'parties'} linked.` : '')
-      + (attached ? ` ${attached} ${attached === 1 ? 'file is' : 'files are'} on the file.` : ''),
+      + (attached ? ` ${attached} ${attached === 1 ? 'file is' : 'files are'} on the file.` : '')
+      + (linked ? ` ${linked} ${linked === 1 ? 'link' : 'links'} between a company and its people recorded.` : ''),
     );
   });
 }
@@ -571,15 +669,97 @@ function nationalitiesFromForm(f: FormReader, prefix: string): string[] {
     .map((name) => countryCodeFor(f.optional(name, { max: 80 }))));
 }
 
-/** Create one person from the prefixed fields, or nothing if they have no name. */
+/**
+ * Write who works for which company, once everybody exists.
+ *
+ * Both directions are columns the register has had since migration 0008 and
+ * neither was reachable from this form: an employer arrived with nobody
+ * attached to it, and the immigration manager who writes on its behalf arrived
+ * unattached to the employer. The practice asked for it directly — *"for a
+ * company I need a contact person's name as well, or at least be able to link a
+ * name from clients/contacts"*.
+ *
+ * A box's value is either a slot on this page (`p3`, or `a` for the client) or
+ * the id of a client already on the register. A slot nobody ticked resolves to
+ * nothing and the link is skipped, rather than failing the whole press.
+ *
+ * Which column is written depends on which end is the company:
+ *
+ *  - a **person** pointing at a company gets `organisation_id` and the role
+ *    they hold there;
+ *  - a **company** pointing at a person gets `primary_contact_id` — who to ring
+ *    — and, where that person has no employer recorded, the other half of the
+ *    link too, because they plainly work there.
+ */
+async function linkOrganisations(
+  c: Parameters<typeof auditFrom>[0], f: FormReader,
+  madeInSlot: Map<string, { id: string; kind: 'individual' | 'organisation' }>,
+  partyCount: number, stamp: string,
+): Promise<number> {
+  const resolve = async (value: string | null): Promise<string | null> => {
+    if (!value) return null;
+    const slot = madeInSlot.get(value);
+    if (slot) return slot.id;
+    // Not a slot, so it must be a record already on the register — checked
+    // rather than trusted, because a stale page could name one since deleted.
+    const row = await one<{ id: string }>(
+      c.env.DB, 'SELECT id FROM clients WHERE id = ?', value);
+    return row?.id ?? null;
+  };
+
+  let written = 0;
+  const prefixes = ['a_', ...Array.from({ length: partyCount }, (_, i) => `p${i}_`)];
+  for (const prefix of prefixes) {
+    const slotKey = prefix === 'a_' ? 'a' : prefix.slice(0, -1);
+    const self = madeInSlot.get(slotKey);
+    if (!self) continue;
+    const otherId = await resolve(f.optional(`${prefix}organisation_id`, { max: 80 }));
+    if (!otherId || otherId === self.id) continue;
+
+    if (self.kind === 'organisation') {
+      await run(c.env.DB, 'UPDATE clients SET primary_contact_id = ?, updated_at = ? WHERE id = ?',
+        otherId, stamp, self.id);
+      // The contact plainly works there. Written only into an empty box: a
+      // person who already has an employer recorded is not moved by this.
+      await run(
+        c.env.DB,
+        `UPDATE clients SET organisation_id = COALESCE(organisation_id, ?), updated_at = ?
+          WHERE id = ?`,
+        self.id, stamp, otherId);
+    } else {
+      await run(
+        c.env.DB,
+        'UPDATE clients SET organisation_id = ?, organisation_role = ?, updated_at = ? WHERE id = ?',
+        otherId, f.optional(`${prefix}organisation_role`, { max: 100 }), stamp, self.id);
+    }
+    written += 1;
+  }
+  return written;
+}
+
+/** Create one person or company from the prefixed fields, or nothing unnamed. */
 async function createPerson(
   c: Parameters<typeof auditFrom>[0], f: FormReader, prefix: string, stamp: string,
-): Promise<{ id: string; ref: string } | null> {
-  const given = plainAscii(f.optional(`${prefix}given_names`, { max: 120 })) || null;
+): Promise<{ id: string; ref: string; fullName: string; kind: 'individual' | 'organisation' } | null> {
+  // A company or a person, as the form says. It used to be 'individual' always,
+  // whatever the document said and whatever the reading proposed, so an
+  // employer arrived on the register as a person with a very long family name.
+  const kind = f.enum(`${prefix}kind`, ['individual', 'organisation'] as const,
+    { fallback: 'individual' })!;
+  const given = kind === 'organisation'
+    ? null
+    : plainAscii(f.optional(`${prefix}given_names`, { max: 120 })) || null;
+  const typed = f.optional(`${prefix}family_name`, { max: 200 }) ?? '';
   // Capitals, as everywhere else a family name is stored — a record made by
   // the assistant is a record like any other.
-  const family = familyNameFor(f.optional(`${prefix}family_name`, { max: 120 })) || null;
-  const fullName = composeFullName('individual', { givenNames: given, familyName: family });
+  const family = familyNameFor(typed) || null;
+  // A company's registered name is copied as it is written, not restyled: the
+  // register that holds it is not the practice's to shout at. So the same box
+  // feeds two different things — the stored family name, in capitals like every
+  // other, and the displayed full name, as typed. That is exactly what the
+  // client form does, and this form has to agree with it or the two routes
+  // would produce differently-shaped companies.
+  const fullName = composeFullName(kind, { givenNames: given, familyName: typed }, typed);
   if (!fullName) return null;
 
   const id = newId('cli');
@@ -589,23 +769,27 @@ async function createPerson(
     `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name, preferred_name,
         email, phone, date_of_birth, current_visa_type, current_visa_expiry,
         status, assigned_to, created_at, updated_at, created_by)
-     VALUES (?,?, 'individual', ?,?,?,?,?,?,?,?,?, 'active', ?,?,?,?)`,
-    id, ref, fullName, given, family,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'active', ?,?,?,?)`,
+    id, ref, kind, fullName, given, family,
     f.optional(`${prefix}preferred_name`, { max: 80 }),
     f.email(`${prefix}email`),
     f.optional(`${prefix}phone`, { max: 40 }),
-    f.date(`${prefix}date_of_birth`),
-    f.optional(`${prefix}current_visa_type`, { max: 120 }),
-    f.date(`${prefix}current_visa_expiry`),
+    // A company has no birthday and holds no visa. The boxes are on the form
+    // for everybody, so anything typed into them for a company is dropped here
+    // rather than stored as a fact about a legal entity.
+    kind === 'organisation' ? null : f.date(`${prefix}date_of_birth`),
+    kind === 'organisation' ? null : f.optional(`${prefix}current_visa_type`, { max: 120 }),
+    kind === 'organisation' ? null : f.date(`${prefix}current_visa_expiry`),
     c.get('user')!.id, stamp, stamp, c.get('user')!.id,
   );
-  await c.env.DB.batch(setNationalityStatements(c.env, id, nationalitiesFromForm(f, prefix)));
+  await c.env.DB.batch(setNationalityStatements(
+    c.env, id, kind === 'organisation' ? [] : nationalitiesFromForm(f, prefix)));
   await addEntry(c.env, {
     entityType: 'client', entityId: id, kind: 'system',
     body: `Client ${ref} created from a document read by the assistant, and checked before saving.`,
     createdBy: c.get('user')!.id,
   });
-  return { id, ref };
+  return { id, ref, fullName, kind };
 }
 
 /**

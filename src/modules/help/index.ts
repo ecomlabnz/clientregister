@@ -37,6 +37,23 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.7.0', date: '8 September 2026',
+    notes: [
+      'When the assistant reads a document, every person it found now has a \u201cPerson or '
+        + 'company\u201d box you can set before anything is saved. An employer used to be created '
+        + 'as a person with a very long surname, and the only fix was to spot it and edit the '
+        + 'record afterwards.',
+      'A company gets no date of birth, nationality or visa, and its registered name is kept '
+        + 'exactly as written rather than put into capitals.',
+      'Every person now has a \u201cWorks for\u201d box \u2014 or \u201cMain contact there\u201d '
+        + 'on a company \u2014 offering the other people in the same reading and every company '
+        + 'already on the register. Choosing one records both sides: the company knows who to '
+        + 'ring, and the person\u2019s record says where they work and what they do there.',
+      'A matter opened by the assistant is now named the same way as every other matter. That was '
+        + 'fixed on the New matter form earlier today and this one was missed.',
+    ],
+  },
+  {
     version: '1.6.0', date: '8 September 2026',
     notes: [
       'When the assistant reads a document to open a matter, the document is now kept and put on '
