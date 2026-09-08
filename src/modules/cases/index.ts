@@ -57,7 +57,9 @@ export interface CaseRow {
   id: string; ref: string; client_id: string; title: string; descriptor: string | null;
   case_type: string;
   status: CaseStatus; priority: string; assigned_to: string | null;
-  inz_application_number: string | null; inz_client_number: string | null;
+  inz_application_number: string | null;
+  /** The client's, joined on. The matter has no column of its own since 0073. */
+  inz_client_number: string | null;
   lodged_at: string | null; decision_due_at: string | null; decided_at: string | null;
   chase_inz: number;
   outcome: string | null; fee_quoted_cents: number | null; fee_agreed_cents: number | null;
@@ -183,7 +185,10 @@ function caseForm(
       <div class="form-section">
         <h3>Immigration New Zealand</h3>
         ${field({ label: 'INZ application number', name: 'inz_application_number', value: values.inz_application_number, maxlength: 60 })}
-        ${field({ label: 'INZ client number', name: 'inz_client_number', value: values.inz_client_number, maxlength: 60 })}
+        ${'' /* No INZ client number here. It is one number per person, not per
+                 application, and typing it on each matter is how one client
+                 ended up with two of them. It lives on the client and the
+                 matter reads it from there \u2014 migration 0073. */}
         ${field({ label: 'Lodged on', name: 'lodged_at', type: 'date', value: dateInputValue(values.lodged_at) })}
         ${field({ label: 'Response / decision due', name: 'decision_due_at', type: 'date', value: dateInputValue(values.decision_due_at),
                   hint: 'The date that must not be missed — RFI or PPI deadline, or expected decision. '
@@ -242,7 +247,6 @@ function readCaseForm(f: FormReader, types: Term[]) {
     priority: f.enum('priority', PRIORITIES, { fallback: 'normal' })!,
     assigned_to: f.text('assigned_to', { required: true, label: 'Assigned to', max: 60 }),
     inz_application_number: f.optional('inz_application_number', { max: 60 }),
-    inz_client_number: f.optional('inz_client_number', { max: 60 }),
     lodged_at: f.date('lodged_at'),
     decision_due_at: f.date('decision_due_at'),
     decided_at: f.date('decided_at'),
@@ -345,7 +349,7 @@ export const casesModule: AppModule = {
         // phrase against one column missed "GARCIA Maria Luisa" entirely.
         const m = everyTermClause(
           ['k.title', 'k.ref', 'cl.full_name', 'k.descriptor',
-           'k.inz_application_number', 'k.inz_client_number'],
+           'k.inz_application_number', 'cl.inz_client_number'],
           q, params.length + 1);
         if (m.sql) { where.push(m.sql); params.push(...m.params); }
       }
@@ -398,7 +402,8 @@ export const casesModule: AppModule = {
 
       const rows = await all<CaseRow & { client_name: string; client_ref: string; assignee_name: string | null }>(
         c.env.DB,
-        `SELECT k.*, cl.full_name AS client_name, cl.ref AS client_ref, u.name AS assignee_name
+        `SELECT k.*, cl.full_name AS client_name, cl.ref AS client_ref,
+                cl.inz_client_number AS inz_client_number, u.name AS assignee_name
            FROM cases k
            JOIN clients cl ON cl.id = k.client_id
            LEFT JOIN users u ON u.id = k.assigned_to
@@ -627,12 +632,12 @@ export const casesModule: AppModule = {
       await run(
         c.env.DB,
         `INSERT INTO cases (id, ref, client_id, title, descriptor, case_type, status, priority, assigned_to,
-            inz_application_number, inz_client_number, lodged_at, decision_due_at, decided_at,
+            inz_application_number, lodged_at, decision_due_at, decided_at,
             next_action, next_action_due, summary, chase_inz, currency, created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NZD',?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NZD',?,?,?)`,
         id, ref, v.client_id, caseNameFrom(types, v.case_type, client!.full_name),
         v.descriptor, v.case_type, status, v.priority, v.assigned_to,
-        v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue, v.decided_at,
+        v.inz_application_number, v.lodged_at, decisionDue, v.decided_at,
         v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), nowIso(), user.id,
       );
       await run(
@@ -655,7 +660,8 @@ export const casesModule: AppModule = {
       const brief = aiAvailable ? await latestBrief(c.env, id) : null;
       const kase = await one<CaseRow & { client_name: string; client_ref: string; assignee_name: string | null }>(
         c.env.DB,
-        `SELECT k.*, cl.full_name AS client_name, cl.ref AS client_ref, u.name AS assignee_name
+        `SELECT k.*, cl.full_name AS client_name, cl.ref AS client_ref,
+                cl.inz_client_number AS inz_client_number, u.name AS assignee_name
            FROM cases k JOIN clients cl ON cl.id = k.client_id
            LEFT JOIN users u ON u.id = k.assigned_to
           WHERE k.id = ?`,
@@ -1100,7 +1106,13 @@ export const casesModule: AppModule = {
                          a visible gap rather than an empty cell. */}
                 <dt>Owner</dt><dd>${kase.assignee_name ?? 'Nobody — assign one'}</dd>
                 <dt>INZ application</dt><dd>${kase.inz_application_number ?? '—'}</dd>
-                <dt>INZ client no.</dt><dd>${kase.inz_client_number ?? '—'}</dd>
+                ${'' /* The client's, not the matter's: one number per person.
+                         Shown here because it is quoted on everything sent to
+                         INZ about this application, and linked because setting
+                         it is done on their page. */}
+                <dt>INZ client no.</dt><dd>${kase.inz_client_number
+                  ? html`<code>${kase.inz_client_number}</code>`
+                  : html`<a href="/clients/${kase.client_id}">not recorded — set it on the client</a>`}</dd>
                 <dt>Lodged</dt><dd>${dateShort(kase.lodged_at)}</dd>
                 ${!decided && kase.decision_due_at
                   ? html`<dt>Due</dt><dd class="${isOverdue(kase.decision_due_at) ? 'warn' : ''}">
@@ -1170,12 +1182,12 @@ export const casesModule: AppModule = {
       await run(
         c.env.DB,
         `UPDATE cases SET client_id=?, title=?, descriptor=?, case_type=?, priority=?, assigned_to=?,
-           inz_application_number=?, inz_client_number=?, lodged_at=?, decision_due_at=?, decided_at=?,
+           inz_application_number=?, lodged_at=?, decision_due_at=?, decided_at=?,
            next_action=?, next_action_due=?, summary=?, chase_inz=?, updated_at=?
          WHERE id=?`,
         v.client_id, caseNameFrom(types, v.case_type, editClient?.full_name ?? null),
         v.descriptor, v.case_type, v.priority, v.assigned_to,
-        v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue, v.decided_at,
+        v.inz_application_number, v.lodged_at, decisionDue, v.decided_at,
         v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), id,
       );
       // The chases follow the dates rather than being fired once: moving the

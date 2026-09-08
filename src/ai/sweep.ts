@@ -107,8 +107,11 @@ export async function matchMatters(env: Env, result: SweepResult, senderEmail: s
     { on: 'inz_application_number',
       sql: `${select} WHERE TRIM(UPPER(k.inz_application_number)) = ?`,
       value: usable(result.identifiers.inz_application_number) },
+    // The client's since 0073, so this identifies the person and returns every
+    // matter they have. Which is what an INZ letter quoting only a client
+    // number actually tells you.
     { on: 'inz_client_number',
-      sql: `${select} WHERE TRIM(UPPER(k.inz_client_number)) = ?`,
+      sql: `${select} WHERE TRIM(UPPER(cl.inz_client_number)) = ?`,
       value: usable(result.identifiers.inz_client_number) },
     { on: 'case_reference',
       sql: `${select} WHERE TRIM(UPPER(k.ref)) = ?`,

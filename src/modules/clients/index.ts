@@ -94,6 +94,7 @@ export interface ClientRow {
   english_test_date: string | null;
   current_visa_type: string | null; current_visa_expiry: string | null;
   current_visa_expiry_rule: string | null;
+  inz_client_number: string | null;
   address: string | null; status: ClientStatus; assigned_to: string | null; notes: string | null;
   created_at: string; updated_at: string; created_by: string | null;
 }
@@ -334,6 +335,16 @@ function clientForm(
 
         <div class="settings-form">
           <p class="settings-head subhead">Immigration</p>
+          ${'' /* First in the block because it is the first thing quoted to INZ
+                   about a person, and because the practice asked for it by name
+                   on 8 September 2026: "every individual client must have INZ
+                   Client Number". It used to be typed onto every matter
+                   separately, which is how one client ended up with two. */}
+          <div class="settings-cell">${field({ label: 'INZ client number', name: 'inz_client_number',
+            value: values.inz_client_number ?? '', maxlength: 20, inputmode: 'numeric',
+            hint: 'Digits only. One per person, issued by INZ and never changed \u2014 so it '
+              + 'lives here rather than on each matter, and every matter reads it from here. '
+              + 'Leave it blank only until INZ has issued one.' })}</div>
           <div class="settings-cell">${select({ label: 'Current visa', name: 'current_visa_type',
             value: values.current_visa_type ?? '', options: visaTypeOptions,
             includeBlank: 'Not recorded',
@@ -414,6 +425,16 @@ function readClientForm(f: FormReader) {
     ? f.text('organisation_name', { required: true, label: 'Registered name', max: 200 })
     : '';
 
+  // Spaces and dashes come off first: a number read aloud off a letter is
+  // written "64 486 276" as often as not, and refusing that would teach people
+  // that the box is broken. What is left has to be digits, and the database
+  // says so too — this is here so the message names the box.
+  const typedInz = (f.optional('inz_client_number', { max: 40 }) ?? '').replace(/[\s-]/g, '');
+  const inzClientNumber = typedInz || null;
+  if (inzClientNumber && !/^[0-9]{6,12}$/.test(inzClientNumber)) {
+    f.errors['inz_client_number'] = 'An INZ client number is six to twelve digits and nothing else.';
+  }
+
   const nzbn = f.optional('nzbn', { max: 20 });
   if (nzbn && !isValidNzbnFormat(nzbn)) {
     f.errors['nzbn'] = 'An NZBN is 13 digits, starting 9429.';
@@ -456,6 +477,7 @@ function readClientForm(f: FormReader) {
     current_visa_type: f.optional('current_visa_type', { max: 120 }),
     current_visa_expiry: f.date('current_visa_expiry'),
     current_visa_expiry_rule: f.optional('current_visa_expiry_rule', { max: 200 }),
+    inz_client_number: inzClientNumber,
     address: f.optional('address', { max: 500 }),
     status: f.enum('status', CLIENT_STATUSES, { fallback: 'prospect' })!,
     assigned_to: f.optional('assigned_to', { max: 60 }),
@@ -633,7 +655,7 @@ export const clientsModule: AppModule = {
         // column found nothing for "GARCIA Maria Luisa", which is how a lawyer
         // and INZ both write it.
         const cols = ['full_name', 'family_name', 'given_names', 'email', 'phone', 'ref',
-                      'preferred_name', 'nzbn', 'company_number'];
+                      'preferred_name', 'nzbn', 'company_number', 'inz_client_number'];
         for (const term of searchTerms(q)) {
           params.push(`%${term.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`);
           const n = params.length;
@@ -1060,15 +1082,15 @@ export const clientsModule: AppModule = {
             email, phone, whatsapp, telegram_username, telegram_user_id,
             date_of_birth,
             english_test_type, english_test_score, english_test_date,
-            current_visa_type, current_visa_expiry, current_visa_expiry_rule,
+            current_visa_type, current_visa_expiry, current_visa_expiry_rule, inz_client_number,
             address, status, assigned_to, notes,
             created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, ref, v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
         v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
-        v.current_visa_type, v.current_visa_expiry, v.current_visa_expiry_rule,
+        v.current_visa_type, v.current_visa_expiry, v.current_visa_expiry_rule, v.inz_client_number,
         v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), nowIso(), user.id,
       );
@@ -1537,6 +1559,11 @@ export const clientsModule: AppModule = {
                              ${passports.length > 1
                                ? html`<div class="muted small"><a href="#passports">${passports.length} passports on file</a></div>`
                                : html`<div class="muted small"><a href="#passports">Details</a></div>`}`}</dd>
+                    ${'' /* First, and shown even when empty: a blank here is
+                             the practice's own standing instruction unmet. */}
+                    <dt>INZ client no.</dt><dd>${client.inz_client_number
+                      ? html`<code>${client.inz_client_number}</code>`
+                      : html`${badge('not recorded', 'amber')}`}</dd>
                     <dt>Current visa</dt><dd>${labelFor(visaTerms, client.current_visa_type) || '—'}</dd>
                     <dt>Visa expiry</dt><dd>${!client.current_visa_expiry && client.current_visa_expiry_rule
                       ? html`${badge('not yet fixed', 'amber')}
@@ -1907,7 +1934,7 @@ export const clientsModule: AppModule = {
            nzbn=?, company_number=?, organisation_id=?, organisation_role=?, email=?, phone=?, whatsapp=?, telegram_username=?, telegram_user_id=?,
            date_of_birth=?,
            english_test_type=?, english_test_score=?, english_test_date=?,
-           current_visa_type=?, current_visa_expiry=?, current_visa_expiry_rule=?,
+           current_visa_type=?, current_visa_expiry=?, current_visa_expiry_rule=?, inz_client_number=?,
            address=?, status=?, assigned_to=?, notes=?, updated_at=?
          WHERE id=?`,
         v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
@@ -1915,7 +1942,7 @@ export const clientsModule: AppModule = {
         v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
-        v.current_visa_type, v.current_visa_expiry, v.current_visa_expiry_rule,
+        v.current_visa_type, v.current_visa_expiry, v.current_visa_expiry_rule, v.inz_client_number,
         v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), id,
       );

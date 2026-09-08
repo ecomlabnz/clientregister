@@ -558,15 +558,23 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       clientKind = made.kind;
     }
 
+    // The INZ client number the reading found is the applicant's, and since
+    // migration 0073 that is where it lives. Two rules, both of which have to
+    // hold or the whole press fails on a database error rather than saving:
+    // what the record already holds wins, and a number another client already
+    // carries is left alone — that is either a duplicate person or a misread,
+    // and both are for somebody to look at rather than for this to force.
+    await setInzClientNumber(c, f.optional('inz_client_number', { max: 40 }), clientId);
+
     const caseId = newId('cas');
     const caseRef = await nextYearlyRef(c.env.DB, 'case', 'CASE');
     await run(
       c.env.DB,
       `INSERT INTO cases (id, ref, client_id, title, descriptor, case_type, status, priority, assigned_to,
-          inz_application_number, inz_client_number, lodged_at, decision_due_at,
+          inz_application_number, lodged_at, decision_due_at,
           next_action, next_action_due, summary,
           currency, created_at, updated_at, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'NZD', ?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'NZD', ?,?,?)`,
       // The matter's name is composed the same way as everywhere else, from
       // the type and the client. This route wrote `descriptor` into both
       // columns and carried a comment saying so was "written from one place" —
@@ -578,7 +586,6 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       f.enum('priority', PRIORITIES, { fallback: 'normal' })!,
       f.optional('assigned_to', { max: 80 }),
       f.optional('inz_application_number', { max: 40 }),
-      f.optional('inz_client_number', { max: 40 }),
       f.date('lodged_at'), f.date('decision_due_at'),
       f.optional('next_action', { max: 200 }), f.date('next_action_due'),
       f.optional('summary', { max: 8000 }),
@@ -726,6 +733,28 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
  * now, and a reading that quietly replaced a corrected visa expiry with an
  * older one would be worse than a reading that filled nothing in.
  */
+/**
+ * Put an INZ client number on a client, if it is safe to.
+ *
+ * Never over what is recorded, and never one another client holds — the column
+ * is unique, so a clash would abort the insert and lose the whole reading. A
+ * number that cannot be written is not an error here: the client page shows the
+ * gap and the alerts page lists it.
+ */
+async function setInzClientNumber(
+  c: Parameters<typeof auditFrom>[0], typed: string | null, clientId: string,
+): Promise<void> {
+  const number = (typed ?? '').replace(/[\s-]/g, '');
+  if (!/^[0-9]{6,12}$/.test(number)) return;
+  await run(
+    c.env.DB,
+    `UPDATE clients SET inz_client_number = ?, updated_at = ?
+      WHERE id = ? AND COALESCE(TRIM(inz_client_number), '') = ''
+        AND NOT EXISTS (SELECT 1 FROM clients o WHERE o.inz_client_number = ? AND o.id <> ?)`,
+    number, nowIso(), clientId, number, clientId,
+  );
+}
+
 async function fillEmptyFields(
   c: Parameters<typeof auditFrom>[0], f: FormReader, prefix: string, clientId: string,
 ): Promise<void> {

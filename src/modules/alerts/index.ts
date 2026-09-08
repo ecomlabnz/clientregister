@@ -43,6 +43,8 @@ export type AlertKind =
   | 'status_unknown'
   /** A visa whose expiry waits on an event that has not happened yet. */
   | 'expiry_unfixed'
+  /** An individual with a live matter and no INZ client number recorded. */
+  | 'no_inz_number'
   /**
    * A certificate whose expiry was worked out from an issue date nobody read
    * off the certificate.
@@ -137,6 +139,7 @@ const KIND_LABELS: Record<AlertKind, string> = {
   no_slack: 'No room to act',
   status_unknown: 'Status not recorded',
   expiry_unfixed: 'Expiry not yet fixed',
+  no_inz_number: 'No INZ client number',
   unconfirmed_expiry: 'Worked out, never confirmed',
 };
 
@@ -426,6 +429,31 @@ export const CHECKS_NOT_ABOUT_A_DATE = {
         ORDER BY k.ref LIMIT 100`,
 
   /**
+   * An individual with a live matter and no INZ client number on their record.
+   *
+   * **The practice's standing instruction, 8 September 2026:** *"every
+   * individual client must have INZ Client Number."* The register cannot make
+   * INZ issue one, so it cannot be a column that refuses to be empty — a
+   * first-time applicant has none until they lodge, and a database that refused
+   * such a record would turn the instruction into "no new client may be
+   * entered". So the requirement lives here, as a list to be worked through,
+   * which is also the only form of it that can be finished.
+   *
+   * Individuals only, and only where there is a live matter. An organisation
+   * does not hold one, and a lead who never came back is not a gap in the file.
+   */
+  noInzNumber: (openIn: string) => `SELECT cl.id AS client_id, cl.ref AS client_ref,
+              cl.full_name AS client_name, cl.updated_at,
+              COUNT(k.id) AS matters, MIN(k.ref) AS first_ref
+         FROM clients cl JOIN cases k ON k.client_id = cl.id
+        WHERE cl.kind = 'individual'
+          AND cl.status <> 'archived'
+          AND COALESCE(TRIM(cl.inz_client_number), '') = ''
+          AND k.status IN (${openIn})
+        GROUP BY cl.id
+        ORDER BY cl.ref LIMIT 100`,
+
+  /**
    * A visa whose expiry is a rule waiting on an event — "24 months after
    * first arrival" — with no date fixed yet (0041). Left as a blank this
    * would be indistinguishable from "never recorded" and nothing would
@@ -604,7 +632,7 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
   const lodgedPlaceholders = LODGED_CASE_STATUSES.map(() => '?').join(',');
 
   const [cases, tasks, quotes, documents, quiet, contradictions,
-         unacknowledged, noSlack, statusUnknown, expiryUnfixed] = await Promise.all([
+         unacknowledged, noSlack, statusUnknown, expiryUnfixed, noInzNumber] = await Promise.all([
     all<any>(
       env.DB,
       `SELECT k.id, k.ref, k.title, k.descriptor, k.status, k.decision_due_at, cl.full_name AS client_name
@@ -644,6 +672,8 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
     all<any>(env.DB, CHECKS_NOT_ABOUT_A_DATE.statusUnknown(openPlaceholders),
       ...OPEN_CASE_STATUSES),
     all<any>(env.DB, CHECKS_NOT_ABOUT_A_DATE.expiryUnfixed()),
+    all<any>(env.DB, CHECKS_NOT_ABOUT_A_DATE.noInzNumber(openPlaceholders),
+      ...OPEN_CASE_STATUSES),
   ]);
 
   // Fired on an absence rather than on a row, so it is assembled rather than
@@ -752,6 +782,18 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
       // To the client, not the matter: the visa is recorded on the person, and
       // the row exists to be cleared.
       href: `/clients/${k.client_id}`,
+    })),
+    ...noInzNumber.map((cl: any) => ({
+      kind: 'no_inz_number' as const,
+      // Never overdue — there is no date it is late against — and always
+      // pressing, because everything sent to INZ about this person quotes it.
+      // It clears the moment the number is entered on their page.
+      severity: 'urgent' as AlertSeverity,
+      date: String(cl.updated_at ?? today).slice(0, 10),
+      title: `No INZ client number — ${cl.client_name}`,
+      detail: `${cl.client_ref} · ${cl.matters} open ${cl.matters === 1 ? 'matter' : 'matters'}`
+        + `${cl.first_ref ? ` · ${cl.first_ref}` : ''}`,
+      href: `/clients/${cl.client_id}`,
     })),
     ...expiryUnfixed.map((cl: any) => ({
       kind: 'expiry_unfixed' as const,

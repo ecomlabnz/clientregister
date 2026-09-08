@@ -11,8 +11,8 @@ guarantee in a handler lasts until somebody adds a second handler — and this
 register is written to by the application, by bulk loads, and occasionally by
 hand at a console. Everything below holds in all three cases.
 
-**67 refusals** across 23 tables, plus
-**9 uniqueness rules**. Each is quoted in the words the
+**69 refusals** across 23 tables, plus
+**10 uniqueness rules**. Each is quoted in the words the
 database itself uses, because that is what somebody will see.
 
 Read from the schema as it finally stands, after every migration — not from the
@@ -86,6 +86,8 @@ whether or not the rule exists is not a test.
 |---|---|
 | insert | passport country must be an ISO 3166-1 alpha-2 country code |
 | update | passport country must be an ISO 3166-1 alpha-2 country code |
+| insert | An INZ client number is six to twelve digits and nothing else. |
+| update | An INZ client number is six to twelve digits and nothing else. |
 
 ### `documents`
 
@@ -231,10 +233,16 @@ whether or not the rule exists is not a test.
 | `invoice_shares` | invoice_id, party_key | always |
 | `kb_article_versions` | article_id, version | always |
 | `service_items` | name COLLATE NOCASE | always |
+| `clients` | inz_client_number | inz_client_number IS NOT NULL |
 | `tags` | name | always |
 | `users` | email | always |
 
-The partial ones are worth calling out, because both were learned the hard way:
+The INZ client number is partial for a different reason from the other two:
+empty is the normal state of a client INZ has never issued one to, and most of
+the register is in it. What it catches is the same person entered twice — which
+is exactly what it caught the day it was added.
+
+The other partial ones are worth calling out, because both were learned the hard way:
 a client may hold many passports but only **one primary**, and a matter may name
 many people but only **one principal applicant**. A bulk load that ignored the
 first stopped dead mid-run against the live register.

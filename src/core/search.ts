@@ -167,9 +167,10 @@ export async function searchEverything(
         WHERE (full_name LIKE ?1 ESCAPE '\\' OR ref LIKE ?1 ESCAPE '\\'
            OR email LIKE ?1 ESCAPE '\\' OR phone LIKE ?1 ESCAPE '\\'
            OR family_name LIKE ?1 ESCAPE '\\' OR given_names LIKE ?1 ESCAPE '\\'
-           OR preferred_name LIKE ?1 ESCAPE '\\' OR nzbn LIKE ?1 ESCAPE '\\')${
+           OR preferred_name LIKE ?1 ESCAPE '\\' OR nzbn LIKE ?1 ESCAPE '\\'
+           OR inz_client_number LIKE ?1 ESCAPE '\\')${
              everyOtherTerm(['full_name','ref','email','phone','family_name','given_names',
-                             'preferred_name','nzbn'], terms, 4)}
+                             'preferred_name','nzbn','inz_client_number'], terms, 4)}
         ORDER BY CASE WHEN ref = ?2 THEN 0 ELSE 1 END, full_name LIMIT ?3`,
       like, q.toUpperCase(), limit, ...rest,
     ).then((rows) => rows.map((r) => ({
@@ -184,10 +185,10 @@ export async function searchEverything(
         WHERE (k.title LIKE ?1 ESCAPE '\\' OR k.ref LIKE ?1 ESCAPE '\\'
            OR k.descriptor LIKE ?1 ESCAPE '\\' OR k.summary LIKE ?1 ESCAPE '\\'
            OR k.inz_application_number LIKE ?1 ESCAPE '\\'
-           OR k.inz_client_number LIKE ?1 ESCAPE '\\'
+           OR cl.inz_client_number LIKE ?1 ESCAPE '\\'
            OR cl.full_name LIKE ?1 ESCAPE '\\')${
              everyOtherTerm(['k.title','k.ref','k.descriptor','k.summary',
-                             'k.inz_application_number','k.inz_client_number',
+                             'k.inz_application_number','cl.inz_client_number',
                              'cl.full_name'], terms, 3)}
         ORDER BY k.updated_at DESC LIMIT ?2`,
       like, limit, ...rest,
