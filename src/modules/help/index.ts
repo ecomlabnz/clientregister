@@ -37,6 +37,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.7.2', date: '8 September 2026',
+    notes: [
+      'Opening a matter onto a client who is already on the register now puts their surname into '
+        + 'capitals if it was not, renames their matters to match, and notes it on their file. The '
+        + 'assistant was reusing older records exactly as they stood, so a name loaded before that '
+        + 'rule existed came through unchanged.',
+    ],
+  },
+  {
     version: '1.7.1', date: '8 September 2026',
     notes: [
       'All 34 clients whose surname was not in capitals have been corrected, and the matters named '
