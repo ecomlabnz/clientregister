@@ -1786,6 +1786,19 @@ body.site { background: var(--bg); }
    the target — which matters most on a phone, where a bare radio is a 12px
    thing to hit. */
 .filing-find { align-items: flex-end; }
+/* One person on a quotation, as a block rather than a table row.
+   A four-column editable table put the name field at one character wide on a
+   390px phone; several people is a form, and forms stack. */
+.party-edit {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 14px 4px; margin: 0 0 12px;
+}
+.party-edit > legend {
+  font-size: 0.8rem; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--muted); padding: 0 6px;
+}
+.party-edit-flags { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0 0 12px; }
+
 .pick-list { list-style: none; margin: 12px 0; padding: 0; }
 .pick {
   border: 1px solid var(--border); border-radius: var(--radius);
