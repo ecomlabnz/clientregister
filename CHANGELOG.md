@@ -7,6 +7,17 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.3.1 — 8 September 2026
+
+### Fixed
+- **Reminder emails now open the register at the practice's own address.** The
+  practice put the register on `app.immigration.kiwi`. Every link the register
+  builds for itself — the nightly automation emails and reminders — was still
+  built from the workers.dev name it was first deployed on, so a reminder about
+  a client's deadline opened a different address to the one the practice signs
+  in on. The workers.dev name still answers, deliberately: it is the way back
+  in if the domain ever breaks.
+
 ## 1.3.0 — 8 September 2026
 
 ### Added
