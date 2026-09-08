@@ -7,6 +7,27 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.7.2 — 8 September 2026
+
+### Fixed
+- **A client record the assistant reuses is put into the house style.** Reported:
+  *"case CASE-26-210 was just created through the assistant and the surname was
+  not capitalised, I did it manually."*
+
+  The assistant had not failed to capitalise anything — it matched an existing
+  client, correctly, and used that record as it stood. The record had been
+  loaded on 1 September, before the rule reached it. Every one of those 34 was
+  corrected minutes later by the repair in 1.7.1, so that record is right now.
+
+  What was not fixed by a repair is the hole it came through: **the register
+  never tidied a record it merely reused.** Another load or import and the same
+  thing happens again, and the matter named from that record carries the old
+  spelling into every list. Opening a matter onto an existing client now puts
+  that client's surname into capitals, renames their matters to match, and
+  writes a line on their file saying so. It is a house-style correction and not
+  a change of fact — `LE` and `Le` are the same surname, which is why it is safe
+  to do without asking.
+
 ## 1.7.1 — 8 September 2026
 
 ### Fixed

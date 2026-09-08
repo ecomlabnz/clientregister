@@ -20,6 +20,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { familyNameFor, composeFullName } from '../src/core/names';
 import { mountModule, fakeUser } from './support/d1';
 import { clientsModule } from '../src/modules/clients';
+import { assistantModule } from '../src/modules/assistant';
+import { normaliseClientName } from '../src/core/casename';
 
 const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
 const MIGRATION = '0070_every_surname_in_capitals.sql';
@@ -158,5 +160,98 @@ describe('and every surname saved from now on', () => {
       expect(source, `${file} creates a client without capitalising the surname`)
         .toMatch(/familyNameFor\(/);
     }
+  });
+});
+
+/**
+ * The record the assistant merely reuses.
+ *
+ * Reported on 8 September 2026: *"case CASE-26-210 was just created through the
+ * assistant and the surname was not capitalised, I did it manually."*
+ *
+ * The assistant had not failed to capitalise anything. It had matched an
+ * existing client — correctly — and used it as it stood, and that record had
+ * been loaded on 1 September before the rule reached it. Migration 0070 has
+ * since corrected all 34 of those, so that particular record is fixed.
+ *
+ * The hole it came through is not fixed by a migration: the register never
+ * tidied a record it merely reused. Another load, another import, a row written
+ * by hand, and the same thing happens — and the matter named from that record
+ * carries the old spelling into every list in the app.
+ */
+describe('a client record the assistant reuses', () => {
+  const TYPES = [{ key: 'wv_aewv', label: 'WV. AEWV' }];
+
+  function withOldRecord() {
+    const h = mountModule(assistantModule, { user: USER });
+    h.db.prepare(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
+                  VALUES (?,?,?,'x',?,'active',?,?)`).run(USER.id, USER.email, USER.name, USER.role, AT, AT);
+    h.db.exec(`INSERT INTO settings (key,value,updated_at)
+               VALUES ('vocab.case_types','wv_aewv | WV. AEWV','${AT}')`);
+    // Loaded before the rule: the surname as somebody typed it.
+    h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,status,created_at,updated_at)
+               VALUES ('cl1','CL-0123','individual','Thi Ngoc Anh Le','Thi Ngoc Anh','Le','active','${AT}','${AT}')`);
+    // A reference well clear of the counter, which a seeded row does not
+    // advance — the route allocates the next one itself and would collide.
+    h.db.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
+               VALUES ('k0','CASE-26-900','cl1','WV. AEWV — Thi Ngoc Anh Le','An older matter',
+                       'wv_aewv','lodged','${USER.id}','${AT}','${AT}')`);
+    return h;
+  }
+
+  it('is put into the house style when it is used', async () => {
+    const h = withOldRecord();
+    const done = await normaliseClientName(h.env as any, 'cl1', TYPES);
+    expect(done).toEqual({ was: 'Thi Ngoc Anh Le', now: 'Thi Ngoc Anh LE', matters: 1 });
+    const row = h.get<{ family_name: string; full_name: string }>(
+      'SELECT family_name, full_name FROM clients')!;
+    expect(row.family_name).toBe('LE');
+    expect(row.full_name).toBe('Thi Ngoc Anh LE');
+  });
+
+  it('carries the correction into the matters already named after them', async () => {
+    const h = withOldRecord();
+    await normaliseClientName(h.env as any, 'cl1', TYPES);
+    expect(h.get<{ title: string }>(`SELECT title FROM cases WHERE id = 'k0'`)!.title)
+      .toBe('WV. AEWV — Thi Ngoc Anh LE');
+  });
+
+  it('does nothing at all to a record already right', async () => {
+    // The ordinary case, and it must cost nothing and say nothing.
+    const h = withOldRecord();
+    h.db.exec(`UPDATE clients SET family_name = 'LE', full_name = 'Thi Ngoc Anh LE'`);
+    expect(await normaliseClientName(h.env as any, 'cl1', TYPES)).toBeNull();
+  });
+
+  it('does not restyle a company', async () => {
+    const h = withOldRecord();
+    h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,family_name,status,created_at,updated_at)
+               VALUES ('org1','CL-0200','organisation','Land Meat New Zealand Limited',
+                       'Land Meat New Zealand Limited','active','${AT}','${AT}')`);
+    expect(await normaliseClientName(h.env as any, 'org1', TYPES)).toBeNull();
+    expect(h.get<{ full_name: string }>(`SELECT full_name FROM clients WHERE id = 'org1'`)!.full_name)
+      .toBe('Land Meat New Zealand Limited');
+  });
+
+  it('happens when a matter is opened onto that record, and is noted on the file', async () => {
+    // The route the practice actually used.
+    const h = withOldRecord();
+    const res = await h.post('/assistant/intake/apply', {
+      existing_client_id: 'cl1',
+      descriptor: 'Peak Seasonal Work Visa',
+      case_type: 'wv_aewv', status: 'engaged', assigned_to: USER.id,
+      a_kind: 'individual', a_given_names: 'Thi Ngoc Anh', a_family_name: 'Le',
+      party_count: '0',
+    });
+    expect(res.status).toBe(303);
+    expect(h.get<{ full_name: string }>('SELECT full_name FROM clients')!.full_name)
+      .toBe('Thi Ngoc Anh LE');
+    // And the new matter is named from the corrected spelling, not the old one.
+    const opened = h.get<{ title: string }>(
+      `SELECT title FROM cases WHERE ref <> 'CASE-26-900' ORDER BY created_at DESC`)!;
+    expect(opened.title).toBe('WV. AEWV — Thi Ngoc Anh LE');
+    const note = h.get<{ body: string }>(
+      `SELECT body FROM entries WHERE entity_type = 'client' AND body LIKE '%capitals%'`);
+    expect(note?.body, 'a name changed with nothing on the file to say why').toContain('Thi Ngoc Anh LE');
   });
 });

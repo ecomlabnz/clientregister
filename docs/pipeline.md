@@ -13,6 +13,43 @@ Last reviewed: 4 September 2026.
 
 ## Asked for, not yet built
 
+### 0. Shrink a PDF on the way in
+**Asked 8 September 2026:** *"in the pipeline — we will need to add a PDF reducer
+into the app — automatic. We already built it, it will need to be copied. Make
+sure this is in the pipeline."*
+
+Not written from scratch: the practice has one already, built elsewhere, and it
+is to be brought across.
+
+Why it matters here rather than being a nicety. The register now keeps the files
+it is given — the intake reader stores what it read (1.6.0), matters and clients
+carry documents, and knowledge-base articles carry the circulars they are about.
+Scans arriving from clients and from INZ are the large ones: a phone photograph
+of a passport page is routinely several megabytes, and a scanned decision letter
+larger. Every one of those is stored at full size today, sent at full size when
+it is forwarded, and counted against the 25 MB single-upload ceiling in
+`core/files.ts`.
+
+**Where it would go.** `putFile` in `core/files.ts` is the single point every
+stored file passes through — both file tables' routes call it, deliberately, so
+that the safety rules could not drift apart. A reducer belongs there and nowhere
+else, for the same reason.
+
+**What has to be decided before it is built**, none of it guessable from here:
+
+- **What the existing one is** — a library, a service, a Worker of its own — and
+  whether it runs inside a Cloudflare Worker at all. The CPU ceiling on a request
+  is the thing to check first; a reduction that cannot finish in a request has to
+  happen after the upload, not during it.
+- **Whether the original is kept.** For a scan the practice took, probably not.
+  For a document a client or INZ sent, the original is evidence, and a register
+  that silently replaced it with a smaller copy would have destroyed the thing it
+  exists to hold. The likely answer is: reduce what the practice produces, keep
+  what arrives — but that is the practice's decision, not one to infer.
+- **Whether it touches what is already stored**, or only what arrives next. A
+  sweep over existing documents is a data change on live client files and would
+  be rehearsed like any other.
+
 ### 1. Filtering the dashboard cards
 **Asked 4 September 2026:** *"did we not discuss that i need to be able to adjust
 these or filter these? the Needs you today and the Deadlines, or are they

@@ -27,7 +27,7 @@
  */
 
 import type { Env } from '../types';
-import { all, run } from './db';
+import { all, one, run } from './db';
 import { labelFor, type Term } from './vocabulary';
 
 /**
@@ -92,4 +92,54 @@ export async function renameMattersFor(
     changed += 1;
   }
   return changed;
+}
+
+/**
+ * Put an existing client's name into the house style, and its matters with it.
+ *
+ * Reported by the practice on 8 September 2026: a matter opened through the
+ * assistant arrived with the surname not in capitals, and they corrected it by
+ * hand. The assistant had not failed to capitalise anything — it had reused an
+ * existing client record, faithfully, and that record had been loaded on
+ * 1 September before the rule reached it.
+ *
+ * Migration 0070 corrected all 34 such records, so the specific fault is gone.
+ * The hole it came through is not: **the register never tidies a record it
+ * merely reuses.** Another bulk load, an import, a row written by hand, and the
+ * same thing happens again — and the matter named from that record carries the
+ * old spelling into every list.
+ *
+ * So it is done at the point where the register is already writing. This is a
+ * house-style correction and not a change of fact: `LE` and `Le` are the same
+ * surname, which is exactly why it is safe to do without asking, and why it is
+ * kept apart from `fillEmptyFields`, which deliberately never writes over
+ * anything a person recorded.
+ *
+ * Returns what it did, so a caller can put it on the file. Null when there was
+ * nothing to do — which is the ordinary case.
+ */
+export async function normaliseClientName(
+  env: Env, clientId: string, types: Term[],
+): Promise<{ was: string; now: string; matters: number } | null> {
+  const client = await one<{
+    id: string; kind: string; full_name: string;
+    given_names: string | null; family_name: string | null;
+  }>(env.DB, 'SELECT id, kind, full_name, given_names, family_name FROM clients WHERE id = ?', clientId);
+  // A company's registered name is copied from the register that holds it and
+  // is not the practice's to restyle.
+  if (!client || client.kind !== 'individual') return null;
+  const family = (client.family_name ?? '').trim();
+  if (!family || family === family.toUpperCase()) return null;
+
+  const capitals = family.toUpperCase();
+  const fullName = [(client.given_names ?? '').trim(), capitals].filter(Boolean).join(' ');
+  await run(
+    env.DB,
+    'UPDATE clients SET family_name = ?, full_name = ?, updated_at = ? WHERE id = ?',
+    capitals, fullName, new Date().toISOString(), clientId,
+  );
+  // A matter is named after the person, so the correction has to reach them or
+  // the old spelling stays on the front of every one.
+  const matters = await renameMattersFor(env, clientId, fullName, types);
+  return { was: client.full_name, now: fullName, matters };
 }
