@@ -32,6 +32,14 @@ The user-facing version of this list, one line per release, is in the app under
   drift that caused this in the first place — a name that stops matching the
   record it names.
 
+- **The people on a quotation are printed on it.** They could be recorded but
+  the document did not say them, which would have left the letter of engagement
+  referring to a quotation that named nobody. The printed quotation now has a
+  "The parties" section: the lawyer, the client, the applicants and associated
+  parties with their relationship and date of birth, who is nominated to give
+  instructions, and — where there is an agency contact — what that contact may
+  and may not do.
+
 - **Nothing on the dashboard or the alerts list is cut off any more.** Rows were
   clamped to two lines, and two lines hold fewer characters as the window
   narrows — with nothing to say the rest was there. A row that needs three

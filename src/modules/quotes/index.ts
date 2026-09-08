@@ -1026,8 +1026,9 @@ export const quotesModule: AppModule = {
         id,
       );
       if (!q) return c.notFound();
-      const [practice, lines, qs, stages] = await Promise.all([
+      const [practice, lines, qs, stages, parties] = await Promise.all([
         practiceDetails(c.env), quoteLines(c.env, id), quoteSettings(c.env), quoteStages(c.env, id),
+        quoteParties(c.env, id),
       ]);
       const totals = summariseQuote(lines.map((l) => ({
         kind: l.kind, lineAmountCents: l.unit_amount_cents,
@@ -1038,6 +1039,25 @@ export const quotesModule: AppModule = {
       const fees = lines.filter((l) => l.kind === 'professional');
       const disbursements = lines.filter((l) => l.kind !== 'professional');
       await auditFrom(c, { action: 'quote.printed', entityType: 'quote', entityId: id });
+
+      // Split once rather than filtered three times inside the template, so the
+      // document's order is stated in one place and reads the way the letter
+      // reads: applicants, then the people whose details the application needs,
+      // then the people who may be told things.
+      const applicants = parties.filter((p) => p.role === 'applicant');
+      const associated = parties.filter((p) => p.role === 'associated');
+      const contacts = parties.filter((p) => p.role === 'admin_contact');
+      const representative = parties.find((p) => p.is_representative === 1) ?? null;
+
+      /** Their relationship, birthday and how to reach them, in one line. */
+      const partyDetail = (p: QuotePartyRow) => {
+        const bits = [
+          p.relationship,
+          p.date_of_birth ? `born ${dateShort(p.date_of_birth)}` : null,
+          p.email, p.phone,
+        ].filter(Boolean) as string[];
+        return bits.length ? html`<div class="small">${bits.join(' · ')}</div>` : '';
+      };
 
       const lineRows = (rows: QuoteItemRow[]) => rows.map((l) => html`
         <tr>
@@ -1071,9 +1091,49 @@ export const quotesModule: AppModule = {
             </div>
           </header>
 
+          ${'' /* The parties, as the letter of engagement states them — because
+                   the letter will not state them itself. The practice's
+                   decision, 8 September 2026: the letter is a covering letter
+                   and the quotation attached to it is the substance, so this
+                   document has to be able to stand as the record of who the
+                   engagement is with.
+
+                   Everybody is named in the same section rather than the
+                   client in one place and the rest in another: a contract that
+                   lists its parties in two lists invites the question of
+                   whether the second list is party to it. */}
           <section>
-            <h3>Prepared for</h3>
-            <p class="strong">${q.client_name ?? '—'}</p>
+            <h3>The parties</h3>
+            <dl class="kv quote-doc-parties">
+              <dt>The lawyer</dt><dd>${practice.legalName}</dd>
+              <dt>The client</dt>
+              <dd><strong>${q.client_name ?? '—'}</strong>${
+                representative
+                  ? ''
+                  : html`<div class="small">Nominated representative for all parties.</div>`}</dd>
+              ${applicants.map((p) => html`
+                <dt>Applicant</dt>
+                <dd><strong>${p.full_name}</strong>${partyDetail(p)}</dd>`)}
+              ${associated.map((p) => html`
+                <dt>Associated party</dt>
+                <dd><strong>${p.full_name}</strong>${partyDetail(p)}</dd>`)}
+            </dl>
+            ${representative ? html`
+              <p class="small"><strong>${representative.full_name}</strong> is nominated to give
+                 instructions on behalf of all parties named above.</p>` : ''}
+            ${contacts.length ? html`
+              <h4 class="quote-doc-subhead">Day-to-day administrative contact</h4>
+              <dl class="kv quote-doc-parties">
+                ${contacts.map((p) => html`
+                  <dt>${p.organisation || 'Contact'}</dt>
+                  <dd><strong>${p.full_name}</strong>${partyDetail(p)}</dd>`)}
+              </dl>
+              <p class="small">Their role is limited to administrative and clerical support on this
+                 matter — collecting and organising documents, passing on progress, and dealing with
+                 Immigration New Zealand on administrative matters only. They are not authorised to
+                 give legal advice, to exercise professional judgement, or to act as your legal
+                 representative. All legal advice and all decisions come from the lawyer named
+                 above.</p>` : ''}
           </section>
 
           ${q.description ? html`
