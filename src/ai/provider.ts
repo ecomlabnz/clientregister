@@ -110,8 +110,15 @@ export interface IntakePerson {
   current_visa_type: string | null;
   /** ISO date, or null when the document does not say. */
   current_visa_expiry: string | null;
-  /** What they do. Not a field on the register yet; it goes to the summary. */
+  /**
+   * What they do. Pre-fills the role they hold at the company they are linked
+   * to, where they are linked to one, and otherwise goes to the summary.
+   */
   occupation: string | null;
+  /** Where they live, or a company's registered office. */
+  address: string | null;
+  /** A company's NZBN, where the document prints one. */
+  nzbn: string | null;
   /** ISO date, or null when the document does not say. */
   date_of_birth: string | null;
   /** One of the register's party roles, or null when it is not clear. */
@@ -131,6 +138,8 @@ export interface IntakeResult {
   /** ISO dates. */
   lodged_on: string | null;
   decision_due_on: string | null;
+  /** What the document says happens next, where it says so. */
+  next_action: string | null;
   summary: string;
   /**
    * What the document does not say and a person will have to supply. More
@@ -169,6 +178,16 @@ Return current_visa_type and current_visa_expiry for anybody the document says
 holds a visa, including a supporting partner. Return occupation where it is
 stated.
 
+Return everything else the document states about each party that the register
+has a box for, and null for the rest: an address (a person's home address, or a
+company's registered office or trading address), and for a company its NZBN
+where the document prints one. Employment agreements and INZ correspondence
+routinely carry all three.
+
+Return next_action where the document says what happens next — "employer to
+provide the signed IEA", "await the job check outcome". Not a guess about what
+should happen: what the document says will.
+
 The summary must be the whole of what the document says about these people and
 their situation, written as continuous prose a colleague could read instead of
 the document — relationship history, previous marriages and their dates,
@@ -205,6 +224,8 @@ export function normaliseIntake(input: Partial<IntakeResult>): IntakeResult {
       current_visa_type: str(p.current_visa_type, 120),
       current_visa_expiry: isoDate(p.current_visa_expiry),
       occupation: str(p.occupation, 120),
+      address: str(p.address, 400),
+      nzbn: str(p.nzbn, 20),
       date_of_birth: isoDate(p.date_of_birth),
       role: str(p.role, 40),
     };
@@ -221,6 +242,7 @@ export function normaliseIntake(input: Partial<IntakeResult>): IntakeResult {
     inz_application_number: str(input.inz_application_number, 40),
     lodged_on: isoDate(input.lodged_on),
     decision_due_on: isoDate(input.decision_due_on),
+    next_action: str(input.next_action, 200),
     // Eight thousand, not two. The summary is now the file note — the whole of
     // what a document says about a family, a relationship and its history —
     // and two thousand characters cut a three-page partnership summary off

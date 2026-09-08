@@ -7,6 +7,33 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.9.0 — 8 September 2026
+
+### Added
+- **The assistant now fills in everything it read, not a subset of it.** Asked
+  for: *"the assistant should be populating all the known details it extracted
+  from the brief for the client and case, including contacts and other details —
+  as seen in the respective pages for clients and cases."*
+
+  The gap was at both ends. Some of it was never extracted; some of it was
+  extracted and then had nowhere to go — the reading found the employer's
+  registered office on the first page of the employment agreement and this form
+  had no box for it, so it was typed again from the same document.
+
+  Now read and offered: **an address** for every party, **a company's NZBN**,
+  and **what the document says happens next** on the matter, alongside its
+  priority and a date for it. An NZBN is tidied and checked before it is stored
+  — read off a document it can arrive spaced or simply not be one, and stored as
+  read it is refused the first time somebody opens the record, which is a worse
+  place to find out.
+
+  For a client already on the register, every one of these fills a box the
+  record has left empty and never writes over one it has. That rule has not
+  changed; it now covers everything rather than the visa alone.
+
+  Passport numbers stay out, as they always have: extracting one would write it
+  into the run log on the way past.
+
 ## 1.8.0 — 8 September 2026
 
 ### Added
