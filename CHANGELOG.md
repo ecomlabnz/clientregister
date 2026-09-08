@@ -7,6 +7,30 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.7.1 — 8 September 2026
+
+### Fixed
+- **Every family name is in capitals, including the older records.** Asked for
+  directly. Saving a client has capitalised the surname for a long time — all
+  five places that create one do it — but 34 of the 211 people on the register
+  were loaded before that rule reached them, and nothing revisits a record
+  nobody opens. Those 34 are corrected, and the matters named after them follow.
+  Companies are left exactly as they are: a registered name is copied from the
+  register that holds it, not restyled.
+
+- **An invisible carriage return has been taken out of 190 matter names.** This
+  morning's renaming read the case-type list with a database function that
+  strips spaces and *only* spaces; the list is saved from a browser, so every
+  label came through with a line ending still attached — `RV. Partner⏎ —
+  NGUYEN, ANH TAN`.
+
+  Nothing showed it: that character is invisible on a web page. It was in the
+  CSV export, in searches, and would have been in the letter of engagement. The
+  register's own reader was never wrong, so only the copy of that rule written
+  in SQL was — and the tests guarding it all passed because their sample list
+  used tidier line endings than the real one. That is now recorded as a fault
+  in its own right, and the test uses the line endings the setting actually has.
+
 ## 1.7.0 — 8 September 2026
 
 ### Added
