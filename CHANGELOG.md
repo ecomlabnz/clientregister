@@ -7,6 +7,26 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.2.2 — 8 September 2026
+
+### Fixed
+- **A quote and the letter of engagement now send the client to the same
+  terms.** The Letter of Engagement asks the client to confirm they have read
+  the standard terms *set out online at* `www.immigration.kiwi/terms`. The
+  register pointed every quote at a PDF file at a different address on the same
+  site. Both were the practice's own, so nothing was broken — but a client asked
+  to accept terms, who finds the quote and the letter naming two different
+  documents, has been handed a question about their engagement.
+
+  The live setting has been changed to `https://www.immigration.kiwi/terms`
+  (recorded in the audit log and in `docs/operations.md`), and the address the
+  register ships with is now the same one.
+
+- **The quote no longer calls the terms a download.** Three places — the drafted
+  email, the quote page and the printed quote — told the client to download
+  them. They are a page on the practice's own site; a client told to download
+  something that opens in a browser wonders whether they got the right thing.
+
 ## 1.2.1 — 7 September 2026
 
 ### Fixed

@@ -53,10 +53,19 @@ export const PRACTICE_SETTINGS: SettingsGroup = {
       help: 'Off by default. A quote is often forwarded on, and account details invite the '
         + 'invoice-redirection fraud that is common in professional services. Turn it on only if '
         + 'your terms of engagement expect it.' },
+    // The address the practice's own Letter of Engagement sends clients to, and
+    // therefore the one the register must send them to as well. It pointed at a
+    // PDF at a different address until 8 September 2026 — three addresses for
+    // one document, which is one more than a client should ever have to
+    // reconcile.
+    //
+    // A default that names one practice's site is wrong for the second practice
+    // and right for this one; noted in docs/pipeline.md rather than solved here.
     { key: 'practice.terms_url', type: 'string', label: 'Terms of engagement — link',
-      default: 'https://www.immigration.kiwi/_files/ugd/796b4b_09e26cdcd3fd4360ba5569ae15bd67d7.pdf',
+      default: 'https://www.immigration.kiwi/terms',
       maxLength: 500,
-      help: 'Referenced on every quote. Clients download the terms from here.' },
+      help: 'Referenced on every quote. Clients read the terms at this address, so it must be '
+        + 'the same one your letter of engagement sends them to.' },
     { key: 'practice.terms_label', type: 'string', label: 'Terms of engagement — wording',
       default: 'Barrister’s Terms of Engagement', maxLength: 200,
       help: 'How the document is named on the quote.' },

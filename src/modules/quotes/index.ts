@@ -159,7 +159,7 @@ function quoteTotal(q: Pick<QuoteRow, 'amount_cents' | 'gst_cents' | 'disburseme
  * It states the figures and points at the terms, which are the two things a
  * quote must not leave ambiguous.
  */
-function defaultQuoteEmail(
+export function defaultQuoteEmail(
   q: QuoteRow & { client_name: string | null },
   practice: { legalName: string; termsLabel: string; termsUrl: string; contactEmail: string; contactPhone: string },
   items: QuoteItemRow[] = [],
@@ -218,7 +218,10 @@ function defaultQuoteEmail(
 
   if (practice.termsUrl) {
     lines.push(
-      `This quote is given on the ${practice.termsLabel}, which you may download here:`,
+      // "read", not "download": the terms are a page on the practice's own
+      // site, and a client told to download something that opens in a browser
+      // wonders whether they got the right thing.
+      `This quote is given on the ${practice.termsLabel}, which you can read here:`,
       practice.termsUrl,
       '',
       'Please read those terms before accepting this quote.',
@@ -589,7 +592,7 @@ export const quotesModule: AppModule = {
               ? html`<div class="alert alert-ok">
                        This quote is given on the
                        <a href="${terms.termsUrl}" target="_blank" rel="noopener noreferrer">${terms.termsLabel}</a>,
-                       which the client may download from that link.
+                       which the client can read at that link.
                      </div>`
               : ''}
 
@@ -1021,9 +1024,8 @@ export const quotesModule: AppModule = {
                 : ''}
               ${practice.termsUrl
                 ? html`<li>This quote is given on the
-                           <a href="${practice.termsUrl}" rel="noopener"><strong>${practice.termsLabel}</strong></a>,
-                           which may be downloaded from that link. Please read those terms before
-                           accepting.
+                           <a href="${practice.termsUrl}" rel="noopener"><strong>${practice.termsLabel}</strong></a>.
+                           Please read those terms before accepting.
                            <span class="print-only break-url">${practice.termsUrl}</span></li>`
                 : ''}
             </ul>
