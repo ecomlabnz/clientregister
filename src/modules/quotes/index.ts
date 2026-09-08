@@ -21,7 +21,11 @@ import {
   actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, stamp, statusTone, table,
 } from '../../ui/components';
 import { dateInputValue, dateShort, money } from '../../ui/format';
-import { QUOTE_STATUS_LABELS, QUOTE_STATUSES, type QuoteStatus } from '../../domain';
+import {
+  QUOTE_PARTY_KIND_LABELS, QUOTE_PARTY_KINDS, QUOTE_PARTY_ROLE_LABELS, QUOTE_PARTY_ROLES,
+  QUOTE_STATUS_LABELS, QUOTE_STATUSES,
+  type QuotePartyKind, type QuotePartyRole, type QuoteStatus,
+} from '../../domain';
 import { clientOptions } from '../../core/lookups';
 import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
@@ -109,6 +113,32 @@ export interface QuoteStageRow {
 export async function quoteStages(env: Env, quoteId: string): Promise<QuoteStageRow[]> {
   return all<QuoteStageRow>(
     env.DB, 'SELECT * FROM quote_stages WHERE quote_id = ? ORDER BY position, created_at', quoteId);
+}
+
+export interface QuotePartyRow {
+  id: string; quote_id: string; position: number;
+  role: QuotePartyRole; kind: QuotePartyKind;
+  full_name: string; relationship: string | null; date_of_birth: string | null;
+  organisation: string | null; email: string | null; phone: string | null;
+  client_id: string | null; is_representative: number;
+}
+
+/**
+ * Everybody named on the engagement, in the order the letter reads them.
+ *
+ * Ordered by role first — applicants, then associated parties, then the
+ * administrative contacts — because that is the order the letter puts them in
+ * and a document whose sections shuffle between drafts is a document nobody
+ * trusts. `position` orders within a role, so the practice can say which
+ * applicant is first.
+ */
+export async function quoteParties(env: Env, quoteId: string): Promise<QuotePartyRow[]> {
+  return all<QuotePartyRow>(
+    env.DB,
+    `SELECT * FROM quote_parties WHERE quote_id = ?
+      ORDER BY CASE role WHEN 'applicant' THEN 0 WHEN 'associated' THEN 1 ELSE 2 END,
+               position, created_at`,
+    quoteId);
 }
 
 export async function catalogue(env: Env, includeRetired = false): Promise<ServiceItemRow[]> {
@@ -554,7 +584,7 @@ export const quotesModule: AppModule = {
       );
       if (!q) return c.notFound();
 
-      const [entries, terms, lines, items, fees, qSettings, stages, quoteInvoices] = await Promise.all([
+      const [entries, terms, lines, items, fees, qSettings, stages, parties, quoteInvoices] = await Promise.all([
         listEntries(c.env, 'quote', id),
         practiceDetails(c.env),
         quoteLines(c.env, id),
@@ -562,6 +592,7 @@ export const quotesModule: AppModule = {
         moneySettings(c.env),
         quoteSettings(c.env),
         quoteStages(c.env, id),
+        quoteParties(c.env, id),
         all<{ id: string; ref: string; status: string; gross_cents: number }>(
           c.env.DB, `SELECT id, ref, status, gross_cents FROM invoices WHERE quote_id = ? ORDER BY created_at`, id),
       ]);
@@ -709,6 +740,114 @@ export const quotesModule: AppModule = {
                                includeBlank: false, options: optionsFrom(GST_TREATMENTS, GST_TREATMENT_LABELS),
                                hint: 'Disbursements are normally “No GST” — an INZ fee is passed through as it stands.' })}
                     <button class="btn btn-primary" type="submit">Add line</button>
+                  </form>
+                </details>` : ''}`)}
+
+            ${card('The people on this engagement', html`
+              <p class="hint mb">Everybody the letter of engagement names besides the client:
+                 the other applicants, the partner and children whose details the application
+                 needs, and anybody at an agency who may be told how it is going. The client
+                 does not need a row — they are already on the quotation.</p>
+              ${parties.length === 0
+                ? emptyState('Nobody else named yet. The letter will name the client alone.')
+                : html`
+                  <form method="post" action="/quotes/${q.id}/parties">
+                    ${csrfField(csrf)}
+                    <input type="hidden" name="_action" value="save">
+                    ${table(['Who', 'On this engagement', 'Reach them', writable ? 'Remove' : ''],
+                      parties.map((party) => html`
+                        <tr>
+                          <td>
+                            ${writable
+                              ? html`<input name="${`full_name_${party.id}`}" value="${party.full_name}"
+                                            maxlength="200" aria-label="Full name">
+                                     <input name="${`relationship_${party.id}`}" value="${party.relationship ?? ''}"
+                                            maxlength="60" placeholder="partner, son, employer"
+                                            aria-label="Relationship">`
+                              : html`<span class="strong">${party.full_name}</span>
+                                     <div class="muted small">${party.relationship ?? ''}</div>`}
+                          </td>
+                          <td>
+                            ${writable
+                              ? html`
+                                ${select({ label: '', name: `role_${party.id}`, value: party.role,
+                                           includeBlank: false,
+                                           options: optionsFrom(QUOTE_PARTY_ROLES, QUOTE_PARTY_ROLE_LABELS) })}
+                                ${party.kind === 'organisation'
+                                  ? html`<input type="hidden" name="${`kind_${party.id}`}" value="organisation">
+                                         <span class="muted small">An organisation</span>`
+                                  : html`<input type="hidden" name="${`kind_${party.id}`}" value="person">
+                                         <input name="${`date_of_birth_${party.id}`}" type="date"
+                                                value="${party.date_of_birth ?? ''}"
+                                                aria-label="Date of birth">`}
+                                <label class="check small">
+                                  <input type="checkbox" name="${`representative_${party.id}`}"
+                                         ${party.is_representative ? raw('checked') : ''}>
+                                  Nominated to instruct
+                                </label>`
+                              : html`${QUOTE_PARTY_ROLE_LABELS[party.role]}
+                                     ${party.date_of_birth
+                                       ? html`<div class="muted small">${dateShort(party.date_of_birth)}</div>` : ''}
+                                     ${party.is_representative
+                                       ? html`<div class="small">${badge('nominated to instruct', 'blue')}</div>` : ''}`}
+                          </td>
+                          <td class="small">
+                            ${writable
+                              ? html`<input name="${`organisation_${party.id}`}" value="${party.organisation ?? ''}"
+                                            maxlength="200" placeholder="Agency or company" aria-label="Organisation">
+                                     <input name="${`email_${party.id}`}" type="email" value="${party.email ?? ''}"
+                                            maxlength="200" placeholder="Email" aria-label="Email">
+                                     <input name="${`phone_${party.id}`}" value="${party.phone ?? ''}"
+                                            maxlength="60" placeholder="Phone" aria-label="Phone">`
+                              : html`${party.organisation ? html`<div>${party.organisation}</div>` : ''}
+                                     ${party.email ? html`<div>${party.email}</div>` : ''}
+                                     ${party.phone ? html`<div>${party.phone}</div>` : ''}`}
+                          </td>
+                          <td>${writable
+                            ? html`<label class="check small">
+                                     <input type="checkbox" name="${`remove_${party.id}`}"> Remove
+                                   </label>`
+                            : ''}</td>
+                        </tr>`))}
+                    ${writable ? html`
+                      <div class="filters mt">
+                        <button class="btn btn-primary" type="submit">Save the people</button>
+                        <span class="hint">Ticking Remove takes somebody off when you save.</span>
+                      </div>` : ''}
+                  </form>`}
+
+              ${!parties.some((p) => p.is_representative) ? html`
+                <p class="hint">Nobody is nominated to instruct, so the letter will say the client
+                   is — which is the usual arrangement.</p>` : ''}
+
+              ${writable ? html`
+                <details class="reveal mt">
+                  <summary class="btn btn-secondary reveal-open">Add somebody</summary>
+                  <form method="post" action="/quotes/${q.id}/parties" class="stack">
+                    ${csrfField(csrf)}
+                    ${field({ label: 'Full name', name: 'full_name', required: true, maxlength: 200,
+                              hint: 'As it is written on their passport, if they are applying.' })}
+                    ${select({ label: 'On this engagement', name: 'role', value: 'associated',
+                               includeBlank: false,
+                               options: optionsFrom(QUOTE_PARTY_ROLES, QUOTE_PARTY_ROLE_LABELS),
+                               hint: 'An administrative contact may be told how it is going. '
+                                 + 'They may not instruct, and the letter says so.' })}
+                    ${select({ label: 'A person or an organisation', name: 'kind', value: 'person',
+                               includeBlank: false,
+                               options: optionsFrom(QUOTE_PARTY_KINDS, QUOTE_PARTY_KIND_LABELS) })}
+                    ${field({ label: 'Relationship', name: 'relationship', maxlength: 60,
+                              placeholder: 'partner, son, employer',
+                              hint: 'In your own words. It is printed as you write it.' })}
+                    ${field({ label: 'Date of birth', name: 'date_of_birth', type: 'date',
+                              hint: 'For a person. Left off an organisation.' })}
+                    ${field({ label: 'Agency or company', name: 'organisation', maxlength: 200 })}
+                    ${field({ label: 'Email', name: 'email', type: 'email', maxlength: 200 })}
+                    ${field({ label: 'Phone', name: 'phone', maxlength: 60 })}
+                    <label class="check">
+                      <input type="checkbox" name="is_representative" value="1">
+                      Nominated to instruct on everybody's behalf
+                    </label>
+                    <button class="btn btn-primary" type="submit">Add them</button>
                   </form>
                 </details>` : ''}`)}
 
@@ -1431,6 +1570,120 @@ export const quotesModule: AppModule = {
       return redirectWith(c, `/quotes/${id}`, `Valid until ${until}.`);
     });
 
+
+    // --- The people on the engagement ---------------------------------------
+
+    /**
+     * Add somebody to the quotation, or save the ones already on it.
+     *
+     * One route for both, like the lines and the stages above: the page shows
+     * the list and an add form, and whichever was submitted arrives here.
+     *
+     * Almost nothing is checked in this handler. A blank name, a birthday on a
+     * company, a date of birth in the future, an administrative contact with no
+     * way to reach them, two people nominated to instruct — every one of those
+     * is refused by the database (migration 0065), because this is not the only
+     * thing that will ever write these rows: acceptance will, and so will
+     * whatever creates a quotation from an inquiry. What is here is the reading
+     * of the form and the message a person sees when the refusal comes back.
+     */
+    r.post('/:id/parties', requirePermission('quote:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const q = await one<QuoteRow>(c.env.DB, 'SELECT id FROM quotes WHERE id = ?', id);
+      if (!q) return c.notFound();
+      const form = await c.req.formData();
+      const now = nowIso();
+
+      // A refusal from a trigger is a sentence written for the practice. It is
+      // shown as it stands rather than replaced with "could not save", which
+      // is the message that sends somebody to the developer.
+      const said = (err: unknown): string => {
+        const text = err instanceof Error ? err.message : String(err);
+        const at = text.indexOf(': ');
+        return (at >= 0 ? text.slice(at + 2) : text).trim() || 'That could not be saved.';
+      };
+
+      if (form.get('_action') === 'save') {
+        const existing = await quoteParties(c.env, id);
+        const problems: string[] = [];
+        let removed = 0;
+
+        for (const party of existing) {
+          if (form.get(`remove_${party.id}`)) {
+            await run(c.env.DB, 'DELETE FROM quote_parties WHERE id = ? AND quote_id = ?', party.id, id);
+            removed += 1;
+            continue;
+          }
+          const g = (name: string) => String(form.get(`${name}_${party.id}`) ?? '').trim();
+          const role = QUOTE_PARTY_ROLES.includes(g('role') as never)
+            ? g('role') as QuotePartyRole : party.role;
+          const kind = QUOTE_PARTY_KINDS.includes(g('kind') as never)
+            ? g('kind') as QuotePartyKind : party.kind;
+          const positionRaw = Number(g('position'));
+          try {
+            await run(
+              c.env.DB,
+              `UPDATE quote_parties
+                  SET position = ?, role = ?, kind = ?, full_name = ?, relationship = ?,
+                      date_of_birth = ?, organisation = ?, email = ?, phone = ?,
+                      is_representative = ?, updated_at = ?
+                WHERE id = ? AND quote_id = ?`,
+              Number.isFinite(positionRaw) ? Math.max(0, Math.trunc(positionRaw)) : party.position,
+              role, kind, g('full_name').slice(0, 200),
+              g('relationship').slice(0, 60) || null,
+              kind === 'organisation' ? null : (g('date_of_birth').slice(0, 10) || null),
+              g('organisation').slice(0, 200) || null,
+              g('email').slice(0, 200) || null,
+              g('phone').slice(0, 60) || null,
+              form.get(`representative_${party.id}`) ? 1 : 0,
+              now, party.id, id,
+            );
+          } catch (err) {
+            problems.push(`${party.full_name || 'a party'}: ${said(err)}`);
+          }
+        }
+
+        await auditFrom(c, { action: 'quote.parties_saved', entityType: 'quote', entityId: id,
+          meta: { removed, rejected: problems.length } });
+        return problems.length
+          ? redirectWith(c, `/quotes/${id}`, problems[0]!, 'err')
+          : redirectWith(c, `/quotes/${id}`,
+              removed ? `Saved. ${removed} removed.` : 'The people on this quotation are saved.');
+      }
+
+      const f = new FormReader(form);
+      const fullName = f.text('full_name', { required: true, label: 'Name', max: 200 });
+      const role = f.enum('role', QUOTE_PARTY_ROLES, { fallback: 'associated' })!;
+      const kind = f.enum('kind', QUOTE_PARTY_KINDS, { fallback: 'person' })!;
+      if (!f.valid) {
+        return redirectWith(c, `/quotes/${id}`, Object.values(f.errors)[0] ?? 'Give them a name.', 'err');
+      }
+
+      const position = await count(c.env.DB,
+        'SELECT COALESCE(MAX(position), -1) + 1 AS n FROM quote_parties WHERE quote_id = ?', id);
+      try {
+        await run(
+          c.env.DB,
+          `INSERT INTO quote_parties (id, quote_id, position, role, kind, full_name, relationship,
+              date_of_birth, organisation, email, phone, is_representative, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          newId('qp'), id, position, role, kind, fullName,
+          f.optional('relationship', { max: 60 }),
+          kind === 'organisation' ? null : f.optional('date_of_birth', { max: 10 }),
+          f.optional('organisation', { max: 200 }),
+          f.optional('email', { max: 200 }),
+          f.optional('phone', { max: 60 }),
+          f.checkbox('is_representative') ? 1 : 0,
+          now, now,
+        );
+      } catch (err) {
+        return redirectWith(c, `/quotes/${id}`, said(err), 'err');
+      }
+
+      await auditFrom(c, { action: 'quote.party_added', entityType: 'quote', entityId: id,
+        meta: { role, kind } });
+      return redirectWith(c, `/quotes/${id}`, `${fullName} added to this quotation.`);
+    });
 
     // --- Payment stages -----------------------------------------------------
 
