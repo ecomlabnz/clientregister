@@ -7,6 +7,41 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.11.0 — 8 September 2026
+
+### Added
+- **Tags on clients.** Matters have had tags since the register was built and
+  clients never did, for no reason anybody recorded. A client page now has a
+  Tags card, the client list filters by tag and shows each row's tags, and the
+  tag list itself is shared with matters — a tag invented on a matter is the
+  same tag on a client, so there is one list to keep in order rather than two.
+
+  The tag counts shown in the picker now count clients as well as matters. They
+  counted matters alone, which would have shown a tag used on forty clients as
+  "(0)" — and a tag that looks unused is a tag somebody deletes.
+
+  `case_tags` and `client_tags` are the same join written twice. One table keyed
+  on the kind of record is the better shape and is recorded in the pipeline as
+  its own change, deliberately not folded into this one.
+
+### Changed
+- **Writing an email is laid out as a mail client lays it out.** The quotation
+  email screen was on the ordinary three-column form grid — right for entering a
+  client's details, wrong for writing a message. To sat in one column, Copy to
+  and the message in a second, the subject in a third, and the formatting
+  buttons floated away from the box they act on.
+
+  It is now one column: the addresses stacked at the top with their labels
+  beside them, the subject under those, then the message filling the width with
+  its toolbar attached to it, the buttons below, and the explanation of
+  *Formatted* folded away under them rather than sitting between the writer and
+  the box.
+
+- **To and Copy to take several addresses**, separated by commas or semicolons.
+  Duplicates are dropped. One address that is not an address refuses the whole
+  list rather than being quietly skipped: a message the practice believes went
+  to three people and went to two is worse than one that did not send.
+
 ## 1.10.0 — 8 September 2026
 
 ### Added

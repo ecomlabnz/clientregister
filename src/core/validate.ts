@@ -96,6 +96,38 @@ export class FormReader {
     return value.toLowerCase();
   }
 
+  /**
+   * A list of email addresses, separated by commas or semicolons.
+   *
+   * A copy-to box that takes one address is a box people paste two into and
+   * then wonder why only one was sent to — asked for on 8 September 2026:
+   * *"copy to must be able to accept multiple emails comma separated"*.
+   * Semicolons too, because Outlook writes them that way and somebody will
+   * paste from Outlook.
+   *
+   * Every address is checked. One bad address in a list is refused as a whole
+   * rather than quietly dropped: a message the practice believes went to three
+   * people and went to two is worse than a message that did not send.
+   */
+  emails(name: string, opts: TextOpts & { max?: number } = {}): string[] {
+    const value = this.text(name, { ...opts, max: opts.max ?? 2000 });
+    if (!value) return [];
+    const parts = value.split(/[,;]/).map((part) => part.trim()).filter(Boolean);
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const part of parts) {
+      if (!EMAIL_RE.test(part)) {
+        this.fail(name, `${opts.label ?? name}: “${part}” is not a valid email address.`);
+        return [];
+      }
+      const lower = part.toLowerCase();
+      // The same address twice is somebody pasting twice, not an instruction
+      // to send twice.
+      if (!seen.has(lower)) { seen.add(lower); out.push(lower); }
+    }
+    return out;
+  }
+
   enum<T extends string>(name: string, allowed: readonly T[], opts: { required?: boolean; label?: string; fallback?: T } = {}): T | null {
     const value = this.get(name);
     if (!value) {

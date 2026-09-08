@@ -37,6 +37,22 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.11.0', date: '8 September 2026',
+    notes: [
+      'Clients can be tagged. Matters always could; clients never could, for no reason anybody '
+        + 'wrote down. There is a Tags card on a client, and the client list filters by tag.',
+      'It is one list of tags for both. A tag you invent on a matter is the same tag on a client, '
+        + 'so there is one set of labels to keep in order rather than two that drift apart.',
+      'Writing an email now looks like writing an email. The addresses sit stacked at the top, the '
+        + 'subject under them, and the message fills the width with its formatting buttons '
+        + 'attached to it \u2014 instead of the three columns the details forms use, which had '
+        + 'scattered To, Copy to and Subject across the screen.',
+      'To and Copy to accept several addresses separated by commas or semicolons. If one of them '
+        + 'is not an address the whole message is held back and says which \u2014 rather than '
+        + 'going to everybody else and leaving you to notice.',
+    ],
+  },
+  {
     version: '1.10.0', date: '8 September 2026',
     notes: [
       'The letter of engagement exists. When you make a quotation you are now asked \u2014 and must '

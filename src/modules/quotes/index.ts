@@ -1617,56 +1617,76 @@ export const quotesModule: AppModule = {
                    be recorded and queued but not delivered. It sends as soon as one is set up —
                    see Settings → Integrations.</div>`}
 
-        <form method="post" action="/quotes/${q.id}/email" class="form-grid compose">
+        ${'' /* Laid out the way every mail client lays this out: one column,
+                 the addresses stacked at the top, the subject under them, then
+                 the body filling the width with its toolbar attached to it.
+
+                 It was on the ordinary three-column form grid, which is right
+                 for entering a client's details and wrong for writing a
+                 message: To sat in one column, Copy to and the message in the
+                 second, the subject in a third, and the formatting buttons
+                 floated on their own away from the box they act on. The
+                 practice's words: "this is just ugly — I asked for a Gmail
+                 style experience". */}
+        <form method="post" action="/quotes/${q.id}/email" class="compose js-compose">
           ${csrfField(csrf)}
-          <div class="form-section">
-            <h3>Message</h3>
-            ${field({ label: 'To', name: 'to', type: 'email', required: true,
-                      value: q.client_email ?? '', maxlength: 320 })}
-            ${field({ label: 'Copy to', name: 'cc', type: 'email', value: '', maxlength: 320 })}
-            ${field({ label: 'Subject', name: 'subject', required: true, maxlength: 200,
-                      value: `Fee quote ${q.ref} — ${q.description}`.slice(0, 200) })}
+
+          <div class="compose-headers">
+            <div class="compose-row">
+              <label for="f_to">To</label>
+              <input id="f_to" name="to" type="text" required maxlength="2000"
+                     value="${q.client_email ?? ''}" autocomplete="off"
+                     placeholder="somebody@example.com">
+            </div>
+            <div class="compose-row">
+              <label for="f_cc">Copy to</label>
+              <input id="f_cc" name="cc" type="text" maxlength="2000" autocomplete="off"
+                     placeholder="Separate several with commas">
+            </div>
+            <div class="compose-row">
+              <label for="f_subject">Subject</label>
+              <input id="f_subject" name="subject" required maxlength="200"
+                     value="${`Fee quote ${q.ref} — ${q.description}`.slice(0, 200)}">
+            </div>
           </div>
 
-          ${/*
-            * The body gets the full width of the form and a monospace face:
-            * the figures are padded into columns, and in a proportional font
-            * they do not line up with each other.
-            */ ''}
-          <div class="form-section form-section-wide js-compose">
-            <div class="compose-bar">
-              <div class="compose-tools">
-                <button type="button" class="btn btn-small btn-secondary" data-wrap="**" title="Bold"><b>B</b></button>
-                <button type="button" class="btn btn-small btn-secondary" data-wrap="*" title="Italic"><i>I</i></button>
-                <button type="button" class="btn btn-small btn-secondary" data-prefix="## " title="Heading">H</button>
-                <button type="button" class="btn btn-small btn-secondary" data-prefix="- " title="Bulleted list">&bull; List</button>
-                <button type="button" class="btn btn-small btn-secondary" data-prefix="1. " title="Numbered list">1. List</button>
-              </div>
-              <fieldset class="compose-format">
-                <legend class="visually-hidden">Send as</legend>
-                <label><input type="radio" name="format" value="text" checked> Plain text</label>
-                <label><input type="radio" name="format" value="html"> Formatted</label>
-              </fieldset>
+          <div class="compose-bar">
+            <div class="compose-tools">
+              <button type="button" class="btn btn-small btn-secondary" data-wrap="**" title="Bold"><b>B</b></button>
+              <button type="button" class="btn btn-small btn-secondary" data-wrap="*" title="Italic"><i>I</i></button>
+              <button type="button" class="btn btn-small btn-secondary" data-prefix="## " title="Heading">H</button>
+              <button type="button" class="btn btn-small btn-secondary" data-prefix="- " title="Bulleted list">&bull; List</button>
+              <button type="button" class="btn btn-small btn-secondary" data-prefix="1. " title="Numbered list">1. List</button>
             </div>
-            <div class="field">
-              <label for="f_body">Message <span class="req"> *</span></label>
-              <textarea id="f_body" name="body" rows="22" required maxlength="20000"
-                        class="compose-body">${defaultQuoteEmail(q, practice, items, qs.capacityNote)}</textarea>
-              <p class="hint">Written as plain text. Choosing <strong>Formatted</strong> sends a
-                 tidy HTML version as well, with a plain-text copy for clients whose mail client
-                 prefers it — <code>**bold**</code>, <code>*italic*</code>, <code>## heading</code>,
-                 lines starting <code>-</code> or <code>1.</code> for lists, and web addresses become
-                 links. Nothing else is interpreted, so what you type is what is sent.</p>
-            </div>
-            <div class="field checkbox-field">
-              <label><input type="checkbox" name="mark_sent" checked>
-                Mark this quote as sent</label>
-            </div>
+            <fieldset class="compose-format">
+              <legend class="visually-hidden">Send as</legend>
+              <label><input type="radio" name="format" value="text" checked> Plain text</label>
+              <label><input type="radio" name="format" value="html"> Formatted</label>
+            </fieldset>
           </div>
-          <div class="form-actions">
+
+          <label class="visually-hidden" for="f_body">Message</label>
+          <textarea id="f_body" name="body" rows="24" required maxlength="20000"
+                    class="compose-body">${defaultQuoteEmail(q, practice, items, qs.capacityNote)}</textarea>
+
+          <div class="compose-actions">
             <button class="btn btn-primary" type="submit">Queue this email</button>
             <a class="btn btn-secondary" href="/quotes/${q.id}">Cancel</a>
+            <label class="check"><input type="checkbox" name="mark_sent" checked>
+              Mark this quote as sent</label>
           </div>
+
+          ${'' /* Under the button, not between the writer and the box: it
+                   explains a choice already made rather than one being made. */}
+          <details class="compose-help">
+            <summary>What “Formatted” does</summary>
+            <p class="hint">The message is written as plain text. Choosing <strong>Formatted</strong>
+               sends a tidy HTML version as well, with a plain-text copy for clients whose mail
+               client prefers it — <code>**bold**</code>, <code>*italic*</code>,
+               <code>## heading</code>, lines starting <code>-</code> or <code>1.</code> for lists,
+               and web addresses become links. Nothing else is interpreted, so what you type is what
+               is sent.</p>
+          </details>
         </form>`);
     });
 
@@ -1677,8 +1697,13 @@ export const quotesModule: AppModule = {
       if (!q) return c.notFound();
 
       const f = new FormReader(await c.req.formData());
-      const to = f.email('to', { required: true, label: 'To' });
-      const cc = f.email('cc');
+      // Several addresses, comma or semicolon separated. Asked for on
+      // 8 September 2026. One bad address refuses the whole list rather than
+      // being dropped: a message the practice believes went to three people
+      // and went to two is worse than one that did not send.
+      const toList = f.emails('to', { required: true, label: 'To' });
+      const cc = f.emails('cc', { label: 'Copy to' }).join(', ') || null;
+      const to = toList.join(', ') || null;
       const subject = f.text('subject', { required: true, label: 'Subject', max: 200 });
       const body = f.text('body', { required: true, label: 'Message', max: 20000 });
       const asHtml = f.text('format', { max: 10 }) === 'html';

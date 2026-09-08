@@ -215,6 +215,20 @@ Related and unfixed: an article deleted through the database takes its file rows
 with it, but nothing removes the objects from R2. No route deletes an article
 today, so there are no orphans yet.
 
+### 10a. Two tables hold tags, for the same reason
+
+`case_tags` (migration 0007) and `client_tags` (migration 0072) are the same
+join written twice against one shared `tags` list. One `entity_tags` table keyed
+on `(entity_type, entity_id)` is the better shape — it is the pattern
+`documents` and `entries` already use — and a third taggable thing would make it
+three parallel tables.
+
+It was not folded into the client-tags change on purpose: `case_tags` works and
+carries 192 live links, and `docs/spec/rebuilding.md` argues that consolidations
+are done deliberately, one at a time, each with its own migration and rehearsal,
+rather than smuggled in beside a feature. What would let it happen: an hour, a
+rehearsal on a production snapshot, and nothing else in flight on tags.
+
 ### 11. The shipped defaults name this practice
 `practice.terms_url` defaults to `https://www.immigration.kiwi/terms` — this
 practice's own site. Right for them, wrong for the second practice, who would
@@ -288,15 +302,10 @@ It is not urgent while the terms are stable. It becomes urgent the first time
 they are republished, and by then the letters already sent cannot be told which
 edition they meant.
 
-### 14. Tags on clients
+### 14. ~~Tags on clients~~ — done, 1.11.0
 
-**Asked 8 September 2026:** *"we need tags for clients and cases — if not yet
-implemented. For cases they exist I believe but not for clients — why?"*
-
-No reason. `tags` and `case_tags` were built in migration 0007 and `client_tags`
-simply never was. The same tag list would serve both — the table exists, it is
-the join that is missing, along with the raiser on the client page and the
-filter on the client list.
+Migration 0072 added `client_tags`, sharing the one tag list with matters. What
+is left of it is the consolidation, recorded with the file tables in item 10a.
 
 ### 15. Somebody within the practice is not a client
 
