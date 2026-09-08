@@ -51,6 +51,20 @@ rv_child_local | Dependent Child Resident Visa
 # Work
 wv_aewv_local | Accredited Employer Work Visa`;
 
+/**
+ * The same list as the practice's own actually holds it.
+ *
+ * Saved from a browser, so every line ends CRLF. This is not a detail: the
+ * fixture above ends its lines with \n, and that is precisely why the tests
+ * guarding migration 0066 all passed while 190 of the 194 names in the live
+ * register came out as "RV. Partner\r — NGUYEN, ANH TAN". SQLite's `trim()`
+ * strips spaces and nothing else; JavaScript's `.trim()` strips carriage
+ * returns, so the application's parser was right and the SQL copy of it was
+ * wrong, and a fixture tidier than the data agreed with the code instead of
+ * with the register.
+ */
+const VOCAB_AS_SAVED = VOCAB.split('\n').join('\r\n');
+
 function upTo(file: string) {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON;');
@@ -355,5 +369,83 @@ describe('a row on the dashboard shows what it says', () => {
       expect(named, 'the matter is named twice on one row').toBeLessThanOrEqual(1);
     }
     expect(card, 'the reference is what the row is for').toContain('CASE-26-043');
+  });
+});
+
+describe('a name carries no stray line ending', () => {
+  const REPAIR = '0069_a_name_carries_no_stray_line_ending.sql';
+
+  /**
+   * The register as it stood the moment before the repair: rows in place, then
+   * 0066 run over them. Seeded before 0066 rather than after, because 0066 is
+   * the thing that put the carriage return there — a database seeded after it
+   * has nothing for the repair to fix and every test below would pass on
+   * nothing.
+   */
+  function seededWithRealLineEndings() {
+    const db = upTo(MIGRATION);
+    db.exec(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
+             VALUES ('u1','t@example.test','A Tester','x','admin','active','${AT}','${AT}')`);
+    db.exec(`INSERT INTO settings (key, value, updated_at)
+             VALUES ('vocab.case_types', '${VOCAB_AS_SAVED}', '${AT}')`);
+    db.exec(`INSERT INTO clients (id,ref,kind,full_name,status,created_at,updated_at)
+             VALUES ('cl1','CL-0001','individual','A PERSON','active','${AT}','${AT}')`);
+    db.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
+             VALUES ('k1','CASE-26-001','cl1','A description','A description',
+                     'rv_partner_local','lodged','u1','${AT}','${AT}')`);
+    applyRepair(db);
+    return db;
+  }
+
+  it('is what 0066 produced from a vocabulary saved by a browser', () => {
+    // The fault itself, reproduced: everything up to but not including the
+    // repair. If this ever stops carrying a carriage return, the repair below
+    // is testing nothing.
+    const db = seededWithRealLineEndings();
+    expect(one(db, `SELECT title AS v FROM cases WHERE id = 'k1'`).v)
+      .toBe('Partner Resident Visa\r — A PERSON');
+  });
+
+  it('takes it out, and leaves the rest of the name alone', () => {
+    const db = seededWithRealLineEndings();
+    db.exec(readFileSync(`migrations/${REPAIR}`, 'utf8'));
+    expect(one(db, `SELECT title AS v FROM cases WHERE id = 'k1'`).v)
+      .toBe('Partner Resident Visa — A PERSON');
+  });
+
+  it('leaves a name that never had one untouched', () => {
+    const db = seededWithRealLineEndings();
+    db.exec(`UPDATE cases SET title = 'A NAME SOMEBODY CHOSE' WHERE id = 'k1'`);
+    db.exec(readFileSync(`migrations/${REPAIR}`, 'utf8'));
+    expect(one(db, `SELECT title AS v FROM cases WHERE id = 'k1'`).v).toBe('A NAME SOMEBODY CHOSE');
+  });
+
+  it('cleans a description pasted out of a document too', () => {
+    const db = seededWithRealLineEndings();
+    db.exec(`UPDATE cases SET descriptor = 'Meat Process Worker,' || char(13) || ' Canterbury' WHERE id = 'k1'`);
+    db.exec(readFileSync(`migrations/${REPAIR}`, 'utf8'));
+    expect(one(db, `SELECT descriptor AS v FROM cases WHERE id = 'k1'`).v)
+      .toBe('Meat Process Worker, Canterbury');
+  });
+
+  it('leaves no control character anywhere in a name afterwards', () => {
+    const db = seededWithRealLineEndings();
+    db.exec(readFileSync(`migrations/${REPAIR}`, 'utf8'));
+    expect(one(db, `SELECT COUNT(*) AS n FROM cases
+                     WHERE title GLOB '*' || char(13) || '*'
+                        OR title GLOB '*' || char(10) || '*'
+                        OR title GLOB '*' || char(9) || '*'`).n).toBe(0);
+  });
+
+  it('is not how the application reads that same list', () => {
+    // The application's parser was never wrong — JavaScript's trim() strips a
+    // carriage return. Only the SQL copy of the rule was, which is what a
+    // second implementation of one rule costs.
+    const parsed = VOCAB_AS_SAVED.split('\n')
+      .map((line) => line.trim()).filter((line) => line && !line.startsWith('#'))
+      .map((line) => line.slice(line.indexOf('|') + 1).trim());
+    expect(parsed).toEqual([
+      'Partner Resident Visa', 'Dependent Child Resident Visa', 'Accredited Employer Work Visa',
+    ]);
   });
 });

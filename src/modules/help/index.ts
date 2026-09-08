@@ -37,6 +37,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.7.1', date: '8 September 2026',
+    notes: [
+      'All 34 clients whose surname was not in capitals have been corrected, and the matters named '
+        + 'after them with it. New clients have been capitalised on saving for a long time \u2014 '
+        + 'these were older records loaded before that, and nothing goes back over a record nobody '
+        + 'opens. Company names are untouched.',
+      'An invisible line break had crept into 190 matter names this morning \u2014 it did not show '
+        + 'on any page, but it was in the CSV export and in searches. Removed.',
+    ],
+  },
+  {
     version: '1.7.0', date: '8 September 2026',
     notes: [
       'When the assistant reads a document, every person it found now has a \u201cPerson or '
