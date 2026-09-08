@@ -11,8 +11,8 @@ guarantee in a handler lasts until somebody adds a second handler — and this
 register is written to by the application, by bulk loads, and occasionally by
 hand at a console. Everything below holds in all three cases.
 
-**51 refusals** across 20 tables, plus
-**8 uniqueness rules**. Each is quoted in the words the
+**61 refusals** across 21 tables, plus
+**9 uniqueness rules**. Each is quoted in the words the
 database itself uses, because that is what somebody will see.
 
 Read from the schema as it finally stands, after every migration — not from the
@@ -164,6 +164,21 @@ whether or not the rule exists is not a test.
 |---|---|
 | insert | a quote has to say what it is for |
 | update | a quote has to say what it is for |
+
+### `quote_parties`
+
+| On | The database refuses |
+|---|---|
+| insert | a party on a quotation has to have a name |
+| update | a party on a quotation has to have a name |
+| insert | an organisation has no date of birth |
+| update | an organisation has no date of birth |
+| insert | a date of birth has to be a real date in the past, written 1987-04-18 |
+| update | a date of birth has to be a real date in the past, written 1987-04-18 |
+| insert | an administrative contact needs an email address or a phone number |
+| update | an administrative contact needs an email address or a phone number |
+| insert | an administrative contact cannot be the nominated representative |
+| update | an administrative contact cannot be the nominated representative |
 
 ### `kb_article_versions`
 

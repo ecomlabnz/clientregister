@@ -773,6 +773,26 @@ attachments at risk.
 | `created_at` | TEXT | NOT NULL |  |
 | `updated_at` | TEXT | NOT NULL |  |
 
+### `quote_parties`
+
+| Column | Type | | Default |
+|---|---|---|---|
+| `id` | TEXT | PK |  |
+| `quote_id` | TEXT | NOT NULL |  |
+| `position` | INTEGER | NOT NULL | 0 |
+| `role` | TEXT | NOT NULL |  |
+| `kind` | TEXT | NOT NULL | 'person' |
+| `full_name` | TEXT | NOT NULL |  |
+| `relationship` | TEXT |  |  |
+| `date_of_birth` | TEXT |  |  |
+| `organisation` | TEXT |  |  |
+| `email` | TEXT |  |  |
+| `phone` | TEXT |  |  |
+| `client_id` | TEXT |  |  |
+| `is_representative` | INTEGER | NOT NULL | 0 |
+| `created_at` | TEXT | NOT NULL |  |
+| `updated_at` | TEXT | NOT NULL |  |
+
 ### `reply_attachments`
 
 | Column | Type | | Default |
