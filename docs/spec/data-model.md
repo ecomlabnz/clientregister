@@ -786,6 +786,22 @@ attachments at risk.
 | `created_at` | TEXT | NOT NULL |  |
 | `updated_at` | TEXT | NOT NULL |  |
 
+### `intake_uploads`
+
+| Column | Type | | Default |
+|---|---|---|---|
+| `id` | TEXT | PK |  |
+| `run_id` | TEXT | NOT NULL |  |
+| `r2_key` | TEXT | NOT NULL UNIQUE |  |
+| `filename` | TEXT | NOT NULL |  |
+| `content_type` | TEXT | NOT NULL |  |
+| `size_bytes` | INTEGER | NOT NULL |  |
+| `sha256` | TEXT |  |  |
+| `uploaded_at` | TEXT | NOT NULL |  |
+| `uploaded_by` | TEXT |  |  |
+| `document_id` | TEXT |  |  |
+| `attached_at` | TEXT |  |  |
+
 ### `quote_parties`
 
 | Column | Type | | Default |

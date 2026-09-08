@@ -18,6 +18,7 @@ import { audit } from './core/audit';
 import { syncAllFollowUps } from './core/kb';
 import { runAutomations } from './core/automations';
 import { syncAllCaseFollowUps } from './core/decisions';
+import { sweepStaged } from './core/intakefiles';
 
 const app = createApp();
 
@@ -94,10 +95,17 @@ async function housekeeping(env: Env): Promise<void> {
       trigger: 'schedule', userId: null, origin: env.APP_ORIGIN ?? '',
     });
 
+    // Files staged by a reading nobody acted on. They are client documents
+    // sitting in a bucket with nothing pointing at them; keeping them because a
+    // page was closed is the quiet accumulation that makes a register
+    // impossible to reason about later.
+    const staleFiles = await sweepStaged(env);
+
     await audit(env, {
       action: 'cron.housekeeping',
       actorLabel: 'system',
-      meta: { mail, quotesExpired: expired.meta?.changes ?? 0, followUps, chases, automations },
+      meta: { mail, quotesExpired: expired.meta?.changes ?? 0, followUps, chases, automations,
+              staleFiles },
     });
   } catch (err) {
     console.error('scheduled housekeeping failed', err);
