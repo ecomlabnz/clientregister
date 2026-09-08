@@ -3,15 +3,15 @@
 **Enough to rebuild this register from nothing — without the faults it has
 already suffered.**
 
-Four documents. Three are generated from the code and cannot drift from it; the
-fourth is the one that has to be written, and is the one to read first.
+Five documents. Three are generated from the code and cannot drift from it; the
+other two have to be written, and one of those is the one to read first.
 
 | | What it holds | How it is kept true |
 |---|---|---|
 | [`mistakes.md`](mistakes.md) | Every fault this register has actually suffered, and the rule that now prevents it | Written by hand, added to whenever something breaks |
-| [`invariants.md`](invariants.md) | The 51 things the database refuses to do, in its own words, and the 8 uniqueness rules | Extracted from the built schema, and held against it by a test |
-| [`data-model.md`](data-model.md) | 45 tables, every column | Extracted from the built schema, and held against it by a test |
-| [`routes.md`](routes.md) | 178 routes and the permission each requires | Extracted from the module registrations, and checked against the built router by a test |
+| [`invariants.md`](invariants.md) | The 67 things the database refuses to do, in its own words, and the 9 uniqueness rules | Extracted from the built schema, and held against it by a test |
+| [`data-model.md`](data-model.md) | 48 tables, every column | Extracted from the built schema, and held against it by a test |
+| [`routes.md`](routes.md) | 195 routes and the permission each requires | Extracted from the module registrations, and checked against the built router by a test |
 
 ## Read them in this order
 
@@ -21,7 +21,7 @@ you what will go wrong while you build it. A rebuild that skips it will
 rediscover a primary-passport collision, a search that only works in one word
 order, and a page that breaks at 250 rows — all of which cost real time here.
 
-**2. [`invariants.md`](invariants.md).** The 51 rules the database enforces. This is
+**2. [`invariants.md`](invariants.md).** The 67 rules the database enforces. This is
 the heart of the design: *invariants belong in the database, as triggers and
 constraints, not in the route that happens to write the row.* A guarantee in a
 handler lasts until somebody adds a second handler — and this register is written
@@ -34,6 +34,11 @@ inferred, which is why they live next door.
 **4. [`routes.md`](routes.md).** Every page and form, and what each requires. The
 twelve genuinely public routes are listed separately — that list is the whole
 public surface.
+
+**5. [`rebuilding.md`](rebuilding.md).** Whether this register should be rebuilt
+clean rather than repaired — asked by the practice on 8 September 2026, answered
+with the counts, and written down because it will be asked again. It also says
+what the eventual specification has to contain to be worth writing.
 
 ## What is not here, and where it is
 

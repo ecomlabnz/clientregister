@@ -202,6 +202,24 @@ describe('the name itself', () => {
     expect(caseName('', '[retired example 1]')).toBe('[retired example 1]');
   });
 
+  it('puts the type first, so sorting by name groups by kind of work', () => {
+    // The practice's own reason, 8 September 2026: "I like the case naming
+    // where the visa type precedes the name — it allows me to sort the cases by
+    // visa type, very helpful." Sorting by name is grouping by kind of work, on
+    // every list, with no second column and no separate control. Reversing the
+    // halves would take that away and nothing else would notice.
+    const names = [
+      caseName('WV. AEWV', 'ANNA ZULU'),
+      caseName('RV. Partner', 'BEN ALPHA'),
+      caseName('RV. Partner', 'ANNA ZULU'),
+    ].sort();
+    expect(names).toEqual([
+      'RV. Partner — ANNA ZULU',
+      'RV. Partner — BEN ALPHA',
+      'WV. AEWV — ANNA ZULU',
+    ]);
+  });
+
   it('reads its label from the vocabulary it is given', () => {
     const types = [{ key: 'rv_partner', label: 'Partner Resident Visa' }];
     expect(caseNameFrom(types, 'rv_partner', 'A PERSON'))
