@@ -370,8 +370,10 @@ ot_other | OT. Other
 ```
 principal_applicant   | Principal applicant
 secondary_applicant   | Secondary applicant
-supporting_partner    | Supporting partner
+supporting_partner    | Supporting partner (the application turns on the relationship)
+partner               | Partner (the applicant's partner, not part of the application)
 dependent_child       | Dependent child
+family_member         | Family member (any other relative, not applying)
 employer              | Employer
 sponsor               | Sponsor
 agent                 | Agent or representative

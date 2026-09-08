@@ -304,7 +304,9 @@ export const PARTY_ROLES = [
   'principal_applicant',
   'secondary_applicant',
   'supporting_partner',
+  'partner',
   'dependent_child',
+  'family_member',
   'employer',
   'sponsor',
   'agent',
@@ -319,7 +321,18 @@ export const PARTY_ROLE_LABELS: Record<PartyRole, string> = {
   principal_applicant: 'Principal applicant',
   secondary_applicant: 'Secondary applicant',
   supporting_partner: 'Supporting partner',
+  // **Asked for 8 September 2026:** *"someone who is partner but not party to
+  // the application, not a supporting partner, just partner."* The two sit next
+  // to each other in the list because the choice between them is the whole
+  // point: a supporting partner is the partner the application turns on and
+  // whose evidence INZ will assess; a partner is simply the partner, on the
+  // file because the file needs to know who they are.
+  partner: 'Partner',
   dependent_child: 'Dependent child',
+  // Also asked for on 8 September 2026, and the same distinction one step out:
+  // a relative the file needs to know about who is neither applying nor being
+  // relied on. A parent, a sibling, an adult child.
+  family_member: 'Family member',
   employer: 'Employer',
   sponsor: 'Sponsor',
   agent: 'Agent or representative',

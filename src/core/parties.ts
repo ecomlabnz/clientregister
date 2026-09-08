@@ -33,8 +33,18 @@ export interface CaseParty {
 /** Order parties the way a file reads: applicant first, then the rest. */
 const ROLE_ORDER: PartyRole[] = [
   'principal_applicant', 'secondary_applicant', 'dependent_child',
-  'supporting_partner', 'sponsor', 'employer', 'agent', 'lawyer', 'adviser', 'other',
+  'supporting_partner', 'partner', 'family_member', 'sponsor', 'employer', 'agent',
+  'lawyer', 'adviser', 'other',
 ];
+
+/**
+ * Exposed for the test that holds this list against `PARTY_ROLES`.
+ *
+ * A role missing here sorts to the top of every matter, because `indexOf`
+ * returns -1 — which is how it would be noticed: silently, and on the wrong
+ * screen.
+ */
+export const ROLE_ORDER_FOR_TEST = ROLE_ORDER;
 
 function byRole(a: { role: PartyRole }, b: { role: PartyRole }): number {
   return ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role);

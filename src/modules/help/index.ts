@@ -37,6 +37,20 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.13.0', date: '8 September 2026',
+    notes: [
+      'Two more roles on a matter: Partner and Family member. Both sit next to Supporting '
+        + 'partner in the list, because choosing between them is the point.',
+      'Supporting partner means the partner the application turns on, whose relationship '
+        + 'Immigration New Zealand will assess. Partner means simply the partner \u2014 on the '
+        + 'file, not applying, nothing claimed through them. Family member is any other relative '
+        + 'in the same position.',
+      'The assistant can now propose either, and is told the difference: where a document does '
+        + 'not show the relationship is being relied on, it picks the weaker one and leaves the '
+        + 'judgement to you.',
+    ],
+  },
+  {
     version: '1.12.0', date: '8 September 2026',
     notes: [
       'Every client now has their own INZ client number, on their page. It used to live on the '
