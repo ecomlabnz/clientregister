@@ -7,6 +7,37 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.4.1 — 8 September 2026
+
+### Fixed
+- **A matter is named again, instead of being described twice.** Reported by
+  the practice from the dashboard: *"when narrowing the window the text is
+  hiding"*, and the matter names were *"too long — not acceptable"*.
+
+  Two faults, one cause. The New matter form asked one question — what the
+  matter is about — and wrote the answer into both the name and the
+  description. Measured before fixing it: **194 matters, all 194 with the two
+  identical**, averaging 84 characters, 161 of them over sixty. So every list
+  that showed a matter's name and its description showed the same sentence
+  twice, and then ran out of room for the reference and why the row was there.
+
+  A matter is now named **"Partner Resident Visa — [retired example 1]"**, from
+  its type and the person it is for, and the description you wrote is the line
+  underneath. Nobody has to rename anything: migration 0066 rebuilds the names
+  of the matters already in the register and does not touch one word of the
+  descriptions. A matter you named yourself is left alone.
+
+  The name follows what it is made of: correcting a client's spelling renames
+  their matters, and the change is noted on the client's file. That is the
+  drift that caused this in the first place — a name that stops matching the
+  record it names.
+
+- **Nothing on the dashboard or the alerts list is cut off any more.** Rows were
+  clamped to two lines, and two lines hold fewer characters as the window
+  narrows — with nothing to say the rest was there. A row that needs three
+  lines now takes three lines. Checked in Chromium at 390, 700, 1000 and 1400
+  pixels.
+
 ## 1.4.0 — 8 September 2026
 
 ### Added

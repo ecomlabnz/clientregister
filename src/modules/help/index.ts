@@ -37,6 +37,22 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.4.1', date: '8 September 2026',
+    notes: [
+      'Matters are named again instead of being described twice. A matter now reads '
+        + '\u201cPartner Resident Visa \u2014 [retired example 1]\u201d, with the description you '
+        + 'wrote on the line underneath. Every matter already in the register has been renamed '
+        + 'this way and not one description was changed.',
+      'The New matter form had been putting your description into the name as well, which is why '
+        + 'every list showed the same sentence twice and then ran out of room for the reference.',
+      'If you correct the spelling of a client\u2019s name, their matters are renamed to match, '
+        + 'and a note on their file says so.',
+      'Nothing on the dashboard or the alerts list is cut off any more. Rows were limited to two '
+        + 'lines, so narrowing the window hid the end of them. A row that needs three lines now '
+        + 'takes three lines.',
+    ],
+  },
+  {
     version: '1.4.0', date: '8 September 2026',
     notes: [
       'A quotation can now name everybody the engagement is with, not just the client \u2014 the '

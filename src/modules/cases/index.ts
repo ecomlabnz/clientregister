@@ -50,6 +50,7 @@ import {
 import {
   VOCABULARY_SETTINGS, caseTypes, docCategories, isTerm, labelFor, termOptions, type Term,
 } from '../../core/vocabulary';
+import { caseNameFrom } from '../../core/casename';
 import { invoicesSection } from '../invoices';
 
 export interface CaseRow {
@@ -231,19 +232,12 @@ function readCaseForm(f: FormReader, types: Term[]) {
   return {
     client_id: f.text('client_id', { required: true, label: 'Client', max: 60 }),
     descriptor,
-    // Derived, not typed, and written from one place.
-    //
-    // `title` is NOT NULL and several pages still read it — the matter's own
-    // heading, the client's case list, the AI brief — so it is fed from the
-    // description rather than being a second name for the same thing that
-    // drifts away from it. The form no longer asks for a title at all: it used
-    // to arrive pre-filled from the client and the type, which is why every
-    // matter ended up named after two columns that were already on the row.
-    //
-    // The column stays because a practice may one day want a matter named
-    // something other than its description. On the day the form offers it
-    // again, this line is what to remove.
-    title: descriptor,
+    // No `title`. It used to be set here to the description, which is how
+    // every matter in the register ended up named by an 84-character sentence
+    // and how two hundred lists came to print the same words twice. The name
+    // is composed by `caseName` from the type and the client, and the routes
+    // below do it because only they know the client's name. See
+    // `src/core/casename.ts`.
     case_type: submittedType,
     priority: f.enum('priority', PRIORITIES, { fallback: 'normal' })!,
     assigned_to: f.text('assigned_to', { required: true, label: 'Assigned to', max: 60 }),
@@ -605,7 +599,8 @@ export const casesModule: AppModule = {
       const status = f.enum('status', ['lead', 'engaged'] as const, { fallback: 'lead' })!;
 
       const client = v.client_id
-        ? await one<{ id: string; ref: string }>(c.env.DB, 'SELECT id, ref FROM clients WHERE id = ?', v.client_id)
+        ? await one<{ id: string; ref: string; full_name: string }>(
+            c.env.DB, 'SELECT id, ref, full_name FROM clients WHERE id = ?', v.client_id)
         : null;
       if (!client) f.errors['client_id'] = 'Choose an existing client.';
       // The database guarantees a matter has an owner. This guarantees the
@@ -635,7 +630,8 @@ export const casesModule: AppModule = {
             inz_application_number, inz_client_number, lodged_at, decision_due_at, decided_at,
             next_action, next_action_due, summary, chase_inz, currency, created_at, updated_at, created_by)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NZD',?,?,?)`,
-        id, ref, v.client_id, v.title, v.descriptor, v.case_type, status, v.priority, v.assigned_to,
+        id, ref, v.client_id, caseNameFrom(types, v.case_type, client!.full_name),
+        v.descriptor, v.case_type, status, v.priority, v.assigned_to,
         v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue, v.decided_at,
         v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), nowIso(), user.id,
       );
@@ -1162,6 +1158,12 @@ export const casesModule: AppModule = {
           ${pageHeader(`Edit ${existing.ref}`)}${caseForm(c, { ...existing, ...v } as Partial<CaseRow>, clients, users, types, f.errors)}`);
       }
 
+      // The name is composed from the type and the client, and the form can
+      // change either — a matter moved to the right client, or corrected from
+      // a visitor visa to a work visa, has to end up called what it now is.
+      const editClient = await one<{ full_name: string }>(
+        c.env.DB, 'SELECT full_name FROM clients WHERE id = ?', v.client_id);
+
       const policy = await decisionPolicy(c.env);
       const decisionDue = v.decision_due_at
         ?? expectedDecisionDate(v.lodged_at, policy.expectedMonths);
@@ -1171,7 +1173,8 @@ export const casesModule: AppModule = {
            inz_application_number=?, inz_client_number=?, lodged_at=?, decision_due_at=?, decided_at=?,
            next_action=?, next_action_due=?, summary=?, chase_inz=?, updated_at=?
          WHERE id=?`,
-        v.client_id, v.title, v.descriptor, v.case_type, v.priority, v.assigned_to,
+        v.client_id, caseNameFrom(types, v.case_type, editClient?.full_name ?? null),
+        v.descriptor, v.case_type, v.priority, v.assigned_to,
         v.inz_application_number, v.inz_client_number, v.lodged_at, decisionDue, v.decided_at,
         v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), id,
       );

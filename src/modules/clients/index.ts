@@ -47,6 +47,7 @@ import { casesForClient, relatedClients } from '../../core/parties';
 import { can } from '../../core/rbac';
 import { preferencesFor } from '../../core/preferences';
 import { caseTypes, docCategories, englishTests, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
+import { renameMattersFor } from '../../core/casename';
 import { filesPanel, listDocuments } from '../documents';
 import { countryCodeFor, countryName, countryOptions } from '../../core/countries';
 import { FLAG_LIVES, flagKinds, flagsForClient, isShowing } from '../../core/flags';
@@ -1856,6 +1857,24 @@ export const clientsModule: AppModule = {
         nowIso(), id,
       );
       await c.env.DB.batch(setNationalityStatements(c.env, id, v.nationalities));
+
+      // A matter is named after the person it is for, so correcting a spelling
+      // here has to reach the matters as well. Without this the old spelling
+      // stays on the front of every matter they have, and the name drifts out
+      // of step with the record it names — which is exactly how every matter in
+      // the register came to be called by its own description. See
+      // `src/core/casename.ts`.
+      if (existing.full_name !== v.full_name) {
+        const renamed = await renameMattersFor(c.env, id, v.full_name, await caseTypes(c.env));
+        if (renamed) {
+          await addEntry(c.env, {
+            entityType: 'client', entityId: id, kind: 'system',
+            body: `Name changed from ${existing.full_name} to ${v.full_name}. `
+              + `${renamed} ${renamed === 1 ? 'matter was' : 'matters were'} renamed to match.`,
+            createdBy: user.id,
+          });
+        }
+      }
 
       // This form owns the primary passport and nothing else about the
       // passports table. A client with none yet gets one made; a client with
