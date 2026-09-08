@@ -773,6 +773,15 @@ attachments at risk.
 | `created_at` | TEXT | NOT NULL |  |
 | `updated_at` | TEXT | NOT NULL |  |
 
+### `client_tags`
+
+| Column | Type | | Default |
+|---|---|---|---|
+| `client_id` | TEXT | NOT NULL, PK part |  |
+| `tag_id` | TEXT | NOT NULL, PK part |  |
+| `created_at` | TEXT | NOT NULL |  |
+| `created_by` | TEXT |  |  |
+
 ### `engagement_clauses`
 
 | Column | Type | | Default |

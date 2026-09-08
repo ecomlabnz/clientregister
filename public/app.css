@@ -769,8 +769,48 @@ textarea { resize: vertical; min-height: 70px; }
 .settings-cell-wide { grid-column: 1 / -1; }
 .settings-cell-wide textarea { min-height: 92px; }
 
-/* Composing a message. The body is padded into columns of figures, which only
-   line up in a monospace face. */
+/* Writing a message.
+ *
+ * One column, the way every mail client does it: the addresses stacked at the
+ * top, the subject under them, the body filling the width with its toolbar
+ * attached. It used to sit on the ordinary form grid, which puts three fields
+ * across a wide screen — right for entering a client's details, wrong for
+ * writing a message, because it scattered To, Copy to and Subject into
+ * different columns and floated the formatting buttons away from the box they
+ * act on. Reported 8 September 2026: "this is just ugly". */
+.compose {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.compose-headers { display: flex; flex-direction: column; }
+/* A label in its own column beside the field, as a mail client writes it, and
+   stacked on a phone where there is no room for two columns. */
+.compose-row {
+  display: grid; grid-template-columns: 6.5rem minmax(0, 1fr);
+  align-items: center; gap: 0 12px;
+  border-bottom: 1px solid var(--border); padding: 2px 0;
+}
+.compose-row > label { margin: 0; font-weight: 500; color: var(--muted); }
+.compose-row > input {
+  border: none; background: none; padding: 10px 0; width: 100%;
+  color: inherit; font: inherit;
+}
+.compose-row > input:focus { outline: none; box-shadow: none; }
+.compose-row:focus-within { border-bottom-color: var(--accent); }
+@media (max-width: 560px) {
+  .compose-row { grid-template-columns: minmax(0, 1fr); gap: 0; padding-bottom: 6px; }
+  .compose-row > label { font-size: 0.8rem; }
+  .compose-row > input { padding: 4px 0 8px; }
+}
+.compose-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.compose-actions .check { margin-left: auto; }
+@media (max-width: 560px) { .compose-actions .check { margin-left: 0; } }
+.compose-help summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; }
+.compose-help p { margin-top: 6px; }
+
+/* The body is padded into columns of figures, which only line up in a
+   monospace face. */
 .compose-body { font-family: var(--mono); font-size: 0.85rem; line-height: 1.5; min-height: 320px; }
 .compose-bar {
   display: flex; justify-content: space-between; align-items: center;

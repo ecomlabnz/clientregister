@@ -48,6 +48,7 @@ import { can } from '../../core/rbac';
 import { preferencesFor } from '../../core/preferences';
 import { caseTypes, docCategories, englishTests, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
 import { renameMattersFor } from '../../core/casename';
+import { detachTag, attachTag, findOrCreateTag, listTags, tagsForClient, tagsForClients } from '../../core/tags';
 import { filesPanel, listDocuments } from '../documents';
 import { countryCodeFor, countryName, countryOptions } from '../../core/countries';
 import { FLAG_LIVES, flagKinds, flagsForClient, isShowing } from '../../core/flags';
@@ -591,6 +592,7 @@ export const clientsModule: AppModule = {
     r.get('/', requirePermission('register:read'), async (c) => {
       const q = (c.req.query('q') ?? '').trim();
       const status = c.req.query('status') ?? '';
+      const tagFilter = (c.req.query('tag') ?? '').trim();
       const pageNum = pageNumberFor(c.req.query('page'));
 
       const prefs = await preferencesFor(c.env, c.get('user')!.id);
@@ -642,6 +644,16 @@ export const clientsModule: AppModule = {
         where.push(`status = ?${params.length + 1}`);
         params.push(status);
       }
+      // By name rather than by id, so the address of a filtered list reads as
+      // what it filters — and survives a tag being renamed, which is the same
+      // reasoning the matters list already uses.
+      if (tagFilter) {
+        params.push(tagFilter);
+        // `c.id`, not `clients.id`: the list query aliases the table, and the
+        // count query below reuses the same clause.
+        where.push(`EXISTS (SELECT 1 FROM client_tags xt JOIN tags t ON t.id = xt.tag_id
+                             WHERE xt.client_id = c.id AND t.name = ?${params.length})`);
+      }
       const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
       const asked = c.req.query('sort') ?? '';
@@ -654,7 +666,7 @@ export const clientsModule: AppModule = {
       // or the page size keeps the view, the search and the sort.
       const listHref = (over: Record<string, string | number> = {}) =>
         `/clients?${new URLSearchParams({
-          view, q, status, sort: sortKey, dir: sortDir,
+          view, q, status, tag: tagFilter, sort: sortKey, dir: sortDir,
           page: String(pageNum), size: String(PAGE_SIZE),
           ...Object.fromEntries(Object.entries(over).map(([k, v]) => [k, String(v)])),
         }).toString()}`;
@@ -673,6 +685,12 @@ export const clientsModule: AppModule = {
       );
       const hasMore = rows.length > PAGE_SIZE;
       const shown = rows.slice(0, PAGE_SIZE);
+      // One query for the page rather than one per row, the same way the
+      // matters list does it.
+      const [tagsByClient, allTags] = await Promise.all([
+        tagsForClients(c.env, shown.map((row: any) => row.id)),
+        listTags(c.env),
+      ]);
       // One query for the whole page. A list of two hundred clients must not
       // become two hundred queries to say where they are from.
       const nationalities = await nationalitiesByClient(c.env, shown.map((r) => r.id));
@@ -725,6 +743,12 @@ export const clientsModule: AppModule = {
             <option value="">All statuses</option>
             ${CLIENT_STATUSES.map((s) => html`<option value="${s}" ${s === status ? raw('selected') : ''}>${CLIENT_STATUS_LABELS[s]}</option>`)}
           </select>
+          ${allTags.length ? html`
+            <select name="tag">
+              <option value="">All tags</option>
+              ${allTags.map((tag) => html`<option value="${tag.name}"
+                ${tag.name === tagFilter ? raw('selected') : ''}>${tag.name} (${String(tag.uses)})</option>`)}
+            </select>` : ''}
           <button class="btn btn-secondary" type="submit">Filter</button>
         </form>
         <div data-live-results>
@@ -745,6 +769,10 @@ export const clientsModule: AppModule = {
                     ? html`Organisation${row.nzbn ? html` · NZBN ${row.nzbn}` : ''}`
                     : (nationalities.get(row.id) ?? []).map(countryName).join(' · ')}
                 </div>
+                ${(tagsByClient.get(row.id) ?? []).length
+                  ? html`<div class="tag-row">${(tagsByClient.get(row.id) ?? []).map((tag) =>
+                      badge(tag.name, tag.colour))}</div>`
+                  : ''}
                 <div class="row-meta show-sm">
                   <code>${row.ref}</code>
                   ${badge(CLIENT_STATUS_LABELS[row.status], statusTone(row.status))}
@@ -1078,8 +1106,9 @@ export const clientsModule: AppModule = {
       );
       if (!client) return c.notFound();
       const clientNationalities = await nationalitiesFor(c.env, id);
-      const [clientFlags, flagKindTerms] = await Promise.all([
+      const [clientFlags, flagKindTerms, clientTags, allTags] = await Promise.all([
         flagsForClient(c.env, id), flagKinds(c.env),
+        tagsForClient(c.env, id), listTags(c.env),
       ]);
 
       const [cases, quotes, inquiries, entries, tasks, partyCases, related, employer, people,
@@ -1569,6 +1598,39 @@ export const clientsModule: AppModule = {
                      group shows itself, without anyone having to maintain a second list.</p>`)
               : ''}
 
+            ${'' /* Matters have had these since migration 0007 and clients
+                     never did, for no reason anybody recorded. Asked for
+                     8 September 2026. The same tag list serves both, so a tag
+                     invented on a matter is the same tag here. */}
+            ${foldingCard('Tags', html`
+              ${clientTags.length === 0
+                ? html`<p class="muted small">No tags yet.</p>`
+                : html`<div class="tag-row">${clientTags.map((tag) => html`
+                    <span class="tag-chip">
+                      ${badge(tag.name, tag.colour)}
+                      ${writable ? html`
+                        <form method="post" action="/clients/${client.id}/tags/${tag.id}/remove" class="inline-form">
+                          ${csrfField(csrf)}
+                          <button class="btn-tag-remove" type="submit" title="Remove ${tag.name}">×</button>
+                        </form>` : ''}
+                    </span>`)}</div>`}
+              ${writable ? html`
+                <details class="tag-add">
+                  <summary>Add a tag</summary>
+                  <form method="post" action="/clients/${client.id}/tags" class="tag-form">
+                    ${csrfField(csrf)}
+                    <label class="sr-only" for="f_tag">Tag</label>
+                    <input id="f_tag" name="tag" list="client-tag-options" maxlength="40" required
+                           placeholder="Type a new tag or pick one" autocomplete="off">
+                    <datalist id="client-tag-options">
+                      ${allTags.map((tag) => html`<option value="${tag.name}"></option>`)}
+                    </datalist>
+                    <button class="btn btn-secondary btn-small" type="submit">Add</button>
+                    <p class="hint">Anything you type that does not exist yet is created, and is
+                       then available on matters too.</p>
+                  </form>
+                </details>` : ''}`)}
+
             ${card('Open tasks', tasks.length === 0
               ? emptyState('Nothing outstanding.')
               : html`<ul class="list">${tasks.map((t: any) => html`
@@ -1933,6 +1995,32 @@ export const clientsModule: AppModule = {
       }
       await auditFrom(c, { action: 'client.updated', entityType: 'client', entityId: id });
       return redirectWith(c, `/clients/${id}`, 'Client updated.');
+    });
+
+    // --- Tags -----------------------------------------------------------------
+    r.post('/:id/tags', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const user = c.get('user')!;
+      const f = new FormReader(await c.req.formData());
+      const name = f.text('tag', { required: true, label: 'Tag', max: 40 });
+      if (!f.valid) return redirectWith(c, `/clients/${id}`, 'Type a tag.', 'err');
+
+      const tag = await findOrCreateTag(c.env, name, user.id);
+      if (!tag) return redirectWith(c, `/clients/${id}`, 'That tag name is empty.', 'err');
+
+      await attachTag(c.env, 'client', id, tag.id, user.id);
+      await auditFrom(c, { action: 'client.tagged', entityType: 'client', entityId: id,
+        meta: { tag: tag.name } });
+      return redirectWith(c, `/clients/${id}`, `Tagged “${tag.name}”.`);
+    });
+
+    r.post('/:id/tags/:tagId/remove', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const tagId = c.req.param('tagId')!;
+      await detachTag(c.env, 'client', id, tagId);
+      await auditFrom(c, { action: 'client.untagged', entityType: 'client', entityId: id,
+        meta: { tag: tagId } });
+      return redirectWith(c, `/clients/${id}`, 'Tag removed.');
     });
 
     /**
