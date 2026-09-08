@@ -655,6 +655,11 @@ export interface FieldOpts {
   disabled?: boolean;
   step?: string;
   /**
+   * Which keyboard a phone should offer. `numeric` on a digits-only box saves
+   * the client's number being typed on a letter keyboard.
+   */
+  inputmode?: 'numeric' | 'tel' | 'email' | 'decimal';
+  /**
    * Put the cursor here on load. Use it only where the whole point of the page
    * is this one box — a page that steals focus from somebody halfway through
    * reading it is worse than one that does nothing.
@@ -679,6 +684,7 @@ export function field(opts: FieldOpts): Raw {
                ${opts.step ? raw(`step="${opts.step}"`) : ''}
                ${opts.maxlength ? raw(`maxlength="${opts.maxlength}"`) : ''}
                ${opts.autocomplete ? raw(`autocomplete="${opts.autocomplete}"`) : ''}
+               ${opts.inputmode ? raw(`inputmode="${opts.inputmode}"`) : ''}
                ${opts.autofocus ? raw('autofocus') : ''}
                placeholder="${opts.placeholder ?? ''}">`;
   return html`

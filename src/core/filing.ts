@@ -246,10 +246,10 @@ export async function filingSearch(
         WHERE (k.ref LIKE ?1 ESCAPE '\\' OR k.title LIKE ?1 ESCAPE '\\'
            OR k.descriptor LIKE ?1 ESCAPE '\\' OR k.summary LIKE ?1 ESCAPE '\\'
            OR k.inz_application_number LIKE ?1 ESCAPE '\\'
-           OR k.inz_client_number LIKE ?1 ESCAPE '\\'
+           OR cl.inz_client_number LIKE ?1 ESCAPE '\\'
            OR cl.full_name LIKE ?1 ESCAPE '\\')${
              everyOtherTerm(['k.ref', 'k.title', 'k.descriptor', 'k.summary',
-                             'k.inz_application_number', 'k.inz_client_number',
+                             'k.inz_application_number', 'cl.inz_client_number',
                              'cl.full_name'], terms, 4)}
         ORDER BY CASE WHEN k.ref = ?2 THEN 0 ELSE 1 END,
                  CASE WHEN k.status IN ('closed', 'withdrawn') THEN 1 ELSE 0 END,
@@ -261,9 +261,11 @@ export async function filingSearch(
         WHERE (ref LIKE ?1 ESCAPE '\\' OR full_name LIKE ?1 ESCAPE '\\'
            OR family_name LIKE ?1 ESCAPE '\\' OR given_names LIKE ?1 ESCAPE '\\'
            OR preferred_name LIKE ?1 ESCAPE '\\' OR email LIKE ?1 ESCAPE '\\'
-           OR phone LIKE ?1 ESCAPE '\\' OR nzbn LIKE ?1 ESCAPE '\\')${
+           OR phone LIKE ?1 ESCAPE '\\' OR nzbn LIKE ?1 ESCAPE '\\'
+           OR inz_client_number LIKE ?1 ESCAPE '\\')${
              everyOtherTerm(['ref', 'full_name', 'family_name', 'given_names',
-                             'preferred_name', 'email', 'phone', 'nzbn'], terms, 4)}
+                             'preferred_name', 'email', 'phone', 'nzbn',
+                             'inz_client_number'], terms, 4)}
         ORDER BY CASE WHEN ref = ?2 THEN 0 ELSE 1 END, full_name
         LIMIT ?3`, like, upper, limit, ...rest),
   ]);

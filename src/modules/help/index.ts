@@ -37,6 +37,25 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.12.0', date: '8 September 2026',
+    notes: [
+      'Every client now has their own INZ client number, on their page. It used to live on the '
+        + 'matter, so the same person\u2019s number was typed again on every file they had \u2014 '
+        + 'and two of your clients had ended up with two different numbers between them.',
+      'The 87 numbers already in the register were moved onto the right people. Three could not '
+        + 'be settled without you, and each is flagged on the file with a note naming every number '
+        + 'found: CL-0041, CL-0231, and CL-0068 with CL-0252 \u2014 which look like the same '
+        + 'person entered twice.',
+      'Alerts has a new list, \u201cNo INZ client number\u201d, naming everybody with a live '
+        + 'matter who still needs one. It shortens by one each time you fill one in.',
+      'A search for a client number finds the person, so a letter from Immigration New Zealand '
+        + 'quoting nothing else still lands you on the right file.',
+      'The register refuses anything that is not six to twelve digits, and refuses giving two '
+        + 'clients the same number \u2014 which is the surest sign the same person has been '
+        + 'entered twice.',
+    ],
+  },
+  {
     version: '1.11.0', date: '8 September 2026',
     notes: [
       'Clients can be tagged. Matters always could; clients never could, for no reason anybody '
