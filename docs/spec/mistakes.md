@@ -467,6 +467,38 @@ derived from the system or it is not shown. The notice now reads
 there is no longer a sentence to go stale. Where a claim genuinely cannot be
 derived, it carries the date it was checked, so a reader can weigh it.
 
+### 28. A fixture tidier than the data it stands for
+
+Migration 0066 rebuilt every matter's name from the practice's case-type
+vocabulary — a settings row holding "key | Label" lines — and read it with
+SQLite's `trim()`.
+
+**SQLite's `trim()` strips spaces. Only spaces.** The settings row was saved from
+a browser, so its lines end CRLF, and every label came out with a carriage
+return still attached: 190 of the 194 names became `RV. Partner\r — NGUYEN, ANH
+TAN`.
+
+Six tests guarded that migration, including one that checked no raw key was
+printed and one that compared a digest of every row before and after. All six
+passed, because the fixture they seeded the vocabulary with used Unix line
+endings. The fixture agreed with the code instead of with the register.
+
+Nothing else showed it either: a carriage return is whitespace in HTML and
+collapses, so every page looked right. It was in the CSV export, in a search for
+the label, and would have been in the letter of engagement. It was found hours
+later by querying the live register for it while reading the same vocabulary for
+something unrelated.
+
+Note what the fault was *not*: the application's own parser was never wrong —
+JavaScript's `.trim()` removes a carriage return — so this is also fault 26
+again, one rule with two implementations, and the SQL one drifting.
+
+**The rule.** A fixture stands in for production data, so it carries production's
+mess: the line endings the file actually has, the punctuation the names actually
+contain, the empty column that is empty in real life. Where the shape of the real
+data can be measured, measure it and seed to that shape. A test whose input is
+cleaner than reality is testing the code against itself.
+
 ---
 
 ## Working practices that caught things
