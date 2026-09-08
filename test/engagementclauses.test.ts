@@ -13,6 +13,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
+import { mountModule, fakeUser } from './support/d1';
+import { quotesModule } from '../src/modules/quotes';
+import { clausesFor, clauseTypes, engagementText } from '../src/core/engagement';
 
 const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
 const AT = '2026-09-08T09:00:00Z';
@@ -103,5 +106,129 @@ describe('whether a letter goes with a quotation', () => {
     expect(() => d.exec("UPDATE quotes SET with_letter = 2 WHERE id = 'q1'")).toThrow();
     d.exec("UPDATE quotes SET with_letter = 0 WHERE id = 'q1'");
     expect((d.prepare(`SELECT with_letter AS v FROM quotes WHERE id = 'q1'`) as any).get().v).toBe(0);
+  });
+});
+
+describe('which clauses belong on a letter', () => {
+  function seeded() {
+    const h = mountModule(quotesModule, { user: fakeUser({ role: 'owner' }) });
+    const add = (id: string, position: number, heading: string, types: string, active = 1) =>
+      (h.db.prepare(
+        `INSERT INTO engagement_clauses (id,position,heading,body,case_types,active,created_at,updated_at)
+         VALUES (?,?,?,'Something it says',?,?,'${AT}','${AT}')`) as any)
+        .run(id, position, heading, types, active);
+    add('all', 0, 'Legal fees and disbursements', '');
+    add('partnership', 1, 'Partnership assessment', 'rv_partner wv_partner');
+    add('employer', 2, 'Employer accreditation', 'employer_accreditation');
+    add('retired', 3, 'An old clause', '', 0);
+    return h;
+  }
+
+  const headings = async (h: any, types: string[]) =>
+    (await clausesFor(h.env as any, types)).map((c) => c.heading);
+
+  it('puts a clause naming no matter type on every letter', async () => {
+    const h = seeded();
+    expect(await headings(h, ['employer_accreditation'])).toContain('Legal fees and disbursements');
+    expect(await headings(h, [])).toContain('Legal fees and disbursements');
+  });
+
+  it('keeps a clause off a letter it does not belong on', async () => {
+    // The whole reason the list exists: a page on how INZ assesses whether a
+    // relationship is genuine has no business on an employer accreditation.
+    const h = seeded();
+    expect(await headings(h, ['employer_accreditation'])).not.toContain('Partnership assessment');
+    expect(await headings(h, ['rv_partner'])).toContain('Partnership assessment');
+  });
+
+  it('includes a clause when the quotation covers any of the types it names', async () => {
+    // A quotation can cover more than one matter. Requiring *every* type to
+    // match would drop the partnership pages from a quotation covering a
+    // partner visa and a dependent child — the letter that most needs them.
+    const h = seeded();
+    expect(await headings(h, ['rv_partner', 'rv_child'])).toContain('Partnership assessment');
+  });
+
+  it('leaves a switched-off clause out of new letters', async () => {
+    const h = seeded();
+    expect(await headings(h, ['rv_partner'])).not.toContain('An old clause');
+  });
+
+  it('keeps the order the practice put them in', async () => {
+    const h = seeded();
+    expect(await headings(h, ['rv_partner']))
+      .toEqual(['Legal fees and disbursements', 'Partnership assessment']);
+  });
+
+  it('reads a list of types however it was typed', () => {
+    expect(clauseTypes({ case_types: 'rv_partner  wv_partner' })).toEqual(['rv_partner', 'wv_partner']);
+    expect(clauseTypes({ case_types: 'rv_partner, wv_partner' })).toEqual(['rv_partner', 'wv_partner']);
+    expect(clauseTypes({ case_types: '   ' })).toEqual([]);
+  });
+});
+
+describe('the words around the clauses', () => {
+  it('ships none of them, which is the point', async () => {
+    // A letter carrying wording the register invented would be worse than one
+    // that went out empty: the empty one is obvious. So the register supplies
+    // no opening, no acknowledgements and no closing, and says so.
+    const h = mountModule(quotesModule, { user: fakeUser({ role: 'owner' }) });
+    const text = await engagementText(h.env as any);
+    expect(text.opening).toBe('');
+    expect(text.acknowledgements).toEqual([]);
+    expect(text.closing).toBe('');
+    expect(text.configured, 'an empty letter must not read as a configured one').toBe(false);
+  });
+
+  it('reads the acknowledgements one per line, dropping the blank ones', async () => {
+    const h = mountModule(quotesModule, { user: fakeUser({ role: 'owner' }) });
+    h.db.exec(`INSERT INTO settings (key,value,updated_at) VALUES
+      ('engagement.opening','I am pleased to act for you.','${AT}'),
+      ('engagement.acknowledgements','have read these terms\n\n  accept that no outcome is guaranteed  \n','${AT}')`);
+    const text = await engagementText(h.env as any);
+    expect(text.acknowledgements)
+      .toEqual(['have read these terms', 'accept that no outcome is guaranteed']);
+    expect(text.configured).toBe(true);
+  });
+});
+
+describe('who may rewrite the terms a client is asked to accept', () => {
+  it('is an administrator, not everybody who can send a quote', async () => {
+    // Writing a quotation is daily work. Rewriting the contract is not.
+    const specialist = mountModule(quotesModule, { user: fakeUser({ role: 'adviser' }) });
+    expect((await specialist.request('/quotes/clauses')).status).toBe(403);
+    const owner = mountModule(quotesModule, { user: fakeUser({ role: 'owner' }) });
+    expect((await owner.request('/quotes/clauses')).status).toBe(200);
+  });
+
+  it('refuses a clause with nothing in it, through the real route', async () => {
+    const h = mountModule(quotesModule, { user: fakeUser({ role: 'owner' }) });
+    await h.post('/quotes/clauses', { heading: 'A heading', body: '   ' });
+    expect(h.count('SELECT COUNT(*) AS n FROM engagement_clauses')).toBe(0);
+  });
+
+  it('writes one, with the matters it belongs on', async () => {
+    const h = mountModule(quotesModule, { user: fakeUser({ role: 'owner' }) });
+    const body = new URLSearchParams({ _csrf: 'test-csrf-token', heading: 'Partnership assessment',
+      body: 'INZ will assess whether the partnership is genuine and stable.', position: '3' });
+    body.append('case_types', 'rv_partner');
+    body.append('case_types', 'wv_partner');
+    await h.request('/quotes/clauses', { method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'http://localhost' }, body });
+    const row = h.get<{ heading: string; case_types: string; position: number; active: number }>(
+      'SELECT heading, case_types, position, active FROM engagement_clauses')!;
+    expect(row.heading).toBe('Partnership assessment');
+    expect(row.case_types).toBe('rv_partner wv_partner');
+    expect(row.position).toBe(3);
+    expect(row.active).toBe(1);
+  });
+
+  it('switches one off rather than deleting it', async () => {
+    const h = mountModule(quotesModule, { user: fakeUser({ role: 'owner' }) });
+    h.db.exec(`INSERT INTO engagement_clauses (id,position,heading,body,case_types,active,created_at,updated_at)
+               VALUES ('c1',0,'A clause','Something','',1,'${AT}','${AT}')`);
+    await h.post('/quotes/clauses/c1/toggle');
+    expect(h.count('SELECT COUNT(*) AS n FROM engagement_clauses')).toBe(1);
+    expect(h.get<{ active: number }>('SELECT active FROM engagement_clauses')!.active).toBe(0);
   });
 });

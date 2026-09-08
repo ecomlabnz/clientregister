@@ -54,13 +54,21 @@ describe('the covering email a quote drafts', () => {
     // something that opens in a browser wonders whether they got the right
     // thing — and on a document they are being asked to accept, that is the
     // one doubt worth spending a word to avoid.
+    //
+    // Corrected 8 September 2026. The practice pointed out what is actually at
+    // that address: a page whose only content is a button that downloads the
+    // current edition as a PDF. So neither word alone is honest — "download"
+    // sends somebody looking for a file at a page address, and "read" leaves
+    // them on a page wondering where the terms are. What is pinned now is that
+    // the email does not call the *link* a file, and does say where the current
+    // edition comes from.
     const body = defaultQuoteEmail(quote, practice);
-    expect(body).not.toMatch(/download/i);
-    expect(body).toContain('read');
+    expect(body).not.toMatch(/download (the|these|those) terms/i);
+    expect(body).toMatch(/current edition/i);
   });
 
   it('asks the client to read them before accepting', () => {
-    expect(defaultQuoteEmail(quote, practice)).toMatch(/read those terms before accepting/i);
+    expect(defaultQuoteEmail(quote, practice)).toMatch(/read them before accepting/i);
   });
 
   it('says nothing about terms when no address is configured', () => {
