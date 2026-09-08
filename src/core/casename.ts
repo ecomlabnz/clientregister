@@ -37,6 +37,13 @@ import { labelFor, type Term } from './vocabulary';
  * alone repeats across a client's matters, and the name alone repeats across a
  * client's file. An em dash rather than a hyphen, because migration 0026 split
  * the old titles on exactly that and the convention is theirs.
+ *
+ * **The type comes first, and that is load-bearing.** The practice, on seeing
+ * it: *"I like the case naming where the visa type precedes the name — it
+ * allows me to sort the cases by visa type, very helpful."* Sorting by name is
+ * therefore grouping by kind of work, on every list in the register, with no
+ * second column and no separate control. Anybody tempted to put the person
+ * first is taking that away.
  */
 export function caseName(typeLabel: string, clientName: string | null | undefined): string {
   const type = (typeLabel || '').trim();
