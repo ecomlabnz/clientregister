@@ -25,7 +25,7 @@ import {
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate, dateOrDateTime, instantForDate } from '../../ui/format';
 import {
   canTransition, CASE_STATUS_HELP, CASE_STATUS_LABELS, CASE_STATUSES, CASE_TRANSITIONS,
-  DEADLINE_CASE_STATUSES, ENTRY_KIND_LABELS, ENTRY_KINDS,
+  DEADLINE_CASE_STATUSES, CHOOSABLE_ENTRY_KINDS, ENTRY_KIND_LABELS, ENTRY_KINDS,
   isAwaitingStatus, isOpenStatus, isPartyRole, OPEN_CASE_STATUSES, PARTY_ROLE_LABELS, PARTY_ROLES, PRIORITIES,
   PRIORITY_LABELS, TASK_STATUS_LABELS, type CaseStatus,
 } from '../../domain';
@@ -993,7 +993,7 @@ export const casesModule: AppModule = {
                             placeholder: 'What happened, what was said, what was advised.' })}
                   <div class="row-form">
                     ${select({ label: 'Kind', name: 'kind', value: 'note', includeBlank: false,
-                               options: optionsFrom(ENTRY_KINDS.filter((k) => k !== 'system') as any, ENTRY_KIND_LABELS as any) })}
+                               options: optionsFrom(CHOOSABLE_ENTRY_KINDS as any, ENTRY_KIND_LABELS as any) })}
                     ${field({ label: 'It happened on', name: 'occurred_at', type: 'date',
                               value: nowIso().slice(0, 10),
                               hint: 'Backdate a note written up later.' })}
@@ -1026,7 +1026,7 @@ export const casesModule: AppModule = {
                     correction: writable && correctable(e, c.get('user')?.id ?? null)
                       ? { csrf, minutes: CORRECTION_WINDOW_MINUTES,
                           kindOptions: optionsFrom(
-                            ENTRY_KINDS.filter((k) => k !== 'system') as any,
+                            CHOOSABLE_ENTRY_KINDS as any,
                             ENTRY_KIND_LABELS as any) }
                       : null,
                   }))}

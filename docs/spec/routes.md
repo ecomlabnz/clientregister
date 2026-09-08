@@ -208,6 +208,11 @@ inquiry becomes a client only when a person converts it.
 | POST | `/inbox/:id/triage` | ai:run |
 | POST | `/inbox/:id/unfile` | register:write |
 | GET | `/inbox/api/pending` | ingest:triage |
+| POST | `/inbox/delete` | ingest:triage |
+| POST | `/inbox/delete/confirm` | ingest:triage |
+| POST | `/inbox/file` | register:write |
+| POST | `/inbox/file/confirm` | register:write |
+| POST | `/inbox/sweep` | ai:run |
 | GET | `/inbox/threads` | ingest:triage |
 | GET | `/inbox/threads/:id` | ingest:triage |
 | POST | `/inbox/threads/:id/file` | register:write |

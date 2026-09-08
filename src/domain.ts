@@ -248,19 +248,50 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 };
 
 export const ENTRY_KINDS = [
-  'note', 'prelim_consult', 'call', 'meeting', 'email_in', 'email_out', 'message',
-  'system', 'file',
+  'note', 'status_query', 'consult', 'call', 'meeting', 'email_in', 'email_out',
+  'message', 'system', 'file',
 ] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
 export const ENTRY_KIND_LABELS: Record<EntryKind, string> = {
   note: 'Note',
-  // Asked for by the practice on 1 September 2026. A first meeting is the one
-  // that decides whether there is a matter at all, and what was said in it is
-  // the thing most often gone back to.
-  prelim_consult: 'Preliminary consultation',
+  // Asked for on 8 September 2026. The commonest note in an immigration
+  // practice that is waiting on INZ: chasing where an application has got to.
+  // Its own kind because "have we heard anything" is the question a file gets
+  // asked most, and a file note you can pick out at a glance answers it.
+  status_query: 'Status query',
+  // Asked for on 1 September as "Preliminary consultation" and shortened to
+  // what the practice actually calls it on 8 September. A first meeting is the
+  // one that decides whether there is a matter at all, and what was said in it
+  // is the thing most often gone back to.
+  //
+  // The stored value changed with the name, which cost nothing: it had been
+  // `prelim_consult`, the database refused that value from the day it was
+  // offered, and so not one row carries it. See migration 0064.
+  consult: 'Consult',
   call: 'Phone call', meeting: 'Meeting', email_in: 'Email received',
   email_out: 'Email sent', message: 'Message', system: 'System', file: 'Document',
 };
+
+/**
+ * The kinds a person may choose when writing a note.
+ *
+ * Everything else on the list is written by the register about itself: `system`
+ * when a status changes, `email_in` and `email_out` when mail actually moves.
+ * Offering those to somebody typing a note invites a file note that says an
+ * email was sent when none was — which is a record of something that did not
+ * happen, on a table that cannot be corrected after five minutes.
+ *
+ * The practice asked for the two email kinds to be taken out of the choices on
+ * 8 September, having found them there and had no use for them. They stay as
+ * kinds because the register writes them and one of each already exists.
+ *
+ * One list, in one place. Until now three forms each remembered to filter out
+ * `system` and none of them filtered anything else — which is how the two email
+ * kinds came to be offered at all.
+ */
+export const CHOOSABLE_ENTRY_KINDS: EntryKind[] = [
+  'note', 'status_query', 'consult', 'call', 'meeting', 'message', 'file',
+];
 
 /**
  * How a client relates to a particular case.

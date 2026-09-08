@@ -179,7 +179,8 @@ export function flagBand(opts: {
  * So it searches. Type a name, a reference, or an INZ application number, press
  * Find, and pick from what comes back. Two forms rather than one, because they
  * do different things: finding is a GET, so the results can be linked to and
- * the back button behaves; filing is a POST, because it writes.
+ * the back button behaves; filing is a POST, because it writes. (Finding turns
+ * into a POST as well when the caller is carrying something — see `carry`.)
  *
  * It works with scripting switched off — that is the rule, and it is also why
  * the search is a button rather than a keystroke. `app.js` narrows the list as
@@ -189,19 +190,37 @@ export function flagBand(opts: {
 export function filingPicker(opts: {
   /** Where the POST goes. */
   action: string;
-  /** Where the GET goes — usually this same page. */
+  /** Where the find form goes — usually this same page. */
   findAction: string;
   csrf: string;
   query: string;
   hits: Array<{ value: string; ref: string; title: string; detail: string; closed: boolean }>;
   hint: Raw;
+  /**
+   * Fields that have to survive the search, when the picker is reached by a
+   * POST instead of sitting on a page of its own.
+   *
+   * The inbox files several messages at once, and which messages those are
+   * arrives as a POST from the list. Pressing Find would lose them, so they
+   * ride along in both forms as hidden fields — and finding becomes a POST
+   * too, because two hundred ids do not belong in a URL.
+   */
+  carry?: Array<{ name: string; value: string }>;
+  /** What the button says, when "File it" is not what is about to happen. */
+  submitLabel?: string;
 }): Raw {
+  const carry = opts.carry ?? [];
+  const carried = html`${carry.map((f) =>
+    html`<input type="hidden" name="${f.name}" value="${f.value}">`)}`;
   return html`
     ${'' /* data-live-search is the enhancement the search page already uses:
              app.js re-fetches this same page as you type and swaps the region
              below. Same URL, same markup, same server rendering — scripting
-             only removes the press. */}
-    <form method="get" action="${opts.findAction}" class="row-form filing-find" data-live-search>
+             only removes the press. It is off when something is being carried,
+             because that re-fetch is a GET and would arrive without it. */}
+    <form method="${carry.length ? 'post' : 'get'}" action="${opts.findAction}"
+          class="row-form filing-find" ${carry.length ? '' : raw('data-live-search')}>
+      ${carry.length ? html`${csrfField(opts.csrf)}${carried}` : ''}
       ${field({ label: 'Find the matter or client', name: 'find', value: opts.query,
                 placeholder: 'Name, CASE-26-014, CL-0082, or an INZ application number' })}
       <button class="btn btn-secondary" type="submit">Find</button>
@@ -215,6 +234,7 @@ export function filingPicker(opts: {
       ? html`
         <form method="post" action="${opts.action}" class="filing-choose">
           <input type="hidden" name="_csrf" value="${opts.csrf}">
+          ${carried}
           <ul class="pick-list">
             ${opts.hits.map((hit, i) => html`
               <li class="pick">
@@ -229,7 +249,7 @@ export function filingPicker(opts: {
                 </label>
               </li>`)}
           </ul>
-          <button class="btn btn-primary" type="submit">File it</button>
+          <button class="btn btn-primary" type="submit">${opts.submitLabel ?? 'File it'}</button>
         </form>`
       : ''}
     </div>

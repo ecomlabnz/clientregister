@@ -7,6 +7,57 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.3.0 — 8 September 2026
+
+### Added
+- **Several messages can be filed onto a matter or client at once.** Asked for
+  directly, and the word used was critical. The post arrives in runs — six
+  documents for one application land in six emails — and filing them one at a
+  time meant six searches for the same matter, which is the point at which
+  somebody stops filing and the matter stops being the place the file lives.
+
+  The tick boxes that were there for deleting now do both: **File selected**
+  beside **Delete selected**. Filing shows what is about to be filed, asks for
+  one matter or client, and writes **a note for each message** rather than one
+  note listing six — a file note is evidence of one thing that happened, and a
+  summary of six is evidence of none of them. Nothing is deleted or moved: the
+  messages stay in the inbox under Filed and each one can be put back.
+
+  Both steps are POSTs, the search included, because the selection travels as
+  hidden fields and two hundred message ids do not belong in a URL. The form's
+  own action is the filing one and Delete carries a `formaction`, so the press
+  that happens by accident — Enter in the form — is the one that writes a note
+  rather than the one that destroys a message.
+
+  A message that became an inquiry can now be selected. It can be filed; it
+  still cannot be deleted, and the delete confirmation names it and leaves it
+  alone. The only thing filing refuses is a message already filed, because
+  notes are append-only and a second one could never be taken off.
+
+- **"Status query" is a kind of file note**, and "Preliminary consultation" is
+  now **"Consult"**. The two email kinds are no longer offered when writing a
+  note by hand — a filed message still records itself as correspondence.
+
+### Fixed
+- **Lead or client is now on the first tab of the client form.** It was there
+  all along, on the fifth tab under "File management", where nobody creating a
+  client would look. A control you cannot find is a control you do not have.
+
+- **A note kind the forms offered was refused by the database.** "Preliminary
+  consultation" was added to the list on 1 September and could never be saved:
+  the list of kinds lived in two places — the application and a database
+  constraint written in migration 0002 — and only one of them grew. Anybody who
+  picked it got an error instead of a note, and nobody found out for a week.
+
+  The constraint has gone (migration 0064), which is the same decision the
+  register already made for knowledge base article kinds: a list of words a
+  practice uses to describe its own work is configuration, and configuration in
+  a database constraint means rebuilding the table every time somebody changes
+  their mind about a word. The forms still refuse anything not on the list.
+
+  Rebuilding that table meant copying every one of the 883 file notes and
+  putting the append-only guards back. The rehearsal is kept as a test, so
+  every build proves the rows survive the copy and the guards still guard.
 ## 1.2.2 — 8 September 2026
 
 ### Fixed

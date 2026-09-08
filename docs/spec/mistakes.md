@@ -408,6 +408,35 @@ printed inside a row does not change what the row's position claims. If it
 cannot be acted on the way its neighbours can, it is a different kind of thing
 and gets its own heading.
 
+### 26. One idea in two places, and only one of them grows
+
+The kinds a file note can be lived in two lists: `ENTRY_KINDS` in
+`src/domain.ts`, which the forms offer, and a CHECK constraint written in
+migration 0002, which the database will accept. Nothing held them together.
+
+On 1 September 2026 "Preliminary consultation" was added to the first list. It
+was on three forms for a week and it never once worked — every attempt to save
+one was refused by the constraint. The error was a database error, so it read as
+a fault rather than as a missing value, and nobody reported it. It was found on
+8 September only because the practice asked for the list to change again and the
+database was attacked directly to see what it would accept.
+
+Two things went wrong, and the second is the more useful one:
+
+- **The lists could disagree**, and disagreeing was silent until somebody used
+  the new value.
+- **Nothing exercised the new value.** The test that guarded this list asserted
+  `ENTRY_KINDS` contained `prelim_consult` — reading the list to check the list
+  said what the list said. It passed every day for a week while the value it
+  named was unwritable.
+
+**The rule.** Where a value must be accepted by something else — a database
+constraint, another service, a file format — the test writes one and reads it
+back. A list checked against itself proves nothing. And when a list is
+configuration rather than a rule about the shape of the world, the constraint
+is the wrong place for it: `entries.kind` no longer has one (migration 0064),
+for the same reason `kb_articles.kind` never did.
+
 ---
 
 ## Working practices that caught things

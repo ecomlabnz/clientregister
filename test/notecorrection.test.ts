@@ -19,7 +19,8 @@ import { describe, expect, it } from 'vitest';
 import { migratedSqlite, mountModule, fakeUser } from './support/d1';
 import { CORRECTION_WINDOW_MINUTES, correctable } from '../src/core/timeline';
 import { notesModule } from '../src/modules/notes';
-import { ENTRY_KINDS, ENTRY_KIND_LABELS } from '../src/domain';
+import { CHOOSABLE_ENTRY_KINDS, ENTRY_KINDS, ENTRY_KIND_LABELS } from '../src/domain';
+import { readFileSync } from 'node:fs';
 
 const AT = '2026-09-01T09:00:00Z';
 const USER = fakeUser();
@@ -223,12 +224,63 @@ describe('correcting through the register', () => {
   });
 });
 
+/**
+ * The kinds a note may be.
+ *
+ * This used to read: *"expect(ENTRY_KINDS).toContain('prelim_consult')"*. It
+ * passed for a week while choosing that kind on any of the three note forms
+ * produced an error — `entries.kind` carried a CHECK listing eight values and
+ * `prelim_consult` was not among them, so the database refused every row.
+ *
+ * The test asserted that a word was in a list in the same file the list is
+ * written in. It could not fail. What it never asked was whether a note of that
+ * kind could actually be written, which is the only thing anybody wanted to
+ * know.
+ *
+ * So now it writes one of each, against the real schema.
+ */
 describe('the kinds a note may be', () => {
-  it('includes a preliminary consultation', () => {
-    // Asked for by the practice: a first meeting is the one that decides
-    // whether there is a matter at all, and what was said in it is the thing
-    // most often gone back to.
-    expect(ENTRY_KINDS).toContain('prelim_consult');
-    expect(ENTRY_KIND_LABELS.prelim_consult).toBe('Preliminary consultation');
+  it('can every one of them actually be written', () => {
+    const db = seeded();
+    expect(CHOOSABLE_ENTRY_KINDS.length, 'no kinds were read').toBeGreaterThan(4);
+    for (const kind of CHOOSABLE_ENTRY_KINDS) {
+      expect(() => db.prepare(
+        `INSERT INTO entries (id, entity_type, entity_id, kind, body, occurred_at, created_at)
+         VALUES (?, 'client', 'cl1', ?, 'x', ?, ?)`,
+      ).run(`e_${kind}`, kind, AT, AT), `a note of kind ${kind} is refused`).not.toThrow();
+    }
+    const written = (db.prepare('SELECT COUNT(*) AS n FROM entries') as any).get() as { n: number };
+    expect(written.n).toBe(CHOOSABLE_ENTRY_KINDS.length);
+  });
+
+  it('offers the two the practice asked for, by the names they use', () => {
+    expect(CHOOSABLE_ENTRY_KINDS).toContain('status_query');
+    expect(ENTRY_KIND_LABELS.status_query).toBe('Status query');
+    expect(CHOOSABLE_ENTRY_KINDS).toContain('consult');
+    expect(ENTRY_KIND_LABELS.consult).toBe('Consult');
+  });
+
+  it('does not offer a kind the register writes about itself', () => {
+    // A note that says an email was sent, written by hand when none was, is a
+    // record of something that did not happen — on a table that cannot be
+    // corrected after five minutes. Asked for on 8 September; `system` was
+    // already excluded, by three separate filters that each remembered it.
+    for (const written of ['system', 'email_in', 'email_out'] as const) {
+      expect(CHOOSABLE_ENTRY_KINDS, `${written} is still offered`).not.toContain(written);
+      expect(ENTRY_KINDS, `${written} has stopped being a kind at all`).toContain(written);
+    }
+  });
+
+  it('keeps one list rather than three that each remember to filter', () => {
+    // Every form that writes a note reads the same list. Three did their own
+    // filtering, all three remembered `system`, and none of them filtered
+    // anything else — which is how the email kinds came to be on offer.
+    for (const path of ['src/modules/cases/index.ts', 'src/modules/clients/index.ts',
+                        'src/modules/inquiries/index.ts']) {
+      const src = readFileSync(path, 'utf8');
+      expect(src, `${path} still filters the list itself`)
+        .not.toContain("ENTRY_KINDS.filter((k) => k !== 'system')");
+      expect(src, `${path} does not use the shared list`).toContain('CHOOSABLE_ENTRY_KINDS');
+    }
   });
 });
