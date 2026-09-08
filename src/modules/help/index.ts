@@ -37,6 +37,26 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.5.0', date: '8 September 2026',
+    notes: [
+      'The letter of engagement has somewhere to keep its words. Settings \u2192 Letter of '
+        + 'engagement holds how the letter opens, what the client confirms and how it signs off. '
+        + 'Quotes \u2192 Letter clauses holds the headed sections in the middle, and a clause can '
+        + 'be limited to certain kinds of matter so the partnership pages do not turn up on an '
+        + 'employer accreditation.',
+      'Nothing is filled in for you, on purpose \u2014 this is your contract wording, not '
+        + 'something the register should invent. Nothing is sent yet either: the letter itself is '
+        + 'the next piece.',
+      'A clause is switched off rather than deleted, so one you stop using does not disappear from '
+        + 'the letters already sent. Only an administrator can edit them.',
+      'Tick boxes on the quotation\u2019s people list were drawn with their words underneath them '
+        + 'instead of beside them. Fixed.',
+      'The quote and its covering email no longer describe your terms of engagement as something '
+        + 'to read on a page \u2014 that address publishes the current edition as a file, and they '
+        + 'now say so.',
+    ],
+  },
+  {
     version: '1.4.1', date: '8 September 2026',
     notes: [
       'Matters are named again instead of being described twice. A matter now reads '

@@ -7,6 +7,48 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.5.0 — 8 September 2026
+
+### Added
+- **Where the letter of engagement keeps the words it says every time.** The
+  first half of the letter work, and it is configuration rather than a
+  document: nothing is sent yet.
+
+  The practice settled the shape of it: **the letter states no parties, no
+  scope and no fees.** Those are the quotation's, and the letter refers to the
+  quotation rather than repeating it — a covering letter that restates a fee
+  schedule is a document that can disagree with its own attachment.
+
+  What is left divides in two. **Settings → Letter of engagement** holds the
+  frame: how the letter opens, what the client confirms when they accept, how
+  it closes and who signs it. **Quotes → Letter clauses** holds the body — the
+  headed sections, in your order, each of which can be limited to certain kinds
+  of matter, so the partnership assessment does not appear on an employer
+  accreditation.
+
+  Nothing is supplied. The register ships no wording for a contract between a
+  lawyer and a client: a letter carrying terms the register invented would be
+  worse than one that went out empty, because the empty one is obvious.
+
+  A clause is switched off, never deleted — one withdrawn from new letters must
+  not vanish from the letters already sent. Only an administrator can edit
+  them: writing a quotation is daily work, rewriting the terms a client accepts
+  is not.
+
+### Fixed
+- **Tick boxes on three forms had no styling behind them at all.** The class was
+  written on the quotation's people list and on the new clause editor, and no
+  rule existed for it, so the box was drawn at the right size and its words fell
+  underneath it. An unstyled class is invisible in a diff and looks fine until
+  somebody opens the page.
+
+- **The wording about the terms of engagement was half wrong, and is corrected.**
+  1.2.2 changed "download the terms" to "read the terms" on the reasoning that
+  they are a page rather than a file. The practice pointed out what is actually
+  at that address: a page whose only content is a button that downloads the
+  current edition. So neither word alone is honest, and the quote and its
+  covering email now say the address is where the current edition is published.
+
 ## 1.4.1 — 8 September 2026
 
 ### Fixed
