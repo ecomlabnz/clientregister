@@ -743,6 +743,11 @@ export const quotesModule: AppModule = {
                   </form>
                 </details>` : ''}`)}
 
+            ${'' /* A block per person rather than a row per person. The first
+                     version of this was a four-column table, and at 390px the
+                     name column was one character wide — the same fault the
+                     practice had just reported on the dashboard, built fresh.
+                     Editing several people is a form, and forms stack. */}
             ${card('The people on this engagement', html`
               <p class="hint mb">Everybody the letter of engagement names besides the client:
                  the other applicants, the partner and children whose details the application
@@ -750,71 +755,67 @@ export const quotesModule: AppModule = {
                  does not need a row — they are already on the quotation.</p>
               ${parties.length === 0
                 ? emptyState('Nobody else named yet. The letter will name the client alone.')
-                : html`
-                  <form method="post" action="/quotes/${q.id}/parties">
-                    ${csrfField(csrf)}
-                    <input type="hidden" name="_action" value="save">
-                    ${table(['Who', 'On this engagement', 'Reach them', writable ? 'Remove' : ''],
-                      parties.map((party) => html`
-                        <tr>
-                          <td>
-                            ${writable
-                              ? html`<input name="${`full_name_${party.id}`}" value="${party.full_name}"
-                                            maxlength="200" aria-label="Full name">
-                                     <input name="${`relationship_${party.id}`}" value="${party.relationship ?? ''}"
-                                            maxlength="60" placeholder="partner, son, employer"
-                                            aria-label="Relationship">`
-                              : html`<span class="strong">${party.full_name}</span>
-                                     <div class="muted small">${party.relationship ?? ''}</div>`}
-                          </td>
-                          <td>
-                            ${writable
-                              ? html`
-                                ${select({ label: '', name: `role_${party.id}`, value: party.role,
-                                           includeBlank: false,
-                                           options: optionsFrom(QUOTE_PARTY_ROLES, QUOTE_PARTY_ROLE_LABELS) })}
-                                ${party.kind === 'organisation'
-                                  ? html`<input type="hidden" name="${`kind_${party.id}`}" value="organisation">
-                                         <span class="muted small">An organisation</span>`
-                                  : html`<input type="hidden" name="${`kind_${party.id}`}" value="person">
-                                         <input name="${`date_of_birth_${party.id}`}" type="date"
-                                                value="${party.date_of_birth ?? ''}"
-                                                aria-label="Date of birth">`}
-                                <label class="check small">
-                                  <input type="checkbox" name="${`representative_${party.id}`}"
-                                         ${party.is_representative ? raw('checked') : ''}>
-                                  Nominated to instruct
-                                </label>`
-                              : html`${QUOTE_PARTY_ROLE_LABELS[party.role]}
-                                     ${party.date_of_birth
-                                       ? html`<div class="muted small">${dateShort(party.date_of_birth)}</div>` : ''}
-                                     ${party.is_representative
-                                       ? html`<div class="small">${badge('nominated to instruct', 'blue')}</div>` : ''}`}
-                          </td>
-                          <td class="small">
-                            ${writable
-                              ? html`<input name="${`organisation_${party.id}`}" value="${party.organisation ?? ''}"
-                                            maxlength="200" placeholder="Agency or company" aria-label="Organisation">
-                                     <input name="${`email_${party.id}`}" type="email" value="${party.email ?? ''}"
-                                            maxlength="200" placeholder="Email" aria-label="Email">
-                                     <input name="${`phone_${party.id}`}" value="${party.phone ?? ''}"
-                                            maxlength="60" placeholder="Phone" aria-label="Phone">`
-                              : html`${party.organisation ? html`<div>${party.organisation}</div>` : ''}
-                                     ${party.email ? html`<div>${party.email}</div>` : ''}
-                                     ${party.phone ? html`<div>${party.phone}</div>` : ''}`}
-                          </td>
-                          <td>${writable
-                            ? html`<label class="check small">
-                                     <input type="checkbox" name="${`remove_${party.id}`}"> Remove
-                                   </label>`
-                            : ''}</td>
-                        </tr>`))}
-                    ${writable ? html`
+                : writable
+                  ? html`
+                    <form method="post" action="/quotes/${q.id}/parties">
+                      ${csrfField(csrf)}
+                      <input type="hidden" name="_action" value="save">
+                      ${parties.map((party) => html`
+                        <fieldset class="party-edit">
+                          <legend>${QUOTE_PARTY_ROLE_LABELS[party.role]}${
+                            party.is_representative ? ' · nominated to instruct' : ''}</legend>
+                          <input type="hidden" name="${`kind_${party.id}`}" value="${party.kind}">
+                          <div class="form-section">
+                            ${field({ label: 'Full name', name: `full_name_${party.id}`,
+                                      value: party.full_name, maxlength: 200 })}
+                            ${field({ label: 'Relationship', name: `relationship_${party.id}`,
+                                      value: party.relationship ?? '', maxlength: 60,
+                                      placeholder: 'partner, son, employer' })}
+                            ${select({ label: 'On this engagement', name: `role_${party.id}`,
+                                       value: party.role, includeBlank: false,
+                                       options: optionsFrom(QUOTE_PARTY_ROLES, QUOTE_PARTY_ROLE_LABELS) })}
+                            ${party.kind === 'organisation'
+                              ? html`<div class="field"><label>Date of birth</label>
+                                       <p class="hint">An organisation has none.</p></div>`
+                              : field({ label: 'Date of birth', name: `date_of_birth_${party.id}`,
+                                        type: 'date', value: party.date_of_birth ?? '' })}
+                            ${field({ label: 'Agency or company', name: `organisation_${party.id}`,
+                                      value: party.organisation ?? '', maxlength: 200 })}
+                            ${field({ label: 'Email', name: `email_${party.id}`, type: 'email',
+                                      value: party.email ?? '', maxlength: 200 })}
+                            ${field({ label: 'Phone', name: `phone_${party.id}`,
+                                      value: party.phone ?? '', maxlength: 60 })}
+                          </div>
+                          <div class="party-edit-flags">
+                            <label class="check">
+                              <input type="checkbox" name="${`representative_${party.id}`}"
+                                     ${party.is_representative ? raw('checked') : ''}>
+                              Nominated to instruct on everybody's behalf
+                            </label>
+                            <label class="check">
+                              <input type="checkbox" name="${`remove_${party.id}`}">
+                              Take them off this quotation
+                            </label>
+                          </div>
+                        </fieldset>`)}
                       <div class="filters mt">
                         <button class="btn btn-primary" type="submit">Save the people</button>
-                        <span class="hint">Ticking Remove takes somebody off when you save.</span>
-                      </div>` : ''}
-                  </form>`}
+                        <span class="hint">Ticking the second box takes somebody off when you save.</span>
+                      </div>
+                    </form>`
+                  : html`<ul class="list">${parties.map((party) => html`
+                      <li>
+                        <strong>${party.full_name}</strong>
+                        ${party.relationship ? html` — ${party.relationship}` : ''}
+                        ${party.is_representative ? badge('nominated to instruct', 'blue') : ''}
+                        <div class="muted small">
+                          ${QUOTE_PARTY_ROLE_LABELS[party.role]}
+                          ${party.date_of_birth ? html` · ${dateShort(party.date_of_birth)}` : ''}
+                          ${party.organisation ? html` · ${party.organisation}` : ''}
+                          ${party.email ? html` · ${party.email}` : ''}
+                          ${party.phone ? html` · ${party.phone}` : ''}
+                        </div>
+                      </li>`)}</ul>`}
 
               ${!parties.some((p) => p.is_representative) ? html`
                 <p class="hint">Nobody is nominated to instruct, so the letter will say the client
@@ -823,7 +824,7 @@ export const quotesModule: AppModule = {
               ${writable ? html`
                 <details class="reveal mt">
                   <summary class="btn btn-secondary reveal-open">Add somebody</summary>
-                  <form method="post" action="/quotes/${q.id}/parties" class="stack">
+                  <form method="post" action="/quotes/${q.id}/parties" class="form-section">
                     ${csrfField(csrf)}
                     ${field({ label: 'Full name', name: 'full_name', required: true, maxlength: 200,
                               hint: 'As it is written on their passport, if they are applying.' })}
@@ -842,7 +843,8 @@ export const quotesModule: AppModule = {
                               hint: 'For a person. Left off an organisation.' })}
                     ${field({ label: 'Agency or company', name: 'organisation', maxlength: 200 })}
                     ${field({ label: 'Email', name: 'email', type: 'email', maxlength: 200 })}
-                    ${field({ label: 'Phone', name: 'phone', maxlength: 60 })}
+                    ${field({ label: 'Phone', name: 'phone', maxlength: 60,
+                              hint: 'An administrative contact needs one of these two.' })}
                     <label class="check">
                       <input type="checkbox" name="is_representative" value="1">
                       Nominated to instruct on everybody's behalf

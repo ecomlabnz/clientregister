@@ -7,6 +7,32 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.4.0 — 8 September 2026
+
+### Added
+- **A quotation can name everybody the engagement is with.** It named exactly
+  one person — the client. A real letter of engagement names five: the client,
+  a partner, a child, and two administrative contacts at an agency. Four of
+  those five had nowhere to live in the register, so they were retyped into
+  Word every time.
+
+  A quotation now carries the other applicants, the associated parties whose
+  details the application needs, and the agency contacts who may be told how it
+  is going. Each says what they are on the engagement, their relationship in
+  the practice's own words, and their date of birth. One person may be
+  nominated to instruct on everybody's behalf; when nobody is, it is the
+  client, which is what the letter says by default.
+
+  This is the first piece of the Letter of Engagement, which will name nobody
+  itself: the quotation is the substance and the letter refers to it.
+
+  The rules sit in the database rather than in the form, because acceptance
+  will write these rows too and will not go through it: a party needs a name,
+  an organisation has no birthday, a date of birth is a real date in the past,
+  an administrative contact has an email or a phone, somebody who may not
+  instruct cannot be the one nominated to instruct, and there is at most one of
+  those per quotation.
+
 ## 1.3.1 — 8 September 2026
 
 ### Fixed
