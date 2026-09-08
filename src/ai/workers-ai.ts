@@ -77,7 +77,8 @@ Reply with a single JSON object and nothing else, using exactly these keys:
  "other_parties":[same shape as applicant],
  "case_type":one of [${input.caseTypes.join(', ')}] or null,
  "suggested_title":string|null,"inz_client_number":string|null,"inz_application_number":string|null,
- "lodged_on":string|null,"decision_due_on":string|null,"summary":string,"missing":string[]}
+ "lodged_on":string|null,"decision_due_on":string|null,"summary":string,"file_note":string,
+ "missing":string[]}
 Party roles must be one of: principal_applicant, secondary_applicant, supporting_partner,
 partner, dependent_child, family_member, employer, sponsor, agent, other.
 supporting_partner is the partner an application turns on and whose relationship INZ will

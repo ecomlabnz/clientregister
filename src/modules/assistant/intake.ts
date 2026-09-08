@@ -424,15 +424,20 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
               name: 'next_action', value: reading.next_action ?? '', maxlength: 200 })}</div>
             <div class="settings-cell">${field({ label: 'By when', name: 'next_action_due',
               type: 'date', value: '' })}</div>
-            ${'' /* Twelve rows and eight thousand characters, because this is
-                     now the whole of what the document said and it is saved
-                     twice over: to the matter's summary, which somebody edits,
-                     and to a file note, which nobody does. Four rows on a
-                     three-page partnership history was a box you had to scroll
-                     to read before you could check it. */}
+            ${'' /* Two boxes, because they are two things. They used to be one
+                     field written to both places, and the practice saw the
+                     result: "the summary and the note are identical - this
+                     should not be the case - it does need to be a summary. for
+                     full details i can go to notes or ask the ai to read this
+                     file and brief me." */}
             <div class="settings-cell-wide">${field({ label: 'Summary', name: 'summary', type: 'textarea',
-              rows: 12, value: reading.summary, maxlength: 8000,
-              hint: 'Saved to the matter, and kept as a file note exactly as it reads here.' })}</div>
+              rows: 4, value: reading.summary, maxlength: 1200,
+              hint: 'A few sentences, shown at the top of the matter. Not the whole document — '
+                + 'that goes in the file note below.' })}</div>
+            <div class="settings-cell-wide">${field({ label: 'File note', name: 'file_note',
+              type: 'textarea', rows: 14, value: reading.file_note, maxlength: 8000,
+              hint: 'The whole of what the document said, kept on the file exactly as it reads '
+                + 'here. Append-only once saved, so read it before you press.' })}</div>
           </div>`)}
 
         <div class="form-actions">
@@ -588,7 +593,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       f.optional('inz_application_number', { max: 40 }),
       f.date('lodged_at'), f.date('decision_due_at'),
       f.optional('next_action', { max: 200 }), f.date('next_action_due'),
-      f.optional('summary', { max: 8000 }),
+      f.optional('summary', { max: 1200 }),
       stamp, stamp, user.id,
     );
 
@@ -672,14 +677,12 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
 
     // The whole of what the document said, as a file note.
     //
-    // The matter's summary field is a working description somebody edits; a
-    // file note is the record of what a document stated on the day it arrived,
-    // and file notes are append-only. Most of what these summaries carry has
-    // no column to go in — a relationship history, two previous marriages and
-    // their dates, where a child lives, an assault reported to Police — and
-    // without this it was read once, shown on a form, and lost the moment the
-    // matter was opened.
-    const note = f.optional('summary', { max: 8000 });
+    // Its own box since 8 September 2026. The matter's summary is a few
+    // sentences somebody edits; a file note is the record of what a document
+    // stated on the day it arrived, and file notes are append-only. Writing one
+    // field into both gave the matter a Summary card holding three pages of
+    // prose, identical to the note directly under it.
+    const note = f.optional('file_note', { max: 8000 });
     if (note) {
       await addEntry(c.env, {
         entityType: 'case', entityId: caseId, kind: 'note',

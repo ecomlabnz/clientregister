@@ -39,7 +39,8 @@ const READING = {
   case_type: null, suggested_title: 'Partnership information',
   inz_client_number: null, inz_application_number: null,
   lodged_on: null, decision_due_on: null,
-  summary: 'Two previous marriages, a child living overseas, and the address they share.',
+  summary: 'A partnership work visa for Minh Duc TRAN, supported by Bich Ha PHAM.',
+  file_note: 'Two previous marriages, a child living overseas, and the address they share.',
   missing: [],
 };
 
@@ -94,6 +95,7 @@ describe('opening the matter', () => {
     // A matter must be assigned to somebody — the database says so.
     assigned_to: USER.id,
     summary: READING.summary,
+    file_note: READING.file_note,
     party_count: '1',
     p0_create: 'on', p0_given_names: 'Bich Ha', p0_family_name: 'PHAM',
     p0_nationality: 'VN', p0_nationality_2: 'NZ', p0_role: 'supporting_partner',
@@ -118,18 +120,25 @@ describe('opening the matter', () => {
     expect(client.current_visa_expiry).toBe('2028-05-22');
   });
 
-  it('writes the summary as a file note, not only as a field', async () => {
+  it('writes the whole reading as a file note, and the summary as the summary', async () => {
     // A file note is the record of what a document said on the day it arrived,
-    // and file notes are append-only. The matter's summary is a working
-    // description somebody edits. They are not the same thing.
+    // and file notes are append-only. The matter's summary is a few sentences
+    // somebody edits. They are not the same thing, and until 8 September 2026
+    // one field was written into both — which the practice saw at once: "the
+    // summary and the note are identical - this should not be the case".
     const h = mount();
     seed(h);
     await apply(h);
     const notes = rows(h,
       "SELECT body FROM entries WHERE entity_type = 'case' AND kind = 'note'") as any[];
     expect(notes).toHaveLength(1);
-    expect(notes[0].body).toContain(READING.summary);
+    expect(notes[0].body).toContain(READING.file_note);
     expect(notes[0].body).toContain('read by the assistant');
+
+    const kase = rows(h, 'SELECT summary FROM cases')[0] as any;
+    expect(kase.summary).toBe(READING.summary);
+    expect(kase.summary, 'the summary must not be the file note again')
+      .not.toContain(READING.file_note);
   });
 
   it('keeps what the matter is about, and names it the way every matter is named', async () => {
@@ -156,7 +165,7 @@ describe('opening the matter', () => {
   it('writes no note when there is nothing to say', async () => {
     const h = mount();
     seed(h);
-    await apply(h, { summary: '' });
+    await apply(h, { file_note: '' });
     const notes = rows(h,
       "SELECT body FROM entries WHERE entity_type = 'case' AND kind = 'note'") as any[];
     expect(notes).toHaveLength(0);
