@@ -7,6 +7,33 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.15.0 — 8 September 2026
+
+### Fixed
+- **The matter's summary was the file note over again.** Reported on looking at
+  a matter the assistant had just opened: *"the summary and the note are
+  identical - this should not be the case - it does need to be a summary. for
+  full details i can go to notes or ask the ai to read this file and brief me."*
+
+  Quite right. One field was being written into both places, so the Summary card
+  at the top of a matter held three pages of prose — identical to the file note
+  directly beneath it, and pushing everything else off the screen.
+
+  They are two things now and the assistant returns both: a **summary** of at
+  most four sentences — who this is for, what they are applying for, and the one
+  thing that decides it — and a **file note** carrying the whole of what the
+  document said. The note is append-only and is the record; the summary heads
+  the matter and is read at a glance. The check-it form has a box for each.
+
+  Matters opened before today keep the long text in both places. The summary is
+  editable on the matter; the note is not, and should not be.
+
+- **Quotes and Invoices sit together on a matter, quotes first.** Asked: *"why
+  do i see quotes in the right side line? why is it not with invoices? above
+  them. good reason exists?"* None did — they were in different columns for no
+  reason anybody had recorded. They are one subject read in one order: a
+  quotation is what a matter is billed from, an invoice is what came of it.
+
 ## 1.14.0 — 8 September 2026
 
 ### Changed

@@ -858,6 +858,19 @@ export const casesModule: AppModule = {
                      their own page afterwards, which is where it belongs.</p>
                 </details>` : ''}`)}
 
+            ${'' /* Quotes above Invoices, and both in the main column. They
+                     were in different columns for no reason anybody recorded —
+                     the practice asked: "why do i see quotes in the right side
+                     line? why is it not with invoices? above them. good reason
+                     exists?" None did. They are one subject read in one order:
+                     a quotation is what a matter is billed from, and an invoice
+                     is what came of it. */}
+            ${foldingCard('Quotes', quotes.length === 0
+              ? emptyState('No quotes on this case.')
+              : html`<ul class="list">${quotes.map((qt: any) => html`
+                  <li><a href="/quotes/${qt.id}"><code>${qt.ref}</code></a> — ${truncate(qt.description, 40)}
+                      <span class="muted small">${qt.status}</span></li>`)}</ul>`)}
+
             ${invoicesPanel}
 
             ${foldingCard('Tasks', html`
@@ -1128,12 +1141,6 @@ export const casesModule: AppModule = {
                 ? html`<p class="${isOverdue(kase.next_action_due) ? 'warn' : 'muted'}">
                         Due ${dateShort(kase.next_action_due)} (${relativeDays(kase.next_action_due)})</p>`
                 : ''}`)}
-
-            ${foldingCard('Quotes', quotes.length === 0
-              ? emptyState('No quotes on this case.')
-              : html`<ul class="list">${quotes.map((qt: any) => html`
-                  <li><a href="/quotes/${qt.id}"><code>${qt.ref}</code></a> — ${truncate(qt.description, 40)}
-                      <span class="muted small">${qt.status}</span></li>`)}</ul>`)}
 
             ${foldingCard('Summary', html`<p class="prewrap">${kase.summary || '—'}</p>`)}
           </div>
