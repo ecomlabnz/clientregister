@@ -37,7 +37,7 @@ export function composeFullName(
   // An organisation's registered name is copied from the register that holds
   // it and is not the practice's to restyle.
   if (kind === 'organisation') return tidy(organisationName);
-  return tidy(`${plainAscii(parts.givenNames)} ${familyNameFor(parts.familyName)}`);
+  return tidy(`${givenNamesFor(parts.givenNames)} ${familyNameFor(parts.familyName)}`);
 }
 
 /**
@@ -92,6 +92,37 @@ export function familyNameFor(value: string | null | undefined): string {
 }
 
 /**
+ * Given names in ordinary case: Van Chien, not VAN CHIEN.
+ *
+ * The mirror of `familyNameFor`, and asked for on 8 September 2026 for the same
+ * reason the surname is shouted: *"the reverse is true for given names — they
+ * should be normalised. Not VAN CHIEN but Van Chien."* A passport prints the
+ * whole name in capitals and so does an INZ letter, so anything read out of a
+ * document arrives that way; capitalising only the family name is what makes it
+ * legible at a glance which part is which.
+ *
+ * **Only a name that is entirely in one case is touched.** "VAN CHIEN" and
+ * "van chien" are somebody's shift key, not a decision. "McKenzie", "de Jong",
+ * "Anne-Marie" and "d'Angelo" are decisions, and re-casing them would be this
+ * function inventing a style the person did not use — the exact fault the
+ * uppercase rule avoids by only ever being applied on the way in.
+ *
+ * Each part is capitalised, including after a hyphen or an apostrophe: ANNE-MARIE
+ * becomes Anne-Marie, O'BRIEN becomes O'Brien. Not perfect — MACLEOD becomes
+ * Macleod, and nothing here can know it should be MacLeod — which is why a name
+ * already carrying a capital in the middle is left exactly as it is.
+ */
+export function givenNamesFor(value: string | null | undefined): string {
+  const plain = plainAscii(value);
+  if (!plain) return '';
+  const letters = plain.replace(/[^A-Za-z]/g, '');
+  // Mixed case means somebody chose it. Nothing to do.
+  if (!letters || (plain !== plain.toUpperCase() && plain !== plain.toLowerCase())) return plain;
+  return plain.toLowerCase().replace(/(^|[\s'-])([a-z])/g, (_, before: string, letter: string) =>
+    `${before}${letter.toUpperCase()}`);
+}
+
+/**
  * "FAMILY, Given" — for alphabetical listings, file labels and matter names.
  *
  * The family name is capitalised, as a passport prints it and as INZ writes it.
@@ -102,7 +133,7 @@ export function familyNameFor(value: string | null | undefined): string {
  */
 export function formalName(parts: NameParts, fallback = ''): string {
   const family = familyNameFor(parts.familyName);
-  const given = plainAscii(parts.givenNames);
+  const given = givenNamesFor(parts.givenNames);
   if (!family) return given || fallback;
   return given ? `${family}, ${given}` : family;
 }

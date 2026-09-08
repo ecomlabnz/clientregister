@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 import { mountModule, fakeUser } from './support/d1';
 import { assistantModule } from '../src/modules/assistant';
 import { normaliseIntake } from '../src/ai/provider';
+import { matchExisting } from '../src/modules/assistant/intake';
 
 const AT = '2026-09-08T09:00:00Z';
 const USER = fakeUser();
@@ -179,7 +180,7 @@ describe('the matter opened this way', () => {
     const h = seeded();
     await h.post('/assistant/intake/apply', applyForm());
     const row = h.get<{ title: string; descriptor: string }>('SELECT title, descriptor FROM cases')!;
-    expect(row.title).toBe('WV. Seasonal — THI NGOC ANH LE');
+    expect(row.title).toBe('WV. Seasonal — Thi Ngoc Anh LE');
     expect(row.descriptor).toBe('Peak Seasonal Work Visa for a meat process worker');
     expect(row.title === row.descriptor).toBe(false);
   });
@@ -202,5 +203,114 @@ describe('what the reading itself proposes', () => {
       applicant: { kind: 'company', family_name: 'LE' }, other_parties: [],
     } as never);
     expect(read.applicant.kind).toBe('individual');
+  });
+});
+
+/**
+ * The same company, read twice.
+ *
+ * Reported on 8 September 2026 with a screenshot of the client list showing
+ * CL-0257 and CL-0259, both [retired example 7] LIMITED, forty minutes apart:
+ * *"the assistant just created a duplicate organisation. Does it check if it
+ * already exists??? Same needs to be true for clients so as to avoid
+ * duplication."*
+ *
+ * It did not check, for two separate reasons, and both are here:
+ *
+ *  - **A company could never match.** The name test wanted a given name and a
+ *    family name to agree, and a company has one name in one field.
+ *  - **Only the applicant was ever looked for.** Every other party a reading
+ *    named — the employer, the partner, the adviser — was created afresh, on
+ *    every reading, however many times they were already on the register.
+ */
+describe('somebody the reading names who is already on the register', () => {
+  const seededWith = (rows: string) => {
+    const h = seeded();
+    h.db.exec(rows);
+    return h;
+  };
+
+  it('is offered as a choice rather than created again — a company', async () => {
+    const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,family_name,status,created_at,updated_at)
+      VALUES ('org1','CL-0257','organisation','[retired example 7] LIMITED',
+              '[retired example 7] LIMITED','active','${AT}','${AT}')`);
+    const run = h.get<{ id: string }>('SELECT 1 AS id');
+    expect(run).toBeTruthy();
+    const matched = await matchExisting(h.env as any,
+      { kind: 'organisation', family_name: 'Land Meat New Zealand Limited' } as never);
+    expect(matched?.ref, 'a company read twice is a second company').toBe('CL-0257');
+  });
+
+  it('is matched however the document capitalised it', async () => {
+    const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,family_name,status,created_at,updated_at)
+      VALUES ('org1','CL-0257','organisation','Land Meat New Zealand Limited',
+              '[retired example 7] LIMITED','active','${AT}','${AT}')`);
+    expect((await matchExisting(h.env as any,
+      { kind: 'organisation', family_name: '[retired example 7] LIMITED' } as never))?.ref)
+      .toBe('CL-0257');
+  });
+
+  it('is not matched to a person who happens to share the name', async () => {
+    // A company's whole name matching is the same company. A person's is not.
+    const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,status,created_at,updated_at)
+      VALUES ('cl9','CL-0300','individual','Land MEAT','Land','MEAT','active','${AT}','${AT}')`);
+    expect(await matchExisting(h.env as any,
+      { kind: 'organisation', family_name: 'Land Meat' } as never)).toBeNull();
+  });
+
+  it('is left alone when it has been archived', async () => {
+    const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,family_name,status,created_at,updated_at)
+      VALUES ('org1','CL-0257','organisation','[retired example 7] LIMITED',
+              '[retired example 7] LIMITED','archived','${AT}','${AT}')`);
+    expect(await matchExisting(h.env as any,
+      { kind: 'organisation', family_name: '[retired example 7] LIMITED' } as never)).toBeNull();
+  });
+
+  it('is linked to the matter instead of duplicated, when the choice is kept', async () => {
+    const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,family_name,status,created_at,updated_at)
+      VALUES ('org1','CL-0257','organisation','[retired example 7] LIMITED',
+              '[retired example 7] LIMITED','active','${AT}','${AT}')`);
+    await h.post('/assistant/intake/apply', applyForm({ p0_existing_client_id: 'org1' }));
+
+    expect(h.count(`SELECT COUNT(*) AS n FROM clients WHERE full_name LIKE '%LAND MEAT%'`),
+      'the company was created a second time').toBe(1);
+    const caseId = h.get<{ id: string }>('SELECT id FROM cases')!.id;
+    expect(h.count(
+      'SELECT COUNT(*) AS n FROM case_parties WHERE case_id = ? AND client_id = ?',
+      caseId, 'org1')).toBe(1);
+  });
+
+  it('is still created when the choice is refused', async () => {
+    // The page offers; the person decides. "Create a new record" has to work.
+    const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,family_name,status,created_at,updated_at)
+      VALUES ('org1','CL-0257','organisation','[retired example 7] LIMITED',
+              '[retired example 7] LIMITED','active','${AT}','${AT}')`);
+    await h.post('/assistant/intake/apply', applyForm({ p0_existing_client_id: '' }));
+    expect(h.count(`SELECT COUNT(*) AS n FROM clients WHERE full_name LIKE '%LAND MEAT%'`)).toBe(2);
+  });
+
+  it('does not fail the whole press when the same person is named twice', async () => {
+    // One row per client per matter — the database refuses a second, and a
+    // reading that named somebody twice would have taken the matter with it.
+    const h = seededWith(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,status,created_at,updated_at)
+      VALUES ('p9','CL-0400','individual','[retired example 4]','James','MCFARLANE','active','${AT}','${AT}')`);
+    const res = await h.post('/assistant/intake/apply', applyForm({
+      p0_existing_client_id: 'p9', p1_existing_client_id: 'p9' }));
+    expect(res.status).toBe(303);
+    const caseId = h.get<{ id: string }>('SELECT id FROM cases')!.id;
+    expect(h.count('SELECT COUNT(*) AS n FROM case_parties WHERE case_id = ? AND client_id = ?',
+      caseId, 'p9')).toBe(1);
+  });
+
+  it('does not link the applicant to their own matter twice', async () => {
+    const h = seeded();
+    h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,status,created_at,updated_at)
+               VALUES ('cl9','CL-0500','individual','Thi Ngoc Anh LE','Thi Ngoc Anh','LE','active','${AT}','${AT}')`);
+    const res = await h.post('/assistant/intake/apply', applyForm({
+      existing_client_id: 'cl9', p0_existing_client_id: 'cl9' }));
+    expect(res.status).toBe(303);
+    const caseId = h.get<{ id: string }>('SELECT id FROM cases')!.id;
+    expect(h.count('SELECT COUNT(*) AS n FROM case_parties WHERE case_id = ? AND client_id = ?',
+      caseId, 'cl9')).toBe(1);
   });
 });

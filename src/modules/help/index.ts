@@ -37,6 +37,21 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.8.0', date: '8 September 2026',
+    notes: [
+      'The assistant now recognises everybody it has seen before, not only the client. An employer '
+        + 'could never be matched at all \u2014 the check wanted a first name and a surname to '
+        + 'agree, and a company has one name \u2014 and everybody other than the client was '
+        + 'created afresh on every reading. Each person now offers the same choice: use the record '
+        + 'already there, or create a new one.',
+      'Given names are recorded in ordinary case: Van Chien, not VAN CHIEN. Documents print the '
+        + 'whole name in capitals, so everything read out of one arrived shouted \u2014 and '
+        + 'capitalising only the surname is what shows at a glance which half is which.',
+      'A name somebody has styled themselves \u2014 McKenzie, de Jong, Anne-Marie \u2014 is left '
+        + 'exactly as it is.',
+    ],
+  },
+  {
     version: '1.7.2', date: '8 September 2026',
     notes: [
       'Opening a matter onto a client who is already on the register now puts their surname into '

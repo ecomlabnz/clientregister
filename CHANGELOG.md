@@ -7,6 +7,43 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.8.0 — 8 September 2026
+
+### Added
+- **The assistant now recognises everybody it has seen before, not just the
+  client.** Reported with a screenshot of two [retired example 7] LIMITEDs
+  forty minutes apart: *"the assistant just created a duplicate organisation.
+  Does it check if it already exists??? Same needs to be true for clients so as
+  to avoid duplication."*
+
+  It did not check, for two separate reasons.
+
+  **A company could never match.** The name test wanted a given name and a
+  family name to agree, and a company has one name in one field — so no
+  employer ever matched anything, on any reading. A whole company name matching
+  exactly is not the coincidence a shared surname is: it is the same company.
+
+  **Only the client was ever looked for.** Every other person a reading named —
+  the employer, the partner, the adviser — was created afresh on every reading,
+  however many times they were already on the register.
+
+  Each person the reading names now carries the same choice the client has:
+  *use the record already there*, or *create a new one*. Keeping the existing
+  record leaves it untouched, fills in only what it had left empty, and links it
+  to the matter.
+
+### Fixed
+- **Given names are recorded in ordinary case: Van Chien, not VAN CHIEN.** Asked
+  for, and the mirror of the surname rule. A passport prints the whole name in
+  capitals and so does an INZ letter, so everything the assistant reads arrives
+  shouted end to end — and capitalising only the family name is what makes it
+  legible at a glance which half is which. "[retired example 5]" tells you;
+  "[retired example 5]" does not.
+
+  Only a name entirely in one case is touched. *McKenzie*, *de Jong*,
+  *Anne-Marie* and *d'Angelo* are decisions somebody made, and re-casing them
+  would be the register inventing a style the person did not use.
+
 ## 1.7.2 — 8 September 2026
 
 ### Fixed

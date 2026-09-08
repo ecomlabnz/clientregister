@@ -29,7 +29,7 @@ import { auditFrom } from '../../core/audit';
 import { all, nextRef, nextYearlyRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { FormReader } from '../../core/validate';
-import { composeFullName, familyNameFor, plainAscii } from '../../core/names';
+import { composeFullName, familyNameFor, givenNamesFor, plainAscii } from '../../core/names';
 import { addEntry } from '../../core/timeline';
 import { caseTypes, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
 import { countryCodeFor, countryOptions } from '../../core/countries';
@@ -271,10 +271,16 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
         value: org.id, label: `${org.full_name} (${org.ref})`,
       })),
     ];
-    const [users, existing] = await Promise.all([
+    const [users, existing, partyMatches] = await Promise.all([
       all<{ id: string; name: string }>(c.env.DB,
         `SELECT id, name FROM users WHERE status = 'active' ORDER BY name`),
       matchExisting(c.env, applicant),
+      // Everybody else, checked the same way. Until 8 September 2026 only the
+      // applicant was looked for, so every employer, partner and adviser a
+      // reading named was created afresh however many times they had been read
+      // before — which is how two [retired example 7] LIMITEDs came to be in
+      // the list within forty minutes.
+      Promise.all(parties.map((person) => matchExisting(c.env, person))),
     ]);
     const proposedTitle = reading.suggested_title
       ?? (reading.case_type ? labelFor(types, reading.case_type) : 'New matter');
@@ -341,6 +347,20 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
               <legend>${[person.given_names, person.family_name].filter(Boolean).join(' ') || `Person ${i + 1}`}</legend>
               <label class="checkbox-field"><input type="checkbox" name="p${i}_create" value="1" checked>
                 Add them to the register and link them to this matter</label>
+              ${'' /* The same choice the client gets. Without it, somebody
+                       already on the register is added a second time and there
+                       is no way on this page to say so. */}
+              ${partyMatches[i] ? html`
+                <div class="field">
+                  <label for="f_p${i}_existing">Which record</label>
+                  <select id="f_p${i}_existing" name="p${i}_existing_client_id">
+                    <option value="${partyMatches[i]!.id}">Use ${partyMatches[i]!.full_name}
+                      (${partyMatches[i]!.ref}) — already on the register</option>
+                    <option value="">Create a new record</option>
+                  </select>
+                  <p class="hint">Using the existing record leaves it untouched. The boxes below
+                     are ignored, except where they fill in something it has left empty.</p>
+                </div>` : ''}
               <div class="settings-form">
                 ${personFields(`p${i}_`, person, null, visaTypeOptions,
                                 organisationChoices)}
@@ -554,19 +574,49 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     const added: string[] = [];
     const madeInSlot = new Map<string, { id: string; kind: 'individual' | 'organisation' }>();
     madeInSlot.set('a', { id: clientId, kind: clientKind });
+    // The applicant is already a party on this matter, and a client can hold
+    // only one role on one matter.
+    const linkedAlready = new Set<string>([clientId]);
     for (let i = 0; i < partyCount; i++) {
       if (!form.has(`p${i}_create`)) continue;
-      const made = await createPerson(c, f, `p${i}_`, stamp);
-      if (!made) continue;
+
+      // An existing record if the page offered one and it was kept, otherwise a
+      // new one. Without this every employer and every partner already on the
+      // register was created again on every reading.
+      const chosen = f.optional(`p${i}_existing_client_id`, { max: 80 });
+      let made: { id: string; ref: string; kind: 'individual' | 'organisation' } | null = null;
+      if (chosen) {
+        const row = await one<{ id: string; ref: string; kind: string }>(
+          c.env.DB, 'SELECT id, ref, kind FROM clients WHERE id = ?', chosen);
+        if (row) {
+          made = { id: row.id, ref: row.ref,
+                   kind: row.kind === 'organisation' ? 'organisation' : 'individual' };
+          // The same treatment the client gets: fill what is empty, never write
+          // over what is there, and tidy the name into the house style.
+          await fillEmptyFields(c, f, `p${i}_`, row.id);
+          await normaliseClientName(c.env, row.id, types);
+        }
+      }
+      if (!made) {
+        const fresh = await createPerson(c, f, `p${i}_`, stamp);
+        if (!fresh) continue;
+        made = { id: fresh.id, ref: fresh.ref, kind: fresh.kind };
+      }
+
       madeInSlot.set(`p${i}`, { id: made.id, kind: made.kind });
       const role = f.enum(`p${i}_role`, PARTY_ROLES, { fallback: 'other' })! as PartyRole;
-      await run(
-        c.env.DB,
-        `INSERT INTO case_parties (id, case_id, client_id, role, created_at, created_by)
-         VALUES (?,?,?,?,?,?)`,
-        newId('prt'), caseId, made.id, role, stamp, user.id,
-      );
-      added.push(`${made.ref} as ${PARTY_ROLE_LABELS[role].toLowerCase()}`);
+      // One row per client per matter — the database refuses a second, and a
+      // person named twice in one reading would otherwise fail the whole press.
+      if (made.id !== clientId && !linkedAlready.has(made.id)) {
+        linkedAlready.add(made.id);
+        await run(
+          c.env.DB,
+          `INSERT INTO case_parties (id, case_id, client_id, role, created_at, created_by)
+           VALUES (?,?,?,?,?,?)`,
+          newId('prt'), caseId, made.id, role, stamp, user.id,
+        );
+        added.push(`${made.ref} as ${PARTY_ROLE_LABELS[role].toLowerCase()}`);
+      }
     }
 
     const linked = await linkOrganisations(c, f, madeInSlot, partyCount, stamp);
@@ -767,7 +817,7 @@ async function createPerson(
     { fallback: 'individual' })!;
   const given = kind === 'organisation'
     ? null
-    : plainAscii(f.optional(`${prefix}given_names`, { max: 120 })) || null;
+    : givenNamesFor(f.optional(`${prefix}given_names`, { max: 120 })) || null;
   const typed = f.optional(`${prefix}family_name`, { max: 200 }) ?? '';
   // Capitals, as everywhere else a family name is stored — a record made by
   // the assistant is a record like any other.
@@ -820,7 +870,7 @@ async function createPerson(
  * offering to merge two clients on that basis would be worse than offering
  * nothing.
  */
-async function matchExisting(
+export async function matchExisting(
   env: AppContext['Bindings'], person: IntakePerson,
 ): Promise<{ id: string; ref: string; full_name: string } | null> {
   const tries: Array<[string, string[]]> = [];
@@ -831,7 +881,21 @@ async function matchExisting(
       [person.phone.replace(/[\s-]/g, '')],
     ]);
   }
-  if (person.family_name && person.given_names) {
+  if (person.kind === 'organisation') {
+    // A company has one name, and it is the whole of it. The clause below wants
+    // both halves of a person's name to agree, which a company can never
+    // satisfy — so until 8 September 2026 an employer was never matched and a
+    // second [retired example 7] LIMITED was created every time one was read.
+    // Reported by the practice on seeing two of them in the list.
+    //
+    // A whole company name matching exactly is not the coincidence a shared
+    // family name is: it is the same company.
+    const name = (person.family_name ?? '').trim().toLowerCase();
+    if (name) {
+      tries.push(["kind = 'organisation' AND LOWER(full_name) = ?", [name]]);
+      tries.push(["kind = 'organisation' AND LOWER(family_name) = ?", [name]]);
+    }
+  } else if (person.family_name && person.given_names) {
     tries.push([
       'LOWER(family_name) = ? AND LOWER(given_names) = ?',
       [person.family_name.toLowerCase(), person.given_names.toLowerCase()],
