@@ -37,6 +37,21 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.6.0', date: '8 September 2026',
+    notes: [
+      'When the assistant reads a document to open a matter, the document is now kept and put on '
+        + 'that matter. It used to be read and thrown away \u2014 so the letter you opened the '
+        + 'matter from was not on the file, only the register\u2019s reading of it.',
+      'The review screen lists the files before you press the button, so you can see exactly what '
+        + 'is about to go on the file.',
+      'Read something and never press the button, and the copy is deleted a week later. A client\u2019s '
+        + 'document should not sit in storage because a page was closed.',
+      'The notice on that page had been saying file storage was switched off. It was switched on '
+        + 'on 29 August. It now says what is actually true, and says the opposite if storage is '
+        + 'ever off.',
+    ],
+  },
+  {
     version: '1.5.0', date: '8 September 2026',
     notes: [
       'The letter of engagement has somewhere to keep its words. Settings \u2192 Letter of '
@@ -1851,11 +1866,13 @@ function sections(origin: string): Section[] {
            That press is the moment anything is written — before it, the register is untouched. One
            submit creates the client, links the other people as parties, opens the case and puts a
            line on its timeline saying where it came from.</p>
+        <h4>What happens to your file</h4>
+        <p><strong>It is kept.</strong> The upload is stored when it is read, and goes onto the
+           matter when you press the button that opens it — so the document the matter was opened
+           from is on the file, not just the reading of it. Read something and never press the
+           button, and the copy is deleted a week later.</p>
         <h4>What it will not do</h4>
         <ul>
-          <li><strong>It will not keep your file.</strong> The upload is read and dropped. There is
-              nowhere to keep it until R2 is switched on, and pretending otherwise would lose
-              somebody's document. Attach it to the matter afterwards if it belongs on the file.</li>
           <li><strong>It will not extract a passport number</strong>, even when the document shows
               one. Pulling it out here would write it into the run log on the way past, which is a
               copy nobody asked for. It is one field, typed once.</li>

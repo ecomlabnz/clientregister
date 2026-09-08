@@ -40,11 +40,25 @@ export function safeFilename(name: string): string {
  */
 export async function putFile(
   bucket: R2Bucket,
-  opts: { key: string; file: File; uploadedBy: string | null },
+  opts: {
+    key: string;
+    file: File;
+    uploadedBy: string | null;
+    /**
+     * What the bytes say the file is, where the caller has looked.
+     *
+     * The browser's own answer comes from the file extension, so it is absent
+     * as often as it is wrong — a Word document usually arrives with no type at
+     * all. The intake reader already sniffs the first bytes, and a file stored
+     * under a type it is not is a file that will be served back wrongly one
+     * day. Where a caller has better evidence than the browser, it wins.
+     */
+    contentType?: string;
+  },
 ): Promise<{ digest: string; size: number; contentType: string }> {
   const bytes = new Uint8Array(await opts.file.arrayBuffer());
   const digest = await sha256Hex(bytes);
-  const contentType = opts.file.type || 'application/octet-stream';
+  const contentType = opts.contentType || opts.file.type || 'application/octet-stream';
   await bucket.put(opts.key, bytes, {
     httpMetadata: { contentType },
     customMetadata: { uploadedBy: opts.uploadedBy ?? 'unknown', sha256: digest },

@@ -10,11 +10,16 @@
  * where that box always sits. Correct what is wrong, fill what is empty, press
  * the button. Until the button, the register has not changed.
  *
- * The file is read and dropped. It is not stored: there is nowhere to store it
- * until R2 is switched on, and pretending otherwise would lose somebody's
- * document. Passport numbers are deliberately not extracted — the register
- * seals that column, and pulling them out here would write them in the clear
- * into the run log on the way past.
+ * The file is kept. It is stored the moment it is read and put on the matter by
+ * the press that opens it — see `core/intakefiles.ts` for why it has to wait in
+ * between and what happens to one nobody uses. It was dropped until 8 September
+ * 2026, on the stated grounds that there was nowhere to keep it until R2 was
+ * switched on; R2 had been on since 29 August, and what was being dropped was
+ * the letter the matter was being opened from.
+ *
+ * Passport numbers are deliberately not extracted — the register seals that
+ * column, and pulling them out here would write them in the clear into the run
+ * log on the way past.
  */
 
 import type { Hono } from 'hono';
@@ -38,6 +43,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import { card, csrfField, emptyState, field, optionsFrom, pageHeader, select } from '../../ui/components';
 import { isAiEnabled } from '../../ai/provider';
+import { attachStagedTo, stageUpload, stagedFor } from '../../core/intakefiles';
 import type { IntakePerson, IntakeResult } from '../../ai/provider';
 import {
   ACCEPTED_UPLOADS, MAX_UPLOADS, describeAccepted, latestIntake, readUpload, runIntake,
@@ -117,11 +123,20 @@ function personFields(prefix: string, person: IntakePerson, roleFixed: PartyRole
 export function registerIntakeRoutes(r: Hono<AppContext>): void {
   // --- Drop it here, and what came back ------------------------------------
   r.get('/intake', requirePermission('ai:run'), async (c) => {
+    // Whether an upload survives the reading. It does when there is a bucket to
+    // put it in, and the notice on the page says whichever is true rather than
+    // a sentence written once and left — which is how it came to claim for ten
+    // days that storage was off after it had been switched on.
+    const filesKept = Boolean(c.env.DOCS);
     const enabled = isAiEnabled(c.env);
     const session = c.get('session')!;
     const runId = c.req.query('run');
     const reading = runId ? await latestIntake(c.env, runId) : null;
     const types = await caseTypes(c.env);
+    // What this reading kept, so the review page can say what is about to go on
+    // the file. Shown rather than assumed: a person about to press a button
+    // that writes to a client's file should see everything it will write.
+    const staged = runId ? await stagedFor(c.env, runId) : [];
 
     if (!reading) {
       return page(c, { title: 'Open a matter', active: '/assistant' }, html`
@@ -164,9 +179,14 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
               <p class="small">It reads what you give it and fills in the client, the other people
                  named, and the matter. You check it and press the button — that is the moment
                  anything is written.</p>
-              <p class="small"><strong>The file is not kept.</strong> It is read and dropped, because
-                 there is nowhere to keep it until R2 is switched on. Attach it to the matter
-                 afterwards if you need it on the file.</p>
+              ${filesKept
+                ? html`<p class="small"><strong>The file is kept.</strong> It goes onto the matter
+                     when you press the button, so the document the matter was opened from is on
+                     the file. Read a document and never press the button and the copy is deleted
+                     after a week.</p>`
+                : html`<p class="small"><strong>The file is not kept.</strong> File storage is not
+                     switched on for this register, so an upload is read and dropped. Attach it to
+                     the matter afterwards if you need it on the file.</p>`}
               <p class="small"><strong>Passport numbers are not extracted</strong>, even when they
                  are in the document. Pulling them out here would write them into the run log on the
                  way past, and a passport number belongs in one place only — typed once, on the
@@ -215,6 +235,18 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       <form method="post" action="/assistant/intake/apply" class="entry-form">
         ${csrfField(session.csrf)}
         <input type="hidden" name="run" value="${runId}">
+
+        ${staged.length ? card(
+          `${staged.length === 1 ? 'The file this was read from' : 'The files this was read from'}`,
+          html`
+            <p class="hint">${staged.length === 1 ? 'It goes' : 'They go'} onto the matter when you
+               press the button below, so the document the matter was opened from is on the file.</p>
+            <ul class="list">
+              ${staged.map((file) => html`
+                <li><strong>${file.filename}</strong>
+                  <span class="muted small">${String(Math.round(file.size_bytes / 1024))} KB ·
+                    ${file.content_type}</span></li>`)}
+            </ul>`) : ''}
 
         ${card('The client', html`
           ${existing ? html`
@@ -316,10 +348,29 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     }
 
     const outcome = await runIntake(c.env, { text, files }, { userId: user.id });
+
+    // Kept only once the reading worked, and keyed to it. A failed reading
+    // leaves nothing behind — there is no page to attach it from, so a stored
+    // file would be an orphan from the moment it was written.
+    //
+    // The type comes from the reader, which sniffed the first bytes, rather
+    // than from the browser, whose answer comes from the file extension and is
+    // absent as often as it is wrong.
+    let kept = 0;
+    if (outcome.ok) {
+      for (const [i, upload] of uploads.slice(0, MAX_UPLOADS).entries()) {
+        const staged = await stageUpload(c.env, {
+          runId: outcome.runId, file: upload,
+          contentType: files[i]?.mediaType ?? upload.type, userId: user.id,
+        });
+        if (staged) kept += 1;
+      }
+    }
+
     await auditFrom(c, {
       action: 'assistant.intake', entityType: 'intake',
       entityId: outcome.ok ? outcome.runId : null,
-      meta: { ok: outcome.ok, files: files.length, chars: text.length },
+      meta: { ok: outcome.ok, files: files.length, kept, chars: text.length },
     });
     return outcome.ok
       ? c.redirect(`/assistant/intake?run=${outcome.runId}`, 303)
@@ -436,14 +487,38 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
         createdBy: user.id,
       });
     }
+    // The documents this matter was opened from, onto the matter.
+    //
+    // They were stored when the reading happened, because at that moment there
+    // was nothing to attach them to. This is the press that creates the thing
+    // they belong on, so it is where they land — the same R2 objects, not
+    // copies. Anything left unattached is deleted after a week by the nightly
+    // sweep.
+    const runId = f.optional('run', { max: 80 });
+    const attached = runId
+      ? await attachStagedTo(c.env, {
+          runId, entityType: 'case', entityId: caseId, userId: user.id,
+          description: `Read by the assistant on ${stamp.slice(0, 10)}, and this matter opened from it.`,
+        })
+      : 0;
+    if (attached) {
+      await addEntry(c.env, {
+        entityType: 'case', entityId: caseId, kind: 'system',
+        body: `${attached} ${attached === 1 ? 'file' : 'files'} the assistant read `
+          + `${attached === 1 ? 'was' : 'were'} put on this matter.`,
+        createdBy: user.id,
+      });
+    }
+
     await auditFrom(c, {
       action: 'case.created_from_intake', entityType: 'case', entityId: caseId,
-      meta: { ref: caseRef, client: clientRef, run: f.optional('run', { max: 80 }), parties: added.length },
+      meta: { ref: caseRef, client: clientRef, run: runId, parties: added.length, files: attached },
     });
 
     return redirectWith(c, `/cases/${caseId}`,
       `Case ${caseRef} opened for ${clientRef}.`
-      + (added.length ? ` ${added.length} other ${added.length === 1 ? 'party' : 'parties'} linked.` : ''),
+      + (added.length ? ` ${added.length} other ${added.length === 1 ? 'party' : 'parties'} linked.` : '')
+      + (attached ? ` ${attached} ${attached === 1 ? 'file is' : 'files are'} on the file.` : ''),
     );
   });
 }
