@@ -22,6 +22,7 @@ import { quotesModule } from '../src/modules/quotes';
 import {
   parseTemplateLines, parseTemplateStages, writeTemplateLines, writeTemplateStages,
 } from '../src/core/quotetemplate';
+import { unitFrom } from '../src/modules/quotes';
 import { fakeUser, mountModule, type Harness } from './support/d1';
 
 const AT = '2026-09-09T00:00:00Z';
@@ -232,5 +233,47 @@ describe('reading and writing the template text', () => {
   it('takes a label-less stage, since the numbering is the practice’s own', () => {
     expect(parseTemplateStages(' | On acceptance | exclusive'))
       .toEqual([{ label: '', description: 'On acceptance', treatment: 'exclusive' }]);
+  });
+});
+
+/**
+ * The unit a line is priced in, which may be nothing at all.
+ *
+ * **Reported on 9 September 2026:** *"for some reason cannot remove 'item' word
+ * even if i edit it"*. It could not be removed by anybody: both routes that
+ * write the column ended in `|| defaultUnitLabel`, so an empty box was
+ * indistinguishable from an absent one and became "item" again on the way to
+ * the database. Clearing the field and saving looked exactly like not having
+ * tried.
+ */
+describe('the unit on a line', () => {
+  it('falls back to the practice default only when the form does not carry one', () => {
+    expect(unitFrom(null, 'item')).toBe('item');
+    expect(unitFrom(undefined, 'item')).toBe('item');
+  });
+
+  it('is emptied when somebody clears the box, which is the whole complaint', () => {
+    expect(unitFrom('', 'item')).toBe('');
+    expect(unitFrom('   ', 'item')).toBe('');
+  });
+
+  it('keeps what was typed, trimmed and within the column', () => {
+    expect(unitFrom('  hour  ', 'item')).toBe('hour');
+    expect(unitFrom('x'.repeat(50), 'item')).toBe('x'.repeat(30));
+  });
+
+  it('goes to the database empty, and stays empty', async () => {
+    const h = mountModule(quotesModule, { user: owner() });
+    seed(h); priced(h);
+
+    const res = await h.post('/quotes/q_src/items', {
+      description: 'Professional time', kind: 'professional', quantity: '1',
+      unit_amount: '100.00', gst_treatment: 'exclusive', unit_label: '',
+    });
+    expect(res.status).toBe(303);
+    const added = h.get<{ unit_label: string }>(
+      `SELECT unit_label FROM quote_items WHERE description = 'Professional time'
+        AND quote_id = 'q_src' ORDER BY rowid DESC`);
+    expect(added?.unit_label).toBe('');
   });
 });

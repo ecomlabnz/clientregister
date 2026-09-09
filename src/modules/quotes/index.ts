@@ -176,6 +176,29 @@ export async function catalogue(env: Env, includeRetired = false): Promise<Servi
 }
 
 /**
+ * The unit a line is priced in, which may be nothing at all.
+ *
+ * **Reported on 9 September 2026:** *"for some reason cannot remove 'item' word
+ * even if i edit it"*. Quite right, and it could not be removed by anybody:
+ * both routes that write the column ended in `|| defaultUnitLabel`, so an empty
+ * box was indistinguishable from an absent one and became "item" again on the
+ * way to the database. Clearing the field and saving looked exactly like not
+ * having tried.
+ *
+ * The distinction is between a field that is **absent** — a form that does not
+ * carry it, where the practice's default is the right answer — and a field that
+ * is **present and empty**, which is somebody saying they do not want one. Only
+ * the first falls back.
+ *
+ * An empty unit prints as nothing: `pluraliseUnit` already returns the empty
+ * string for it, so a line reads "1" rather than "1 item".
+ */
+export function unitFrom(submitted: unknown, fallback: string): string {
+  if (submitted === null || submitted === undefined) return fallback;
+  return String(submitted).trim().slice(0, 30);
+}
+
+/**
  * Recalculate the header figures from the lines.
  *
  * `quotes.amount_cents`, `gst_cents` and `disbursements_cents` remain the
@@ -912,7 +935,10 @@ export const quotesModule: AppModule = {
             ${card('Items', html`
               ${lines.length === 0
                 ? emptyState('No lines yet. Add the first one below.')
-                : table(['Description', 'Qty', 'Unit', 'Amount', 'GST', ''], [
+                // Amount last, to the right of GST, at the practice's
+                // instruction of 9 September 2026: the eye runs along a fee line
+                // to the figure that matters, and that is what the line comes to.
+                : table(['Description', 'Qty', 'Unit', 'GST', 'Amount', ''], [
                     ...lines.map((l) => html`
                       <tr>
                         <td>
@@ -922,9 +948,9 @@ export const quotesModule: AppModule = {
                         <td class="num">${formatQuantity(l.quantity_milli)}
                           <div class="muted small">${pluraliseUnit(l.unit_label, l.quantity_milli)}</div></td>
                         <td class="num">${money(l.unit_amount_cents, q.currency)}</td>
-                        <td class="num strong">${money(l.net_cents, q.currency)}</td>
                         <td class="num">${l.gst_cents ? money(l.gst_cents, q.currency)
                           : html`<span class="muted">—</span>`}</td>
+                        <td class="num strong">${money(l.net_cents, q.currency)}</td>
                         <td>${writable
                           ? actionButton(`/quotes/${q.id}/items/${l.id}/remove`, csrf, 'Remove',
                               { className: 'btn btn-link-danger btn-small',
@@ -1429,7 +1455,7 @@ export const quotesModule: AppModule = {
                      it, which is the thing a reader should see first. */}
               <dl class="quote-doc-meta">
                 <dt>Date</dt><dd>${dateShort(issuedOn)}</dd>
-                <dt>Our reference</dt><dd class="strong">${q.ref}</dd>
+                <dt>Our Ref</dt><dd class="strong">${q.ref}</dd>
                 ${q.case_ref ? html`<dt>Matter</dt><dd>${q.case_ref}</dd>` : ''}
               </dl>
             </div>
@@ -1637,10 +1663,30 @@ export const quotesModule: AppModule = {
         id,
       );
       if (!q) return c.notFound();
-      const [practice, lines, qs, stages, parties] = await Promise.all([
+      const [practice, lines, qs, stages, parties, printTypes] = await Promise.all([
         practiceDetails(c.env), quoteLines(c.env, id), quoteSettings(c.env), quoteStages(c.env, id),
-        quoteParties(c.env, id),
+        quoteParties(c.env, id), caseTypes(c.env),
       ]);
+
+      // What the quotation is about, without repeating whose it is.
+      //
+      // Asked for on 9 September 2026: *"here no need for the name in section
+      // Re, just the type of visa will suffice"*. The name is already at the
+      // head of the document, and a reference line that repeats it says nothing
+      // the reader did not have.
+      //
+      // Derived from the type key rather than cut off the front of the stored
+      // name: the name is composed as "TYPE — Client", and splitting a string
+      // on an em dash works until somebody's matter has one in it. A quotation
+      // with no kind of work recorded falls back to its own name, which is the
+      // only thing left that describes it.
+      //
+      // `labelFor` answers "—" for a key it has not got, not an empty string,
+      // so `|| description` never fired and a quotation with no kind of work
+      // recorded printed a bare em dash on its reference line. Caught by the
+      // test for exactly that case; hence the explicit check rather than a
+      // falsy one.
+      const printRe = q.case_type ? labelFor(printTypes, q.case_type) : q.description;
       const totals = summariseQuote(lines.map((l) => ({
         kind: l.kind, lineAmountCents: l.unit_amount_cents,
         netCents: l.net_cents, gstCents: l.gst_cents, grossCents: l.gross_cents,
@@ -1705,7 +1751,7 @@ export const quotesModule: AppModule = {
                        quote" and a reference, which a client cannot place. */}
               <dl class="quote-doc-meta">
                 <dt>Quote</dt><dd class="strong">${q.ref}</dd>
-                <dt>Re</dt><dd>${q.description}</dd>
+                <dt>Re</dt><dd>${printRe}</dd>
                 <dt>Issued</dt><dd>${dateShort(issuedOn)}</dd>
                 <dt>Valid until</dt><dd class="strong">${dateShort(validTo)}</dd>
                 ${q.case_ref ? html`<dt>Matter</dt><dd>${q.case_ref}</dd>` : ''}
@@ -2266,7 +2312,7 @@ export const quotesModule: AppModule = {
                 net_cents = ?, gst_cents = ?, gross_cents = ?, updated_at = ?
               WHERE id = ? AND quote_id = ?`,
             position, description, kind,
-            String(form.get(`unit_${line.id}`) ?? line.unit_label).trim().slice(0, 30) || qs.defaultUnitLabel,
+            unitFrom(form.get(`unit_${line.id}`), line.unit_label),
             quantity, unitAmount, fees.gstRegistered ? treatment : 'none', gstRateBp,
             amounts.netCents, amounts.gstCents, amounts.grossCents, nowIso(), line.id, id,
           );
@@ -2318,7 +2364,7 @@ export const quotesModule: AppModule = {
             net_cents, gst_cents, gross_cents, created_at, updated_at)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         newId('qit'), id, nextPosition, serviceItemId || null, caseTypeChosen, description, kind,
-        f.optional('unit_label', { max: 30 }) || qs.defaultUnitLabel,
+        unitFrom(form.get('unit_label'), qs.defaultUnitLabel),
         quantity, unitAmount, fees.gstRegistered ? treatment : 'none', gstRateBp,
         amounts.netCents, amounts.gstCents, amounts.grossCents, now, now,
       );
