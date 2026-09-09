@@ -29,6 +29,7 @@ import {
 import { clientOptions, openCaseOptions } from '../../core/lookups';
 import { addEntry, listEntries } from '../../core/timeline';
 import { can } from '../../core/rbac';
+import { applyTemplate, saveTemplateFrom } from '../../core/quotetemplate';
 import {
   computeGst, FEE_KIND_LABELS, FEE_KINDS, GST_TREATMENT_LABELS, GST_TREATMENTS,
   type FeeKind, type GstTreatment,
@@ -68,6 +69,24 @@ export const QUOTE_SETTINGS: SettingsGroup = {
       help: 'Printed on every quote. Leave blank to omit it.' },
     { key: 'quotes.default_unit_label', type: 'string', label: 'Default unit', default: 'item', maxLength: 30,
       help: 'What one of something is called when a line does not say otherwise.' },
+
+    // --- The shape every quotation starts from -----------------------------
+    //
+    // Written by the "Use as the template" button on a quotation rather than
+    // typed, and editable here afterwards. See `core/quotetemplate.ts` for why
+    // the amounts are deliberately not part of it.
+    { key: 'quotes.template_lines', type: 'text', maxLength: 4000, default: '',
+      label: 'New quotations start with these lines',
+      help: 'One per line, as kind | Description | GST — for example '
+        + '“professional | Professional time | exclusive” or '
+        + '“disbursement | INZ application fee | inclusive”. Kind is professional, disbursement '
+        + 'or third_party. Every line arrives with no amount. Easiest set by opening a quotation '
+        + 'you are happy with and pressing “Use as the template”.' },
+    { key: 'quotes.template_stages', type: 'text', maxLength: 4000, default: '',
+      label: 'And these payment stages',
+      help: 'One per line, as Label | What it is for and when it falls due | GST. Every stage '
+        + 'arrives with no amount. Leave both boxes empty and new quotations start blank, as '
+        + 'they always did.' },
   ],
 };
 
@@ -533,8 +552,23 @@ export const quotesModule: AppModule = {
         issuedOn, days, until, notes, withLetter === '1' ? 1 : 0,
         nowIso(), nowIso(), user.id,
       );
+      // The practice's standard shape, if they have set one. Every row arrives
+      // at zero: a template that carried figures would put the last client's
+      // price on this client's quotation, and the first time somebody did not
+      // notice would be the time it went out.
+      const fees = await moneySettings(c.env);
+      const laid = await applyTemplate(c.env, id, {
+        unitLabel: qs.defaultUnitLabel, gstRateBp: fees.gstRateBp,
+        gstRegistered: fees.gstRegistered,
+      });
+
       await addEntry(c.env, { entityType: 'quote', entityId: id, kind: 'system',
-        body: `Quote ${ref} started — valid until ${until}.`, createdBy: user.id });
+        body: `Quote ${ref} started — valid until ${until}.`
+          + (laid.lines || laid.stages
+            ? ` Started from the practice's template: ${laid.lines} line(s) and `
+              + `${laid.stages} stage(s), all at nil until priced.`
+            : ''),
+        createdBy: user.id });
       if (forClient) {
         await addEntry(c.env, { entityType: 'client', entityId: forClient, kind: 'system',
           body: `Quote ${ref} drafted: ${description}.`, createdBy: user.id });
@@ -854,7 +888,16 @@ export const quotesModule: AppModule = {
               ? actionButton(`/quotes/${q.id}/status`, csrf, 'Cancel quote',
                   { className: 'btn btn-danger', fields: { status: 'withdrawn' },
                     confirm: `Cancel quote ${q.ref}? It stays on the file, marked withdrawn.` })
-              : ''}` : ''}`)}
+              : ''}` : ''}
+          ${'' /* Behind admin:settings rather than quote:write. Pressing it
+                 changes what *every* future quotation starts from, which is a
+                 configuration act wearing the clothes of a quotation one. */}
+          ${can(c.get('user'), 'admin:settings') && (lines.length > 0 || stages.length > 0)
+            ? actionButton(`/quotes/${q.id}/template`, csrf, 'Use as the template',
+                { className: 'btn btn-secondary',
+                  confirm: `Make the shape of ${q.ref} the starting point for every new `
+                    + 'quotation? The wording and GST treatment are copied; no amounts are.' })
+            : ''}`)}
 
         <div class="cols">
           <div class="col-main">
@@ -2071,6 +2114,34 @@ export const quotesModule: AppModule = {
       await auditFrom(c, { action: 'quote.updated', entityType: 'quote', entityId: id,
         meta: { before, after } });
       return redirectWith(c, `/quotes/${id}`, 'Quote updated.');
+    });
+
+    /**
+     * Make this quotation's shape the one every new quotation starts from.
+     *
+     * **Asked for on 9 September 2026:** *"I would like to have its stems to be
+     * a default template for all, without the money figures, so each new one
+     * can be adjusted with ease."*
+     *
+     * The wording and the GST treatment are copied; no amount is. What it
+     * writes is the two settings under Quotes, so the practice can read what
+     * they have captured and edit it there without pressing this again.
+     */
+    r.post('/:id/template', requirePermission('admin:settings'), async (c) => {
+      const id = c.req.param('id')!;
+      const q = await one<{ ref: string }>(c.env.DB, 'SELECT ref FROM quotes WHERE id = ?', id);
+      if (!q) return c.notFound();
+
+      const saved = await saveTemplateFrom(c.env, id);
+      if (saved.lines === 0 && saved.stages === 0) {
+        return redirectWith(c, `/quotes/${id}`,
+          'That quotation has no lines or stages to take a shape from.', 'err');
+      }
+      await auditFrom(c, { action: 'quote.template_saved', entityType: 'quote', entityId: id,
+        meta: { ref: q.ref, lines: saved.lines, stages: saved.stages } });
+      return redirectWith(c, `/quotes/${id}`,
+        `New quotations will start from ${q.ref}: ${saved.lines} line(s) and `
+        + `${saved.stages} stage(s), with no amounts. Edit it under Settings → Quotes.`);
     });
 
     r.post('/:id/status', requirePermission('quote:write'), async (c) => {

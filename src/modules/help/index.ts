@@ -37,6 +37,21 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.22.0', date: '9 September 2026',
+    notes: [
+      'New quotations can start from a shape you choose. Open one you are happy with and press '
+        + '\u201CUse as the template\u201D \u2014 its lines and payment stages become the '
+        + 'starting point for every quotation you make afterwards.',
+      'No amounts are copied, ever. Every line and stage arrives at nil and you type the figures. '
+        + 'A template carrying prices would eventually put one client\u2019s figure on another\u2019s '
+        + 'quotation.',
+      'What it captured is plain text under Settings \u2192 Quotes, so you can read and edit it '
+        + 'there rather than pressing the button again.',
+      'The button is only for you and administrators: it changes what every future quotation '
+        + 'starts from, which is a settings decision rather than a quoting one.',
+    ],
+  },
+  {
     version: '1.21.0', date: '9 September 2026',
     notes: [
       'The letter now shows where your covering letter ends and your terms begin \u2014 a rule '
