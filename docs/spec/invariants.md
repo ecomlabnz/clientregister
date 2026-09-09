@@ -11,7 +11,7 @@ guarantee in a handler lasts until somebody adds a second handler — and this
 register is written to by the application, by bulk loads, and occasionally by
 hand at a console. Everything below holds in all three cases.
 
-**87 refusals** across 24 tables, plus
+**93 refusals** across 24 tables, plus
 **10 uniqueness rules**. Each is quoted in the words the
 database itself uses, because that is what somebody will see.
 
@@ -189,6 +189,29 @@ whether or not the rule exists is not a test.
 | update | a quote has to say what it is for |
 | insert | A quotation on a matter is for that matter's client. Move the matter, or take the matter off the quotation. |
 | update | A quotation on a matter is for that matter's client. Move the matter, or take the matter off the quotation. |
+| insert | a share link must be at least 32 hexadecimal characters: it is the only thing protecting a client's fee quote |
+| update | a share link must be at least 32 hexadecimal characters: it is the only thing protecting a client's fee quote |
+| update | a quotation keeps the link it was sent with. Withdraw the quotation and issue a new one instead. |
+| update | an acceptance records who accepted and when, or neither |
+| update | an acceptance is the moment a contract was formed and cannot be changed. Issue a new quotation instead. |
+| update | only a quotation that has been sent can be accepted. This one is not out with the client. |
+
+The last six arrived with migration 0078, which gives a quotation a private link
+the client can open without an account, and a way for them to accept it.
+
+The link is 128 bits from the platform's cryptographic generator and is the only
+thing standing between the address and a client's fee quote, so its length is
+kept by the database rather than by whichever route mints one. It is minted once
+and then fixed: a link that changed would break an email already sent, and the
+practice would have no way of knowing which client held a dead address.
+
+**An acceptance is the moment a contract was formed**, so it is append-only in
+the strongest sense the register has — who accepted, when, and from where are
+written together or not at all, and none of the three can afterwards be changed
+or cleared by anybody, including the owner. A quotation accepted in error is
+answered with a new quotation, exactly as it would be on paper. And only a
+quotation that has actually been sent can come back accepted: a draft has
+reached nobody, and a withdrawn one has been taken back.
 
 ### `quote_stages`
 
