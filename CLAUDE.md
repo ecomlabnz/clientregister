@@ -83,6 +83,15 @@ is "it depends", say what it depends on in one sentence. "Do not understand —
 clarify" means shorter and more concrete, not more detail. Standing
 instruction (31 August 2026): be brief and to the point, no fluff.
 
+**End the day with a digest** (standing instruction, 9 September 2026): *"i do
+not always have time to read your writing but i want to - so at the end of the
+day produce easily readable digest of what has been accomplished."* Plain words,
+grouped by what changed for the practice rather than by release number, and
+short enough to read in a couple of minutes. What shipped, what it means for
+them, what is waiting on them. It is not a changelog — `CHANGELOG.md` is already
+that — and it is not per-change commentary during the day, which is the thing
+they do not have time for.
+
 ## One practice, one database
 
 Decided 3 September 2026, when the practice said the register will be sold to
