@@ -378,6 +378,114 @@ own, the tab becomes redundant, and the question answers itself. The two
 alternatives considered and not chosen were deleting it outright (loses reply
 and forward) and hiding the tab (leaves the natural route showing nothing).
 
+### 18. A copy of every email the register sends, in the practice's own mailbox
+
+**Handed over 9 September 2026** (`resend_email_tracking_instructions.md`), with
+*"take this into pipeline — for later if I decide."* Not decided. Nothing is
+being built.
+
+The document's premise is that an application sending through Resend has no
+Sent folder, so its mail leaves no trace you can find later. That premise is
+only half true here, and the half that is true is not the half the document
+addresses.
+
+**What already exists.** `cc`, `bcc` and `replyTo` are plumbed end to end —
+`queueEmail` stores all three on `outbound_emails`, and both transports send
+them. So the document's suggestion 3 is already done and has been for some
+time: `practice.reply_to` is a setting, and every message the register sends
+carries it unless a caller overrides it. Suggestion 2, CC, is rejected on
+sight — it prints an internal address on a letter that may be a contract, and
+nothing is gained over BCC.
+
+**What would actually be new** is suggestion 1 in its automatic form: one more
+practice setting, an archive address, applied in `queueEmail` so it is on every
+message rather than remembered per call site. **Half a day**, and small,
+because the field it sets already exists.
+
+**The reason to think before building it.** The register already keeps its own
+record — `outbound_emails` holds every message with its body, its recipients
+and its provider id. What a BCC buys is a second copy in Gmail. Against that:
+it duplicates client correspondence into a mailbox, which is precisely the data
+the offshore-access question (item 19 below, and the Privacy Act point put to
+the practice on 9 September) is about. A copy in two places is a copy to
+protect in two places.
+
+**And there is a better fix hiding behind it.** The real gap is not that mail
+leaves no trace — it is that the trace is not where anybody looks. Sending a
+quotation writes an `email_out` entry on the quote and on the client. **Nothing
+else does**: a channel reply (`core/channels.ts`) and an automation's email
+(`core/automations.ts`) land in `outbound_emails` and never appear on the
+client's timeline. So a message the practice sent through the register is
+invisible on the file it belongs to. That is worth fixing whether or not a BCC
+is ever switched on, and fixing it makes the BCC less necessary rather than
+more.
+
+**One footnote from the document, for the record:** its warning about open and
+click tracking being confused by extra recipients does not apply, because the
+register does not track opens. It should not start. Whether a client opened a
+letter is not information a practice needs, and collecting it puts a tracking
+pixel in correspondence.
+
+**To decide, if it is ever taken up:** which mailbox; whether the second copy is
+wanted at all given who will have access to that mailbox; and whether the
+timeline gap above is the thing actually being asked for.
+
+### 19. Staff who see less than the owner does
+
+**Asked 9 September 2026:** the practice is planning to give access to
+administrative staff in Vietnam, and *"i do not want them to see my cases... I
+do not want them to see my emails and incoming... but i want them to have the
+option of having incoming for their comms so the information is accumulated in
+the system."* Asked whether it should instead be treated as a sale to another
+practice. It should not: a second database is a second register, and the stated
+requirement is that their correspondence accumulates in **this** one.
+
+So this is within-tenant access control, and it does not touch the
+one-practice-one-database decision.
+
+**Three pieces, in the order they should be built:**
+
+1. **Incoming behind the right permission — half a day.** The nav entry asks for
+   `register:read`, which everybody has. It should ask for `ingest:triage`. The
+   routes already refuse; only the tab and the landing redirect need moving.
+
+2. **Teams — 3 to 4 days.** A user, a matter and an inbox channel each belong to
+   a team; you see your team's, the owner sees all. This is what "they must not
+   see my cases" actually requires, and it gives them their own inbox for free —
+   a channel belongs to a team, so their address lands in the register without
+   showing them the practice's.
+
+   **The risk, named plainly, because it is the same one the shared-database
+   decision turns on:** 52 queries touch `cases` across 21 files, and the one
+   that forgets its team clause does not produce a bug report — it shows a staff
+   member a file they should not have. Smaller blast radius than showing another
+   firm's files, but the same shape. It therefore needs one helper every list
+   goes through and a test that fails when a new query does not, and that is
+   most of why it is days rather than one.
+
+3. **A role editor in Settings — about a day.** A grid of roles by permissions
+   an administrator ticks, no deployment. Explicitly *instead of* per-user module
+   switches, which multiply until nobody can answer "who can see what" — which is
+   the question an audit asks.
+
+**Read logging, and why it belongs with this.** The practice's answer on the
+privacy question was that the staff have signed NDAs. Taken. But an NDA is only
+enforceable if a breach can be detected, and the audit log records sign-ins,
+writes and inbox activity — **not reads**. Nobody can currently answer "which
+client files did this person open, and when?" Half a day, and it should ship
+with the teams work rather than after it.
+
+**Still open for the practice, and noted rather than pressed:** whether the
+agreement carries privacy terms — use, retention, correction, breach
+notification, onward transfer — or confidentiality alone, which is narrower than
+what cross-border disclosure of client information contemplates. That is the
+practice's call and its profession's, not this file's.
+
+**Not in scope yet:** the Cloudflare control plane for running many practices.
+That is for a paying second firm, and it is still blocked on the unanswered
+question at the top of `CLAUDE.md` — Cloudflare wants a D1 database named in
+`wrangler.jsonc` at deploy time, and nobody has confirmed the way round it.
+
 ### 8. Reading across from other sessions
 The **App field comparison review** session produced the nine fields above. Its
 own audit ended with no repository changes and a mail-DNS fix. Nothing else has
