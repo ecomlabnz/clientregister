@@ -7,6 +7,28 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.33.0 — 9 September 2026
+
+### Added
+**The client's phone and email now show on the matter.** *"add their phone and
+email there — so if I open the case I can see those details without the need to
+jump into the client."* Both are in Key details, and both are drawn even when
+empty: a blank row says nobody recorded a number, where a missing row says the
+register was never asked. The phone dials and the email opens a message.
+
+### Changed
+**Key details now leads with the numbers you quote.** The client's reference had
+been sharing a line with their name — *"there is the client's name and the case
+number immediately after that — not good"*. The panel now reads **Client,
+Client number, INZ client no., Case number**, one to a row, then phone and
+email, then the matter itself. **Opened** now sits above **Lodged**: a file
+exists before it is filed.
+
+**The client is noted as the principal applicant in Parties.** The row added in
+1.32.1 now says so. It is the register reading the file rather than a role
+recorded on it — record a role for the client and that row is drawn instead,
+saying whatever was recorded.
+
 ## 1.32.1 — 9 September 2026
 
 ### Changed

@@ -37,6 +37,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.33.0', date: '9 September 2026',
+    notes: [
+      'The client\u2019s phone number and email address now show on the matter itself, under Key '
+        + 'details, so you can ring or write without opening their page first.',
+      'Key details now leads with the numbers you quote: Client, Client number, INZ client no., '
+        + 'Case number \u2014 each on its own row, instead of the reference running on from the '
+        + 'name.',
+      'Opened now sits above Lodged, and the client in the Parties list is noted as the principal '
+        + 'applicant.',
+    ],
+  },
+  {
     version: '1.32.1', date: '9 September 2026',
     notes: [
       'The client now appears at the top of the Parties panel on a matter, badged Client, above '
