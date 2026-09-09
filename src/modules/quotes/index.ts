@@ -1306,10 +1306,10 @@ export const quotesModule: AppModule = {
      */
     r.get('/:id/letter', requirePermission('register:read'), async (c) => {
       const id = c.req.param('id')!;
-      const q = await one<QuoteRow & { client_name: string | null; client_address: string | null;
+      const q = await one<QuoteRow & { client_name: string | null; client_phone: string | null;
                                        client_email: string | null; case_ref: string | null }>(
         c.env.DB,
-        `SELECT q.*, cl.full_name AS client_name, cl.address AS client_address,
+        `SELECT q.*, cl.full_name AS client_name, cl.phone AS client_phone,
                 cl.email AS client_email, k.ref AS case_ref
            FROM quotes q
            LEFT JOIN clients cl ON cl.id = q.client_id
@@ -1386,14 +1386,35 @@ export const quotesModule: AppModule = {
             </div>
           </header>
 
-          ${'' /* To whom, and how they are being written to. */}
+          ${'' /* To whom, and how they are being written to.
+
+                 **No postal address, by the practice's instruction of
+                 9 September 2026:** *"The address is not required - it should
+                 only have email and phone number."* It is a letter that goes by
+                 email, to clients who are often between addresses — one of them
+                 read "Summer Place (joint tenancy address; full address not
+                 stated)", which is a note to the file rather than an address,
+                 printed on a contract. How to reach somebody is what this block
+                 is for. */}
           <section class="letter-to">
             <p class="strong">${q.client_name ?? '—'}</p>
-            ${q.client_address ? html`<p class="prewrap small">${q.client_address}</p>` : ''}
             ${q.client_email ? html`<p class="small">By email: ${q.client_email}</p>` : ''}
+            ${q.client_phone ? html`<p class="small">Telephone: ${q.client_phone}</p>` : ''}
           </section>
 
           ${text.subject ? html`<p class="letter-re"><strong>RE: ${text.subject}</strong></p>` : ''}
+
+          ${'' /* The salutation, which the letter had never had. Asked for on
+                 9 September 2026: *"the letter of engagement must start with
+                 'Dear CLIENT'S FULL NAME,'"*. It opened straight into "I am
+                 pleased to act for you" under a bare name, which reads as a
+                 form rather than as a letter from a person.
+
+                 The full name as the register holds it, so it matches the name
+                 the client signs under and the name on the quotation beside it.
+                 A client with no name recorded cannot be greeted, so the line
+                 is left out rather than printing "Dear ,". */}
+          ${q.client_name ? html`<p class="letter-salutation">Dear ${q.client_name},</p>` : ''}
 
           ${text.configured
             ? prose(text.opening)

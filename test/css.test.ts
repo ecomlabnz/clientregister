@@ -211,3 +211,52 @@ describe('the new-thing button on a filter bar', () => {
     expect(css).toMatch(/\.list-bar \{[^}]*flex-wrap: wrap/);
   });
 });
+
+/**
+ * What a printed document leaves round the edge.
+ *
+ * **Asked for on 9 September 2026**, looking at a real quotation: *"the margins
+ * are too thin. they must be at least 25mm all around."* There was no `@page`
+ * rule at all, so the margin was whatever the print dialogue happened to be set
+ * to — on the file the practice sent, 8.5mm at the sides and 5.8mm at the top.
+ *
+ * This is worth pinning because it is invisible on screen. Nothing about the
+ * register looks wrong when this rule is missing; it only shows up on paper,
+ * once, after a client has been sent the document.
+ */
+describe('a printed document keeps a 25mm margin', () => {
+  const rule = /@page\s*\{([^}]*)\}/.exec(css);
+
+  it('sets one at all', () => {
+    expect(rule, 'no @page rule; the printer decides the margin').not.toBeNull();
+  });
+
+  it('is at least 25mm, on every edge', () => {
+    const margin = /margin:\s*([^;]+);/.exec(rule![1]!);
+    expect(margin, '@page sets no margin').not.toBeNull();
+    const sides = margin![1]!.trim().split(/\s+/);
+    // One value means all four edges. Any other count has to be read out, so
+    // "25mm 10mm" cannot pass by looking like it starts with the right number.
+    expect(sides.length, 'write it as one value for all four edges').toBe(1);
+    const parsed = /^([\d.]+)(mm|cm|in|pt)$/.exec(sides[0]!);
+    expect(parsed, `unreadable margin: ${sides[0]}`).not.toBeNull();
+    const asMm = { mm: 1, cm: 10, in: 25.4, pt: 25.4 / 72 }[parsed![2] as 'mm'];
+    expect(Number(parsed![1]) * asMm).toBeGreaterThanOrEqual(25);
+  });
+
+  it('does not force a paper size', () => {
+    // Naming A4 makes a printer loaded with anything else scale the document
+    // down, and the margin shrinks with it — which is the fault this rule
+    // exists to fix, arriving by another road.
+    expect(rule![1]!).not.toMatch(/\bsize\s*:/);
+  });
+
+  it('leaves the document no padding of its own to double it up', () => {
+    // The one that styles the document, not the one-liner further up that only
+    // repeats a table heading across pages.
+    const blocks = [...css.matchAll(/@media print \{([\s\S]*?)\n\}/g)].map((m) => m[1]!);
+    const printBlock = blocks.find((b) => b.includes('.quote-doc {')) ?? '';
+    expect(printBlock, 'no print block styles the document').not.toBe('');
+    expect(printBlock).toMatch(/\.quote-doc \{[^}]*padding: 0/);
+  });
+});

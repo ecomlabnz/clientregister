@@ -7,6 +7,49 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.19.1 — 9 September 2026
+
+### Changed
+**The letter of engagement now greets the client, and stops asking for their
+postal address.** Two corrections from reading a real one:
+
+- *"the letter of engagement must start with `Dear CLIENT'S FULL NAME,`"* — it
+  opened straight into the first paragraph under a bare name, which reads as a
+  form rather than as a letter from a person. The salutation uses the full name
+  as the register holds it, so it matches the name on the quotation beside it
+  and the name the client signs under. A client with no name recorded is not
+  greeted at all, rather than being sent *"Dear ,"*.
+- *"The address is not required - it should only have email and phone number."*
+  It is a letter that goes by email, to clients who are often between
+  addresses — one live record's address reads *"(joint tenancy address; full
+  address not stated)"*, which is a note to the file, printed on a contract.
+  The block now carries email and telephone. The address stays on the client's
+  own record; it is only this document that stops carrying it.
+
+### Fixed
+**Printed documents were leaving almost no margin.** Reported from a real
+quotation: *"the margins are too thin. they must be at least 25mm all around."*
+
+Measured on the file sent: **8.5mm at the sides, 5.8mm at the top.** The cause
+was that the register had no `@page` rule at all — it had never said what margin
+its documents wanted, so the browser's print dialogue decided, and whatever it
+was set to last is what the client received. A quotation carrying the letter of
+engagement is a contract; it gets filed, punched and photocopied.
+
+Now **25mm on every edge, on every printed page** — quotation, letter of
+engagement, invoice alike. Verified by generating the documents through the real
+print route and measuring the result rather than trusting the stylesheet, and
+pinned by a test, because this is invisible on screen: nothing looks wrong when
+the rule is missing, and it only shows up on paper after the document has gone.
+
+Two deliberate limits, both stated in Help:
+
+- **The paper size is not forced.** Naming A4 would make a printer loaded with
+  anything else scale the document down and take the margin with it — the same
+  fault arriving by another road.
+- **The browser can still override it.** Chrome's print box has a Margins
+  control, and *None* ignores the document. It has to stay on *Default*.
+
 ## 1.19.0 — 9 September 2026
 
 ### Added
