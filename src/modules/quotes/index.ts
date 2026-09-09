@@ -1415,8 +1415,9 @@ export const quotesModule: AppModule = {
               ${practice.adviserDetails ? html`<p class="prewrap small">${practice.adviserDetails}</p>` : ''}
               ${practice.postalAddress ? html`<p class="prewrap small">${practice.postalAddress}</p>` : ''}
               <p class="small">
-                ${practice.contactEmail ? html`${practice.contactEmail}<br>` : ''}
-                ${practice.contactPhone ? html`${practice.contactPhone}` : ''}
+                ${practice.contactPhone ? html`Mobile: ${practice.contactPhone}<br>` : ''}
+                ${practice.contactEmail ? html`Email: ${practice.contactEmail}<br>` : ''}
+                ${practice.gstNumber ? html`GST: ${practice.gstNumber}` : ''}
               </p>
             </div>
             <div class="quote-doc-ref">
@@ -1672,10 +1673,15 @@ export const quotesModule: AppModule = {
               <h1>${practice.legalName}</h1>
               ${practice.adviserDetails ? html`<p class="prewrap small">${practice.adviserDetails}</p>` : ''}
               ${practice.postalAddress ? html`<p class="prewrap small">${practice.postalAddress}</p>` : ''}
+              ${'' /* Labelled, at the practice's instruction of 9 September
+                     2026. A bare address and a bare number under a firm's name
+                     are two lines a reader has to work out; two words settle
+                     it, and the GST number belongs with them because it is the
+                     other thing a client copies off a fee document. */}
               <p class="small">
-                ${practice.contactEmail ? html`${practice.contactEmail}<br>` : ''}
-                ${practice.contactPhone ? html`${practice.contactPhone}<br>` : ''}
-                ${practice.gstNumber ? html`GST number ${practice.gstNumber}` : ''}
+                ${practice.contactPhone ? html`Mobile: ${practice.contactPhone}<br>` : ''}
+                ${practice.contactEmail ? html`Email: ${practice.contactEmail}<br>` : ''}
+                ${practice.gstNumber ? html`GST: ${practice.gstNumber}` : ''}
               </p>
             </div>
             <div class="quote-doc-ref">

@@ -1352,9 +1352,21 @@ details[open] > summary { margin-bottom: 12px; }
 .quote-doc-table tfoot td { border-bottom: none; padding: 5px 0; }
 .quote-doc-table tfoot tr:first-child td { border-top: 1px solid var(--border); padding-top: 10px; }
 .quote-doc-table tfoot .totals-row td { border-top: 2px solid var(--border); padding-top: 10px; background: none; }
-.quote-doc-meta { display: grid; grid-template-columns: auto auto; gap: 3px 12px; margin: 0; font-size: 0.85rem; justify-content: end; }
-.quote-doc-meta dt { color: var(--muted); }
-.quote-doc-meta dd { margin: 0; text-align: right; }
+/* Date, reference and matter, meeting on one line down the middle.
+ *
+ * Asked for on 9 September 2026: *"align it to each other in the middle, use :
+ * at the end"*. Both columns were right-aligned, so the labels ended at a
+ * ragged left edge and the values at a ragged one of their own — three pairs
+ * that never quite lined up with each other. Labels right, values left, and the
+ * grid's own column boundary becomes the axis they share.
+ *
+ * The colon is generated rather than typed into each template: there are two
+ * documents carrying this block and it is punctuation, not wording, so one
+ * place is the place where it cannot drift between them. */
+.quote-doc-meta { display: grid; grid-template-columns: auto auto; gap: 3px 10px; margin: 0; font-size: 0.85rem; justify-content: end; }
+.quote-doc-meta dt { color: var(--muted); text-align: right; }
+.quote-doc-meta dt::after { content: ':'; }
+.quote-doc-meta dd { margin: 0; text-align: left; }
 .quote-doc-conditions { margin: 0; padding-left: 18px; font-size: 0.88rem; line-height: 1.6; }
 .quote-doc-conditions li { margin-bottom: 7px; }
 .quote-doc-note { margin-top: 10px; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius); }

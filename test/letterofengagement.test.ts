@@ -429,7 +429,7 @@ describe('where the covering letter ends and the terms begin', () => {
     quote(h);
     const body = await letter(h);
     expect(body).toContain('Short Form Terms of Engagement');
-    expect(body).toContain('Immigration Legal Services (Direct Access)');
+    expect(body).toContain('Immigration Legal Services');
     expect(body.indexOf('Short Form Terms of Engagement'))
       .toBeLessThan(body.indexOf('The Parties, the Scope of Work'));
     // And after the covering letter it closes off.
@@ -521,5 +521,46 @@ describe('the scope of the retainer', () => {
     const body = await (await h.request('/quotes/q1/print')).text();
     expect(body).not.toContain('A limited scope retainer.');
     expect(body).not.toContain('Short Form Terms of Engagement');
+  });
+});
+
+/**
+ * The practice's own details at the head of a document.
+ *
+ * **Asked for on 9 September 2026:** *"under my phone number add my GST, phone
+ * number should start with Mobile: and email should have Email:"*. A bare
+ * address and a bare number under a firm's name are two lines a reader has to
+ * work out, and the GST number belongs with them because it is the other thing
+ * a client copies off a fee document.
+ */
+describe('the practice at the head of the page', () => {
+  const withPractice = (h: ReturnType<typeof mount>) => h.db.exec(`
+    INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES
+      ('practice.contact_phone', '+64 21 000 0000', '${AT}'),
+      ('practice.contact_email', 'practice@example.test', '${AT}'),
+      ('practice.gst_number', '000-000-000', '${AT}')`);
+
+  for (const [what, path] of [['letter', '/quotes/q1/letter'], ['quotation', '/quotes/q1/print']] as const) {
+    it(`labels the mobile, the email and the GST number on the ${what}`, async () => {
+      const h = mount();
+      withWording(h);
+      quote(h);
+      withPractice(h);
+
+      const body = await (await h.request(path)).text();
+      expect(body).toContain('Mobile: +64 21 000 0000');
+      expect(body).toContain('Email: practice@example.test');
+      expect(body).toContain('GST: 000-000-000');
+    });
+  }
+
+  it('leaves out a line the practice has not filled in, rather than a bare label', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    h.db.exec(`INSERT OR REPLACE INTO settings (key, value, updated_at)
+               VALUES ('practice.gst_number', '', '${AT}')`);
+    const body = await (await h.request('/quotes/q1/letter')).text();
+    expect(body).not.toContain('GST:');
   });
 });
