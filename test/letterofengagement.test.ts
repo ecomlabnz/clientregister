@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { mountModule, fakeUser } from './support/d1';
 import { quotesModule } from '../src/modules/quotes';
-import { parseAdminTeam } from '../src/core/engagement';
+import { ENGAGEMENT_SETTINGS, parseAdminTeam } from '../src/core/engagement';
 
 const AT = '2026-09-08T09:00:00Z';
 const USER = fakeUser({ role: 'owner' });
@@ -714,5 +714,41 @@ The basis is set out in the Terms.
     const body = await (await h.request('/quotes/q1/print')).text();
     expect(body).not.toContain('Lawyers Fidelity Fund information.');
     expect(body).not.toContain('Information for Clients');
+  });
+});
+
+/**
+ * How much the practice may write.
+ *
+ * **Asked urgently on 9 September 2026.** Their list of what a client confirms
+ * had outgrown the 4,000-character cap and the box was refusing the rest — one
+ * item per line, and the practice keeps adding items, so the cap is the thing
+ * that moves rather than the list that gets cut.
+ */
+describe('the length of what a client confirms', () => {
+  it('accepts a list far longer than the old cap, and prints all of it', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+
+    // 120 items of about 70 characters: well past 4,000, inside 10,000.
+    const items = Array.from({ length: 120 }, (_, i) =>
+      `confirm item number ${i + 1}, which is a sentence of an ordinary length`);
+    const list = items.join('\n');
+    expect(list.length).toBeGreaterThan(4000);
+    expect(list.length).toBeLessThan(10000);
+
+    // The settings form lives in another module, so the rule itself is what is
+    // pinned here: the declared cap, which is what was refusing the text.
+    const def = ENGAGEMENT_SETTINGS.settings
+      .find((d) => d.key === 'engagement.acknowledgements');
+    expect(def?.maxLength ?? 0).toBeGreaterThanOrEqual(10000);
+
+    h.db.exec(`INSERT OR REPLACE INTO settings (key, value, updated_at)
+               VALUES ('engagement.acknowledgements', '${list}', '${AT}')`);
+    const body = await (await h.request('/quotes/q1/letter')).text();
+    expect(body).toContain('confirm item number 1,');
+    expect(body).toContain('confirm item number 120,');
+    expect((body.match(/<li>confirm item number /g) ?? []).length).toBe(120);
   });
 });

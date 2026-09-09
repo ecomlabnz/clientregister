@@ -37,6 +37,13 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.23.1', date: '9 September 2026',
+    notes: [
+      '\u201CWhat the client confirms\u201D now holds 10,000 characters instead of 4,000. Your '
+        + 'list had outgrown the box and it was refusing the rest.',
+    ],
+  },
+  {
     version: '1.23.0', date: '9 September 2026',
     notes: [
       'Quotations and letters now print as black on white paper whatever your screen is set to. '
