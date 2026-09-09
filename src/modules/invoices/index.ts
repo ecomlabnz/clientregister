@@ -852,14 +852,24 @@ export const invoicesModule: AppModule = {
               <h1>${practice.legalName}</h1>
               ${practice.adviserDetails ? html`<p class="prewrap small">${practice.adviserDetails}</p>` : ''}
               ${practice.postalAddress ? html`<p class="prewrap small">${practice.postalAddress}</p>` : ''}
+              ${'' /* Labelled, as the quotation's are. The two documents are
+                     the same letterhead and a client often holds both; a bare
+                     address and a bare number under a firm's name are two lines
+                     a reader has to work out, and the quotation stopped asking
+                     that of them on 9 September 2026. */}
               <p class="small">
-                ${practice.contactEmail ? html`${practice.contactEmail}<br>` : ''}
-                ${practice.contactPhone ? html`${practice.contactPhone}<br>` : ''}
-                ${practice.gstNumber ? html`GST number ${practice.gstNumber}` : ''}
+                ${practice.contactPhone ? html`Mobile: ${practice.contactPhone}<br>` : ''}
+                ${practice.contactEmail ? html`Email: ${practice.contactEmail}<br>` : ''}
+                ${practice.gstNumber ? html`GST: ${practice.gstNumber}` : ''}
               </p>
             </div>
             <div class="quote-doc-ref">
-              <h2>${totals.hasGst ? 'Tax invoice' : 'Invoice'}</h2>
+              ${'' /* The same size and weight as "FEE QUOTE" on a quotation.
+                     They sit in the same corner of the same letterhead, and
+                     one of them being a heading while the other was the title
+                     of the page only showed once the header was swapped to
+                     match the practice's own invoice. */}
+              <p class="quote-doc-kind">${totals.hasGst ? 'Tax invoice' : 'Invoice'}</p>
               <dl class="quote-doc-meta">
                 <dt>Invoice</dt><dd class="strong">${invoice.ref}</dd>
                 <dt>Issued</dt><dd>${invoice.issued_on ? dateShort(invoice.issued_on) : 'draft'}</dd>

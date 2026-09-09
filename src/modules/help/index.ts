@@ -37,6 +37,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.30.1', date: '9 September 2026',
+    notes: [
+      '\u201CINVOICE\u201D is now the size of a document title, the same as \u201CFEE '
+        + 'QUOTE\u201D on a quotation. It had been an ordinary heading.',
+      'Your contact lines on an invoice are labelled Mobile, Email and GST, as they already were '
+        + 'on a quotation. The same details had been appearing two different ways on two '
+        + 'documents in the same envelope.',
+    ],
+  },
+  {
     version: '1.30.0', date: '9 September 2026',
     notes: [
       'Quotations and invoices are now set close to your own Xero invoice: 8.5pt type, hairline '
