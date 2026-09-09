@@ -1300,6 +1300,21 @@ details[open] > summary { margin-bottom: 12px; }
    RE line and the body: closer below than above, so the letter reads as one
    block of prose rather than three stacked fragments. */
 .letter-salutation { margin: 0 0 10px; }
+/* The seam between the covering letter and the terms.
+ *
+ * A rule across the page with the title sitting on it, because that is what the
+ * eye reads as "a new document starts here" — a heading alone reads as another
+ * section of the same one, which is the confusion this exists to remove. It
+ * keeps its following block on the same page when printed: a divider orphaned
+ * at the foot of page one announces nothing. */
+.letter-terms-start {
+  margin: 30px 0 18px; padding-top: 16px; border-top: 2px solid var(--text);
+  text-align: center; break-after: avoid; page-break-after: avoid;
+}
+.letter-terms-start h2 {
+  margin: 0; font-size: 1.05rem; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.letter-terms-start p { margin: 4px 0 0; text-transform: uppercase; letter-spacing: 0.03em; }
 /* a) b) c), which is how the practice's own numbering reads — the letter has
    numbered clauses around it, and a nested list of digits inside a clause
    numbered 1.4 gives two competing numbering schemes on one page. */

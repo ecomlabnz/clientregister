@@ -53,6 +53,46 @@ export const ENGAGEMENT_SETTINGS: SettingsGroup = {
         + 'responsibility for the matter, who the client deals with day to day, and how they '
         + 'accept. Blank lines separate paragraphs. Nothing is supplied: this is your wording, '
         + 'not the register’s.' },
+    // --- Where the covering letter ends and the terms begin ----------------
+    //
+    // **Asked for on 9 September 2026**, with a line drawn across a screenshot:
+    // everything above it is the covering letter, everything below is the
+    // practice's short-form terms. Two documents on one page, and until now
+    // nothing said where one stopped.
+    //
+    // It matters beyond tidiness. The letter points at a *second* document —
+    // the Standard Terms of Engagement, published at a web address — and a
+    // client who cannot see that the page they are reading is itself a set of
+    // terms has no way to tell the two apart.
+    { key: 'engagement.terms_title', type: 'string', maxLength: 200,
+      label: 'The terms, as they are headed',
+      default: 'Short Form Terms of Engagement',
+      help: 'Printed across the page where the covering letter ends and the terms begin. '
+        + 'Leave blank and no dividing heading is printed.' },
+    { key: 'engagement.terms_subtitle', type: 'string', maxLength: 200,
+      label: 'And under that heading',
+      default: 'Immigration Legal Services (Direct Access)',
+      help: 'Ignored when the heading above is blank.' },
+
+    // --- The scope of the retainer -----------------------------------------
+    //
+    // Its own section under the quotation block, by the practice's choice of
+    // 9 September 2026, rather than inside it: the block states where the work
+    // is written down, and this states the limits of it.
+    //
+    // **The default is deliberately empty.** This is the paragraph that tells a
+    // client what their lawyer will and will not do, and the register does not
+    // write that for anybody — the same reason the opening and the closing ship
+    // blank. The practice pasted their own in.
+    { key: 'engagement.scope_heading', type: 'string', maxLength: 200,
+      label: 'Scope of the retainer — heading',
+      default: 'Scope of the Retainer',
+      help: 'Ignored when there is no wording below.' },
+    { key: 'engagement.scope_terms', type: 'text', maxLength: 4000,
+      label: 'Scope of the retainer — the wording', default: '',
+      help: 'Printed immediately under the block that points at the quotation. Blank lines '
+        + 'separate paragraphs. Nothing is supplied: this is your wording, not the register’s.' },
+
     // --- The administrative team ------------------------------------------
     //
     // **Asked for on 9 September 2026.** The practice's letter says that
@@ -136,6 +176,10 @@ export function parseAdminTeam(raw: string): AdminContact[] {
 export interface EngagementText {
   subject: string;
   opening: string;
+  termsTitle: string;
+  termsSubtitle: string;
+  scopeHeading: string;
+  scopeTerms: string;
   adminTeamHeading: string;
   adminTeamIntro: string;
   adminTeam: AdminContact[];
@@ -155,6 +199,10 @@ export async function engagementText(env: Env): Promise<EngagementText> {
   return {
     subject: (v['engagement.subject'] ?? '').trim(),
     opening,
+    termsTitle: (v['engagement.terms_title'] ?? '').trim(),
+    termsSubtitle: (v['engagement.terms_subtitle'] ?? '').trim(),
+    scopeHeading: (v['engagement.scope_heading'] ?? '').trim(),
+    scopeTerms: (v['engagement.scope_terms'] ?? '').trim(),
     adminTeamHeading: (v['engagement.admin_team_heading'] ?? '').trim(),
     adminTeamIntro: (v['engagement.admin_team_intro'] ?? '').trim(),
     adminTeam: parseAdminTeam(v['engagement.admin_team'] ?? ''),
