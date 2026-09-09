@@ -7,6 +7,19 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.16.1 — 8 September 2026
+
+### Fixed
+- **A new security advisory was blocking every deploy.** `sharp`, an image
+  library the local development runtime pulls in, was found to have two
+  vulnerabilities in the image decoder it uses. Nothing here calls it and it
+  never reaches the live register — it is a development tool — but the rule is
+  that nothing deploys with a known high-severity advisory anywhere in the
+  dependency tree, and the rule is right to be blunt about it.
+
+  Wrangler is updated and `sharp` is pinned to the patched version. The register
+  itself is unchanged.
+
 ## 1.16.0 — 8 September 2026
 
 ### Changed
