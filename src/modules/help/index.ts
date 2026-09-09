@@ -51,6 +51,11 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
         + 'engagement.',
       'The administrative team box now understands however you type it. Written with labels and '
         + 'commas, it was losing the email addresses off the letter completely.',
+      'On a quotation, \u201CRe\u201D names the kind of work rather than repeating the client, '
+        + 'who is already at the top; Amount sits to the right of GST; and \u201COur '
+        + 'reference\u201D is shortened to \u201COur Ref\u201D.',
+      'The unit on a fee line can be cleared. \u201Citem\u201D came back however you edited it, '
+        + 'because an empty box could not be told apart from one that was never filled in.',
     ],
   },
   {

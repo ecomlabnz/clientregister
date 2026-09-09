@@ -149,7 +149,9 @@ describe('creating a quotation', () => {
     await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '0' });
     const id = h.get<{ id: string }>('SELECT id FROM quotes')!.id;
     const body = await (await h.request(`/quotes/${id}/print`)).text();
-    expect(body).toContain('RV. Partner — Larisa MIKHAILOVA');
+    // The kind of work, without the client's name repeated — see the Re line
+    // tests at the foot of this file.
+    expect(body).toContain('RV. Partner');
     expect(body).not.toContain('<h3>Scope</h3>');
   });
 });
@@ -249,5 +251,43 @@ describe('migration 0074 carries the lines across before deleting the rows', () 
     const row = ((db.prepare(`SELECT meta_json FROM audit_log WHERE id='aud_cat74'`) as any).get());
     expect(JSON.parse(row.meta_json))
       .toMatchObject({ copied_rows_removed: 1, rows_kept: 1, quote_lines_carried_across: 1 });
+  });
+});
+
+/**
+ * What the quotation says it is about.
+ *
+ * **Asked on 9 September 2026:** *"here no need for the name in section Re,
+ * just the type of visa will suffice — e.g. RV. Partner"*. The client is
+ * already named at the head of the document, and a reference line repeating
+ * them says nothing the reader did not have.
+ */
+describe('the Re line on a printed quotation', () => {
+  it('names the kind of work, not the client', async () => {
+    const h = mount();
+    await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '0' });
+    const id = h.get<{ id: string }>('SELECT id FROM quotes')!.id;
+
+    const body = await (await h.request(`/quotes/${id}/print`)).text();
+    expect(body).toContain('<dt>Re</dt><dd>RV. Partner</dd>');
+    // The quotation is still *named* with the client, which is how it reads in
+    // a list; it is only the reference line that stops repeating them.
+    expect(h.get<{ description: string }>('SELECT description FROM quotes')!.description)
+      .toContain('—');
+  });
+
+  it('falls back to the quotation’s own name when no kind of work is recorded', async () => {
+    // Derived from the type key rather than cut off the front of the stored
+    // name — splitting on an em dash works until a matter has one in it.
+    const h = mount();
+    await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '0' });
+    const id = h.get<{ id: string }>('SELECT id FROM quotes')!.id;
+    h.db.exec(`UPDATE quotes SET case_type = NULL, description = 'Advice — one hour'`);
+
+    const body = await (await h.request(`/quotes/${id}/print`)).text();
+    // Not a bare em dash, which is what `labelFor` answers for a missing key
+    // and what this printed before the check was made explicit.
+    expect(body).not.toContain('<dt>Re</dt><dd>—</dd>');
+    expect(body).toContain('<dt>Re</dt><dd>Advice — one hour</dd>');
   });
 });
