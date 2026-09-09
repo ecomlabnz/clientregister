@@ -37,6 +37,23 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.19.1', date: '9 September 2026',
+    notes: [
+      'The letter of engagement now begins \u201CDear \u2026,\u201D with the client\u2019s full '
+        + 'name. It used to open straight into the first paragraph under a bare name.',
+      'It no longer asks for a postal address \u2014 the block at the top carries their email and '
+        + 'telephone instead. The address stays on their own record; it is only this letter that '
+        + 'stops printing it.',
+      'Printed documents now leave 25mm clear on all four sides. A quotation you sent came out '
+        + 'with about 8mm at the sides and 6mm at the top \u2014 the register had never said what '
+        + 'the margin should be, so the browser chose.',
+      'One thing to watch when you save one as a PDF: in the browser\u2019s print box, leave '
+        + 'Margins on Default. Set to None and the browser ignores what the document asks for.',
+      'The paper size is deliberately left to your printer. Forcing A4 would make a printer '
+        + 'loaded with anything else shrink the whole page, and the margin with it.',
+    ],
+  },
+  {
     version: '1.19.0', date: '9 September 2026',
     notes: [
       'A matter or a client created by mistake can now be deleted \u2014 the button is at the '
@@ -1998,6 +2015,12 @@ function sections(origin: string): Section[] {
         <p><strong>Print view</strong> gives the invoice on your letterhead with your GST number,
            your bank account and the payments already received. It is headed <em>Tax invoice</em>
            when GST applies and simply <em>Invoice</em> when it does not.</p>
+        <h4>Margins, when you save one as a PDF</h4>
+        <p>Every document the register prints — quotation, letter of engagement, invoice —
+           leaves <strong>25mm clear on all four sides</strong>. There is one setting that can
+           override it: in the browser’s print box, <strong>Margins</strong> must be left on
+           <em>Default</em>. Set to <em>None</em> and the browser ignores what the document asks
+           for and prints to the edge of the paper.</p>
         <h4>Xero</h4>
         <p>Not connected yet. The invoice already carries somewhere to record a push — the Xero
            identifier and when it went — so that when it is connected the two systems can agree
