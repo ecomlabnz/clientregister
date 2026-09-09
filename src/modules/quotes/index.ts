@@ -1664,7 +1664,13 @@ export const quotesModule: AppModule = {
           ${practice.termsUrl ? html`
             <section>
               <h3>Standard terms of engagement</h3>
-              <p>This engagement is on the ${practice.termsLabel}, whose current edition is
+              ${'' /* Not justified. A web address cannot be broken between
+                     words, so the line before it is stretched to the full
+                     measure around whatever few words fit — which on the letter
+                     read "published" ... "at" with most of a line of white
+                     between them. Justification is for prose, and a paragraph
+                     carrying an address is only mostly prose. */}
+              <p class="letter-terms-link">This engagement is on the ${practice.termsLabel}, whose current edition is
                  ${'' /* A live link, asked for on 9 September 2026. The
                         address stays visible as the link's own text rather
                         than hidden behind words, because this document is

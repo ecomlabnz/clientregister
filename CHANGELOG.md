@@ -7,6 +7,20 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.27.1 — 9 September 2026
+
+### Fixed
+**A gap in the middle of the letter, from justifying it.** The paragraph naming
+the standard terms carries a web address, and a web address cannot be broken
+between words — so the line before it was stretched to the full measure around
+whatever few words fit, and read "…whose current edition is published" then most
+of a line of white, then "at".
+
+Justification is for prose, and a paragraph carrying an address is only mostly
+prose. That one keeps its ragged edge. Found by looking at the rendered page in
+a browser rather than at the rule that produced it, which would not have shown
+it.
+
 ## 1.27.0 — 9 September 2026
 
 ### Fixed
