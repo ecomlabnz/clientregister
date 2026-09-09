@@ -224,14 +224,22 @@ describe('the new-thing button on a filter bar', () => {
  * `@page` is a request. Chrome's print dialogue has a Margins control and every
  * setting but "Default" overrides the document. A margin a contract depends on
  * cannot sit behind a preference in somebody's print box, so the page margin is
- * zero and the document carries its own 25mm as padding, which no print setting
- * can reach.
+ * zero and the document carries its own side margin as padding, which no print
+ * setting can reach.
  *
- * This is worth pinning because it is invisible on screen. Nothing about the
- * register looks wrong when it is missing; it shows up on paper, once, after a
+ * **The figure is 20mm**, reduced from 25mm on 9 September 2026 once that
+ * mechanism was working: 25mm was the number asked for while documents were
+ * coming out at 8.5mm, and 20mm is what the practice actually wants now that
+ * the margin is applied at all. The two halves are asserted against one
+ * constant below, so they cannot drift apart — which is the fault this suite
+ * exists to catch, and it is invisible on screen: nothing about the register
+ * looks wrong when the margin is missing; it shows up on paper, once, after a
  * client has been sent the document.
  */
-describe('a printed document keeps a 25mm margin', () => {
+describe('a printed document keeps its margin', () => {
+  /** The margin the practice asked for, in millimetres. One place. */
+  const MARGIN_MM = 20;
+
   // Anchored to the start of a line, so the worked example inside the comment
   // above the rule — which shows the old `@page { margin: 25mm }` — is not
   // mistaken for the rule itself. It was, and this test failed against correct
@@ -256,7 +264,7 @@ describe('a printed document keeps a 25mm margin', () => {
     expect(page, 'no @page rule at all').not.toBeNull();
     const sides = /margin:\s*([^;]+);/.exec(page![1]!)![1]!.trim().split(/\s+/);
     expect(sides.length, 'write it as "<top/bottom> <sides>"').toBe(2);
-    expect(asMm(sides[0]!)).toBeGreaterThanOrEqual(25);
+    expect(asMm(sides[0]!)).toBe(MARGIN_MM);
     expect(asMm(sides[1]!), 'the sides are the document\u2019s, not the page\u2019s').toBe(0);
   });
 
@@ -269,7 +277,7 @@ describe('a printed document keeps a 25mm margin', () => {
     const sides = padding![1]!.trim().split(/\s+/);
     expect(sides.length, 'write it as "<top/bottom> <sides>"').toBe(2);
     expect(asMm(sides[0]!), 'the top and bottom belong to @page').toBe(0);
-    expect(asMm(sides[1]!)).toBeGreaterThanOrEqual(25);
+    expect(asMm(sides[1]!), 'the sides must match the page\u2019s top and bottom').toBe(MARGIN_MM);
   });
 
   it('names A4, because the practice prints A4', () => {
@@ -308,5 +316,113 @@ describe('a printed document keeps a 25mm margin', () => {
     expect(body![1]!.trim()).toMatch(/pt$/);
     expect(asMm(body![1]!)).toBeGreaterThanOrEqual(asMm('9pt'));
     expect(asMm(body![1]!)).toBeLessThanOrEqual(asMm('11pt'));
+  });
+});
+
+/**
+ * The letter of engagement is set flush to both margins.
+ *
+ * **Asked for on 9 September 2026:** *"justify the text on both sides in the
+ * letter of engagement."*
+ *
+ * Two things are worth pinning, and neither is the appearance. The first is
+ * that only running prose is justified: stretching a two-word line to the full
+ * measure is what makes justification look wrong, and a name, a date and a
+ * salutation are all short lines. The second is the specificity — the
+ * exceptions carry two class names against the rule's one, so they hold
+ * whatever order the file is edited into, which is not something anybody
+ * should have to check by eye after moving a block.
+ */
+describe('the letter of engagement is justified, and only where it is prose', () => {
+  // Comments out of the way first. Every rule below is described in prose
+  // directly above itself, and a selector list read with the comment still in
+  // it is the comment. That is not a hypothetical: it is what this suite did on
+  // the first run.
+  const rules = css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  /**
+   * The selectors of the rule inside the letter that carries a declaration.
+   * Scoped to the letter deliberately: `text-align: left` is an ordinary thing
+   * to write and the stylesheet says it elsewhere about a table cell.
+   */
+  const selectorsOf = (declaration: string): string[] => {
+    const found = [...rules.matchAll(new RegExp(`([^{}]*)\\{[^{}]*${declaration}[^{}]*\\}`, 'g'))]
+      .map((m) => m[1]!.split(',').map((s) => s.trim()).filter(Boolean))
+      .filter((selectors) => selectors.every((s) => s.startsWith('.letter-doc')));
+    expect(found.length, `no rule inside the letter sets ${declaration}`).toBe(1);
+    return found[0]!;
+  };
+
+  const justified = selectorsOf('text-align: justify;');
+
+  it('justifies the prose of the letter', () => {
+    // The opening and closing are bare paragraphs on the document; the
+    // clauses, the scope, the addendum and the acknowledgements are inside
+    // sections; the two lettered and numbered lists are list items.
+    for (const selector of ['.letter-doc > p', '.letter-doc section p', '.letter-doc li']) {
+      expect(justified, `${selector} is not justified`).toContain(selector);
+    }
+  });
+
+  it('leaves the quotation ragged', () => {
+    // A quotation is a table of figures with short descriptions beside them,
+    // and a justified two-word cell is a row of gaps. Nothing outside the
+    // letter may be caught by the rule.
+    for (const selector of justified) {
+      expect(selector, `${selector} justifies more than the letter`)
+        .toMatch(/^\.letter-doc\b/);
+    }
+  });
+
+  it('leaves the address, the RE line, the salutation and the signature alone', () => {
+    // Every one of these is a short line, and a short line stretched to the
+    // full measure is the thing that makes justified text look broken.
+    const exempt = selectorsOf('text-align: left;');
+    for (const selector of [
+      '.letter-doc .letter-to p',
+      '.letter-doc .letter-re',
+      '.letter-doc .letter-salutation',
+      '.letter-doc .letter-signature p',
+      // Names, mobiles and email addresses. The same reasoning as the block at
+      // the top of the letter: it is contact detail, not a sentence.
+      '.letter-doc .letter-admin-team li',
+      // The register's own message about missing wording, which is not part of
+      // the contract and should not be set as though it were.
+      '.letter-doc .alert',
+    ]) {
+      expect(exempt, `${selector} would be justified`).toContain(selector);
+    }
+  });
+
+  it('exempts by specificity rather than by order', () => {
+    // Two class names against one. Were the exceptions written with the same
+    // weight as the rule they undo, they would hold only while they stayed
+    // below it in the file — which is a guarantee that lasts until somebody
+    // tidies the stylesheet.
+    const classes = (selector: string) => (selector.match(/\.[a-z-]+/g) ?? []).length;
+    const weakestException = Math.min(...[
+      '.letter-doc .letter-to p',
+      '.letter-doc .letter-re',
+      '.letter-doc .letter-salutation',
+      '.letter-doc .letter-signature p',
+      '.letter-doc .letter-admin-team li',
+      '.letter-doc .alert',
+    ].map(classes));
+    const strongestRule = Math.max(...justified.map(classes));
+    expect(weakestException).toBeGreaterThan(strongestRule);
+  });
+
+  it('still justifies the acknowledgements, which are sentences', () => {
+    // The exemptions above are all contact detail and furniture. The numbered
+    // list a client is asked to accept is prose and is set as prose — it is
+    // caught by `.letter-doc li` and must not gain an exemption of its own.
+    const exempt = selectorsOf('text-align: left;');
+    expect(exempt.some((s) => s.includes('letter-acknowledgements'))).toBe(false);
+  });
+
+  it('never stretches a last line', () => {
+    // `text-align-last` is left at its default on purpose: the last line of a
+    // paragraph, and so every one-line paragraph, stays as it was.
+    expect(rules).not.toContain('text-align-last');
   });
 });

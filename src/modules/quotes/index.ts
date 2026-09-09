@@ -1627,14 +1627,14 @@ export const quotesModule: AppModule = {
           </section>
 
           ${'' /* The one thing the stylesheet cannot hold.
-                 The document asks for a 25mm margin and Chrome's print dialogue
+                 The document asks for a 20mm margin and Chrome's print dialogue
                  overrides it on any Margins setting but Default — which is how a
                  letter went out at 8.5mm on 9 September 2026 with the rule
                  correctly in place and live. Said here, beside the button,
                  because Help is not where somebody is standing when they press
                  it. */}
           <p class="hint no-print">In the print box, leave <strong>Margins</strong> on
-             <strong>Default</strong>. Any other setting overrides the 25mm this document asks
+             <strong>Default</strong>. Any other setting overrides the 20mm this document asks
              for.</p>
           ${'' /* After the signature, and on a page of its own.
                  It is not the practice speaking to this client about this
@@ -1922,14 +1922,14 @@ export const quotesModule: AppModule = {
           </section>
 
           ${'' /* The one thing the stylesheet cannot hold.
-                 The document asks for a 25mm margin and Chrome's print dialogue
+                 The document asks for a 20mm margin and Chrome's print dialogue
                  overrides it on any Margins setting but Default — which is how a
                  letter went out at 8.5mm on 9 September 2026 with the rule
                  correctly in place and live. Said here, beside the button,
                  because Help is not where somebody is standing when they press
                  it. */}
           <p class="hint no-print">In the print box, leave <strong>Margins</strong> on
-             <strong>Default</strong>. Any other setting overrides the 25mm this document asks
+             <strong>Default</strong>. Any other setting overrides the 20mm this document asks
              for.</p>
           <footer class="quote-doc-foot no-print">
             <button class="btn btn-primary" data-print type="button">Print this quote</button>

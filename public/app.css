@@ -1353,6 +1353,45 @@ details[open] > summary { margin-bottom: 12px; }
   margin: 0 0 12px; font-size: 1.05rem; letter-spacing: 0.04em; text-transform: uppercase;
 }
 .letter-brief { padding: 12px 14px; border-left: 3px solid var(--accent); background: var(--surface-2); }
+/* Justified — set flush to both margins.
+ *
+ * **Asked for on 9 September 2026:** *"justify the text on both sides in the
+ * letter of engagement."* It is how a New Zealand legal document is set, and
+ * a straight right edge is most of what makes a page read as a deed rather
+ * than as a printout.
+ *
+ * Only the running prose. Everything that is not a sentence keeps its ragged
+ * edge, because justification stretches the spaces in a line and there is
+ * nothing to gain by stretching a name, a date or a salutation — and a great
+ * deal to lose on a two-word line. So the address block, the RE line, "Dear
+ * …,", the signature, the headings and the administrative team's contact lines
+ * are all left alone, and the centred rule between the covering letter and the
+ * terms stays centred. The acknowledgements are not: they are numbered
+ * sentences, which is prose.
+ *
+ * The exceptions below each carry two class names against the rule's one, so
+ * they win on specificity rather than on the order they happen to be written
+ * in. A last line is never stretched: `text-align-last` is left at its
+ * default, which is why a one-line paragraph looks no different.
+ *
+ * The quotation is deliberately not justified. It is a table of figures with
+ * short descriptions beside them, and a justified two-word cell is a row of
+ * gaps. */
+.letter-doc > p,
+.letter-doc section p,
+.letter-doc li {
+  text-align: justify;
+  text-justify: inter-word;
+}
+.letter-doc .letter-to p,
+.letter-doc .letter-re,
+.letter-doc .letter-salutation,
+.letter-doc .letter-signature p,
+.letter-doc .letter-admin-team li,
+.letter-doc .alert,
+.letter-doc .hint {
+  text-align: left;
+}
 .letter-acknowledgements li { margin-bottom: 8px; }
 .letter-signature { margin-top: 32px; }
 .letter-signature p { margin: 0 0 2px; }
@@ -1464,10 +1503,18 @@ details[open] > summary { margin-bottom: 12px; }
  *     reach, and which applies on every page because it insets every line.
  *   - **The top and bottom are `@page`**, because padding cannot do them: a
  *     block's padding falls at the start and end of the *document*, not at each
- *     page break, so a two-page letter would get its 25mm at the top of page
+ *     page break, so a two-page letter would get its margin at the top of page
  *     one and nothing at the top of page two. That was measured, not assumed.
  *
- * `@page` sets no side margin, so the padding cannot double it to 50mm.
+ * `@page` sets no side margin, so the padding cannot double it to 40mm.
+ *
+ * **The figure is 20mm**, reduced from 25mm at the practice's instruction of
+ * 9 September 2026 once the mechanism above was working. 25mm was what was
+ * asked for when the documents were printing at 8.5mm and the number needed to
+ * be unmistakably generous; with the margin actually being applied, 20mm is the
+ * width the practice wants and is still ample for a hole punch and a staple.
+ * It is one number in two places — here and the print padding below — and both
+ * are pinned by `test/css.test.ts`.
  *
  * What this still cannot do is force a top margin on a dialogue set to
  * anything but Default. Nothing in a stylesheet can. The print page says so on
@@ -1480,7 +1527,7 @@ details[open] > summary { margin-bottom: 12px; }
  * prints A4 and wants A4, and a New Zealand legal document that silently came
  * out US Letter would be the worse fault of the two.
  */
-@page { size: A4; margin: 25mm 0; }
+@page { size: A4; margin: 20mm 0; }
 
 @media print {
   .print-only { display: block; font-size: 0.8em; color: #444; margin-top: 4px; }
@@ -1492,7 +1539,7 @@ details[open] > summary { margin-bottom: 12px; }
   /* The side margin, where no print setting can reach it. See the note by
      `@page` above for why the top and bottom are not here too. */
   .quote-doc {
-    max-width: none; margin: 0; padding: 0 25mm; border: none; border-radius: 0;
+    max-width: none; margin: 0; padding: 0 20mm; border: none; border-radius: 0;
     background: #fff; color: #000;
   }
 

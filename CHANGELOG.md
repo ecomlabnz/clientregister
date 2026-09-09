@@ -7,6 +7,36 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.25.0 — 9 September 2026
+
+### Changed
+**The letter of engagement is justified — set flush to both margins.** Asked
+for: *"justify the text on both sides in the letter of engagement."* It is how a
+New Zealand legal document is set, and a straight right edge is most of what
+makes a page read as a deed rather than as a printout.
+
+Only the running prose. Justification works by stretching the spaces in a line,
+and there is nothing to gain by stretching a name, a date or a salutation — and
+a great deal to lose on a two-word line. So the address block, the RE line,
+"Dear …,", the signature and every heading keep their ragged edge, the rule
+between the covering letter and the terms stays centred, and a last line is
+never stretched. **The quotation is deliberately left as it was**: it is a table
+of figures with short descriptions beside them, and a justified two-word cell is
+a row of gaps.
+
+**The margin is 20mm, down from 25mm.** Asked for in the same breath, and it is
+the same two numbers as before — the page's top and bottom, and the document's
+own side padding. 25mm was the figure named while documents were coming out at
+8.5mm and the number had to be unmistakably generous; now that the margin is
+actually being applied, 20mm is the width the practice wants, and is still ample
+for a hole punch and a staple. It applies to the quotation, the letter of
+engagement and the invoice alike, because they are one document family and a
+practice's paper should not change width between them.
+
+The two halves are now asserted against a single figure in `test/css.test.ts`
+rather than against a floor each, so they cannot drift apart — which is the
+fault that suite exists to catch, and one nothing on screen would show.
+
 ## 1.24.0 — 9 September 2026
 
 ### Added
