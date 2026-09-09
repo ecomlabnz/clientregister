@@ -37,6 +37,23 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.26.0', date: '9 September 2026',
+    notes: [
+      'The totals under a quotation\u2019s fee lines sit under Amount again. They had stayed '
+        + 'under GST when Amount was moved to the right of it, so every one of them was a '
+        + 'column to the left of the figures it was adding up.',
+      'The payment stages now show what the client pays \u2014 the same figure the printed '
+        + 'quotation shows \u2014 with how much of it is GST underneath. A price no longer '
+        + 'breaks across three lines, and \u201CStage 1\u201D no longer splits in two.',
+      'A line comes off a quotation with a small red cross rather than the word \u201CRemove\u201D.',
+      'The fee lines and the payment stages are tighter. Same size type, less empty space \u2014 '
+        + 'the items card is about a third shorter.',
+      'Colour on the invoice. \u201CTax invoice\u201D, \u201CShort Form Terms of '
+        + 'Engagement\u201D and the addendum title now carry your accent colour, the same as the '
+        + 'section headings. Your own name at the top stays black.',
+    ],
+  },
+  {
     version: '1.25.0', date: '9 September 2026',
     notes: [
       'The letter of engagement is now justified \u2014 the text is straight down both edges, '

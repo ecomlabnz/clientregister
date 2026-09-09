@@ -16,7 +16,7 @@ import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
-import { emphasise, html, join, raw } from '../../ui/html';
+import { emphasise, html, join, raw, type Raw } from '../../ui/html';
 import {
   actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, stamp, statusTone, table,
 } from '../../ui/components';
@@ -235,6 +235,44 @@ export interface QuoteRow {
 
 function quoteTotal(q: Pick<QuoteRow, 'amount_cents' | 'gst_cents' | 'disbursements_cents'>): number {
   return q.amount_cents + q.gst_cents + q.disbursements_cents;
+}
+
+/**
+ * The columns of the fee lines on a quotation, on screen.
+ *
+ * **Named once because the totals beneath them are derived from it.** Amount
+ * moved to the right of GST on 9 September 2026 and the totals stayed where
+ * they were, so every figure in the totals block printed one column to the left
+ * of the figures it was totalling — under GST. Reported the same day: *"you
+ * swapped the columns but left the totals under gst - not acceptable."*
+ *
+ * Two facts had to agree and each was written down separately, which is the
+ * arrangement that guarantees they will eventually disagree. Now there is one:
+ * move a column here and the totals move with it.
+ */
+const ITEM_COLUMNS = ['Description', 'Qty', 'Unit', 'GST', 'Amount', ''] as const;
+
+/** Where the figures live, and how far the label beside them may reach. */
+const AMOUNT_COLUMN = ITEM_COLUMNS.indexOf('Amount');
+const COLUMNS_AFTER_AMOUNT = ITEM_COLUMNS.length - AMOUNT_COLUMN - 1;
+
+/**
+ * The totals under a quotation's fee lines, each figure under Amount.
+ *
+ * A row is dropped rather than printed as nil when it does not apply — there is
+ * no Disbursements line on a quotation with no disbursements, and no GST line
+ * on a practice that is not registered.
+ */
+function totalRows(
+  rows: Array<[label: string, cents: number, shown: boolean]>, currency: string,
+): Raw[] {
+  return rows.filter(([, , shown]) => shown).map(([label, cents]) => html`
+    <tr class="totals-row">
+      <td colspan="${String(AMOUNT_COLUMN)}">${label}</td>
+      <td class="num strong">${money(cents, currency)}</td>
+      ${COLUMNS_AFTER_AMOUNT > 0
+        ? html`<td colspan="${String(COLUMNS_AFTER_AMOUNT)}"></td>` : ''}
+    </tr>`);
 }
 
 /**
@@ -938,7 +976,7 @@ export const quotesModule: AppModule = {
                 // Amount last, to the right of GST, at the practice's
                 // instruction of 9 September 2026: the eye runs along a fee line
                 // to the figure that matters, and that is what the line comes to.
-                : table(['Description', 'Qty', 'Unit', 'GST', 'Amount', ''], [
+                : table([...ITEM_COLUMNS], [
                     ...lines.map((l) => html`
                       <tr>
                         <td>
@@ -951,28 +989,31 @@ export const quotesModule: AppModule = {
                         <td class="num">${l.gst_cents ? money(l.gst_cents, q.currency)
                           : html`<span class="muted">—</span>`}</td>
                         <td class="num strong">${money(l.net_cents, q.currency)}</td>
-                        <td>${writable
-                          ? actionButton(`/quotes/${q.id}/items/${l.id}/remove`, csrf, 'Remove',
-                              { className: 'btn btn-link-danger btn-small',
+                        <td class="row-action">${writable
+                          ? actionButton(`/quotes/${q.id}/items/${l.id}/remove`, csrf,
+                              `Remove “${l.description}”`,
+                              { className: 'btn-remove', icon: '\u00d7',
                                 confirm: `Remove “${l.description}” from this quote?` })
                           : ''}</td>
                       </tr>`),
-                    html`<tr class="totals-row">
-                      <td colspan="3">Professional fees</td>
-                      <td class="num strong">${money(totals.feesNetCents, q.currency)}</td><td colspan="2"></td></tr>`,
-                    ...(totals.disbursementsNetCents !== 0 ? [html`<tr class="totals-row">
-                      <td colspan="3">Disbursements</td>
-                      <td class="num strong">${money(totals.disbursementsNetCents, q.currency)}</td><td colspan="2"></td></tr>`] : []),
-                    html`<tr class="totals-row">
-                      <td colspan="3">Subtotal</td>
-                      <td class="num strong">${money(totals.subtotalNetCents, q.currency)}</td><td colspan="2"></td></tr>`,
-                    ...(totals.hasGst ? [html`<tr class="totals-row">
-                      <td colspan="3">GST</td>
-                      <td class="num strong">${money(totals.gstCents, q.currency)}</td><td colspan="2"></td></tr>`] : []),
-                    html`<tr class="totals-row">
-                      <td colspan="3" class="strong">Total payable</td>
-                      <td class="num strong">${money(totals.totalCents, q.currency)}</td><td colspan="2"></td></tr>`,
-                  ])}
+                    // A total belongs under the column it totals. The label
+                    // spans everything up to Amount and the figure sits in
+                    // Amount, so a total lines up with the figures above it.
+                    // It spanned one column fewer until 9 September 2026, when
+                    // Amount moved to the right of GST and the totals were left
+                    // where they were — reported the same day as "you swapped
+                    // the columns but left the totals under gst". Both are now
+                    // derived from ITEM_COLUMNS, so moving a column moves the
+                    // totals with it.
+                    ...totalRows([
+                      ['Professional fees', totals.feesNetCents, true],
+                      ['Disbursements', totals.disbursementsNetCents,
+                        totals.disbursementsNetCents !== 0],
+                      ['Subtotal', totals.subtotalNetCents, true],
+                      ['GST', totals.gstCents, totals.hasGst],
+                      ['Total payable', totals.totalCents, true],
+                    ], q.currency),
+                  ], { compact: true })}
 
               ${writable && lines.length > 0 ? html`
                 <details class="add-block">
@@ -1181,25 +1222,50 @@ export const quotesModule: AppModule = {
               <p class="hint mb">When each part falls due. Kept apart from the items above, because
                  the two do not line up: one piece of work can be split across a deposit and a
                  balance, and one stage can gather several fees into a single payment.</p>
+              ${'' /* The figure the client pays, and the same one the
+                       printed quotation shows.
+
+                       **Reported on 9 September 2026**, looking at this card:
+                       *"do not like how this is formatted in the register."*
+                       Three things were wrong with it and they compounded.
+
+                       The figure was the *net* amount with "+ GST" beside it
+                       and the inclusive figure in grey underneath — the
+                       arrangement the printed quotation stopped using earlier
+                       the same day, when the practice said the stages "should
+                       already be showing the GST inclusive amounts". So the
+                       screen and the paper disagreed about the same five
+                       numbers, and the screen is where the practice checks them
+                       before they go out.
+
+                       And it broke across three lines. "$2,000.00 +" / "GST" /
+                       "$2,300.00 incl." is not a price, and "Stage 1" was
+                       splitting after "Stage" in a column narrow enough to make
+                       it. Both are now held on one line.
+
+                       What is underneath says how much of the figure is tax,
+                       which works for a stage of either treatment — "+ GST" was
+                       a lie on the INZ fee, which is GST inclusive: nothing is
+                       added to it. */}
               ${stages.length === 0
                 ? emptyState('No stages set out. Payment terms alone will be printed.')
                 : table(['Stage', 'Description', 'Amount'], [
                     ...stages.map((s) => html`
                       <tr>
-                        <td class="small strong">${s.label || '—'}</td>
+                        <td class="small strong nowrap">${s.label || '—'}</td>
                         <td>${s.description}</td>
-                        <td class="num">${money(s.net_cents, q.currency)}
-                          ${s.gst_treatment === 'exclusive' && s.gst_cents
-                            ? html`<span class="muted small"> + GST</span>` : ''}
+                        <td class="num">
+                          <span class="nowrap">${money(s.gross_cents, q.currency)}</span>
                           ${s.gst_cents
-                            ? html`<div class="muted small">${money(s.gross_cents, q.currency)} incl.</div>` : ''}
+                            ? html`<div class="muted small nowrap">includes
+                                     ${money(s.gst_cents, q.currency)} GST</div>` : ''}
                         </td>
                       </tr>`),
                     html`<tr class="totals-row">
                       <td colspan="2" class="strong">Scheduled</td>
-                      <td class="num strong ${stageTotal !== totals.totalCents ? 'warn' : ''}">
+                      <td class="num strong nowrap ${stageTotal !== totals.totalCents ? 'warn' : ''}">
                         ${money(stageTotal, q.currency)}</td></tr>`,
-                  ])}
+                  ], { compact: true })}
 
               ${stages.length > 0 && stageTotal !== totals.totalCents
                 ? html`<p class="alert alert-warn">The stages come to
