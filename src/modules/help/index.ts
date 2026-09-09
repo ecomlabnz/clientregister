@@ -46,6 +46,11 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
         + 'details you want the client to have. What you type is what prints.',
       '\u201CQuotation\u201D is capitalised where the letter points at it, since your opening '
         + 'defines it as a term.',
+      'The colour is back \u2014 section headings and links in your accent, on white paper. '
+        + 'Making the documents stop printing in the dark theme had taken the colour out with it.',
+      'The address of your standard terms is now a live link on the letter, and still shows the '
+        + 'address itself so a printed copy is still usable.',
+      'Spacing tightened once more.',
     ],
   },
   {

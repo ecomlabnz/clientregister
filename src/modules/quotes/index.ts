@@ -1598,7 +1598,13 @@ export const quotesModule: AppModule = {
             <section>
               <h3>Standard terms of engagement</h3>
               <p>This engagement is on the ${practice.termsLabel}, whose current edition is
-                 published at <span class="break-url">${practice.termsUrl}</span>. Please read them
+                 ${'' /* A live link, asked for on 9 September 2026. The
+                        address stays visible as the link's own text rather
+                        than hidden behind words, because this document is
+                        read on paper as often as on a screen and a printout
+                        of "click here" is worth nothing. */}
+                 published at <a class="break-url" href="${practice.termsUrl}"
+                    target="_blank" rel="noopener noreferrer">${practice.termsUrl}</a>. Please read them
                  before accepting.</p>
             </section>` : ''}
 
