@@ -53,6 +53,39 @@ export const ENGAGEMENT_SETTINGS: SettingsGroup = {
         + 'responsibility for the matter, who the client deals with day to day, and how they '
         + 'accept. Blank lines separate paragraphs. Nothing is supplied: this is your wording, '
         + 'not the register’s.' },
+    // --- The administrative team ------------------------------------------
+    //
+    // **Asked for on 9 September 2026.** The practice's letter says that
+    // day-to-day contact is with an administrative team whose role is limited
+    // to support — that they give no legal advice, exercise no professional
+    // judgement and do not represent the client. A paragraph saying so names
+    // people, and the people change while the paragraph does not.
+    //
+    // So the paragraph is the practice's wording, edited as a clause, and the
+    // people are these settings. Nobody's name reaches this repository; the
+    // register holds them, which is also what makes them per-practice for free
+    // the day a second practice has a database of its own.
+    //
+    // Not on the quotation, by the same instruction: the quotation is the work
+    // and the fees, and who answers the telephone is a term of the engagement.
+    { key: 'engagement.admin_team_heading', type: 'string', maxLength: 200,
+      label: 'Administrative team — heading',
+      default: 'Day-to-Day Administrative Team Contact',
+      help: 'The heading of the section. Ignored when no people are listed below.' },
+    { key: 'engagement.admin_team_intro', type: 'string', maxLength: 400,
+      label: 'The line that introduces them',
+      default: 'The designated administrative (non-legal) contacts for this engagement are:',
+      help: 'Printed above the list.' },
+    { key: 'engagement.admin_team', type: 'text', maxLength: 2000,
+      label: 'Who they are', default: '',
+      help: 'One person per line, as Name | Short name | Mobile | Email — for example '
+        + '“Ms A B Example | Ann | +64 21 000 0000 | ann@example.com”. The short name is what '
+        + 'appears in brackets beside their number; leave it out if you would rather it did not. '
+        + 'Only the name is required. Leave the whole box empty and the section is not printed.' },
+    { key: 'engagement.admin_team_also', type: 'string', maxLength: 300,
+      label: 'And anyone else', default: 'or any other person nominated by them',
+      help: 'Printed as the last item of the list. Leave blank to name only the people above.' },
+
     { key: 'engagement.acknowledgements', type: 'text', label: 'What the client confirms',
       maxLength: 4000, default: '',
       help: 'One per line. Printed as a numbered list above the signature, introduced by the line '
@@ -73,9 +106,40 @@ export const ENGAGEMENT_SETTINGS: SettingsGroup = {
   ],
 };
 
+/** One of the practice's administrative contacts, as the letter names them. */
+export interface AdminContact {
+  name: string;
+  /** What appears in brackets beside their number. Optional. */
+  short: string;
+  mobile: string;
+  email: string;
+}
+
+/**
+ * The people on one line of the setting.
+ *
+ * `Name | Short | Mobile | Email`, and only the name is required — a practice
+ * that lists a person with no mobile should get their name printed, not a
+ * dangling "Mobile:" with nothing after it. Extra fields past the fourth are
+ * ignored rather than run together into the email, because a stray pipe in
+ * somebody's title should not put rubbish on a contract.
+ */
+export function parseAdminTeam(raw: string): AdminContact[] {
+  return raw.split('\n')
+    .map((line) => line.split('|').map((part) => part.trim()))
+    .filter((parts) => (parts[0] ?? '') !== '')
+    .map((parts) => ({
+      name: parts[0]!, short: parts[1] ?? '', mobile: parts[2] ?? '', email: parts[3] ?? '',
+    }));
+}
+
 export interface EngagementText {
   subject: string;
   opening: string;
+  adminTeamHeading: string;
+  adminTeamIntro: string;
+  adminTeam: AdminContact[];
+  adminTeamAlso: string;
   acknowledgements: string[];
   acknowledgementsIntro: string;
   closing: string;
@@ -91,6 +155,10 @@ export async function engagementText(env: Env): Promise<EngagementText> {
   return {
     subject: (v['engagement.subject'] ?? '').trim(),
     opening,
+    adminTeamHeading: (v['engagement.admin_team_heading'] ?? '').trim(),
+    adminTeamIntro: (v['engagement.admin_team_intro'] ?? '').trim(),
+    adminTeam: parseAdminTeam(v['engagement.admin_team'] ?? ''),
+    adminTeamAlso: (v['engagement.admin_team_also'] ?? '').trim(),
     // One per line, blanks dropped — a stray empty line in a settings box would
     // otherwise print as an empty numbered item in a contract.
     acknowledgements: (v['engagement.acknowledgements'] ?? '')

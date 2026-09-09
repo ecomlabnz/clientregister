@@ -1300,6 +1300,11 @@ details[open] > summary { margin-bottom: 12px; }
    RE line and the body: closer below than above, so the letter reads as one
    block of prose rather than three stacked fragments. */
 .letter-salutation { margin: 0 0 10px; }
+/* a) b) c), which is how the practice's own numbering reads — the letter has
+   numbered clauses around it, and a nested list of digits inside a clause
+   numbered 1.4 gives two competing numbering schemes on one page. */
+.letter-admin-team { list-style-type: lower-alpha; margin: 8px 0 12px; padding-left: 24px; }
+.letter-admin-team li { margin-bottom: 2px; }
 .letter-brief { padding: 12px 14px; border-left: 3px solid var(--accent); background: var(--surface-2); }
 .letter-acknowledgements li { margin-bottom: 8px; }
 .letter-signature { margin-top: 32px; }
@@ -1345,7 +1350,22 @@ details[open] > summary { margin-bottom: 12px; }
 .quote-doc-parties > dd { margin: 0; }
 .quote-doc-subhead { margin: 14px 0 6px; font-size: 0.95rem; }
 .quote-doc-terms { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); }
-.break-url { word-break: break-all; font-size: 0.85rem; }
+/* A long address inside a sentence.
+ *
+ * **Reported on 9 September 2026:** *"the web link is breaking in the wrong
+ * place"* — a terms URL split as "http" / "s://www.immigration.kiwi/terms" in
+ * the middle of a contract.
+ *
+ * `word-break: break-all` was the cause. It breaks at whatever character the
+ * line happens to end on, with no preference for a sensible one, so a URL
+ * beginning a few characters before the margin is cut after "http".
+ *
+ * `overflow-wrap: anywhere` is the rule that was wanted: the browser first
+ * tries to move the whole address to the next line, and only breaks inside it
+ * when it genuinely does not fit — which on a phone it sometimes will not.
+ * `word-break: normal` is stated rather than assumed, because this class is
+ * used inside blocks that set their own. */
+.break-url { overflow-wrap: anywhere; word-break: normal; font-size: 0.85rem; }
 /* Wraps. The row had two buttons and gained a third when the letter of
    engagement arrived beside the quotation, and three did not fit a phone —
    468px of buttons in a 390px window, which scrolls the whole document
