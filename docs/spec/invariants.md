@@ -11,7 +11,7 @@ guarantee in a handler lasts until somebody adds a second handler — and this
 register is written to by the application, by bulk loads, and occasionally by
 hand at a console. Everything below holds in all three cases.
 
-**69 refusals** across 23 tables, plus
+**71 refusals** across 23 tables, plus
 **10 uniqueness rules**. Each is quoted in the words the
 database itself uses, because that is what somebody will see.
 
@@ -166,6 +166,8 @@ whether or not the rule exists is not a test.
 |---|---|
 | insert | a quote has to say what it is for |
 | update | a quote has to say what it is for |
+| insert | A quotation on a matter is for that matter's client. Move the matter, or take the matter off the quotation. |
+| update | A quotation on a matter is for that matter's client. Move the matter, or take the matter off the quotation. |
 
 ### `engagement_clauses`
 

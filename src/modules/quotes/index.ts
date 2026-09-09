@@ -181,6 +181,8 @@ export async function refreshQuoteTotals(env: Env, quoteId: string): Promise<Quo
 
 export interface QuoteRow {
   id: string; ref: string; client_id: string | null; case_id: string | null; inquiry_id: string | null;
+  /** The kind of work, since 0075. What the letter chooses its clauses from. */
+  case_type: string | null;
   description: string; amount_cents: number; gst_cents: number; disbursements_cents: number;
   currency: string; status: QuoteStatus; valid_until: string | null; sent_at: string | null;
   responded_at: string | null; notes: string | null; created_at: string; updated_at: string;
@@ -489,9 +491,10 @@ export const quotesModule: AppModule = {
       // quotation takes the matter's name, and its client, so a quotation
       // cannot end up naming one person and billing another.
       const matter = caseId
-        ? await one<{ title: string; client_id: string }>(
-            c.env.DB, 'SELECT title, client_id FROM cases WHERE id = ?', caseId)
+        ? await one<{ title: string; client_id: string; case_type: string }>(
+            c.env.DB, 'SELECT title, client_id, case_type FROM cases WHERE id = ?', caseId)
         : null;
+      const matterType = matter?.case_type ?? null;
       if (caseId && !matter) {
         return redirectWith(c, '/quotes/new', 'That matter no longer exists.', 'err');
       }
@@ -518,11 +521,15 @@ export const quotesModule: AppModule = {
       const ref = await nextRef(c.env.DB, 'quote', 'Q');
       await run(
         c.env.DB,
-        `INSERT INTO quotes (id, ref, client_id, case_id, inquiry_id, description, amount_cents, gst_cents,
+        `INSERT INTO quotes (id, ref, client_id, case_id, inquiry_id, description, case_type,
+            amount_cents, gst_cents,
             disbursements_cents, currency, status, issued_on, validity_days, valid_until, notes,
             with_letter, created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?, 0, 0, 0, 'NZD', 'draft', ?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?, 0, 0, 0, 'NZD', 'draft', ?,?,?,?,?,?,?,?)`,
         id, ref, forClient, caseId || null, inquiryId || null, description,
+        // The kind of work, kept rather than used once to make the name. It is
+        // what the letter chooses its clauses from — see 0075.
+        matter ? matterType : caseType,
         issuedOn, days, until, notes, withLetter === '1' ? 1 : 0,
         nowIso(), nowIso(), user.id,
       );
@@ -1320,16 +1327,27 @@ export const quotesModule: AppModule = {
       // Which clauses belong on this letter depends on the work, and the work
       // is the quotation's. A quotation covering more than one kind of matter
       // gets the clauses of all of them — see `clausesFor`.
-      // `case_type`, not `service_item_id`. Before 0074 this read the catalogue
-      // id — `svc_t_vv_partner` against a clause listing `vv_partner` — so a
-      // quotation with no matter attached silently got no work-specific
-      // clauses at all.
-      const kinds = [...new Set(lines.map((l) => l.case_type).filter(Boolean))];
-      const caseType = q.case_id
-        ? (await one<{ case_type: string }>(
-            c.env.DB, 'SELECT case_type FROM cases WHERE id = ?', q.case_id))?.case_type ?? null
-        : null;
-      const clauses = await clausesFor(c.env, caseType ? [caseType] : kinds as string[]);
+      // Every kind of work on the quotation, from all three places one can be
+      // recorded — and the union, not one instead of the others.
+      //
+      // This read the matter's type *or* the lines', never both, so a quotation
+      // covering a partnership residence application and a dependent child got
+      // the clauses of whichever branch won. The comment above it promised the
+      // opposite. Found by Fable's audit, 8 September 2026.
+      //
+      // `quotes.case_type` is the third, added by 0075: the New quote form asked
+      // for the kind of work and then threw it away, so a quotation with no
+      // matter and no case-type line had none recorded anywhere and printed
+      // with no work-specific clauses at all.
+      const kinds = [...new Set([
+        q.case_type,
+        q.case_id
+          ? (await one<{ case_type: string }>(
+              c.env.DB, 'SELECT case_type FROM cases WHERE id = ?', q.case_id))?.case_type ?? null
+          : null,
+        ...lines.map((l) => l.case_type),
+      ].filter(Boolean))] as string[];
+      const clauses = await clausesFor(c.env, kinds);
 
       const issuedOn = q.issued_on ?? q.created_at.slice(0, 10);
       const representative = parties.find((p) => p.is_representative === 1) ?? null;
@@ -1888,6 +1906,25 @@ export const quotesModule: AppModule = {
 
       const rateBp = settings.gstRegistered ? settings.gstRateBp : 0;
       const { net, gst } = computeGst(amount, treatment, rateBp);
+
+      // A quotation on a matter is for that matter's client, and the matter
+      // decides. Refused rather than silently corrected: somebody who picked a
+      // different client on this form meant something, and it is either "this
+      // is the wrong matter" or "this is the wrong client" — the register
+      // cannot tell which, and guessing writes a contract naming the wrong
+      // person.
+      //
+      // The database refuses it too, since migration 0075. This is here so the
+      // message names the box rather than arriving as a 500.
+      if (existing.case_id && clientId) {
+        const matterClient = (await one<{ client_id: string }>(
+          c.env.DB, 'SELECT client_id FROM cases WHERE id = ?', existing.case_id))?.client_id;
+        if (matterClient && matterClient !== clientId) {
+          return redirectWith(c, `/quotes/${id}/edit`,
+            'This quotation is on a matter, so it is for that matter\u2019s client. '
+              + 'Take the matter off it first if it should be for somebody else.', 'err');
+        }
+      }
 
       await run(
         c.env.DB,
