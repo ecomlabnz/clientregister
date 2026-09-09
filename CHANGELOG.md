@@ -26,6 +26,16 @@ and their client.
 
 - **"Quotation" is capitalised** where the letter points at it. The opening
   defines it as a term, and a defined term is capitalised wherever it appears.
+- **The colour is back.** *"i like some theme colours in it — did not mean to
+  get rid of colour completely."* Fair: the document went black and white when
+  it was made to stop printing in the dark theme, and that threw out the colour
+  along with the problem. Section headings are in the practice's accent again
+  and links keep it; what stays black is the body text, which is what "readable"
+  actually meant. The small print is darkened rather than flattened.
+- **The address of the standard terms is a live link**, and still shows the
+  address as its own text — a printout of "click here" is worth nothing.
+- **Tighter again**: line spacing 1.3, and paragraph and section gaps reduced
+  once more.
 
 ## 1.23.1 — 9 September 2026
 

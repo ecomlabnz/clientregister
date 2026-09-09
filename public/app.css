@@ -1315,8 +1315,8 @@ details[open] > summary { margin-bottom: 12px; }
    so it is set as prose rather than as a page of the application: a measured
    line length, room between paragraphs, and headings that do not shout. */
 .letter-doc { max-width: 46rem; }
-.letter-doc p { margin: 0 0 12px; line-height: 1.6; }
-.letter-doc section { margin-bottom: 20px; }
+.letter-doc p { margin: 0 0 9px; line-height: 1.5; }
+.letter-doc section { margin-bottom: 15px; }
 .letter-doc ul, .letter-doc ol { margin: 0 0 12px; padding-left: 22px; line-height: 1.6; }
 .letter-doc li { margin-bottom: 6px; }
 .letter-to { margin: 24px 0 16px; }
@@ -1359,9 +1359,18 @@ details[open] > summary { margin-bottom: 12px; }
 
 .quote-doc h1 { font-size: 1.3rem; margin-bottom: 4px; }
 .quote-doc h2 { font-size: 1rem; }
+/* Headings in the practice's accent rather than grey.
+ *
+ * Asked for on 9 September 2026: *"i like some theme colours in it - did not
+ * mean to get rid of colour completely - but only make it fully readable"*. The
+ * document went black and white when it was made to stop printing in the dark
+ * theme, which threw out the colour along with the problem. The palette on
+ * `.quote-doc` is a light one, so an accent on the section headings is legible
+ * on paper and on screen alike — it is the body text that must stay black, and
+ * does. */
 .quote-doc h3 {
-  font-size: 0.8rem; margin: 22px 0 6px; text-transform: uppercase;
-  letter-spacing: 0.06em; color: var(--muted);
+  font-size: 0.78rem; margin: 16px 0 5px; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--accent);
 }
 .quote-doc-head {
   display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap;
@@ -1500,22 +1509,28 @@ details[open] > summary { margin-bottom: 12px; }
    * against the 1.6 the screen uses, and paragraph gaps a little over half what
    * they were. A five-page letter loses about a page to this without a word
    * being cut. */
-  body { font-size: 9.5pt; line-height: 1.35; }
+  body { font-size: 9.5pt; line-height: 1.3; }
   .quote-doc .small, .quote-doc .hint, .quote-doc .prewrap.small { font-size: 8.5pt; }
-  .letter-doc p, .letter-doc ul, .letter-doc ol { line-height: 1.38; margin-bottom: 7px; }
-  .letter-doc li { margin-bottom: 3px; }
-  .letter-doc section { margin-bottom: 12px; }
+  .letter-doc p, .letter-doc ul, .letter-doc ol { line-height: 1.3; margin-bottom: 5px; }
+  .letter-doc li { margin-bottom: 2px; }
+  .letter-doc section { margin-bottom: 9px; }
   .letter-doc h3 { margin-bottom: 4px; }
   .letter-terms-start { margin: 18px 0 12px; padding-top: 10px; }
   /* An addendum begins a page of its own, which is what an addendum is, and
      keeps the signature on the page with the letter it signs. */
   .letter-addendum { break-before: page; page-break-before: always; margin-top: 0; border-top: none; }
 
-  /* Grey on white loses more to a printer than it gains on a screen, and some
-     of this is the addressee's own contact details. */
-  .quote-doc, .quote-doc .muted, .quote-doc .hint, .quote-doc .small { color: #000; }
+  /* Body text black, and only body text.
+   *
+   * This flattened every colour in the document, headings and highlights with
+   * it, which is not what "readable" meant — see the note on `.quote-doc h3`.
+   * What it was really fixing is grey-on-white small print, so that is all it
+   * fixes now: the muted colour is darkened rather than removed, and the
+   * accent is left alone. */
+  .quote-doc { color: #111; }
+  .quote-doc .muted, .quote-doc .hint { color: #3a3a3a; }
 
-  .quote-doc a { color: #000; text-decoration: underline; }
+  .quote-doc a { color: var(--accent); text-decoration: underline; }
   .main { padding: 0; }
   .bare-main { max-width: none; }
   body.bare { display: block; min-height: 0; padding: 0; }
