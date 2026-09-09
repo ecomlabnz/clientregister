@@ -7,6 +7,45 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.20.0 — 9 September 2026
+
+### Added
+**The letter of engagement can name your administrative team.** Asked for: the
+letter says day-to-day contact is with an administrative team whose role is
+limited to support — that they give no legal advice, exercise no professional
+judgement, and do not act as the client's representative. A paragraph saying
+that has to name people, and the people change while the paragraph does not.
+
+So they are split. **The paragraph is yours**, written as a clause under
+Quotes → Letter clauses like every other. **The people are settings**, under
+Settings → Letter of engagement: a heading, the line that introduces them, one
+person per line as `Name | Short name | Mobile | Email`, and a last item for
+"or any other person nominated by them".
+
+The letter prints them as a lettered list with the mobiles and emails gathered
+onto one line each, in the order entered. Only the name is required — somebody
+with no mobile recorded is simply absent from the mobile line rather than
+leaving a gap in it, and a line with no name at all is dropped rather than
+printing an empty item on a contract.
+
+**They are on the letter and not on the quotation**, by the same instruction:
+the quotation is the work and the fees, and who answers the telephone is a term
+of the engagement.
+
+No name goes into the code for this. They live in the register, which is also
+what makes them per-practice for free the day a second practice has a database
+of its own.
+
+### Fixed
+**A web address was breaking in the middle of "http".** Reported from a real
+letter, where the terms URL split as `http` / `s://…` — in a contract.
+
+The cause was `word-break: break-all`, which breaks at whatever character the
+line happens to end on with no preference for a sensible one. The rule that was
+wanted is `overflow-wrap: anywhere`: the browser first tries to move the whole
+address to the next line, and breaks inside it only when it genuinely will not
+fit, which on a phone it sometimes will not.
+
 ## 1.19.1 — 9 September 2026
 
 ### Changed

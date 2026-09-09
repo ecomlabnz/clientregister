@@ -16,7 +16,7 @@ import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
-import { html, raw } from '../../ui/html';
+import { html, join, raw } from '../../ui/html';
 import {
   actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, stamp, statusTone, table,
 } from '../../ui/components';
@@ -1440,6 +1440,44 @@ export const quotesModule: AppModule = {
               <h3>${clause.heading}</h3>
               ${prose(clause.body)}
             </section>`)}
+
+          ${'' /* Who the client actually deals with day to day.
+
+                 **Asked for on 9 September 2026.** The letter says that
+                 day-to-day contact is with an administrative team whose role is
+                 limited to support — no legal advice, no professional
+                 judgement, no representation. That paragraph names people, and
+                 the people change while the paragraph does not.
+
+                 So the paragraph is a clause in the practice's own words, and
+                 the people are settings. No name is written into this
+                 repository.
+
+                 It sits after the clauses, so the paragraph that explains the
+                 limit is read before the names it applies to. It is on the
+                 letter and not on the quotation, by the same instruction: the
+                 quotation is the work and the fees; who answers the telephone
+                 is a term of the engagement. */}
+          ${text.adminTeam.length ? html`
+            <section>
+              ${text.adminTeamHeading ? html`<h3>${text.adminTeamHeading}</h3>` : ''}
+              ${text.adminTeamIntro ? html`<p>${text.adminTeamIntro}</p>` : ''}
+              <ol class="letter-admin-team">
+                ${text.adminTeam.map((person) => html`<li>${person.name}</li>`)}
+                ${text.adminTeamAlso ? html`<li>${text.adminTeamAlso}</li>` : ''}
+              </ol>
+              ${'' /* Gathered onto one line each rather than beside each name,
+                     which is how the practice writes it — and it keeps a list
+                     of four people to six lines instead of twelve. Somebody
+                     with no mobile recorded is simply absent from the mobile
+                     line, rather than leaving a gap in it. */}
+              ${text.adminTeam.some((p) => p.mobile) ? html`<p class="small">Mobile:
+                ${join(text.adminTeam.filter((p) => p.mobile).map((p) =>
+                  html`${p.mobile}${p.short ? html` (${p.short})` : ''}`), '; ')}</p>` : ''}
+              ${text.adminTeam.some((p) => p.email) ? html`<p class="small">Email:
+                ${join(text.adminTeam.filter((p) => p.email).map((p) => html`${p.email}`), '; ')}</p>`
+                : ''}
+            </section>` : ''}
 
           ${practice.termsUrl ? html`
             <section>

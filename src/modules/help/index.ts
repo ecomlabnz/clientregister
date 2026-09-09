@@ -37,6 +37,22 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.20.0', date: '9 September 2026',
+    notes: [
+      'The letter of engagement can now name your administrative team. Settings \u2192 Letter of '
+        + 'engagement has a box for them: one person per line, as Name | Short name | Mobile | '
+        + 'Email. Only the name is required.',
+      'The paragraph explaining that their role is limited \u2014 no legal advice, no '
+        + 'professional judgement, not your representative \u2014 stays your own wording, written '
+        + 'as a clause under Quotes \u2192 Letter clauses. The register supplies the names, not '
+        + 'the words.',
+      'They print on the letter and never on the quotation: the quotation is the work and the '
+        + 'fees, and who answers the telephone is a term of the engagement.',
+      'A web address in a letter was breaking in the middle of \u201Chttp\u201D. It now moves to '
+        + 'the next line whole, and only breaks inside itself when it genuinely will not fit.',
+    ],
+  },
+  {
     version: '1.19.1', date: '9 September 2026',
     notes: [
       'The letter of engagement now begins \u201CDear \u2026,\u201D with the client\u2019s full '
