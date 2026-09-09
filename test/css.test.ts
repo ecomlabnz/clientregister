@@ -309,12 +309,19 @@ describe('a printed document keeps its margin', () => {
     // then "make font smaller and use tighter paragraph and line spacing".
     // Points rather than pixels is the part that matters — a size set in
     // points is the size it claims to be on paper, whatever 14 screen pixels
-    // happen to become. 10pt is the ordinary size of a legal document; below
-    // 9pt it stops being one somebody can read.
+    // happen to become.
+    //
+    // **The floor moved from 9pt to 8pt on 9 September 2026**, and only because
+    // the practice supplied the evidence: one of their own Xero invoices, asked
+    // to be matched — *"see how small and nice the font is, aim at compact
+    // format"*. Its body measures 8pt. A floor set from my own judgement about
+    // legibility does not outrank a document the practice already sends to
+    // clients, so it now sits at what that document does. It is still a floor:
+    // below 8pt a fee document stops being one somebody can read across a desk.
     const body = /body \{[^}]*font-size:\s*([^;]+);/.exec(printBlock);
     expect(body, 'the printed page sets no type size').not.toBeNull();
     expect(body![1]!.trim()).toMatch(/pt$/);
-    expect(asMm(body![1]!)).toBeGreaterThanOrEqual(asMm('9pt'));
+    expect(asMm(body![1]!)).toBeGreaterThanOrEqual(asMm('8pt'));
     expect(asMm(body![1]!)).toBeLessThanOrEqual(asMm('11pt'));
   });
 });
