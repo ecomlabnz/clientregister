@@ -37,6 +37,19 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.26.1', date: '9 September 2026',
+    notes: [
+      'A quotation now says: \u201CThis Quotation (fee quote) is subject to the Letter of '
+        + 'Engagement, Short Form and Standard Terms of Engagement. Please read them before '
+        + 'accepting.\u201D It had named only the standard terms.',
+      '\u201CStandard Terms of Engagement\u201D is the link \u2014 it is the one of the three '
+        + 'the client does not already have in their hand. The address still prints underneath '
+        + 'on paper.',
+      'The covering email and the note on the quotation screen say the same thing, so the three '
+        + 'do not describe the engagement differently.',
+    ],
+  },
+  {
     version: '1.26.0', date: '9 September 2026',
     notes: [
       'The totals under a quotation\u2019s fee lines sit under Amount again. They had stayed '
