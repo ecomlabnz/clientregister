@@ -1534,7 +1534,10 @@ export const quotesModule: AppModule = {
           <section class="letter-brief">
             <h3>The Parties, the Scope of Work, the Fees (Legal and Disbursements)
                 and the Payment Terms</h3>
-            <p>These are set out in <strong>quotation ${q.ref}</strong>, which accompanies this
+            ${'' /* "Quotation" capitalised: the opening defines it as a term
+                   ("the \"Quotation\"") and a defined term is capitalised
+                   wherever it appears. Asked for on 9 September 2026. */}
+            <p>These are set out in <strong>Quotation ${q.ref}</strong>, which accompanies this
                letter and forms part of it${representative
                  ? html`, and in which <strong>${representative.full_name}</strong> is nominated to
                         give instructions on behalf of all parties named`
@@ -1580,21 +1583,15 @@ export const quotesModule: AppModule = {
             <section>
               ${text.adminTeamHeading ? html`<h3>${text.adminTeamHeading}</h3>` : ''}
               ${text.adminTeamIntro ? html`<p>${text.adminTeamIntro}</p>` : ''}
+              ${'' /* Each line as the practice wrote it. The register used to
+                     take the line apart and print the numbers and addresses
+                     gathered at the foot of the section; the practice looked at
+                     that and asked for the print to match the box they typed
+                     into, which it now does. */}
               <ol class="letter-admin-team">
-                ${text.adminTeam.map((person) => html`<li>${person.name}</li>`)}
+                ${text.adminTeam.map((line) => html`<li>${line}</li>`)}
                 ${text.adminTeamAlso ? html`<li>${text.adminTeamAlso}</li>` : ''}
               </ol>
-              ${'' /* Gathered onto one line each rather than beside each name,
-                     which is how the practice writes it — and it keeps a list
-                     of four people to six lines instead of twelve. Somebody
-                     with no mobile recorded is simply absent from the mobile
-                     line, rather than leaving a gap in it. */}
-              ${text.adminTeam.some((p) => p.mobile) ? html`<p class="small">Mobile:
-                ${join(text.adminTeam.filter((p) => p.mobile).map((p) =>
-                  html`${p.mobile}${p.short ? html` (${p.short})` : ''}`), '; ')}</p>` : ''}
-              ${text.adminTeam.some((p) => p.email) ? html`<p class="small">Email:
-                ${join(text.adminTeam.filter((p) => p.email).map((p) => html`${p.email}`), '; ')}</p>`
-                : ''}
             </section>` : ''}
 
           ${practice.termsUrl ? html`

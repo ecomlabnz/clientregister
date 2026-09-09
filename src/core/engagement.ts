@@ -146,10 +146,9 @@ export const ENGAGEMENT_SETTINGS: SettingsGroup = {
       help: 'Printed above the list.' },
     { key: 'engagement.admin_team', type: 'text', maxLength: 2000,
       label: 'Who they are', default: '',
-      help: 'One person per line, as Name | Short name | Mobile | Email — for example '
-        + '“Ms A B Example | Ann | +64 21 000 0000 | ann@example.com”. The short name is what '
-        + 'appears in brackets beside their number; leave it out if you would rather it did not. '
-        + 'Only the name is required. Leave the whole box empty and the section is not printed.' },
+      help: 'One person per line, written however you would write it — a name on its own, or a '
+        + 'name with a mobile and an email after it. Each line is printed on the letter exactly '
+        + 'as you type it here. Leave the box empty and the section is not printed.' },
     { key: 'engagement.admin_team_also', type: 'string', maxLength: 300,
       label: 'And anyone else', default: 'or any other person nominated by them',
       help: 'Printed as the last item of the list. Leave blank to name only the people above.' },
@@ -178,87 +177,29 @@ export const ENGAGEMENT_SETTINGS: SettingsGroup = {
   ],
 };
 
-/** One of the practice's administrative contacts, as the letter names them. */
-export interface AdminContact {
-  name: string;
-  /** What appears in brackets beside their number. Optional. */
-  short: string;
-  mobile: string;
-  email: string;
-}
-
 /**
- * The people on one line of the setting.
+ * The administrative contacts, one to a line, exactly as the practice wrote them.
  *
- * **Rewritten on 9 September 2026, the day it shipped**, because the practice
- * typed the natural thing and their clients' letters lost both email addresses:
+ * **This was cleverer twice and wrong twice**, on 9 September 2026, the day it
+ * shipped. First it read four fields by position — `Name | Short | Mobile |
+ * Email` — and a line typed the natural way lost both email addresses off a
+ * client's letter. Then it read the same line by *recognising* what each part
+ * was, which rescued the addresses and printed them gathered onto their own
+ * "Mobile:" and "Email:" lines at the foot of the section. The practice looked
+ * at that and said the print must appear the same way as the box they typed it
+ * into.
  *
- *     Ms A B Example, Mobile: +64 21 000 0001 | Email: ann@example.test; and
+ * They are right, and the second version was the same mistake as the first with
+ * more machinery: the register was taking a sentence apart in order to put it
+ * back together differently from how somebody wrote it. There is nothing here
+ * it needs the pieces for — the letter prints the list and nothing else reads
+ * it — so it does not take it apart at all.
  *
- * The first version read four fields *by position* — `Name | Short | Mobile |
- * Email` — so that line gave a name of "Ms A B Example, Mobile: +64 21 000
- * 0001", a short name of "Email: ann@example.test; and", and no mobile or
- * email at all. The short name is only ever printed in brackets beside a
- * number, so with no number it was never printed: the address vanished off a
- * contract without a word.
- *
- * That is a fault in the format, not in the typing. A field that silently
- * discards an email address is the wrong field. So the line is now read by
- * **recognising** what things are rather than by counting separators:
- *
- *   - anything labelled `Email:`, or containing an `@`, is the email;
- *   - anything labelled `Mobile:`, `Phone:` or `Tel:`, or that is otherwise
- *     just digits and punctuation, is the number;
- *   - what is left is the name, and a second leftover is the short name.
- *
- * Both separators are honoured — `|` and a comma before a label — and a
- * trailing "; and", which is how a person writes a list, is dropped. The
- * documented four-field form still parses exactly as it did, so the text the
- * "Use as the template" button writes still round-trips.
+ * One non-empty line per person, printed verbatim. Whatever the practice writes
+ * about how to reach somebody is between them and their client.
  */
-const CONTACT_LABEL = /^\s*(?:e-?mail|mobile|phone|tel(?:ephone)?)\s*[:.]?\s*/i;
-const MOBILE_LABEL = /(?:^|[|,;])\s*(?:mobile|phone|tel(?:ephone)?)\s*[:.]\s*([^|,;]+)/i;
-const EMAIL_LABEL = /(?:^|[|,;])\s*e-?mail\s*[:.]\s*([^|,;]+)/i;
-
-/** Digits and the punctuation a telephone number is written with, nothing else. */
-function looksLikeNumber(value: string): boolean {
-  return /\d/.test(value) && /^[+()\d\s.-]+$/.test(value);
-}
-
-export function parseAdminTeam(raw: string): AdminContact[] {
-  return raw.split('\n').map((original) => {
-    // "…; and" is how somebody writes a list, not part of anybody's address.
-    let line = original.replace(/[;,]?\s*\band\b\s*$/i, '').trim();
-    if (line === '') return null;
-
-    let email = '';
-    let mobile = '';
-
-    const labelledEmail = EMAIL_LABEL.exec(line);
-    if (labelledEmail) {
-      email = labelledEmail[1]!.trim();
-      line = line.replace(labelledEmail[0], ' ');
-    }
-    const labelledMobile = MOBILE_LABEL.exec(line);
-    if (labelledMobile) {
-      mobile = labelledMobile[1]!.trim();
-      line = line.replace(labelledMobile[0], ' ');
-    }
-
-    // What is left, once the labelled parts are out of the way.
-    const rest: string[] = [];
-    for (const part of line.split('|').map((x) => x.replace(/^[\s,;]+|[\s,;]+$/g, ''))) {
-      if (part === '') continue;
-      const bare = part.replace(CONTACT_LABEL, '').trim();
-      if (!email && bare.includes('@')) { email = bare; continue; }
-      if (!mobile && looksLikeNumber(bare)) { mobile = bare; continue; }
-      rest.push(part);
-    }
-
-    const name = (rest[0] ?? '').replace(/[\s,;]+$/, '');
-    if (name === '') return null;
-    return { name, short: rest[1] ?? '', mobile, email };
-  }).filter((row): row is AdminContact => row !== null);
+export function parseAdminTeam(raw: string): string[] {
+  return raw.split('\n').map((line) => line.trim()).filter(Boolean);
 }
 
 export interface EngagementText {
@@ -272,7 +213,7 @@ export interface EngagementText {
   addendum: string;
   adminTeamHeading: string;
   adminTeamIntro: string;
-  adminTeam: AdminContact[];
+  adminTeam: string[];
   adminTeamAlso: string;
   acknowledgements: string[];
   acknowledgementsIntro: string;
