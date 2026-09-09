@@ -37,6 +37,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.27.1', date: '9 September 2026',
+    notes: [
+      'Fixed a gap in the middle of the letter. Justifying the paragraph that carries the terms '
+        + 'address stretched the line before it, because a web address cannot be split between '
+        + 'words. That paragraph is no longer justified.',
+    ],
+  },
+  {
     version: '1.27.0', date: '9 September 2026',
     notes: [
       'The black pages are gone. A document page is now simply not a dark page \u2014 not a '
