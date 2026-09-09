@@ -37,6 +37,21 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.27.0', date: '9 September 2026',
+    notes: [
+      'The black pages are gone. A document page is now simply not a dark page \u2014 not a '
+        + 'print rule, so there is nothing left for a browser to skip. What was black was the '
+        + 'sheet behind the document, which a print rule could not reach.',
+      'Checked with \u201CBackground graphics\u201D ticked, which is what you had on: six '
+        + 'files, nothing dark anywhere, 20mm on every edge.',
+      'Every document now says which printing it is \u2014 \u201CPrinted Wednesday, 9 September '
+        + '2026 at 11:40 pm NZST\u201D at the foot of the quotation, the letter and the invoice. '
+        + 'Two printings of the same reference are otherwise identical once they are on paper.',
+      'It shows on the screen as well as on the paper, because what you see should be what '
+        + 'prints.',
+    ],
+  },
+  {
     version: '1.26.1', date: '9 September 2026',
     notes: [
       'A quotation now says: \u201CThis Quotation (fee quote) is subject to the Letter of '

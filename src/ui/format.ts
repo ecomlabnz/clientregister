@@ -26,6 +26,29 @@ export function dateTime(value: string | null | undefined): string {
 }
 
 /**
+ * The moment a document was produced, in full, for the foot of that document.
+ *
+ * **Asked for on 9 September 2026:** *"it is better if — when Print button is
+ * clicked — a clean PDF is generated with full date and time stamp."* A
+ * quotation and a letter of engagement are revised before they go out, and two
+ * printings of the same reference are otherwise indistinguishable once they are
+ * on paper. The reference says which document; this says which printing of it.
+ *
+ * Long-form and unambiguous, because it is read off paper by somebody who may
+ * be holding two copies: the day named, the month in words, the year, the time
+ * to the minute, and the time zone said rather than assumed.
+ */
+export function printedAt(value: string | null | undefined): string {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-NZ', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', timeZoneName: 'short', timeZone: TZ,
+  }).format(d);
+}
+
+/**
  * Just the clock time, for a column that shows the date on its own line.
  *
  * A log of a hundred rows reads by date first and time second; putting both in

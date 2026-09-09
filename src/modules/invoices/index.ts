@@ -31,7 +31,7 @@ import {
   actionButton, badge, card, collapsibleCard, csrfField, emptyState, field, optionsFrom, pageHeader,
   select, stamp, statusTone, table,
 } from '../../ui/components';
-import { dateShort, money } from '../../ui/format';
+import { dateShort, money, printedAt } from '../../ui/format';
 import {
   allocateSplit, FEE_KINDS, FEE_KIND_LABELS, formatBp, GST_TREATMENTS, GST_TREATMENT_LABELS,
   moneySettings, parsePercentToBp, SPLIT_BASE_LABELS, sumBp,
@@ -841,7 +841,7 @@ export const invoicesModule: AppModule = {
           <td class="num">${money(l.net_cents, invoice.currency)}</td>
         </tr>`);
 
-      return page(c, { title: `Invoice ${invoice.ref}`, bare: true }, html`
+      return page(c, { title: `Invoice ${invoice.ref}`, bare: true, paper: true }, html`
         <article class="quote-doc">
           <header class="quote-doc-head">
             <div>
@@ -944,6 +944,22 @@ export const invoicesModule: AppModule = {
                print here once they are entered.</p>
           </section>`}
 
+          ${'' /* Which printing of this document the reader is holding.
+
+                 **Asked for on 9 September 2026:** *"it is better if — when
+                 Print button is clicked — a clean PDF is generated with full
+                 date and time stamp."* A quotation is revised before it goes
+                 out, and two printings of the same reference are otherwise
+                 indistinguishable once they are on paper: the reference says
+                 which document, this says which printing of it.
+
+                 Rendered by the server at the moment the page is asked for,
+                 which is what makes it honest — there is no script on these
+                 pages and the register does not read the reader's clock. It is
+                 on the screen as well as on the paper, because a document that
+                 shows one thing on screen and another on paper is the fault
+                 this register has spent the day removing. */}
+          <p class="quote-doc-stamp">Printed ${printedAt(nowIso())}</p>
           <footer class="quote-doc-foot no-print">
             <button class="btn btn-primary" data-print type="button">Print this invoice</button>
             <a class="btn btn-secondary" href="/invoices/${invoice.id}">Back to the invoice</a>

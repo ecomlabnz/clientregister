@@ -20,7 +20,7 @@ import { emphasise, html, join, raw, type Raw } from '../../ui/html';
 import {
   actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, stamp, statusTone, table,
 } from '../../ui/components';
-import { dateInputValue, dateShort, money } from '../../ui/format';
+import { dateInputValue, dateShort, money, printedAt } from '../../ui/format';
 import {
   QUOTE_PARTY_KIND_LABELS, QUOTE_PARTY_KINDS, QUOTE_PARTY_ROLE_LABELS, QUOTE_PARTY_ROLES,
   QUOTE_STATUS_LABELS, QUOTE_STATUSES,
@@ -1500,7 +1500,7 @@ export const quotesModule: AppModule = {
         })}`;
       };
 
-      return page(c, { title: `Letter of engagement — ${q.ref}`, bare: true }, html`
+      return page(c, { title: `Letter of engagement — ${q.ref}`, bare: true, paper: true }, html`
         <article class="quote-doc letter-doc">
           <header class="quote-doc-head">
             <div>
@@ -1715,6 +1715,22 @@ export const quotesModule: AppModule = {
               ${prose(text.addendum)}
             </section>` : ''}
 
+          ${'' /* Which printing of this document the reader is holding.
+
+                 **Asked for on 9 September 2026:** *"it is better if — when
+                 Print button is clicked — a clean PDF is generated with full
+                 date and time stamp."* A quotation is revised before it goes
+                 out, and two printings of the same reference are otherwise
+                 indistinguishable once they are on paper: the reference says
+                 which document, this says which printing of it.
+
+                 Rendered by the server at the moment the page is asked for,
+                 which is what makes it honest — there is no script on these
+                 pages and the register does not read the reader's clock. It is
+                 on the screen as well as on the paper, because a document that
+                 shows one thing on screen and another on paper is the fault
+                 this register has spent the day removing. */}
+          <p class="quote-doc-stamp">Printed ${printedAt(nowIso())}</p>
           <footer class="quote-doc-foot no-print">
             <button class="btn btn-primary" data-print type="button">Print this letter</button>
             <a class="btn btn-secondary" href="/quotes/${q.id}/print">The quotation</a>
@@ -1795,7 +1811,7 @@ export const quotesModule: AppModule = {
           <td class="num">${money(l.net_cents, q.currency)}</td>
         </tr>`);
 
-      return page(c, { title: `Quote ${q.ref}`, bare: true }, html`
+      return page(c, { title: `Quote ${q.ref}`, bare: true, paper: true }, html`
         <article class="quote-doc">
           <header class="quote-doc-head">
             <div>
@@ -2022,6 +2038,22 @@ export const quotesModule: AppModule = {
           <p class="hint no-print">In the print box, leave <strong>Margins</strong> on
              <strong>Default</strong>. Any other setting overrides the 20mm this document asks
              for.</p>
+          ${'' /* Which printing of this document the reader is holding.
+
+                 **Asked for on 9 September 2026:** *"it is better if — when
+                 Print button is clicked — a clean PDF is generated with full
+                 date and time stamp."* A quotation is revised before it goes
+                 out, and two printings of the same reference are otherwise
+                 indistinguishable once they are on paper: the reference says
+                 which document, this says which printing of it.
+
+                 Rendered by the server at the moment the page is asked for,
+                 which is what makes it honest — there is no script on these
+                 pages and the register does not read the reader's clock. It is
+                 on the screen as well as on the paper, because a document that
+                 shows one thing on screen and another on paper is the fault
+                 this register has spent the day removing. */}
+          <p class="quote-doc-stamp">Printed ${printedAt(nowIso())}</p>
           <footer class="quote-doc-foot no-print">
             <button class="btn btn-primary" data-print type="button">Print this quote</button>
             <a class="btn btn-secondary" href="/quotes/${q.id}">Back to the quote</a>
