@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { mountModule, fakeUser } from './support/d1';
 import { quotesModule } from '../src/modules/quotes';
+import { parseAdminTeam } from '../src/core/engagement';
 
 const AT = '2026-09-08T09:00:00Z';
 const USER = fakeUser({ role: 'owner' });
@@ -276,5 +277,130 @@ describe('the width a document is set in', () => {
     // window and scrolled the whole letter sideways.
     const foot = css.match(/\.quote-doc-foot \{[^}]*\}/)?.[0] ?? '';
     expect(foot).toMatch(/flex-wrap:\s*wrap/);
+  });
+});
+
+/**
+ * The administrative team the client actually deals with.
+ *
+ * **Asked for on 9 September 2026.** The letter says day-to-day contact is with
+ * an administrative team whose role is limited to support — no legal advice, no
+ * professional judgement, no representation. That paragraph names people, and
+ * the people change while the paragraph does not: so the paragraph is a clause
+ * in the practice's own words, and the people are settings.
+ *
+ * **The names in these tests are invented.** The practice's real administrative
+ * staff are in the register and nowhere else, which is the whole point of the
+ * arrangement and also the standing rule.
+ */
+describe('the administrative team', () => {
+  const team = (h: ReturnType<typeof mount>, value: string) =>
+    h.db.exec(`INSERT OR REPLACE INTO settings (key, value, updated_at)
+               VALUES ('engagement.admin_team', '${value}', '${AT}')`);
+
+  const letter = async (h: ReturnType<typeof mount>) =>
+    (await h.request('/quotes/q1/letter')).text();
+
+  it('is absent entirely until somebody is listed', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    const body = await letter(h);
+    expect(body).not.toContain('Day-to-Day Administrative Team Contact');
+    expect(body).not.toContain('designated administrative');
+  });
+
+  it('names them, with the mobiles and emails gathered onto one line each', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    team(h, 'Ms A B Example | Ann | +64 21 000 0001 | ann@example.test\n'
+          + 'Mr C D Sample | Colin | +64 21 000 0002 | colin@example.test');
+
+    const body = await letter(h);
+    expect(body).toContain('Day-to-Day Administrative Team Contact');
+    expect(body).toContain('The designated administrative (non-legal) contacts');
+    expect(body).toContain('Ms A B Example');
+    expect(body).toContain('Mr C D Sample');
+    // One line each, in the order entered, the short name in brackets.
+    expect(body).toContain('+64 21 000 0001 (Ann); +64 21 000 0002 (Colin)');
+    expect(body).toContain('ann@example.test; colin@example.test');
+    // And the standing last item.
+    expect(body).toContain('or any other person nominated by them');
+  });
+
+  it('prints a person who has only a name, without a dangling label', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    team(h, 'Ms A B Example');
+
+    const body = await letter(h);
+    expect(body).toContain('Ms A B Example');
+    // No "Mobile:" or "Email:" heading with nothing after it.
+    expect(body).not.toMatch(/Mobile:\s*<\/p>/);
+    expect(body).not.toMatch(/Email:\s*<\/p>/);
+  });
+
+  it('leaves a person out of the mobile line rather than leaving a gap in it', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    team(h, 'Ms A B Example | Ann | | ann@example.test\n'
+          + 'Mr C D Sample | Colin | +64 21 000 0002 | colin@example.test');
+
+    const body = await letter(h);
+    expect(body).toContain('+64 21 000 0002 (Colin)');
+    expect(body).not.toContain('; +64 21 000 0002');
+    expect(body).toContain('ann@example.test; colin@example.test');
+  });
+
+  it('does not put them on the quotation', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    team(h, 'Ms A B Example | Ann | +64 21 000 0001 | ann@example.test');
+
+    const body = await (await h.request('/quotes/q1/print')).text();
+    expect(body).not.toContain('Ms A B Example');
+    expect(body).not.toContain('Day-to-Day Administrative Team Contact');
+  });
+
+  it('escapes what is typed, because a contract is not a place for markup', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    team(h, 'Ms <script>alert(1)</script> Example | X | +64 21 000 0001 | x@example.test');
+
+    const body = await letter(h);
+    expect(body).not.toContain('<script>alert(1)</script>');
+    expect(body).toContain('&lt;script&gt;');
+  });
+});
+
+describe('reading the administrative team setting', () => {
+  it('takes the name alone, and fills the rest with nothing', () => {
+    expect(parseAdminTeam('Ms A B Example')).toEqual([
+      { name: 'Ms A B Example', short: '', mobile: '', email: '' },
+    ]);
+  });
+
+  it('ignores blank lines and stray whitespace', () => {
+    expect(parseAdminTeam('\n  Ms A B Example  |  Ann  \n\n   \n')).toEqual([
+      { name: 'Ms A B Example', short: 'Ann', mobile: '', email: '' },
+    ]);
+  });
+
+  it('drops a line with no name rather than printing an empty item', () => {
+    // "| | +64 21 000 0001 |" is somebody halfway through being typed. A
+    // contract should not print a blank bullet with a telephone number.
+    expect(parseAdminTeam('| | +64 21 000 0001 |')).toEqual([]);
+  });
+
+  it('ignores anything past the fourth field', () => {
+    // A stray pipe in a title should not run rubbish into the email address.
+    expect(parseAdminTeam('A | B | C | D | E')).toEqual([
+      { name: 'A', short: 'B', mobile: 'C', email: 'D' },
+    ]);
   });
 });
