@@ -1455,6 +1455,7 @@ details[open] > summary { margin-bottom: 12px; }
 .letter-doc .letter-salutation,
 .letter-doc .letter-signature p,
 .letter-doc .letter-admin-team li,
+.letter-doc .letter-terms-link,
 .letter-doc .alert,
 .letter-doc .hint {
   text-align: left;

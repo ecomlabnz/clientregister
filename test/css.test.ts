@@ -386,6 +386,11 @@ describe('the letter of engagement is justified, and only where it is prose', ()
       // Names, mobiles and email addresses. The same reasoning as the block at
       // the top of the letter: it is contact detail, not a sentence.
       '.letter-doc .letter-admin-team li',
+      // The paragraph carrying the terms address. A URL cannot break between
+      // words, so justifying the line before it stretches a handful of words
+      // across the whole measure — which is what it did, on a contract, and
+      // was found by looking at the rendered page rather than the rule.
+      '.letter-doc .letter-terms-link',
       // The register's own message about missing wording, which is not part of
       // the contract and should not be set as though it were.
       '.letter-doc .alert',
@@ -406,6 +411,7 @@ describe('the letter of engagement is justified, and only where it is prose', ()
       '.letter-doc .letter-salutation',
       '.letter-doc .letter-signature p',
       '.letter-doc .letter-admin-team li',
+      '.letter-doc .letter-terms-link',
       '.letter-doc .alert',
     ].map(classes));
     const strongestRule = Math.max(...justified.map(classes));
