@@ -27,9 +27,10 @@ function mount() {
   h.db.exec(`INSERT INTO settings (key,value,updated_at)
              VALUES ('vocab.case_types','rv_partner | RV. Partner
 wv_aewv | WV. AEWV','${AT}')`);
-  h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,email,address,status,created_at,updated_at)
+  h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,given_names,family_name,email,phone,address,status,created_at,updated_at)
              VALUES ('cl1','CL-0001','individual','Duc Manh BUI','Duc Manh','NGUYEN',
-                     'client@example.test','12 Example Street, Auckland','active','${AT}','${AT}')`);
+                     'client@example.test','+64 21 000 0000','12 Example Street, Auckland',
+                     'active','${AT}','${AT}')`);
   h.db.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
              VALUES ('k1','CASE-26-001','cl1','RV. Partner — Duc Manh BUI','A partnership application',
                      'rv_partner','lodged','${USER.id}','${AT}','${AT}')`);
@@ -98,14 +99,53 @@ describe('the letter says nothing the quotation says', () => {
 });
 
 describe('what the letter carries', () => {
-  it('is addressed to the client, at the address on their record', async () => {
+  /**
+   * **Changed on 9 September 2026, by the practice:** *"The address is not
+   * required - it should only have email and phone number."* It is a letter
+   * that goes by email, to clients often between addresses — one live record's
+   * address read "Summer Place (joint tenancy address; full address not
+   * stated)", which is a note to the file, printed on a contract.
+   *
+   * The address stays on the client's own record and in the register; it is
+   * only this document that stops carrying it.
+   */
+  it('reaches the client by email and telephone, and not by post', async () => {
     const h = mount();
     withWording(h);
     quote(h);
     const body = await (await h.request('/quotes/q1/letter')).text();
     expect(body).toContain('Duc Manh BUI');
-    expect(body).toContain('12 Example Street, Auckland');
     expect(body).toContain('client@example.test');
+    expect(body).toContain('+64 21 000 0000');
+    // The fixture has one, so this is a rule and not an empty column.
+    expect(h.get<{ address: string }>(
+      `SELECT address FROM clients WHERE id = 'cl1'`)?.address).toBe('12 Example Street, Auckland');
+    expect(body).not.toContain('12 Example Street, Auckland');
+  });
+
+  /**
+   * **Asked for the same day:** *"the letter of engagement must start with
+   * 'Dear CLIENT'S FULL NAME,'"*. It opened straight into the first paragraph
+   * under a bare name, which reads as a form rather than a letter.
+   */
+  it('greets the client by name before it says anything', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    const body = await (await h.request('/quotes/q1/letter')).text();
+    expect(body).toContain('Dear Duc Manh BUI,');
+    // Before the first paragraph of the practice's own wording, not after it.
+    expect(body.indexOf('Dear Duc Manh BUI,'))
+      .toBeLessThan(body.indexOf('pleased to act'));
+  });
+
+  it('greets nobody rather than printing “Dear ,” when no name is recorded', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    h.db.exec(`UPDATE clients SET full_name = '' WHERE id = 'cl1'`);
+    const body = await (await h.request('/quotes/q1/letter')).text();
+    expect(body).not.toContain('Dear ,');
   });
 
   it('carries the practice’s own words, and its signature', async () => {

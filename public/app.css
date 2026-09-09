@@ -1296,6 +1296,10 @@ details[open] > summary { margin-bottom: 12px; }
 .letter-to { margin: 24px 0 16px; }
 .letter-to p { margin: 0 0 2px; }
 .letter-re { margin: 0 0 20px; }
+/* The salutation sits with the paragraph it opens, not floating between the
+   RE line and the body: closer below than above, so the letter reads as one
+   block of prose rather than three stacked fragments. */
+.letter-salutation { margin: 0 0 10px; }
 .letter-brief { padding: 12px 14px; border-left: 3px solid var(--accent); background: var(--surface-2); }
 .letter-acknowledgements li { margin-bottom: 8px; }
 .letter-signature { margin-top: 32px; }
@@ -1351,6 +1355,26 @@ details[open] > summary { margin-bottom: 12px; }
 /* Shown only on paper: a hyperlink is no use to somebody holding a printout,
    so the address itself appears there and nowhere else. */
 .print-only { display: none; }
+
+/* The page itself, on paper.
+ *
+ * **Asked for on 9 September 2026**, looking at a real quotation: *"the margins
+ * are too thin. they must be at least 25mm all around."* Quite right, and there
+ * was no `@page` rule at all until now — the margin was whatever the print
+ * dialogue happened to be set to, which on the file the practice sent was
+ * 8.5mm at the sides and 5.8mm at the top. A quotation carrying the letter of
+ * engagement is a contract; it gets filed, punched and copied, and a hole punch
+ * does not care what Chrome's default was that day.
+ *
+ * 25mm on every edge, on every page. The paper size is deliberately not forced:
+ * naming A4 here would make a printer loaded with anything else scale the whole
+ * document down, taking the margin with it.
+ *
+ * One thing this cannot do is beat the browser. Chrome's print dialogue has a
+ * Margins control, and "None" overrides this rule — so Help says to leave it on
+ * Default. That is the only setting this depends on.
+ */
+@page { margin: 25mm; }
 
 @media print {
   .print-only { display: block; font-size: 0.8em; color: #444; margin-top: 4px; }
