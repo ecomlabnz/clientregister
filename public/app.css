@@ -1509,8 +1509,19 @@ details[open] > summary { margin-bottom: 12px; }
  * beneath it. In the accent, because it is the one word on the page that says
  * what the reader is holding. */
 .quote-doc-kind {
-  margin: 0 0 10px; font-size: 2.4rem; font-weight: 650;
-  letter-spacing: -0.02em; line-height: 1.05; color: var(--accent);
+  /* **Set three times on 9 September 2026**, each time from a printed page.
+     Three times the original size was too big; twice is the figure the practice
+     settled on. In capitals, which is how the practice writes it.
+
+     It is pulled up above the practice's name beside it and given four lines of
+     air underneath, so it reads as the title of the page rather than as a label
+     on the reference block below — and the reference block stays where it was
+     rather than rising with it. The negative top margin is small enough that
+     the type still sits inside the document's own 20mm margin: a title touching
+     the edge of the paper is the fault this avoids at the other end. */
+  margin: -0.55rem 0 5.25rem; font-size: 2rem; font-weight: 650;
+  text-transform: uppercase; letter-spacing: 0.01em; line-height: 1.05;
+  color: var(--accent);
   /* It sits at the head of the right-hand column and must not wrap into two
      lines above a block of one-line rows. */
   white-space: nowrap;

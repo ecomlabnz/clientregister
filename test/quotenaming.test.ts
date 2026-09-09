@@ -149,10 +149,10 @@ describe('creating a quotation', () => {
     await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '0' });
     const id = h.get<{ id: string }>('SELECT id FROM quotes')!.id;
     const body = await (await h.request(`/quotes/${id}/print`)).text();
-    // The kind of work, without the client's name repeated — see the Re line
-    // tests at the foot of this file.
-    expect(body).toContain('RV. Partner');
     expect(body).not.toContain('<h3>Scope</h3>');
+    // And no reference line describing the work either — see the reference
+    // block tests at the foot of this file. The items are the scope.
+    expect(body).not.toContain('<dt>Re</dt>');
   });
 });
 
@@ -262,33 +262,60 @@ describe('migration 0074 carries the lines across before deleting the rows', () 
  * already named at the head of the document, and a reference line repeating
  * them says nothing the reader did not have.
  */
-describe('the Re line on a printed quotation', () => {
-  it('names the kind of work, not the client', async () => {
+describe('the reference block on a printed quotation', () => {
+  /**
+   * **The "Re" line is gone.** Asked for on 9 September 2026: *"remove the Re
+   * RV. Partner bit completely — the body of the quote is telling enough."*
+   *
+   * It had already been narrowed that morning, from "RV. Partner — <the
+   * client's name>" to the kind of work alone, because the client is named at
+   * the head of the document. The practice then looked at the result and made the
+   * obvious next observation: the items below name the work, line by line, with
+   * a figure against each. A heading reading "RV. Partner" above a list
+   * beginning "RV. Partner" is the document repeating itself.
+   *
+   * This is pinned because it was built, narrowed and then removed inside a
+   * day, and the tests for the two intermediate states would otherwise sit here
+   * describing a line that is not printed.
+   */
+  it('does not carry a Re line at all', async () => {
     const h = mount();
     await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '0' });
     const id = h.get<{ id: string }>('SELECT id FROM quotes')!.id;
-
     const body = await (await h.request(`/quotes/${id}/print`)).text();
-    expect(body).toContain('<dt>Re</dt><dd>RV. Partner</dd>');
-    // The quotation is still *named* with the client, which is how it reads in
-    // a list; it is only the reference line that stops repeating them.
-    expect(h.get<{ description: string }>('SELECT description FROM quotes')!.description)
-      .toContain('—');
+    expect(body).not.toContain('<dt>Re</dt>');
   });
 
-  it('falls back to the quotation’s own name when no kind of work is recorded', async () => {
-    // Derived from the type key rather than cut off the front of the stored
-    // name — splitting on an em dash works until a matter has one in it.
+  it('still says which quotation, what it is, and how long it stands', async () => {
+    // What the block is for. Losing the Re line must not quietly lose the rest.
     const h = mount();
     await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '0' });
     const id = h.get<{ id: string }>('SELECT id FROM quotes')!.id;
-    h.db.exec(`UPDATE quotes SET case_type = NULL, description = 'Advice — one hour'`);
-
     const body = await (await h.request(`/quotes/${id}/print`)).text();
-    // Not a bare em dash, which is what `labelFor` answers for a missing key
-    // and what this printed before the check was made explicit.
-    expect(body).not.toContain('<dt>Re</dt><dd>—</dd>');
-    expect(body).toContain('<dt>Re</dt><dd>Advice — one hour</dd>');
+    // Printed in capitals, as the practice writes it — by the stylesheet
+    // rather than in the markup, so the words a screen reader announces and
+    // the words somebody copies off the page are still "Fee quote" and not
+    // nine separate letters.
+    expect(body).toContain('class="quote-doc-kind">Fee quote</p>');
+    expect(readFileSync('public/app.css', 'utf8'))
+      .toMatch(/\.quote-doc-kind \{[^}]*text-transform: uppercase/);
+    expect(body).toContain('<dt>Quote</dt>');
+    expect(body).toContain('<dt>Issued</dt>');
+    expect(body).toContain('<dt>Valid until</dt>');
+  });
+
+  it('names the kind of work in the body, where it belongs', async () => {
+    // The reason the Re line could go: the work is on the page already.
+    const h = mount();
+    await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '0' });
+    const id = h.get<{ id: string }>('SELECT id FROM quotes')!.id;
+    h.db.exec(`INSERT INTO quote_items (id, quote_id, position, description, kind, unit_label,
+                 quantity_milli, unit_amount_cents, gst_treatment, gst_rate_bp,
+                 net_cents, gst_cents, gross_cents, created_at, updated_at)
+               VALUES ('qi9', '${id}', 0, 'RV. Partner', 'professional', '',
+                       1000, 0, 'exclusive', 1500, 0, 0, 0, '${AT}', '${AT}')`);
+    const body = await (await h.request(`/quotes/${id}/print`)).text();
+    expect(body).toContain('RV. Partner');
   });
 });
 

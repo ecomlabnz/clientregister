@@ -37,6 +37,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.28.1', date: '9 September 2026',
+    notes: [
+      '\u201CFEE QUOTE\u201D is in capitals now, and at twice its original size rather than '
+        + 'three times \u2014 three was too big on the page.',
+      'It sits a little higher than your name beside it, with four clear lines underneath, so it '
+        + 'reads as the title of the page rather than as a label on the reference block. Still '
+        + '18mm clear of the top of the paper.',
+      'The \u201CRe\u201D line is gone. The items name the work with a figure against each, so a '
+        + 'heading repeating the first of them said nothing new.',
+    ],
+  },
+  {
     version: '1.28.0', date: '9 September 2026',
     notes: [
       'The payment schedule now says how much is left to allocate, not only how much has been: '

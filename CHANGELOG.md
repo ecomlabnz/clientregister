@@ -7,6 +7,33 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.28.1 — 9 September 2026
+
+### Changed
+**The head of a quotation, settled.** Three corrections from looking at a
+printed one:
+
+- **"FEE QUOTE" in capitals**, and at twice its original size rather than three
+  times — three was too big on the page. The capitals come from the stylesheet
+  rather than the markup, so the words a screen reader announces, and the words
+  somebody copies off the page, are still "Fee quote" and not nine separate
+  letters.
+- **Raised above the practice's name** beside it, with **four clear lines**
+  underneath, so it reads as the title of the page rather than as a label on the
+  reference block. The reference block stays where it was rather than rising
+  with it, and the title is still 18mm clear of the top of the paper.
+- **The "Re" line is gone.** *"remove the Re RV. Partner bit completely — the
+  body of the quote is telling enough."* It had already been narrowed that
+  morning, from "RV. Partner — <the client's name>" to the kind of work alone,
+  because the client is named at the head of the document. The next observation
+  was the obvious one: the items below name the work, line by line, with a
+  figure against each, so a heading reading "RV. Partner" above a list beginning
+  "RV. Partner" is the document repeating itself.
+
+The block still says which quotation, when it was issued and how long it stands,
+and there is a test that says so — losing the Re line must not quietly lose the
+rest of it.
+
 ## 1.28.0 — 9 September 2026
 
 ### Added
