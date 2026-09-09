@@ -7,6 +7,40 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.21.0 — 9 September 2026
+
+### Added
+**The letter now shows where the covering letter ends and the terms begin.**
+Asked for with a line drawn across a screenshot: everything above it is the
+covering letter, everything below is the practice's short-form terms. Two
+documents on one page, and nothing said where one stopped.
+
+It matters beyond tidiness. The letter points at a **second** set of terms —
+the Standard Terms of Engagement, published at a web address further down — and
+a client who cannot see that the page in their hand is itself a set of terms has
+no way to tell the two apart. There is now a rule across the page headed
+**Short Form Terms of Engagement / Immigration Legal Services (Direct Access)**,
+and both lines are settings you can reword or clear.
+
+**A place for the scope of the retainer**, immediately under the block that
+points at the quotation — the block says where the work is written down, this
+says the limits of it. Settings → Letter of engagement.
+
+**It ships empty on purpose.** This is the paragraph that tells a client what
+their lawyer will and will not do, and the register does not compose that for
+anybody, the same as the opening and the closing. Nothing prints until you write
+it, and the heading does not appear above an empty section.
+
+### Changed
+- **The quotation block is now headed "The Parties, the Scope of Work, the Fees
+  (Legal and Disbursements) and the Payment Terms."** "The work, the parties and
+  the fees" was too narrow for a document that also settles who the parties are
+  and when the money falls due.
+- **The client is named as "FOR: …"** The block sits between the practice's
+  contact details and the client's, and a bare name between the two does not say
+  which it belongs to.
+- **"Telephone" is now "Mobile"**, which is what the number actually is.
+
 ## 1.20.0 — 9 September 2026
 
 ### Added

@@ -110,14 +110,14 @@ describe('what the letter carries', () => {
    * The address stays on the client's own record and in the register; it is
    * only this document that stops carrying it.
    */
-  it('reaches the client by email and telephone, and not by post', async () => {
+  it('reaches the client by email and mobile, and not by post', async () => {
     const h = mount();
     withWording(h);
     quote(h);
     const body = await (await h.request('/quotes/q1/letter')).text();
     expect(body).toContain('Duc Manh BUI');
     expect(body).toContain('client@example.test');
-    expect(body).toContain('+64 21 000 0000');
+    expect(body).toContain('Mobile: +64 21 000 0000');
     // The fixture has one, so this is a rule and not an empty column.
     expect(h.get<{ address: string }>(
       `SELECT address FROM clients WHERE id = 'cl1'`)?.address).toBe('12 Example Street, Auckland');
@@ -402,5 +402,124 @@ describe('reading the administrative team setting', () => {
     expect(parseAdminTeam('A | B | C | D | E')).toEqual([
       { name: 'A', short: 'B', mobile: 'C', email: 'D' },
     ]);
+  });
+});
+
+/**
+ * Two documents on one page, and a line between them.
+ *
+ * **Asked for on 9 September 2026**, with a line drawn across a screenshot:
+ * everything above it is the covering letter, everything below is the
+ * practice's short-form terms. The letter also points at a *second* set of
+ * terms — the Standard Terms of Engagement, at a web address — so a client who
+ * cannot see that the page in their hand is itself a set of terms has no way to
+ * tell the two apart.
+ */
+describe('where the covering letter ends and the terms begin', () => {
+  const setting = (h: ReturnType<typeof mount>, key: string, value: string) =>
+    h.db.exec(`INSERT OR REPLACE INTO settings (key, value, updated_at)
+               VALUES ('${key}', '${value}', '${AT}')`);
+
+  const letter = async (h: ReturnType<typeof mount>) =>
+    (await h.request('/quotes/q1/letter')).text();
+
+  it('heads the terms, and does so before the quotation block', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    const body = await letter(h);
+    expect(body).toContain('Short Form Terms of Engagement');
+    expect(body).toContain('Immigration Legal Services (Direct Access)');
+    expect(body.indexOf('Short Form Terms of Engagement'))
+      .toBeLessThan(body.indexOf('The Parties, the Scope of Work'));
+    // And after the covering letter it closes off.
+    expect(body.indexOf('pleased to act'))
+      .toBeLessThan(body.indexOf('Short Form Terms of Engagement'));
+  });
+
+  it('prints no divider at all when the practice clears the heading', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    setting(h, 'engagement.terms_title', '');
+    setting(h, 'engagement.terms_subtitle', 'Immigration Legal Services');
+    const body = await letter(h);
+    // The subtitle is not a heading of its own: it goes with the title or not
+    // at all, or the page grows a stray line of shouting.
+    expect(body).not.toContain('letter-terms-start');
+    expect(body).not.toContain('Immigration Legal Services');
+  });
+
+  it('names all four things the quotation settles', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    const body = await letter(h);
+    expect(body).toContain('The Parties, the Scope of Work, the Fees (Legal and Disbursements)');
+    expect(body).toContain('the Payment Terms');
+    // The heading it replaced, which was too narrow for a document that also
+    // settles who the parties are and when the money falls due.
+    expect(body).not.toContain('The work, the parties and the fees');
+  });
+});
+
+describe('the scope of the retainer', () => {
+  const letter = async (h: ReturnType<typeof mount>) =>
+    (await h.request('/quotes/q1/letter')).text();
+
+  it('is not written by the register, so nothing prints until the practice writes it', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    const body = await letter(h);
+    // The heading has a default; the wording deliberately does not, and the
+    // heading must not print on its own above nothing.
+    expect(body).not.toContain('Scope of the Retainer');
+  });
+
+  it('sits under the quotation block, not inside it', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    h.db.exec(`INSERT OR REPLACE INTO settings (key, value, updated_at)
+               VALUES ('engagement.scope_terms',
+                       'A limited scope retainer. Work outside it is not provided.', '${AT}')`);
+
+    const body = await letter(h);
+    expect(body).toContain('Scope of the Retainer');
+    expect(body).toContain('A limited scope retainer.');
+    expect(body.indexOf('The Parties, the Scope of Work'))
+      .toBeLessThan(body.indexOf('A limited scope retainer.'));
+    // Before the practice's own clauses, which follow it.
+    expect(body.indexOf('A limited scope retainer.'))
+      .toBeLessThan(body.indexOf('Standard terms of engagement'));
+  });
+
+  it('keeps its paragraphs, and escapes what is typed', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    h.db.exec(`INSERT OR REPLACE INTO settings (key, value, updated_at)
+               VALUES ('engagement.scope_terms',
+                       'First paragraph.
+
+<b>Second</b> paragraph.', '${AT}')`);
+
+    const body = await letter(h);
+    expect(body).toContain('First paragraph.');
+    expect(body).toContain('&lt;b&gt;Second&lt;/b&gt;');
+    expect(body).not.toContain('<b>Second</b>');
+  });
+
+  it('is on the letter and not on the quotation', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    h.db.exec(`INSERT OR REPLACE INTO settings (key, value, updated_at)
+               VALUES ('engagement.scope_terms', 'A limited scope retainer.', '${AT}')`);
+
+    const body = await (await h.request('/quotes/q1/print')).text();
+    expect(body).not.toContain('A limited scope retainer.');
+    expect(body).not.toContain('Short Form Terms of Engagement');
   });
 });

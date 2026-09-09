@@ -37,6 +37,25 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.21.0', date: '9 September 2026',
+    notes: [
+      'The letter now shows where your covering letter ends and your terms begin \u2014 a rule '
+        + 'across the page headed \u201CShort Form Terms of Engagement / Immigration Legal '
+        + 'Services (Direct Access)\u201D. Both lines are yours to reword or clear, under '
+        + 'Settings \u2192 Letter of engagement.',
+      'That matters because the letter also points at a second set of terms, the Standard Terms '
+        + 'published on the web. A client could not previously tell that the page in their hand '
+        + 'was itself a set of terms.',
+      'There is a box for the scope of the retainer, printed just under the block that points at '
+        + 'the quotation. It is empty until you write it: the register does not compose the '
+        + 'paragraph that says what you will and will not do.',
+      'That block is now headed \u201CThe Parties, the Scope of Work, the Fees (Legal and '
+        + 'Disbursements) and the Payment Terms\u201D.',
+      'The client is named as \u201CFOR: \u2026\u201D, and \u201CTelephone\u201D now reads '
+        + '\u201CMobile\u201D.',
+    ],
+  },
+  {
     version: '1.20.0', date: '9 September 2026',
     notes: [
       'The letter of engagement can now name your administrative team. Settings \u2192 Letter of '
