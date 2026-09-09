@@ -21,7 +21,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { defaultQuoteEmail, type QuoteRow } from '../src/modules/quotes';
+import { defaultQuoteEmail, type QuoteItemRow, type QuoteRow } from '../src/modules/quotes';
 import { PRACTICE_SETTINGS } from '../src/core/practice';
 
 const quote = {
@@ -49,21 +49,74 @@ describe('the covering email a quote drafts', () => {
   });
 
   it('names the documents and sends the client to them', () => {
-    // **Rewritten on 9 September 2026.** The email used to type the whole
-    // quotation into its body. The practice sent one to themselves: *"no link,
-    // no nice formatted page, no ACCEPT button, no letter of engagement —
-    // where is the rest of the mechanics of it all??"*
-    //
-    // A covering letter does not contain the documents. It says what is
-    // waiting, where, and what to do — and the page the link opens carries the
-    // quotation, the letter of engagement and the way to accept them.
-    const body = defaultQuoteEmail(quote, practice, [], '', 'https://app.example.test/q/abc');
+    // **The practice's own letter, given on 9 September 2026**, with the
+    // figures and the address filled in. The email before it typed the whole
+    // quotation into its body; a covering letter does not contain the
+    // documents, it says what is waiting, where, and what to do.
+    const withLetter = { ...quote, with_letter: 1 };
+    const body = defaultQuoteEmail(withLetter, practice, [], '', 'https://app.example.test/q/abc');
     expect(body).toContain('https://app.example.test/q/abc');
     expect(body).toContain('Letter of Engagement');
     expect(body).toContain('Standard Terms of Engagement');
     // And it no longer retypes the itemisation.
     expect(body).not.toContain('Subtotal');
     expect(body).not.toContain('Professional fees');
+  });
+
+  it('does not promise a letter of engagement that is not going', () => {
+    // The one sentence of the practice's that is not true of every quotation.
+    // A quotation sent without a letter must not name one — promising a
+    // document that is not there is worse than a shorter sentence.
+    const body = defaultQuoteEmail({ ...quote, with_letter: 0 }, practice, [], '',
+      'https://app.example.test/q/abc');
+    expect(body).not.toContain('Letter of Engagement');
+    expect(body).toContain('fee quotation**');
+    expect(body).toMatch(/before accepting it/);
+  });
+
+  it('says the total is inclusive only of what it is inclusive of', () => {
+    // "inclusive of GST and the disbursements specified in the quotation" is
+    // the practice's wording and is a statement about a figure on a contract.
+    // It comes apart for a practice that is not GST registered, and for a
+    // quotation with no disbursements on it.
+    const line = (l: Partial<QuoteItemRow>) => ({
+      kind: 'professional', unit_amount_cents: 100000, net_cents: 100000,
+      gst_cents: 15000, gross_cents: 115000, quantity_milli: 1000, ...l,
+    } as QuoteItemRow);
+
+    const feesOnly = defaultQuoteEmail(quote, practice, [line({})], '', 'https://x.test/q/a');
+    expect(feesOnly).toContain('inclusive of GST**');
+    expect(feesOnly).not.toContain('disbursements specified');
+
+    const withDisb = defaultQuoteEmail(quote, practice,
+      [line({}), line({ kind: 'disbursement' })], '', 'https://x.test/q/a');
+    expect(withDisb).toContain('inclusive of GST and the disbursements specified in the quotation');
+
+    const noGst = defaultQuoteEmail(quote, practice,
+      [line({ gst_cents: 0, gross_cents: 100000 })], '', 'https://x.test/q/a');
+    expect(noGst).not.toContain('inclusive of GST');
+  });
+
+  it("carries the practice's own warning about the outcome", () => {
+    // The paragraph the practice added by hand, and the reason the letter is
+    // theirs rather than the register's: a fee quotation that reads as a
+    // promise of a visa is a professional problem, not a wording preference.
+    const body = defaultQuoteEmail(quote, practice, [], '', 'https://x.test/q/a');
+    expect(body).toMatch(/does not constitute a guarantee/i);
+    expect(body).toContain('Immigration New Zealand');
+  });
+
+  it("uses the practice's capacity note where they have written one", () => {
+    // Their letter carries a capacity sentence of its own. The register already
+    // has a setting for that sentence, so the setting wins where it is set and
+    // their words are the default — rather than the client being told twice.
+    const theirs = 'We may decline the engagement if our workload does not permit it.';
+    const set = defaultQuoteEmail(quote, practice, [], theirs, 'https://x.test/q/a');
+    expect(set).toContain(theirs);
+    expect(set).not.toMatch(/availability and capacity/);
+
+    const unset = defaultQuoteEmail(quote, practice, [], '', 'https://x.test/q/a');
+    expect(unset).toMatch(/availability and capacity/);
   });
 
   it('says so plainly when the quotation has no link yet', () => {
@@ -88,28 +141,31 @@ describe('the covering email a quote drafts', () => {
     // edition comes from.
     const body = defaultQuoteEmail(quote, practice, [], '', 'https://app.example.test/q/abc');
     expect(body).not.toMatch(/download (the|these|those) terms/i);
-    // And it still says where the standard terms come from, which is the half
-    // of the old sentence worth keeping: the other two documents are on the
-    // page the link opens, this one is not.
-    expect(body).toMatch(/Standard Terms of Engagement, published at/i);
+    // And it still says where the standard terms come from: the quotation and
+    // the letter are on the page the link opens, this one is not.
+    expect(body).toMatch(/Standard Terms of Engagement/);
+    expect(body).toContain(practice.termsUrl);
   });
 
-  it('asks the client to read them, and to sign if they are content', () => {
-    // The practice's instruction: *"refer to the letter of engagement and
-    // standard terms and ask the client to read and if acceptable — sign."*
-    const body = defaultQuoteEmail(quote, practice, [], '', 'https://app.example.test/q/abc');
-    expect(body).toMatch(/Please read them both/i);
-    expect(body).toMatch(/please sign at the foot of that page/i);
-    // And an invitation to ask first, which is the thing a client most needs
-    // permission to do before signing a contract.
-    expect(body).toMatch(/reply to this email/i);
+  it('asks the client to read, to sign, and to ask first if unsure', () => {
+    const body = defaultQuoteEmail({ ...quote, with_letter: 1 }, practice, [], '',
+      'https://app.example.test/q/abc');
+    expect(body).toMatch(/carefully before accepting them/i);
+    expect(body).toMatch(/sign electronically at the end of the quotation/i);
+    // The invitation to ask before signing, which is the thing a client most
+    // needs permission to do before agreeing to a contract.
+    expect(body).toMatch(/please contact us before accepting it/i);
   });
 
-  it('says nothing about terms when no address is configured', () => {
+  it('points at no terms when no address is configured', () => {
     // A practice that has not set one must not get a sentence pointing at
-    // nowhere. This is also the second practice's first day.
+    // nowhere. This is also the second practice's first day. What is checked is
+    // the *pointer*, not the phrase: the closing paragraph invites a question
+    // about "the terms of engagement" whether or not there is an address, and
+    // it should.
     const body = defaultQuoteEmail(quote, { ...practice, termsUrl: '' });
-    expect(body).not.toMatch(/terms of engagement/i);
+    expect(body).not.toMatch(/Standard Terms of Engagement/);
+    expect(body).not.toMatch(/available here/i);
   });
 });
 

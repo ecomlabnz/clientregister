@@ -7,6 +7,108 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.32.0 — 9 September 2026
+
+### Fixed
+**An accepted quotation could still be edited.** Reported within the hour of
+acceptance going live: *"once accepted the quotation should not change, right?
+is there a block for that?"* and then, having tried it: *"in quote 12 I managed
+to delete a line! should not be possible."*
+
+There was no block. The only guard on any of it was `quote:write`, which asks
+whether somebody may edit quotations **at all** — never whether *this* quotation
+is still theirs to edit. So an accepted quotation could have its fee lines
+changed, its schedule rewritten, its parties swapped and its total moved, after
+a client had put their name to it. That is not an editing mistake; it is a
+contract being altered after it was formed, by the party who wrote it.
+
+**Migration 0079 freezes it in the database**, not on the screen — eleven routes
+write to a quotation, and a rule added to each of them is eleven chances to
+forget. What freezes is everything the client agreed to: the fee lines, the
+payment stages, the people named, the figures, the kind of work, the dates,
+whether a letter goes with it, and the note under the schedule. The status
+freezes too: there is no honest way to move a quotation off *accepted*.
+
+What does not freeze: the practice's own note on the file, which is not printed
+on the document and is not part of what anybody agreed.
+
+The buttons now disappear rather than appearing and failing — but the screen is
+the courtesy and the database is the guarantee. Ten refusals, each attacked
+directly before a line of the application was touched.
+
+### Added
+**Two emails go out when a client accepts.** Asked for: *"the client did not
+receive a confirmation email... remember, two emails should go out — one to the
+client confirming acceptance, and one to the lawyer confirming acceptance."*
+
+They are different letters because they answer different questions. **The
+client's** says what they agreed to, for how much, when, and gives the link
+again — with the promise that the document will not change now, which migration
+0079 is what makes true. **The practice's** says it arrived, who accepted, and
+what it means: that the quotation is now fixed, that a change means a new
+quotation, and where to read it as the client sees it. If the client has no
+email address on file, the practice's letter says so rather than letting them
+assume the client was written to.
+
+Neither can hold up an acceptance. A contract is formed by the client's act, not
+by our bookkeeping, so a mistyped address six weeks ago cannot turn accepting
+into an error page.
+
+**Where the practice's copy goes** is a new setting — Settings → Practice — so
+it can reach an assistant or a shared inbox without changing the address clients
+see. Left empty it goes to the practice email.
+
+**A full note on the quotation's own file.** Asked for: *"there is a note in the
+right side panel, but there should be a comprehensive note in the file note as
+well once it is accepted."* The panel is the record's current state; the file
+notes are what happened to it, which is what somebody reads a year later. It
+carries who accepted, the date they gave, the moment it arrived, where from, the
+total, whether a letter went with it, and that the quotation is now fixed.
+
+## 1.31.0 — 9 September 2026
+
+### Added
+**The covering email is the practice's own letter.** Given as a template:
+*"use this as a template for the emails to the clients... adapt it but I like
+the contents so keep them as much as possible."* So the words are theirs, with
+the figures, the dates and the address filled in — including the paragraph they
+added by hand, that **acceptance is not a guarantee of any immigration
+outcome**, which is a professional matter and not a wording preference.
+
+Five places adapt, because a sentence of theirs would otherwise be untrue of a
+particular quotation:
+
+- **"and Letter of Engagement"** comes out when the quotation goes without one.
+- **"inclusive of GST"** comes out for a practice that is not GST registered,
+  and **"and the disbursements specified"** when there are none. Both are
+  statements about a figure on a contract.
+- **The capacity sentence** uses the practice's own setting where they have
+  written one, and their sentence from this letter where they have not, rather
+  than saying it twice.
+- **The closing date** is left out entirely when a quotation has none — but the
+  capacity sentence stays, which the first draft got wrong: it dropped both
+  together, so a quotation left open indefinitely was also the one that never
+  told the client the engagement could still be declined.
+
+**A green ACCEPTED stamp at the head of the quotation.** Asked for: *"once it is
+accepted there should be a green stamp at the top stating ACCEPTED and date and
+time and name."* On the document itself rather than on the page around it, so it
+appears wherever the quotation is rendered — the client's link, the practice's
+print view, and the paper. Dark green on pale green with a solid border, which
+survives a greyscale printer as a bordered band rather than vanishing.
+
+### Fixed
+**The quotation and the letter were different widths.** Reported: *"why are they
+of different width??"* The letter was set to 46rem, a measure chosen for prose,
+and the quotation to 210mm, a measure chosen for paper. Invisible while each was
+on its own page; obvious the moment the client's page put one under the other.
+Paper wins — they are printed on the same sheet and read in the same envelope,
+and 170mm at 8.5pt is about sixty-five characters a line, which is where prose
+wants to be anyway.
+
+**And they were touching.** There is 26mm between them now, which is what a
+reader needs to see two documents rather than one long one.
+
 ## 1.30.1 — 9 September 2026
 
 ### Fixed

@@ -37,6 +37,45 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.32.0', date: '9 September 2026',
+    notes: [
+      'An accepted quotation can no longer be changed. You found this by deleting a line off one '
+        + '\u2014 the only check was whether you may edit quotations at all, never whether that '
+        + 'one was still open.',
+      'The lines, the schedule, the people, the figures, the dates and the status are all fixed '
+        + 'once a client accepts. The database refuses it, so no screen can forget. Your own '
+        + 'note on the file still works.',
+      'Two emails now go out when a client accepts: one to them confirming what they agreed to, '
+        + 'with the link again; one to you saying it arrived, who accepted, and that the '
+        + 'quotation is now fixed.',
+      'If the client has no email address on file, your copy says so rather than letting you '
+        + 'assume they were written to. Neither email can hold up an acceptance.',
+      'You can send your copy somewhere else \u2014 an assistant, a shared inbox \u2014 under '
+        + 'Settings \u2192 Practice, without changing the address clients see.',
+      'A full note now goes on the quotation\u2019s own file notes when it is accepted: who, the '
+        + 'date they gave, when it arrived, from where, the total, and that it is now fixed.',
+    ],
+  },
+  {
+    version: '1.31.0', date: '9 September 2026',
+    notes: [
+      'The email to the client is now your own letter, with the figures, dates and link filled '
+        + 'in \u2014 including your paragraph that accepting is not a guarantee of any '
+        + 'immigration outcome.',
+      'It adapts where a sentence would otherwise be untrue: it does not promise a Letter of '
+        + 'Engagement that is not going, does not say \u201Cinclusive of GST\u201D when no GST '
+        + 'applies, and does not mention disbursements when there are none.',
+      'Where you have written a capacity note in Settings it uses yours; otherwise it uses the '
+        + 'sentence from your letter. You are never told twice.',
+      'A green ACCEPTED stamp now sits at the head of an accepted quotation, with the date, the '
+        + 'time and who accepted it. It shows on the client\u2019s page, on your print view and '
+        + 'on paper.',
+      'The quotation and the letter of engagement are the same width now, with space between '
+        + 'them. The letter had been set narrower, which only showed once they sat one above the '
+        + 'other.',
+    ],
+  },
+  {
     version: '1.30.1', date: '9 September 2026',
     notes: [
       '\u201CINVOICE\u201D is now the size of a document title, the same as \u201CFEE '
