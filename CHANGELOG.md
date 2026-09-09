@@ -7,6 +7,82 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.18.0 — 9 September 2026
+
+### Added
+**A backup button.** Settings → Export now has, for the owner only, one button
+that downloads the entire register as a single dated zip file.
+
+`docs/operations.md` has carried "there is still no automated backup" as the
+largest single risk since the register went live on 30 August. This is not that
+— a button somebody has to press is not automatic — but it is what makes the
+risk survivable today, and it is the piece an automatic backup would call.
+
+What is in the file:
+
+- `schema.sql` — every table and index.
+- `data/NNN_<table>.sql` — every row, as `INSERT` statements, numbered in the
+  order they load in.
+- `triggers.sql` — the register's rules, to run last.
+- `tables/<table>.json` — the same rows again, for reading with anything else. A
+  practice that has lost its register should not also have to parse SQL to find
+  one client's address.
+- `files/<key>` — the documents themselves out of R2. A `documents` row naming a
+  file the archive does not hold is a reference to nothing.
+- `manifest.json` and `README.md` — what was taken, when, by whom, and how to
+  put it back.
+
+**The shape above was arrived at by restoring one**, which is the only way any of
+it could have been known, and the first three attempts each failed differently:
+
+1. Alphabetical data files put `case_parties` before `cases`. 36 of 51 tables
+   were refused on foreign keys and the restored register had **no clients in
+   it**. The files are numbered in dependency order now, worked out from what
+   each table references, so `for f in data/*.sql` is enough.
+2. Two clients can point at each other — an organisation names its main contact,
+   and that contact's organisation is the organisation. No order restores that
+   pair, so those columns go in empty and are set by an `UPDATE` at the end of
+   the same file, which is what a database's own dump tool does with a loop.
+3. Creating the triggers before loading the data meant today's rules judging
+   the practice's own history. They go on at the end now, over a database that
+   is already whole.
+
+A restore is now rehearsed on every test run — the archive is replayed into an
+empty database with foreign keys **on**, and the records are counted back — so a
+change that quietly breaks it fails here rather than in the week it is needed.
+
+**It includes passport numbers**, which the CSV exports deliberately do not. The
+distinction is what the file is for: an export is read somewhere else, a backup
+puts the register back, and one missing a column cannot. The practice was asked
+in those terms and decided it on 9 September 2026.
+
+Three consequences follow from that, and all three are built in:
+
+- The permission is new (`backup:take`) and belongs to **the owner alone** — not
+  to an administrator, who can otherwise do everything else in Settings.
+- It is a form with a token rather than a link, so it cannot be triggered by a
+  link somebody was sent.
+- Taking one writes an audit row saying what was taken — how many tables, rows,
+  files and bytes — not merely that something was.
+
+The zip is written by hand (`src/core/zip.ts`): there is no zip in the Workers
+runtime and no dependency here that provides one. Deflate comes from the
+platform's `CompressionStream`. The tests take the archive apart from its
+end-of-central-directory record backwards, the way a stranger's tool would,
+rather than by reading back the object that wrote it.
+
+One more fault came from pressing the button rather than from a test: D1 keeps
+its own `_cf_METADATA` table, which `sqlite_master` lists and which D1 then
+refuses to read, so the first press returned a 500 while every test passed. D1's
+own tables are excluded, and the test suite now creates one so the exclusion is
+a rule it can check.
+
+### Fixed
+The Export page still described passport numbers as "the one field the register
+encrypts". They have been stored as written since migration 0042 on 30 August.
+The reason they stay out of the CSVs is unchanged and is now stated as what it
+actually is: a spreadsheet in a downloads folder is the copy that escapes.
+
 ## 1.17.0 — 9 September 2026
 
 ### Fixed

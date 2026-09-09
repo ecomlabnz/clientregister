@@ -32,6 +32,8 @@ interface SqliteDatabase {
 declare namespace NodeJS {
   interface Process {
     getBuiltinModule(id: 'node:sqlite'): { DatabaseSync: new (path: string) => SqliteDatabase };
+    /** For unzipping a backup the way an outside tool would. */
+    getBuiltinModule(id: 'node:zlib'): { inflateRawSync(data: Uint8Array): Uint8Array };
   }
 }
 declare const process: NodeJS.Process;
