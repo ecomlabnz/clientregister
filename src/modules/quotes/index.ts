@@ -1773,12 +1773,20 @@ export const quotesModule: AppModule = {
           <section>
             <h3>The parties</h3>
             <dl class="kv quote-doc-parties">
-              <dt>The lawyer</dt><dd>${practice.legalName}</dd>
-              <dt>The client</dt>
+              ${'' /* "The Lawyer" and "The Client" are the defined terms the
+                     letter and the terms of engagement use, so they are
+                     capitalised here as they are there. */}
+              <dt>The Lawyer</dt><dd>${practice.legalName}</dd>
+              <dt>The Client</dt>
+              ${'' /* The nomination sits beside the name in brackets rather
+                     than on a line of its own beneath it: it qualifies who this
+                     person is, and read underneath it looked like a second
+                     fact about them. Smaller, because it is an aside. */}
               <dd><strong>${q.client_name ?? '—'}</strong>${
                 representative
                   ? ''
-                  : html`<div class="small">Nominated representative for all parties.</div>`}</dd>
+                  : html` <span class="small muted">(Nominated representative for all
+                          parties)</span>`}</dd>
               ${applicants.map((p) => html`
                 <dt>Applicant</dt>
                 <dd><strong>${p.full_name}</strong>${partyDetail(p)}</dd>`)}
@@ -1853,8 +1861,15 @@ export const quotesModule: AppModule = {
                 ${stages.map((s) => html`
                   <tr>
                     <td>${s.label ? html`<strong>${s.label}</strong> ` : ''}${s.description}</td>
-                    <td class="num">${money(s.net_cents, q.currency)}${
-                      s.gst_treatment === 'exclusive' && s.gst_cents ? ' + GST' : ''}</td>
+                    ${'' /* The figure the client pays, not the figure plus a
+                           promise of tax. Asked for on 9 September 2026: the
+                           stages "should already be showing the GST inclusive
+                           amounts". A schedule of payments whose rows have to
+                           be added to a percentage before they mean anything is
+                           a schedule the client has to do arithmetic on, and
+                           the total underneath was already inclusive — so the
+                           rows and the total were in different currencies. */}
+                    <td class="num">${money(s.gross_cents, q.currency)}</td>
                   </tr>`)}
               </tbody>
               <tfoot>
