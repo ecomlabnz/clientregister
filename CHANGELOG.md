@@ -31,7 +31,46 @@ their lawyer will and will not do, and the register does not compose that for
 anybody, the same as the opening and the closing. Nothing prints until you write
 it, and the heading does not appear above an empty section.
 
+### Fixed
+**The 25mm margin was still not happening, and now it is.** A letter printed
+within an hour of the last release measured 8.5mm at the sides — byte for byte
+what it had been before the fix. The stylesheet was live and uncached, so the
+rule was there and was ignored.
+
+`@page` is a request. Chrome's print dialogue has a **Margins** control, and
+every setting but *Default* overrides the document; 8.5mm is about what its
+*Minimum* gives. A margin a contract depends on cannot sit behind a preference
+in somebody's print box.
+
+The margin is now split between the two mechanisms, each doing the half it can
+actually hold:
+
+- **The sides are padding on the document**, which no print setting can reach.
+- **The top and bottom stay with `@page`**, because padding cannot do them: a
+  block's padding falls at the start and end of the *document*, not at each page
+  break, so a two-page letter got 25mm at the top of page one and **0.8mm** at
+  the top of page two. That was measured on the way to this, not reasoned about.
+
+Verified by generating both documents twice — once letting the stylesheet decide
+and once asking for no page margin at all — and measuring every edge of every
+page: 25mm on all four, both times.
+
+**What this still cannot do** is force a top margin when the dialogue is set to
+anything but *Default*. Nothing in a stylesheet can. The print page now says so
+on screen beside the button, where somebody is actually standing when they press
+it, rather than only in Help.
+
 ### Changed
+- **Smaller type, tighter spacing.** The printed document had been inheriting
+  the interface's 14 pixels; it is now 10pt — set in points, so it is the size
+  it claims to be on paper — with line spacing of 1.38 against the screen's 1.6
+  and paragraph gaps a little over half what they were. A five-page letter loses
+  about a page to this without a word being cut. Greys are printed black: grey
+  on white loses more to a printer than it gains on a screen, and some of it is
+  the client's own contact details.
+- **"Letter of engagement" is off the top right corner.** The document says what
+  it is twice already — the RE: line names it, and the rule below heads the
+  terms — and a third label only competed with the practice's own name beside it.
 - **The quotation block is now headed "The Parties, the Scope of Work, the Fees
   (Legal and Disbursements) and the Payment Terms."** "The work, the parties and
   the fees" was too narrow for a document that also settles who the parties are

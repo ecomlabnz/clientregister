@@ -1377,7 +1377,12 @@ export const quotesModule: AppModule = {
               </p>
             </div>
             <div class="quote-doc-ref">
-              <h2>Letter of engagement</h2>
+              ${'' /* No "Letter of engagement" label here, removed on the
+                     practice's instruction of 9 September 2026. The document
+                     says what it is twice over — the RE: line names it, and the
+                     rule further down heads the terms — and a third label in the
+                     corner only competed with the practice's own name beside
+                     it, which is the thing a reader should see first. */}
               <dl class="quote-doc-meta">
                 <dt>Date</dt><dd>${dateShort(issuedOn)}</dd>
                 <dt>Our reference</dt><dd class="strong">${q.ref}</dd>
@@ -1547,6 +1552,16 @@ export const quotesModule: AppModule = {
             ${text.signatureTitle ? html`<p class="small">${text.signatureTitle}</p>` : ''}
           </section>
 
+          ${'' /* The one thing the stylesheet cannot hold.
+                 The document asks for a 25mm margin and Chrome's print dialogue
+                 overrides it on any Margins setting but Default — which is how a
+                 letter went out at 8.5mm on 9 September 2026 with the rule
+                 correctly in place and live. Said here, beside the button,
+                 because Help is not where somebody is standing when they press
+                 it. */}
+          <p class="hint no-print">In the print box, leave <strong>Margins</strong> on
+             <strong>Default</strong>. Any other setting overrides the 25mm this document asks
+             for.</p>
           <footer class="quote-doc-foot no-print">
             <button class="btn btn-primary" data-print type="button">Print this letter</button>
             <a class="btn btn-secondary" href="/quotes/${q.id}/print">The quotation</a>
@@ -1780,6 +1795,16 @@ export const quotesModule: AppModule = {
             </ul>
           </section>
 
+          ${'' /* The one thing the stylesheet cannot hold.
+                 The document asks for a 25mm margin and Chrome's print dialogue
+                 overrides it on any Margins setting but Default — which is how a
+                 letter went out at 8.5mm on 9 September 2026 with the rule
+                 correctly in place and live. Said here, beside the button,
+                 because Help is not where somebody is standing when they press
+                 it. */}
+          <p class="hint no-print">In the print box, leave <strong>Margins</strong> on
+             <strong>Default</strong>. Any other setting overrides the 25mm this document asks
+             for.</p>
           <footer class="quote-doc-foot no-print">
             <button class="btn btn-primary" data-print type="button">Print this quote</button>
             <a class="btn btn-secondary" href="/quotes/${q.id}">Back to the quote</a>
