@@ -661,6 +661,40 @@ tr:last-child td { border-bottom: none; }
 /* Just wide enough for the cross, and out of the way of the figures. */
 .row-action { width: 1%; white-space: nowrap; text-align: right; }
 
+/* Cross out a row, to be removed when the form is saved.
+ *
+ * **Asked for on 9 September 2026:** *"the remove words need to be replaced
+ * here too."* The editing tables carried a checkbox with the word "remove"
+ * beneath it, which was the widest thing in its column and repeated down the
+ * page — the same fault as the button it now matches.
+ *
+ * It stays a checkbox underneath, because this is a batch: nothing happens
+ * until Save, so several rows can go at once and a slip can be untangled by
+ * unticking it. The box is the control and the cross is what it looks like —
+ * the input covers the whole label and carries the spoken name, so a pointer, a
+ * keyboard and a screen reader all reach the real control.
+ *
+ * `input:checked + span` rather than `:has()`, deliberately: what is about to
+ * be deleted has to be visible in *any* browser, not in most of them. */
+.tick-remove { position: relative; display: inline-block; }
+.tick-remove input[type="checkbox"] {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; padding: 0; border: none; background: none;
+  opacity: 0; cursor: pointer;
+}
+.tick-remove-mark {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: var(--radius);
+  color: var(--red); font-size: 1.05rem; line-height: 1;
+}
+.tick-remove:hover .tick-remove-mark { background: var(--red-bg); }
+/* Filled, not merely outlined: a row about to be deleted should be the loudest
+   thing in its column, and only while it is actually ticked. */
+.tick-remove input:checked + .tick-remove-mark { background: var(--red); color: #fff; }
+.tick-remove input:focus-visible + .tick-remove-mark {
+  outline: 2px solid var(--red); outline-offset: 1px;
+}
+
 /* --- Badges ------------------------------------------------------------- */
 
 .badge {
@@ -1467,6 +1501,20 @@ details[open] > summary { margin-bottom: 12px; }
 /* The practice's name at the head of the paper. Left in the text colour: it is
    the one thing on the page that should read as ink, and an accent on it puts
    the firm's name in competition with the headings below it. */
+/* What the document is, above everything else on it.
+ *
+ * **Asked for on 9 September 2026:** *"the word Fee Quote needs to be moved —
+ * into the header above my name — x3 larger in font."* Three times the size it
+ * was, which puts it at roughly 3rem against the 1.3rem of the practice's name
+ * beneath it. In the accent, because it is the one word on the page that says
+ * what the reader is holding. */
+.quote-doc-kind {
+  margin: 0 0 10px; font-size: 2.4rem; font-weight: 650;
+  letter-spacing: -0.02em; line-height: 1.05; color: var(--accent);
+  /* It sits at the head of the right-hand column and must not wrap into two
+     lines above a block of one-line rows. */
+  white-space: nowrap;
+}
 .quote-doc h1 { font-size: 1.3rem; margin-bottom: 4px; }
 /* What the document is — "Tax invoice", "Short Form Terms of Engagement", the
    addendum's title. In the practice's accent, the same as the section headings

@@ -20,7 +20,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
-  badge, csrfField, emptyState, errorList, field, flagBand, flagRaiser, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem, viewTabs,
+  actionButton, badge, csrfField, emptyState, errorList, field, flagBand, flagRaiser, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem, viewTabs,
 } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate, dateOrDateTime, instantForDate } from '../../ui/format';
 import {
@@ -800,12 +800,12 @@ export const casesModule: AppModule = {
                           ${party.notes ? ` · ${party.notes}` : ''}
                         </div>
                       </div>
-                      ${writable && party.client_id !== kase.client_id ? html`
-                        <form method="post" action="/cases/${kase.id}/parties/${party.id}/remove"
-                              class="inline-form" data-confirm="Remove this party from the case?">
-                          ${csrfField(csrf)}
-                          <button class="btn btn-small btn-link-danger" type="submit">Remove</button>
-                        </form>` : ''}
+                      ${writable && party.client_id !== kase.client_id
+                        ? actionButton(`/cases/${kase.id}/parties/${party.id}/remove`, csrf,
+                            `Take ${party.client_name ?? 'this person'} off this matter`,
+                            { className: 'btn-remove', icon: '\u00d7',
+                              confirm: 'Remove this party from the case?' })
+                        : ''}
                     </li>`)}
                 </ul>`}
               ${writable ? html`
@@ -1062,7 +1062,9 @@ export const casesModule: AppModule = {
                       ${writable ? html`
                         <form method="post" action="/cases/${kase.id}/tags/${tag.id}/remove" class="inline-form">
                           ${csrfField(csrf)}
-                          <button class="btn-tag-remove" type="submit" title="Remove ${tag.name}">×</button>
+                          <button class="btn-tag-remove" type="submit"
+                                  aria-label="Remove the tag ${tag.name}"
+                                  title="Remove the tag ${tag.name}">×</button>
                         </form>` : ''}
                     </span>`)}</div>`}
               ${/* Folded away by default. The box is for the once-in-a-while
