@@ -1837,30 +1837,11 @@ export const quotesModule: AppModule = {
         id,
       );
       if (!q) return c.notFound();
-      const [practice, lines, qs, stages, parties, printTypes] = await Promise.all([
+      const [practice, lines, qs, stages, parties] = await Promise.all([
         practiceDetails(c.env), quoteLines(c.env, id), quoteSettings(c.env), quoteStages(c.env, id),
-        quoteParties(c.env, id), caseTypes(c.env),
+        quoteParties(c.env, id),
       ]);
 
-      // What the quotation is about, without repeating whose it is.
-      //
-      // Asked for on 9 September 2026: *"here no need for the name in section
-      // Re, just the type of visa will suffice"*. The name is already at the
-      // head of the document, and a reference line that repeats it says nothing
-      // the reader did not have.
-      //
-      // Derived from the type key rather than cut off the front of the stored
-      // name: the name is composed as "TYPE — Client", and splitting a string
-      // on an em dash works until somebody's matter has one in it. A quotation
-      // with no kind of work recorded falls back to its own name, which is the
-      // only thing left that describes it.
-      //
-      // `labelFor` answers "—" for a key it has not got, not an empty string,
-      // so `|| description` never fired and a quotation with no kind of work
-      // recorded printed a bare em dash on its reference line. Caught by the
-      // test for exactly that case; hence the explicit check rather than a
-      // falsy one.
-      const printRe = q.case_type ? labelFor(printTypes, q.case_type) : q.description;
       const totals = summariseQuote(lines.map((l) => ({
         kind: l.kind, lineAmountCents: l.unit_amount_cents,
         netCents: l.net_cents, gstCents: l.gst_cents, grossCents: l.gross_cents,
@@ -1937,8 +1918,13 @@ export const quotesModule: AppModule = {
                        Scope section out left the document saying only "Fee
                        quote" and a reference, which a client cannot place. */}
               <dl class="quote-doc-meta">
+                ${'' /* No "Re" line. **Asked for on 9 September 2026:**
+                       *"remove the Re RV. Partner bit completely — the body of
+                       the quote is telling enough."* Right: the items below name
+                       the work, line by line, with a figure against each. A
+                       heading that says "RV. Partner" above a list beginning
+                       "RV. Partner" is the document repeating itself. */}
                 <dt>Quote</dt><dd class="strong">${q.ref}</dd>
-                <dt>Re</dt><dd>${printRe}</dd>
                 <dt>Issued</dt><dd>${dateShort(issuedOn)}</dd>
                 <dt>Valid until</dt><dd class="strong">${dateShort(validTo)}</dd>
                 ${q.case_ref ? html`<dt>Matter</dt><dd>${q.case_ref}</dd>` : ''}
