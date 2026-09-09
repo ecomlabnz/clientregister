@@ -1397,9 +1397,17 @@ export const quotesModule: AppModule = {
                  printed on a contract. How to reach somebody is what this block
                  is for. */}
           <section class="letter-to">
-            <p class="strong">${q.client_name ?? '—'}</p>
+            ${'' /* "FOR:" rather than a bare name, asked for on 9 September
+                   2026. The block sits under the practice's own contact details
+                   and above the client's, and a name on its own between two sets
+                   of contact details does not say which of them it belongs to.
+                   Two characters settle it. */}
+            <p class="strong">FOR: ${q.client_name ?? '—'}</p>
             ${q.client_email ? html`<p class="small">By email: ${q.client_email}</p>` : ''}
-            ${q.client_phone ? html`<p class="small">Telephone: ${q.client_phone}</p>` : ''}
+            ${'' /* "Mobile", not "Telephone": what the register holds for a
+                   client is the number they answer, and every one of them is a
+                   mobile. Asked for on 9 September 2026. */}
+            ${q.client_phone ? html`<p class="small">Mobile: ${q.client_phone}</p>` : ''}
           </section>
 
           ${text.subject ? html`<p class="letter-re"><strong>RE: ${text.subject}</strong></p>` : ''}
@@ -1423,17 +1431,52 @@ export const quotesModule: AppModule = {
                      clauses. Nothing is supplied by the register: the words a client is asked to
                      accept are the practice's own.</p>`}
 
+          ${'' /* Where the covering letter ends and the terms begin.
+
+                 **Asked for on 9 September 2026**, with a line drawn across a
+                 screenshot at exactly this point: everything above is the
+                 covering letter, everything below is the practice's short-form
+                 terms. Two documents on one page, and nothing said where one
+                 stopped.
+
+                 It matters beyond tidiness, because the letter points at a
+                 *second* set of terms — the Standard Terms of Engagement,
+                 published at a web address further down. A client who cannot
+                 see that the page in their hand is itself a set of terms has no
+                 way to tell the two apart. */}
+          ${text.termsTitle ? html`
+            <div class="letter-terms-start">
+              <h2>${text.termsTitle}</h2>
+              ${text.termsSubtitle ? html`<p class="small">${text.termsSubtitle}</p>` : ''}
+            </div>` : ''}
+
           ${'' /* The one thing the letter says about the work: where to find it.
                    The quotation carries the parties, the scope and the fees, and
-                   is attached. */}
+                   is attached. The heading names all four, at the practice's
+                   choice of 9 September 2026 — "the work" was too narrow for a
+                   document that also settles who the parties are and when the
+                   money falls due. */}
           <section class="letter-brief">
-            <h3>The work, the parties and the fees</h3>
+            <h3>The Parties, the Scope of Work, the Fees (Legal and Disbursements)
+                and the Payment Terms</h3>
             <p>These are set out in <strong>quotation ${q.ref}</strong>, which accompanies this
                letter and forms part of it${representative
                  ? html`, and in which <strong>${representative.full_name}</strong> is nominated to
                         give instructions on behalf of all parties named`
                  : ''}. Please read it alongside this letter.</p>
           </section>
+
+          ${'' /* And immediately under it, what the retainer does not cover.
+                 Its own section rather than inside the block above, by the
+                 practice's choice: the block says where the work is written
+                 down, this says the limits of it. Blank until the practice
+                 writes it — the register does not compose the paragraph that
+                 tells a client what their lawyer will not do. */}
+          ${text.scopeTerms ? html`
+            <section>
+              ${text.scopeHeading ? html`<h3>${text.scopeHeading}</h3>` : ''}
+              ${prose(text.scopeTerms)}
+            </section>` : ''}
 
           ${clauses.map((clause) => html`
             <section>
