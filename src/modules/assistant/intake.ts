@@ -46,6 +46,7 @@ import { isAiEnabled } from '../../ai/provider';
 import { attachStagedTo, stageUpload, stagedFor } from '../../core/intakefiles';
 import { isValidNzbnFormat, normaliseNzbn } from '../../integrations/nzbn';
 import { caseNameFrom, normaliseClientName } from '../../core/casename';
+import { isAssignable } from '../../core/lookups';
 import type { IntakePerson, IntakeResult } from '../../ai/provider';
 import {
   ACCEPTED_UPLOADS, MAX_UPLOADS, describeAccepted, latestIntake, readUpload, runIntake,
@@ -409,8 +410,12 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
             <div class="settings-cell">${field({ label: 'Decision due', name: 'decision_due_at', type: 'date',
               value: reading.decision_due_on ?? '',
               hint: 'Left empty unless the document gives one. An invented deadline is worse than none.' })}</div>
+            ${'' /* No blank option: a matter must have an owner and the
+                     database refuses one without. Offering "Nobody yet" here
+                     was offering a choice that could only fail — and fail after
+                     the client had already been created. */}
             <div class="settings-cell">${select({ label: 'Owner', name: 'assigned_to',
-              value: c.get('user')!.id, includeBlank: 'Nobody yet',
+              value: c.get('user')!.id, required: true, includeBlank: false,
               options: users.map((u) => ({ value: u.id, label: u.name })) })}</div>
             ${'' /* The rest of what a matter holds, so a matter opened from a
                      document arrives as complete as one opened by hand. What
@@ -510,9 +515,28 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     const descriptor = f.text('descriptor', { required: true, label: 'What this matter is about', max: 200 });
     const caseType = f.text('case_type', { required: true, label: 'Type', max: 60 });
     const status = f.enum('status', CASE_STATUSES, { fallback: 'engaged' })!;
+    // The owner, checked here rather than at the insert, and this is the whole
+    // point of where it sits.
+    //
+    // A matter must be assigned to somebody — the database says so, and refuses
+    // the row. But the client, their nationalities, their INZ number and a file
+    // note are all written before the matter is, and there is no transaction
+    // around them. So a blank owner used to produce a 500 with a half-made
+    // client left behind, and pressing again — the form still saying "create a
+    // new client record" — made a second one with a second CL- reference.
+    // Found by Fable's audit, 8 September 2026.
+    //
+    // Nothing below writes anything until every reason to refuse has been
+    // checked.
+    const assignedTo = f.text('assigned_to', { required: true, label: 'Owner', max: 80 });
     if (!f.valid) return redirectWith(c, '/assistant/intake', Object.values(f.errors)[0]!, 'err');
     if (!types.some((t) => t.key === caseType)) {
       return redirectWith(c, '/assistant/intake', 'Choose a matter type.', 'err');
+    }
+    if (!(await isAssignable(c.env, assignedTo))) {
+      return redirectWith(c, '/assistant/intake',
+        'Choose somebody active to own the matter — a matter nobody owns is a matter nobody does.',
+        'err');
     }
 
     const stamp = nowIso();
@@ -589,7 +613,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       caseId, caseRef, clientId, caseNameFrom(types, caseType, clientName), descriptor,
       caseType, status,
       f.enum('priority', PRIORITIES, { fallback: 'normal' })!,
-      f.optional('assigned_to', { max: 80 }),
+      assignedTo,
       f.optional('inz_application_number', { max: 40 }),
       f.date('lodged_at'), f.date('decision_due_at'),
       f.optional('next_action', { max: 200 }), f.date('next_action_due'),

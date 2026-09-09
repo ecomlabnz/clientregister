@@ -7,6 +7,39 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.17.0 — 9 September 2026
+
+### Fixed
+Four faults found by an audit of the previous two days' work. All four are the
+same species: **a guarantee that lived in one screen's code rather than in the
+database**, so it held until somebody wrote a second screen.
+
+- **A failed "Open the matter" left a half-made client behind.** The Owner box
+  offered "Nobody yet", but a matter must have an owner and the database refuses
+  one without — after the client, their nationalities, their INZ number and a
+  file note had already been written. You saw an error, pressed again, and got a
+  second client with a second CL- number. The owner is now checked before
+  anything at all is written, and the box no longer offers a blank.
+
+- **A quotation could be moved on to a different client than its matter's.** The
+  letter of engagement would then print that client's name and address above the
+  old matter's reference, with the old matter's clauses — on a document that is
+  a contract. Refused now by the database, not by the screen, and the message
+  says what to do instead: take the matter off first.
+
+- **The letter of engagement was still leaving out clauses.** It read the kind
+  of work from the matter *or* from the fee lines, never both, so a quotation
+  covering a partnership application and a dependent child got the clauses of
+  whichever won. And the visa type chosen on the New quote form was thrown away
+  after naming the quotation, so a quotation with no matter and no case-type fee
+  line had no kind of work recorded anywhere and printed with none of its
+  clauses. All three are now recorded and all three are read.
+
+- **Converting an inquiry still named the matter after its own description.**
+  The third place that did this; the other two were corrected on 8 September and
+  this one was missed, because the test guarding the rule only read the file
+  that had been fixed. It reads all three now.
+
 ## 1.16.1 — 8 September 2026
 
 ### Fixed

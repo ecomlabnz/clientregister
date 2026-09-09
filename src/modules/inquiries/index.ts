@@ -29,6 +29,7 @@ import { countryCodeFor, countryOptions } from '../../core/countries';
 import { setNationalityStatements } from '../../core/nationalities';
 import { clientOptions, isAssignable, userOptions } from '../../core/lookups';
 import { composeFullName, familyNameFor, givenNamesFor, plainAscii, splitFullName } from '../../core/names';
+import { caseNameFrom } from '../../core/casename';
 import {
   CORRECTION_WINDOW_MINUTES, addEntry, correctable, listEntries,
 } from '../../core/timeline';
@@ -764,6 +765,12 @@ export const inquiriesModule: AppModule = {
           body: `Client created from inquiry ${inq.ref}.`, createdBy: user.id });
       }
 
+      // The name is composed from the type and the client, so the client's name
+      // has to be read back — the branch above either found an existing record
+      // or made one, and only the second knows the name it wrote.
+      const clientName = (await one<{ full_name: string }>(
+        c.env.DB, 'SELECT full_name FROM clients WHERE id = ?', targetClientId))?.full_name ?? null;
+
       const caseId = newId('cas');
       const caseRef = await nextYearlyRef(c.env.DB, 'case', 'CASE');
       await run(
@@ -771,9 +778,16 @@ export const inquiriesModule: AppModule = {
         `INSERT INTO cases (id, ref, client_id, title, descriptor, case_type, status, priority,
             assigned_to, summary, currency, created_at, updated_at, created_by)
          VALUES (?,?,?,?,?,?,'lead','normal',?,?, 'NZD', ?,?,?)`,
-        // Derived, not typed, and written from one place: the description is
-        // the name, and `title` follows it.
-        caseId, caseRef, targetClientId, descriptor, descriptor, caseType, assignedTo,
+        // Composed in `core/casename.ts`, like every other matter.
+        //
+        // This route wrote the description into both columns and carried a
+        // comment claiming it was "written from one place". It was the third
+        // place. `cases` and the assistant's intake were both corrected on
+        // 8 September and this one was missed — found by Fable's audit the same
+        // night. That is what a derived value with three writers costs, and it
+        // is fault 26's exact shape for the second time.
+        caseId, caseRef, targetClientId,
+        caseNameFrom(types, caseType, clientName), descriptor, caseType, assignedTo,
         inq.body ? `From inquiry ${inq.ref}:\n\n${inq.body}`.slice(0, 4000) : null,
         nowIso(), nowIso(), user.id,
       );

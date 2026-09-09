@@ -1,6 +1,6 @@
 # The data model
 
-**49 tables**, as the schema finally stands after all 74 migrations.
+**49 tables**, as the schema finally stands after all 75 migrations.
 Generated from the built database rather than the migration files, so a rule
 later replaced does not appear twice.
 
@@ -263,6 +263,7 @@ Two conventions hold throughout:
 | `case_id` | TEXT |  |  |
 | `inquiry_id` | TEXT |  |  |
 | `description` | TEXT | NOT NULL |  |
+| `case_type` | TEXT |  |  |
 | `amount_cents` | INTEGER | NOT NULL |  |
 | `gst_cents` | INTEGER | NOT NULL | 0 |
 | `disbursements_cents` | INTEGER | NOT NULL | 0 |
