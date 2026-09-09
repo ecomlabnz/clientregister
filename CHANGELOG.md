@@ -7,6 +7,16 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.32.1 — 9 September 2026
+
+### Changed
+**Tags moved to the bottom of a matter's side column.** *"tags in a case should
+move to the bottom, Key Details are much more important."* The panel a person
+opens a matter to read — client, type, status, INZ numbers, what is due — was
+sitting below a box that held a single word. The order is now Key details, Next
+action, Summary, Tags, and a test asserts that rule rather than the appearance,
+so a later restyle cannot quietly put it back.
+
 ## 1.32.0 — 9 September 2026
 
 ### Fixed

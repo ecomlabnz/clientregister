@@ -37,6 +37,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.32.1', date: '9 September 2026',
+    notes: [
+      'Tags on a matter have moved to the bottom of the right-hand column. Key details \u2014 who '
+        + 'the client is, the INZ numbers, what is due \u2014 now come first, which is what you '
+        + 'open a file to read.',
+    ],
+  },
+  {
     version: '1.32.0', date: '9 September 2026',
     notes: [
       'An accepted quotation can no longer be changed. You found this by deleting a line off one '
