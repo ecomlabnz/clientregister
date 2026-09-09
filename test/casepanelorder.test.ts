@@ -49,3 +49,69 @@ describe('the side column of a matter', () => {
     }
   });
 });
+
+/**
+ * The order of the rows inside Key details.
+ *
+ * Asked for on 9 September 2026: *"there is the client's name and the case
+ * number immediately after that - not good. please create a separate row for
+ * the Client Number immediately under the Client - all followed by INZ client
+ * no. ... as these should never change and they are important"*, then *"add
+ * their phone and email there - so if I open the case I can see those details
+ * without the need to jump into the client"*, *"also add the Case Number there
+ * too"*, and *"Opened above Lodged"*.
+ *
+ * The test asserts the order of the labels, not their spacing, so the panel can
+ * be restyled without rewriting it.
+ */
+describe('the Key details panel', () => {
+  async function keyDetails() {
+    const h = seeded();
+    h.db.prepare('UPDATE clients SET email = ?, phone = ? WHERE id = ?')
+      .run('someone@example.test', '+64 21 000 0000', 'c1');
+    const body = await (await h.request('/cases/k1')).text();
+    const i = body.indexOf('Key details');
+    return body.slice(i, body.indexOf('</dl>', i));
+  }
+
+  it('leads with the four numbers a person quotes, one to a row', async () => {
+    const panel = await keyDetails();
+    const order = ['<dt>Client</dt>', '<dt>Client number</dt>',
+                   '<dt>INZ client no.</dt>', '<dt>Case number</dt>'];
+    const at = order.map((label) => {
+      expect(panel, label).toContain(label);
+      return panel.indexOf(label);
+    });
+    expect(at).toEqual([...at].sort((a, b) => a - b));
+  });
+
+  it('keeps the client reference off the name row', async () => {
+    // The complaint that started this: the name and the reference ran together.
+    const panel = await keyDetails();
+    const nameRow = panel.slice(panel.indexOf('<dt>Client</dt>'),
+                                panel.indexOf('<dt>Client number</dt>'));
+    expect(nameRow).not.toContain('CL-9001');
+  });
+
+  it('shows how to reach the client without opening their page', async () => {
+    const panel = await keyDetails();
+    expect(panel).toContain('someone@example.test');
+    expect(panel).toContain('+64 21 000 0000');
+    expect(panel).toContain('mailto:someone@example.test');
+  });
+
+  it('draws phone and email even when the register has neither', async () => {
+    // A blank row says nobody recorded one. A missing row says nothing at all.
+    const h = seeded();
+    const body = await (await h.request('/cases/k1')).text();
+    const i = body.indexOf('Key details');
+    const panel = body.slice(i, body.indexOf('</dl>', i));
+    expect(panel).toContain('<dt>Phone</dt>');
+    expect(panel).toContain('<dt>Email</dt>');
+  });
+
+  it('puts Opened above Lodged', async () => {
+    const panel = await keyDetails();
+    expect(panel.indexOf('<dt>Opened</dt>')).toBeLessThan(panel.indexOf('<dt>Lodged</dt>'));
+  });
+});

@@ -660,9 +660,11 @@ export const casesModule: AppModule = {
       const aiAvailable = isAiEnabled(c.env) && can(viewer, 'ai:run');
       const brief = aiAvailable ? await latestBrief(c.env, id) : null;
       const kase = await one<CaseRow & {
-        client_name: string; client_ref: string; client_kind: string; assignee_name: string | null }>(
+        client_name: string; client_ref: string; client_kind: string;
+        client_email: string | null; client_phone: string | null; assignee_name: string | null }>(
         c.env.DB,
         `SELECT k.*, cl.full_name AS client_name, cl.ref AS client_ref, cl.kind AS client_kind,
+                cl.email AS client_email, cl.phone AS client_phone,
                 cl.inz_client_number AS inz_client_number, u.name AS assignee_name
            FROM cases k JOIN clients cl ON cl.id = k.client_id
            LEFT JOIN users u ON u.id = k.assigned_to
@@ -807,10 +809,17 @@ export const casesModule: AppModule = {
                     <div>
                       <a href="/clients/${kase.client_id}">${kase.client_name}</a>
                       ${badge('Client', 'blue')}
+                      ${'' /* Asked for the same day the row itself was:
+                               *"i also want there to be a note 'Principal
+                               applicant'"*. It is the register reading the
+                               file, not a role recorded on it — the moment
+                               somebody records a role for the client, that row
+                               is drawn instead of this one and says whatever
+                               they recorded. */}
                       <div class="muted small">
                         <code>${kase.client_ref}</code>
                         ${kase.client_kind === 'organisation' ? ' · organisation' : ''}
-                        · the matter is in their name
+                        · Principal applicant · the matter is in their name
                       </div>
                     </div>
                   </li>`}
@@ -1097,10 +1106,42 @@ export const casesModule: AppModule = {
                        talks about — how long INZ held it, or how long it has
                        been holding it now.
                      - **Priority** appears only when it is not the default,
-                       because "Normal" on every matter is a row of noise. */}
+                       because "Normal" on every matter is a row of noise.
+                     
+                     **The order, asked for on 9 September 2026.** The client's
+                     reference had been sitting on the same line as their name,
+                     which the practice would not have: *"there is the client's
+                     name and the case number immediately after that - not
+                     good"*. So the four numbers a person quotes on the phone or
+                     copies into a letter come first, one to a row —
+                     *"Client, Client Number, INZ client no. ... as these should
+                     never change and they are important"* — then the case
+                     number, then how to reach them: *"add their phone and email
+                     there - so if I open the case I can see those details
+                     without the need to jump into the client"*.
+                     
+                     Phone and email are drawn even when empty, unlike the rest.
+                     An absent phone number is not nothing to know: it is the
+                     reason the call did not happen, and a blank row says so
+                     where a missing row says the register was never asked. */}
             ${foldingCard('Key details', html`
               <dl class="kv">
-                <dt>Client</dt><dd><a href="/clients/${kase.client_id}">${kase.client_name}</a> <code>${kase.client_ref}</code></dd>
+                <dt>Client</dt><dd><a href="/clients/${kase.client_id}">${kase.client_name}</a></dd>
+                <dt>Client number</dt><dd><code>${kase.client_ref}</code></dd>
+                ${'' /* The client's, not the matter's: one number per person.
+                         Shown here because it is quoted on everything sent to
+                         INZ about this application, and linked because setting
+                         it is done on their page. */}
+                <dt>INZ client no.</dt><dd>${kase.inz_client_number
+                  ? html`<code>${kase.inz_client_number}</code>`
+                  : html`<a href="/clients/${kase.client_id}">not recorded — set it on the client</a>`}</dd>
+                <dt>Case number</dt><dd><code>${kase.ref}</code></dd>
+                <dt>Phone</dt><dd>${kase.client_phone
+                  ? html`<a href="tel:${kase.client_phone}">${kase.client_phone}</a>`
+                  : '—'}</dd>
+                <dt>Email</dt><dd>${kase.client_email
+                  ? html`<a href="mailto:${kase.client_email}">${kase.client_email}</a>`
+                  : '—'}</dd>
                 <dt>Type</dt><dd>${labelFor(types, kase.case_type)}</dd>
                 ${decided
                   ? html`<dt>Decision</dt><dd>${decisionLine(kase)}</dd>`
@@ -1113,20 +1154,16 @@ export const casesModule: AppModule = {
                          a visible gap rather than an empty cell. */}
                 <dt>Owner</dt><dd>${kase.assignee_name ?? 'Nobody — assign one'}</dd>
                 <dt>INZ application</dt><dd>${kase.inz_application_number ?? '—'}</dd>
-                ${'' /* The client's, not the matter's: one number per person.
-                         Shown here because it is quoted on everything sent to
-                         INZ about this application, and linked because setting
-                         it is done on their page. */}
-                <dt>INZ client no.</dt><dd>${kase.inz_client_number
-                  ? html`<code>${kase.inz_client_number}</code>`
-                  : html`<a href="/clients/${kase.client_id}">not recorded — set it on the client</a>`}</dd>
+                ${'' /* Opened before Lodged, asked for 9 September 2026: the
+                         file exists before it is filed, and the dates read
+                         wrong the other way round. */}
+                <dt>Opened</dt><dd>${stamp(kase.created_at)}</dd>
                 <dt>Lodged</dt><dd>${dateShort(kase.lodged_at)}</dd>
                 ${!decided && kase.decision_due_at
                   ? html`<dt>Due</dt><dd class="${isOverdue(kase.decision_due_at) ? 'warn' : ''}">
                           ${dateShort(kase.decision_due_at)} (${relativeDays(kase.decision_due_at)})</dd>`
                   : ''}
                 ${elapsed ? html`<dt>${decided ? 'Took' : 'Waiting'}</dt><dd>${elapsed}</dd>` : ''}
-                <dt>Opened</dt><dd>${stamp(kase.created_at)}</dd>
               </dl>`)}
 
             ${foldingCard('Next action', html`

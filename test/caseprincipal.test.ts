@@ -70,6 +70,12 @@ describe('the Parties panel on a matter', () => {
     expect(await partiesPanel(h)).toContain('A Applicant');
   });
 
+  it('notes that the client is the principal applicant', async () => {
+    const { h, party } = seeded();
+    party('p1', 'c2', 'dependent_child');
+    expect(await partiesPanel(h)).toContain('Principal applicant');
+  });
+
   it('does not list the client twice when they do have a party row', async () => {
     // Their recorded role is the truth, so the row stands and nothing is added.
     const { h, party } = seeded();
