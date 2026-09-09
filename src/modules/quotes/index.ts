@@ -339,13 +339,12 @@ export function defaultQuoteEmail(
 
   if (practice.termsUrl) {
     lines.push(
-      // The address is a page, and the page holds the current edition as a
-      // file to download. Both halves are said, because either alone misleads:
-      // "download" sends somebody looking for a file at a page address, and
-      // "read" leaves them on a page wondering where the terms are. Corrected
-      // 8 September 2026 after the practice pointed out what is actually at
-      // that address — 1.2.2 had guessed, and guessed half right.
-      `This quote is given on the ${practice.termsLabel}. The current edition is at`,
+      // The same sentence the quotation itself carries, given by the practice
+      // on 9 September 2026. It names all three documents rather than only the
+      // one with an address, and the email and the quotation must not describe
+      // the engagement differently — they arrive together.
+      'This Quotation (fee quote) is subject to the Letter of Engagement, Short Form and',
+      'Standard Terms of Engagement. The Standard Terms are published at',
       practice.termsUrl,
       '',
       'Please read them before accepting this quote.',
@@ -964,9 +963,11 @@ export const quotesModule: AppModule = {
           <div class="col-main">
             ${terms.termsUrl
               ? html`<div class="alert alert-ok">
-                       This quote is given on the
-                       <a href="${terms.termsUrl}" target="_blank" rel="noopener noreferrer">${terms.termsLabel}</a>.
-                       That address is where the client gets the current edition.
+                       This quotation is subject to the Letter of Engagement, the Short Form Terms
+                       printed with it, and the
+                       <a href="${terms.termsUrl}" target="_blank" rel="noopener noreferrer">Standard
+                       Terms of Engagement</a> — which is the address the client gets the current
+                       edition from.
                      </div>`
               : ''}
 
@@ -1977,11 +1978,35 @@ export const quotesModule: AppModule = {
                            the amount shown is an estimate and you will be told before it is
                            incurred.</li>`
                 : ''}
+              ${'' /* What the client is agreeing to, named.
+
+                     **The practice's own sentence, given on 9 September 2026**,
+                     replacing one that named a single document: *"This
+                     Quotation (fee quote) is subject to the Letter of
+                     Engagement, Short Form and Standard Terms of Engagement.
+                     Please read them before accepting."*
+
+                     Three documents rather than one, which is what a client is
+                     actually held to — the covering letter, the short-form
+                     terms printed under it, and the standard terms published
+                     online. Naming only the last of them was the omission.
+
+                     "Standard Terms of Engagement" is the linked phrase because
+                     it is the only one of the three with an address of its own;
+                     the other two are in the client's hand. It is written here
+                     rather than taken from `practice.terms_label`, because it
+                     is now part of a sentence that names three documents rather
+                     than a label standing on its own. If a practice ever needs
+                     to call it something else, that is a setting to add, not a
+                     reason to keep the old sentence.
+
+                     The address still prints beneath, and only on paper, where
+                     a hyperlink is worth nothing. */}
               ${practice.termsUrl
-                ? html`<li>This quote is given on the
-                           <a href="${practice.termsUrl}" rel="noopener"><strong>${practice.termsLabel}</strong></a>,
-                           whose current edition is published at the address below. Please read
-                           them before accepting.
+                ? html`<li>This Quotation (fee quote) is subject to the Letter of Engagement,
+                           Short Form and
+                           <a href="${practice.termsUrl}" rel="noopener"><strong>Standard Terms of
+                           Engagement</strong></a>. Please read them before accepting.
                            <span class="print-only break-url">${practice.termsUrl}</span></li>`
                 : ''}
             </ul>

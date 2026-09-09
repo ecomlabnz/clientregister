@@ -7,6 +7,30 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.26.1 — 9 September 2026
+
+### Changed
+**A quotation now names all three documents it is subject to.** The practice's
+own sentence, replacing one that named a single set of terms:
+
+> This Quotation (fee quote) is subject to the Letter of Engagement, Short Form
+> and **Standard Terms of Engagement**. Please read them before accepting.
+
+A client is held to three documents — the covering letter, the short-form terms
+printed under it, and the standard terms published online — and only the last of
+them was being named, because it is the only one with an address. "Subject to"
+also says what the sentence is there to say: "given on" describes how the price
+was arrived at, not what is being agreed to.
+
+**Standard Terms of Engagement** is the hyperlink, since it is the one of the
+three the client does not already have in their hand. The address still prints
+underneath on paper, where a hyperlink is worth nothing.
+
+The same sentence now appears in all three places that describe the engagement —
+the printed quotation, the covering email drafted with it, and the note on the
+quotation screen — because they reach the client together and must not describe
+it differently.
+
 ## 1.26.0 — 9 September 2026
 
 ### Fixed
