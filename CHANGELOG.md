@@ -7,6 +7,45 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.22.0 — 9 September 2026
+
+### Added
+**Every new quotation can start from the practice's own shape.** Asked for while
+looking at a real one: *"I would like to have its stems to be a default template
+for all, without the money figures, so each new one can be adjusted with ease."*
+
+Open a quotation whose shape is right and press **Use as the template**. Its
+lines and its payment stages — the wording, the kind of each line, and how GST
+applies to it — become the starting point for every quotation made afterwards.
+The text is stored under Settings → Quotes, so it can be read and edited there
+without pressing the button again.
+
+**No amount is ever part of it.** A template carrying figures would put one
+client's price on another's quotation, and the first time somebody did not
+notice would be the time it was sent. Every row arrives at nil, the totals read
+zero, and the file note on the new quotation says it started from the template
+and is unpriced.
+
+The stages are the part that was actually being retyped: case review, the
+progress payments, the INZ fee, the balance on approval. That wording is what a
+client is held to, and something retyped from memory is something that drifts.
+The lines come too because one of them carries the tax treatment that is easy to
+get wrong and expensive to get wrong — an INZ fee is GST **inclusive** while
+professional time is exclusive.
+
+Two things it deliberately does:
+
+- **The button is behind Settings permission, not quote permission.** Pressing
+  it changes what every future quotation starts from, which is a configuration
+  act wearing the clothes of a quotation one. An adviser can quote; only an
+  administrator or the owner can change the shape.
+- **A quotation with nothing on it cannot become the template.** The first
+  version of this saved before it counted, so pressing the button on an empty
+  quotation would have silently replaced the practice's wording with nothing —
+  found by the test that says so, before anybody could press it.
+
+A practice that sets no template gets the blank quotation it always got.
+
 ## 1.21.0 — 9 September 2026
 
 ### Added
