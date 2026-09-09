@@ -305,6 +305,13 @@ describe('the payment stages on a printed quotation', () => {
   const staged = async (h: ReturnType<typeof mount>) => {
     await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '0' });
     const id = h.get<{ id: string }>('SELECT id FROM quotes')!.id;
+    // The quotation has to be worth what the schedule promises: since migration
+    // 0077 the database refuses stages that come to more than the quotation
+    // does. In the register this is never a question, because the header
+    // figures are rewritten from the lines after every edit; here the stages go
+    // in by hand, so the header goes in by hand with them.
+    h.db.exec(`UPDATE quotes SET amount_cents = 200000, gst_cents = 30000,
+                 disbursements_cents = 153000 WHERE id = '${id}'`);
     // $2,000 plus 15% GST, and an INZ fee that is already inclusive.
     h.db.exec(`INSERT INTO quote_stages (id, quote_id, position, label, description, amount_cents,
                  gst_treatment, gst_rate_bp, net_cents, gst_cents, gross_cents, created_at, updated_at)

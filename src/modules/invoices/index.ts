@@ -406,9 +406,11 @@ export const invoicesModule: AppModule = {
                         ${pluraliseUnit(line.unit_label, line.quantity_milli)}</td>
                       <td class="num col-sm-hide">${money(line.unit_amount_cents, invoice.currency)}</td>
                       <td class="num">${money(line.net_cents, invoice.currency)}</td>
-                      ${editable ? html`<td>${actionButton(
-                        `/invoices/${invoice.id}/items/${line.id}/remove`, csrf, 'Remove',
-                        { className: 'btn btn-danger btn-small', confirm: 'Remove this line?' })}</td>` : ''}
+                      ${editable ? html`<td class="row-action">${actionButton(
+                        `/invoices/${invoice.id}/items/${line.id}/remove`, csrf,
+                        `Remove \u201C${line.description}\u201D`,
+                        { className: 'btn-remove', icon: '\u00d7',
+                          confirm: 'Remove this line?' })}</td>` : ''}
                     </tr>`), { fixed: true })}
 
               <dl class="kv mt">
@@ -531,11 +533,11 @@ export const invoicesModule: AppModule = {
                           <td>${a.label}<div class="muted small"><code>${a.party_key}</code></div></td>
                           <td class="num">${formatBp(a.percent_bp)}</td>
                           <td class="num strong">${money(a.amount_cents, invoice.currency)}</td>
-                          <td>${invoice.status === 'draft' && writable ? html`
-                            <form method="post" action="${`/invoices/${invoice.id}/shares/${a.party_key}/remove`}">
-                              ${csrfField(csrf)}
-                              <button class="linklike danger" type="submit">Remove</button>
-                            </form>` : ''}</td>
+                          <td class="row-action">${invoice.status === 'draft' && writable
+                            ? actionButton(`/invoices/${invoice.id}/shares/${a.party_key}/remove`, csrf,
+                                `Remove ${a.label}\u2019s share`,
+                                { className: 'btn-remove', icon: '\u00d7' })
+                            : ''}</td>
                         </tr>`),
                       html`<tr class="totals-row">
                         <td class="strong">Allocated</td>

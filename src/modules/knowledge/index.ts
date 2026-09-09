@@ -459,11 +459,10 @@ export const knowledgeModule: AppModule = {
                     <div class="muted small">${stamp(file.uploaded_at)}${file.uploader_name ? ` · ${file.uploader_name}` : ''}</div>
                   </div>
                   <div class="file-row-actions">
-                    <form method="post" action="/knowledge/${article.id}/files/${file.id}/remove"
-                          data-confirm="Remove ${file.filename}? The stored file is deleted.">
-                      ${csrfField(session.csrf)}
-                      <button class="btn btn-danger btn-small" type="submit">Remove</button>
-                    </form>
+                    ${actionButton(`/knowledge/${article.id}/files/${file.id}/remove`, session.csrf,
+                      `Remove ${file.filename}`,
+                      { className: 'btn-remove', icon: '\u00d7',
+                        confirm: `Remove ${file.filename}? The stored file is deleted.` })}
                   </div>
                 </div>`)}
               ${c.env.DOCS ? html`
@@ -508,7 +507,9 @@ export const knowledgeModule: AppModule = {
                   <span class="badge badge-${t.colour}">${t.name}
                     <form method="post" action="/knowledge/${article.id}/tags/${t.id}/remove" class="inline-form">
                       ${csrfField(session.csrf)}
-                      <button class="btn-tag-remove" type="submit" title="Remove tag">×</button>
+                      <button class="btn-tag-remove" type="submit"
+                        aria-label="Remove the tag ${t.name}"
+                        title="Remove the tag ${t.name}">×</button>
                     </form>
                   </span>`) : html`<span class="muted small">None yet.</span>`}
               </div>

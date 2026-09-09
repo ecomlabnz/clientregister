@@ -157,6 +157,12 @@ describe('a payment stage shows the figure the client pays', () => {
 
   function staged() {
     const h = seeded();
+    // Since migration 0077 a schedule cannot come to more than the quotation.
+    // These stages are written straight into the table, so the header figures
+    // they are measured against are written with them — which the register
+    // itself does after every line edit.
+    h.db.prepare('UPDATE quotes SET amount_cents = ?, gst_cents = ?, disbursements_cents = ? WHERE id = ?')
+      .run(200000, 99913, 466087, 'q1');
     // One of each treatment, which is the practice's actual shape: professional
     // time is GST exclusive and an INZ fee is GST inclusive.
     stage(h, 's1', 'Stage 1', 200000, 30000, 'exclusive', 0);

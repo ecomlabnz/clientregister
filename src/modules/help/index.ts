@@ -37,6 +37,28 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.28.0', date: '9 September 2026',
+    notes: [
+      'The payment schedule now says how much is left to allocate, not only how much has been: '
+        + 'it says \u201C$4,000.00 allocated of $7,632.70, $3,632.70 left to allocate\u201D.',
+      'And it will not let you allocate more than the quotation comes to. That is enforced by '
+        + 'the database, so no screen can forget it. Saving a whole schedule that would go over '
+        + 'is refused as a whole \u2014 nothing is half-saved.',
+      'Lowering a fee line under a schedule already written is still allowed; you get a warning '
+        + 'rather than a refusal, because the alternative is being unable to fix a typo until '
+        + 'you have taken the schedule apart.',
+      '\u201CFee quote\u201D is now the size of a document title, at the top right of the page.',
+      'The word \u201CRemove\u201D is a small red cross everywhere it appeared \u2014 a party '
+        + 'on a matter, an invoice line, a share, a passport, a certificate, a file on an '
+        + 'article, and the tick boxes in both editing tables on a quotation.',
+      'The tick boxes stay boxes, because those apply when you save. The cross fills solid red '
+        + 'when ticked, so you can see what is about to go before you save it.',
+      'The money columns on a quotation now sit in the same place on every quotation. They were '
+        + 'sized by their contents, so a quote with larger figures put its columns somewhere '
+        + 'slightly different. They still give and take as you change the window width.',
+    ],
+  },
+  {
     version: '1.27.1', date: '9 September 2026',
     notes: [
       'Fixed a gap in the middle of the letter. Justifying the paragraph that carries the terms '

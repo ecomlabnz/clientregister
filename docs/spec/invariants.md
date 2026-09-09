@@ -11,7 +11,7 @@ guarantee in a handler lasts until somebody adds a second handler — and this
 register is written to by the application, by bulk loads, and occasionally by
 hand at a console. Everything below holds in all three cases.
 
-**85 refusals** across 23 tables, plus
+**87 refusals** across 24 tables, plus
 **10 uniqueness rules**. Each is quoted in the words the
 database itself uses, because that is what somebody will see.
 
@@ -189,6 +189,24 @@ whether or not the rule exists is not a test.
 | update | a quote has to say what it is for |
 | insert | A quotation on a matter is for that matter's client. Move the matter, or take the matter off the quotation. |
 | update | A quotation on a matter is for that matter's client. Move the matter, or take the matter off the quotation. |
+
+### `quote_stages`
+
+| On | The database refuses |
+|---|---|
+| insert | The payment stages would come to more than the quotation does. A schedule divides up the fees and disbursements; it cannot add to them. Lower a stage, or add the work to the items first. |
+| update | The payment stages would come to more than the quotation does. A schedule divides up the fees and disbursements; it cannot add to them. Lower a stage, or add the work to the items first. |
+
+The schedule of payments divides up the quotation; it cannot add to it. Stages
+that came to more than the fees and disbursements would ask a client to pay
+twice for part of the work, in a document that is a contract.
+
+The reverse — lowering a fee line under a schedule already written — is
+deliberately **not** refused. That guard would have to sit on `quotes` and would
+block an ordinary correction to an item until the schedule was taken apart
+first. It is reported under the schedule instead, which is the right instrument
+for "these two no longer agree" as against "this would be wrong the moment you
+wrote it".
 
 ### `engagement_clauses`
 

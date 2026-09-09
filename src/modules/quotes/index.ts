@@ -252,6 +252,27 @@ function quoteTotal(q: Pick<QuoteRow, 'amount_cents' | 'gst_cents' | 'disburseme
  */
 const ITEM_COLUMNS = ['Description', 'Qty', 'Unit', 'GST', 'Amount', ''] as const;
 
+/**
+ * How wide each of those columns is, as a share of the table.
+ *
+ * **Reported on 9 September 2026:** *"the money figures move from one quote to
+ * another — slightly — why? They must be fixed, but the columns must be
+ * flexible when changing the width of the window."*
+ *
+ * Because the columns were sized by their contents. A quotation whose largest
+ * figure is $598.00 gives its money columns less room than one whose largest is
+ * $7,000.00, so the same column lands in a different place on every quotation —
+ * and the practice reads them side by side.
+ *
+ * Shares rather than pixels, which is what makes both halves of the instruction
+ * true at once: the columns hold the same *proportions* on every quotation, and
+ * they still give and take as the window changes. Description takes whatever is
+ * left, because it is the one column whose content genuinely varies.
+ */
+const ITEM_WIDTHS: Record<string, string | undefined> = {
+  Qty: '7', Unit: '14', GST: '14', Amount: '16', '': '6',
+};
+
 /** Where the figures live, and how far the label beside them may reach. */
 const AMOUNT_COLUMN = ITEM_COLUMNS.indexOf('Amount');
 const COLUMNS_AFTER_AMOUNT = ITEM_COLUMNS.length - AMOUNT_COLUMN - 1;
@@ -977,7 +998,7 @@ export const quotesModule: AppModule = {
                 // Amount last, to the right of GST, at the practice's
                 // instruction of 9 September 2026: the eye runs along a fee line
                 // to the figure that matters, and that is what the line comes to.
-                : table([...ITEM_COLUMNS], [
+                : table(ITEM_COLUMNS.map((label) => ({ label, width: ITEM_WIDTHS[label] })), [
                     ...lines.map((l) => html`
                       <tr>
                         <td>
@@ -1014,12 +1035,13 @@ export const quotesModule: AppModule = {
                       ['GST', totals.gstCents, totals.hasGst],
                       ['Total payable', totals.totalCents, true],
                     ], q.currency),
-                  ], { compact: true })}
+                  ], { compact: true, fixed: true })}
 
               ${writable && lines.length > 0 ? html`
                 <details class="add-block">
                   <summary>Edit the lines</summary>
-                  <p class="hint mb">Change anything on any line, reorder them, or tick to remove.
+                  <p class="hint mb">Change anything on any line, reorder them, or cross one out to
+                     remove it.
                      Saving recalculates the totals and rewrites the quote.</p>
                   <form method="post" action="/quotes/${q.id}/items">
                     ${csrfField(csrf)}
@@ -1049,7 +1071,29 @@ export const quotesModule: AppModule = {
                               <td><select name="gst_${l.id}" aria-label="GST">
                                 ${GST_TREATMENTS.map((g) => html`<option value="${g}" ${g === l.gst_treatment ? raw('selected') : ''}>${GST_TREATMENT_LABELS[g]}</option>`)}
                               </select></td>
-                              <td><label class="small"><input type="checkbox" name="remove_${l.id}"> remove</label></td>
+                              ${'' /* A red cross, like the one beside the line
+                                     above. **Asked for on 9 September 2026:**
+                                     *"the remove words need to be replaced here
+                                     too."*
+
+                                     Still a checkbox underneath, because this
+                                     is a batch: nothing happens until Save, so
+                                     several lines can go at once and a slip can
+                                     be unticked. The box is the control; the
+                                     cross is what it looks like. It fills red
+                                     when ticked, so what is about to go is
+                                     visible before saving.
+
+                                     `input:checked + span` rather than `:has()`,
+                                     so the ticked state shows in any browser
+                                     rather than in most of them. */}
+                              <td class="row-action">
+                                <label class="tick-remove">
+                                  <input type="checkbox" name="remove_${l.id}"
+                                         aria-label="Remove ${l.description} when you save">
+                                  <span class="tick-remove-mark" aria-hidden="true">×</span>
+                                </label>
+                              </td>
                             </tr>`)}
                         </tbody>
                       </table>
@@ -1268,13 +1312,44 @@ export const quotesModule: AppModule = {
                         ${money(stageTotal, q.currency)}</td></tr>`,
                   ], { compact: true })}
 
-              ${stages.length > 0 && stageTotal !== totals.totalCents
-                ? html`<p class="alert alert-warn">The stages come to
-                         ${money(stageTotal, q.currency)}, but the quote totals
-                         ${money(totals.totalCents, q.currency)} — a difference of
-                         ${money(Math.abs(stageTotal - totals.totalCents), q.currency)}. That may be
-                         deliberate, but it is worth a look before this goes out.</p>`
-                : ''}
+              ${'' /* What is left to allocate, said before the mistake rather
+                     than after it.
+
+                     **Asked for on 9 September 2026:** *"there is a hint as to
+                     how much has been allocated — make sure that it also tells
+                     how much is left to allocate, and that it does not allow
+                     for allocating more than the total fee."*
+
+                     Both halves. The figure still to be scheduled is the one a
+                     person is actually working out in their head while they
+                     type, and it was the one number the page did not show; and
+                     the schedule can no longer be taken past the quotation at
+                     all, which the database enforces (migration 0077).
+
+                     Three states, because they mean different things:
+                     under-allocated is work in progress and is said plainly;
+                     fully allocated is the finished article and says so;
+                     over-allocated can now only be reached by lowering a fee
+                     line under a schedule already written, which is a warning
+                     rather than a refusal — see the migration for why that
+                     direction is deliberately not blocked. */}
+              ${stages.length > 0 || stageTotal > 0 ? html`
+                <p class="${stageTotal > totals.totalCents ? 'alert alert-warn' : 'hint mt'}">
+                  ${stageTotal > totals.totalCents
+                    ? html`The stages come to <strong>${money(stageTotal, q.currency)}</strong>,
+                           which is ${money(stageTotal - totals.totalCents, q.currency)} more than
+                           the quotation's ${money(totals.totalCents, q.currency)}. That happens
+                           when a fee line is lowered under a schedule already written. Lower a
+                           stage to match before this goes out.`
+                    : stageTotal === totals.totalCents
+                    ? html`<strong>${money(stageTotal, q.currency)}</strong> allocated across
+                           ${String(stages.length)} stage(s) — the whole quotation. Nothing left to
+                           allocate.`
+                    : html`<strong>${money(stageTotal, q.currency)}</strong> allocated of
+                           ${money(totals.totalCents, q.currency)}.
+                           <strong>${money(totals.totalCents - stageTotal, q.currency)}</strong>
+                           left to allocate.`}
+                </p>` : ''}
 
               ${q.stage_note ? html`<p class="prewrap small mt"><strong>Note:</strong> ${q.stage_note}</p>` : ''}
 
@@ -1307,7 +1382,13 @@ export const quotesModule: AppModule = {
                                 <td><select name="gst_${s.id}" aria-label="GST">
                                   ${GST_TREATMENTS.map((g) => html`<option value="${g}" ${g === s.gst_treatment ? raw('selected') : ''}>${GST_TREATMENT_LABELS[g]}</option>`)}
                                 </select></td>
-                                <td><label class="small"><input type="checkbox" name="remove_${s.id}"> remove</label></td>
+                                <td class="row-action">
+                                  <label class="tick-remove">
+                                    <input type="checkbox" name="remove_${s.id}"
+                                           aria-label="Remove ${s.label || 'this stage'} when you save">
+                                    <span class="tick-remove-mark" aria-hidden="true">×</span>
+                                  </label>
+                                </td>
                               </tr>`)}
                           </tbody>
                         </table>
@@ -1836,7 +1917,20 @@ export const quotesModule: AppModule = {
               </p>
             </div>
             <div class="quote-doc-ref">
-              <h2>Fee quote</h2>
+              ${'' /* What the document is, said large.
+
+                     **Asked for on 9 September 2026**, then refined the same
+                     hour: *"the word Fee Quote needs to be moved — into the
+                     header above my name — x3 larger in font"*, and then
+                     *"keep the position where it is but align it as the rest of
+                     the text — on the right margin — and increase its font."*
+
+                     So it stays at the head of the right-hand column, flush to
+                     the right margin with the reference block beneath it, and
+                     is simply much larger: it was set at the size of an
+                     ordinary heading, which made it read as a label on the
+                     reference rather than as the name of the document. */}
+              <p class="quote-doc-kind">Fee quote</p>
               ${'' /* "Re", not a Scope paragraph. The name says what the
                        quotation is for in one line, the way a letter's subject
                        does; the items below say what that means. Taking the old
@@ -2677,8 +2771,13 @@ export const quotesModule: AppModule = {
     /** Add one stage, or save edits to all of them. */
     r.post('/:id/stages', requirePermission('quote:write'), async (c) => {
       const id = c.req.param('id')!;
-      const q = await one<QuoteRow>(c.env.DB, 'SELECT id FROM quotes WHERE id = ?', id);
+      const q = await one<QuoteRow>(
+        c.env.DB,
+        `SELECT id, currency, amount_cents, gst_cents, disbursements_cents
+           FROM quotes WHERE id = ?`, id);
       if (!q) return c.notFound();
+      // What there is to divide up: the figure printed as Total payable.
+      const budget = quoteTotal(q);
 
       const fees = await moneySettings(c.env);
       const form = await c.req.formData();
@@ -2693,31 +2792,86 @@ export const quotesModule: AppModule = {
       if (form.get('_action') === 'save') {
         const existing = await quoteStages(c.env, id);
         const problems: string[] = [];
-        let removed = 0;
 
-        for (const stage of existing) {
-          if (form.get(`remove_${stage.id}`)) {
-            await run(c.env.DB, 'DELETE FROM quote_stages WHERE id = ? AND quote_id = ?', stage.id, id);
-            removed += 1;
-            continue;
-          }
+        // Read the whole form before writing any of it.
+        //
+        // Two reasons, and the second is the one that bites. The obvious one is
+        // that a schedule which would come to more than the quotation should be
+        // refused whole rather than half-applied. The other is that the
+        // database refuses each *row* that takes the total over — so a
+        // rebalance that is perfectly correct at the end can be refused in the
+        // middle of itself. Moving $1,000 from the last stage to the first, row
+        // by row, briefly asks for $1,000 more than the quotation.
+        //
+        // So: work out the intended schedule, check it, then take every stage
+        // to nil and build it back up. The sum only ever rises towards a figure
+        // already known to fit, and the schedule the practice typed is the
+        // schedule that gets written.
+        const removing = existing.filter((s) => form.get(`remove_${s.id}`));
+        const keeping = existing.filter((s) => !form.get(`remove_${s.id}`));
+        const planned = keeping.map((stage) => {
           const description = String(form.get(`description_${stage.id}`) ?? '').trim().slice(0, 500);
           const amount = parseMoneyToCents(String(form.get(`amount_${stage.id}`) ?? ''));
-          if (!description || amount === null) { problems.push(stage.label || stage.description); continue; }
-
+          if (!description || amount === null) {
+            problems.push(stage.label || stage.description);
+            // Unreadable: this stage is written back exactly as it was, rather
+            // than left at the nil it is about to be set to.
+            return { stage, keepAsIs: true as const, gross: stage.gross_cents };
+          }
           const treatment = (GST_TREATMENTS.includes(String(form.get(`gst_${stage.id}`)) as never)
             ? String(form.get(`gst_${stage.id}`)) : stage.gst_treatment) as GstTreatment;
           const positionRaw = Number(String(form.get(`position_${stage.id}`) ?? ''));
           const f2 = figures(amount, treatment);
+          return {
+            stage,
+            keepAsIs: false as const,
+            gross: f2.gross,
+            position: Number.isFinite(positionRaw)
+              ? Math.max(0, Math.trunc(positionRaw)) : stage.position,
+            label: String(form.get(`label_${stage.id}`) ?? '').trim().slice(0, 40),
+            description, amount, treatment: fees.gstRegistered ? treatment : 'none',
+            rateBp: f2.rateBp, net: f2.net, gstCents: f2.gstCents,
+          };
+        });
+
+        const intended = planned.reduce((sum, p) => sum + p.gross, 0);
+        if (intended > budget) {
+          return redirectWith(c, `/quotes/${id}`,
+            `That schedule comes to ${money(intended, q.currency)}, which is `
+            + `${money(intended - budget, q.currency)} more than the quotation's `
+            + `${money(budget, q.currency)}. Nothing was saved. A schedule divides up the fees `
+            + 'and disbursements; it cannot add to them.', 'err');
+        }
+
+        for (const stage of removing) {
+          await run(c.env.DB, 'DELETE FROM quote_stages WHERE id = ? AND quote_id = ?', stage.id, id);
+        }
+        const removed = removing.length;
+
+        // Down to nil first. See the note above: this is what stops a correct
+        // rebalance being refused halfway through itself.
+        await run(
+          c.env.DB,
+          `UPDATE quote_stages SET amount_cents = 0, net_cents = 0, gst_cents = 0, gross_cents = 0
+             WHERE quote_id = ?`, id);
+
+        for (const p of planned) {
+          if (p.keepAsIs) {
+            await run(
+              c.env.DB,
+              `UPDATE quote_stages SET amount_cents = ?, net_cents = ?, gst_cents = ?,
+                  gross_cents = ? WHERE id = ? AND quote_id = ?`,
+              p.stage.amount_cents, p.stage.net_cents, p.stage.gst_cents, p.stage.gross_cents,
+              p.stage.id, id);
+            continue;
+          }
           await run(
             c.env.DB,
             `UPDATE quote_stages SET position = ?, label = ?, description = ?, amount_cents = ?,
                 gst_treatment = ?, gst_rate_bp = ?, net_cents = ?, gst_cents = ?, gross_cents = ?,
                 updated_at = ? WHERE id = ? AND quote_id = ?`,
-            Number.isFinite(positionRaw) ? Math.max(0, Math.trunc(positionRaw)) : stage.position,
-            String(form.get(`label_${stage.id}`) ?? '').trim().slice(0, 40),
-            description, amount, fees.gstRegistered ? treatment : 'none', f2.rateBp,
-            f2.net, f2.gstCents, f2.gross, now, stage.id, id,
+            p.position, p.label, p.description, p.amount, p.treatment, p.rateBp,
+            p.net, p.gstCents, p.gross, now, p.stage.id, id,
           );
         }
 
@@ -2743,6 +2897,21 @@ export const quotesModule: AppModule = {
       const position = await count(c.env.DB,
         'SELECT COALESCE(MAX(position), -1) + 1 AS n FROM quote_stages WHERE quote_id = ?', id);
       const fig = figures(amount, treatment);
+
+      // The database refuses this outright — see migration 0077 — but a refusal
+      // surfaces as an error page, and this is a form somebody is standing in
+      // front of. Said here in the figures they are looking at.
+      const already = await count(c.env.DB,
+        'SELECT COALESCE(SUM(gross_cents), 0) AS n FROM quote_stages WHERE quote_id = ?', id);
+      if (fig.gross > 0 && already + fig.gross > budget) {
+        const left = Math.max(0, budget - already);
+        return redirectWith(c, `/quotes/${id}`,
+          left === 0
+            ? `The quotation's ${money(budget, q.currency)} is already fully allocated. `
+              + 'Lower a stage first, or add the work to the items.'
+            : `That stage would take the schedule past the quotation. There is `
+              + `${money(left, q.currency)} left to allocate.`, 'err');
+      }
       await run(
         c.env.DB,
         `INSERT INTO quote_stages (id, quote_id, position, label, description, amount_cents,
