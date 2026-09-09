@@ -37,6 +37,21 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.24.0', date: '9 September 2026',
+    notes: [
+      'Put **two asterisks** around a phrase in your letter wording and it prints in bold. Works '
+        + 'in the clauses, the opening and closing, the scope of the retainer, the addendum and '
+        + 'the acknowledgements.',
+      'Only bold \u2014 no italics, links or headings. A contract is not something to be able to '
+        + 'restructure by accident, and anything else you type stays as the characters you typed.',
+      'The heading above the acknowledgements is yours to write now, rather than fixed at '
+        + '\u201CWhat you confirm by accepting\u201D.',
+      'Pasting a numbered list no longer numbers it twice. \u201C1.\u201D, \u201C2)\u201D and a '
+        + 'stray bullet in front of a number are taken off; a number that is part of the sentence '
+        + 'is left alone.',
+    ],
+  },
+  {
     version: '1.23.2', date: '9 September 2026',
     notes: [
       'The administrative team now prints on the letter exactly as you type it in the box \u2014 '
