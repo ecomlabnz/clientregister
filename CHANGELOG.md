@@ -26,6 +26,18 @@ Four more corrections to the fee documents, all from reading real ones.
   database. Clearing the field and saving looked exactly like not having tried.
   An empty unit now stays empty, and a line reads "1" rather than "1 item".
 - **"Our reference" is shortened to "Our Ref"** on the letter of engagement.
+- **The payment stages show what is payable**, not a figure plus a promise of
+  tax. Each row read "$2,000.00 + GST" while the total beneath them was already
+  inclusive — so the rows and their own total were in different currencies, and
+  a client had to do arithmetic on a payment schedule before it meant anything.
+- **"The Lawyer" and "The Client"** are capitalised on the quotation as they are
+  in the letter, where they are defined terms.
+- **"Nominated representative for all parties" sits beside the name**, in
+  smaller type in brackets, rather than on a line of its own beneath it, where
+  it read as a second fact about the person rather than a note about which name
+  this is.
+- **The type is slightly smaller again** on printed documents and on the
+  document preview.
 
 ### Fixed
 **The documents were printing in the dark theme, and that is why two releases of

@@ -56,6 +56,12 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
         + 'reference\u201D is shortened to \u201COur Ref\u201D.',
       'The unit on a fee line can be cleared. \u201Citem\u201D came back however you edited it, '
         + 'because an empty box could not be told apart from one that was never filled in.',
+      'The payment stages now show the GST-inclusive figure. Each row said \u201C+ GST\u201D '
+        + 'while the total under them was already inclusive, so the rows and the total were not '
+        + 'the same kind of number.',
+      '\u201CThe Lawyer\u201D and \u201CThe Client\u201D are capitalised as the letter defines '
+        + 'them, and \u201CNominated representative for all parties\u201D now sits in smaller '
+        + 'type beside the name it belongs to.',
     ],
   },
   {
