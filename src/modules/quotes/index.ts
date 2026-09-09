@@ -2818,7 +2818,11 @@ export function quotationArticle(
   } = d;
   return html`
         <article class="quote-doc">
-          <header class="quote-doc-head">
+          ${'' /* Title left, practice right — the way the practice's own
+                 Xero invoice is set, chosen by them on 9 September 2026 when
+                 asked whether to match it. The letter of engagement keeps its
+                 letterhead top-left, because a letter is not an invoice. */}
+          <header class="quote-doc-head quote-doc-head-swap">
             <div>
               <h1>${practice.legalName}</h1>
               ${practice.adviserDetails ? html`<p class="prewrap small">${practice.adviserDetails}</p>` : ''}

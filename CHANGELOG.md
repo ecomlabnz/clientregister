@@ -7,6 +7,57 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.30.0 — 9 September 2026
+
+### Changed
+**Quotations and invoices are set close to the practice's own Xero invoice.**
+Asked for, with one of theirs as the example: *"see how small and nice the font
+is, aim at compact format — our quotations and invoices must be close to that."*
+
+Measured off that file rather than eyeballed:
+
+- **8.5pt body** on paper, against the example's 8pt and the 9.5pt it had been.
+  The floor the test kept was 9pt, set from my own judgement about legibility;
+  a document the practice already sends to clients outranks that, so the floor
+  moved to 8pt and the reason is written into the test.
+- **Hairline rules between rows**, so the eye tracks along a line of figures
+  without the row heights having to do it.
+- **The totals gather to the right.** The rules above and below them span only
+  the figure columns, not the width of the page — the detail that does most of
+  the work in the example, because a full-width rule under "Subtotal" cuts the
+  document in half while a short one gathers the numbers into a block.
+- **Section headings are smaller, in the practice's accent, with a rule under
+  them**, which is where that document uses colour.
+- **No shaded bar behind the total.** The general table shades a totals row so
+  it can be found in a long list on screen; on a document the rules do that, and
+  a grey band running the width of the page under a figure ruled only at the
+  right is two different ideas about where the total is.
+
+The invoice takes all of it too — it is the same document furniture.
+
+**The header is swapped to match too** — "FEE QUOTE" (and "Tax invoice") top
+left, the practice's name and contact details top right. That reverses a layout
+settled by hand an hour earlier, so it was put to the practice rather than
+assumed from an example offered for its density; they chose to match.
+
+Two details went with it. The reference block's labels align **left** on this
+side: they were set labels-right in 1.22.1 at the practice's instruction —
+*"align it to each other in the middle"* — which is right against the right
+margin, where the values end flush and the labels reach in towards them. Moved
+to the left margin it inverts, and the labels' left edge goes ragged against the
+margin, which is the fault that instruction was fixing. Every label now starts
+flush at the margin and the values meet them on a shared axis, as the practice's
+own invoice sets it.
+
+And the swap is done by reversing the *layout*, not by moving the markup, so the
+practice's own details are still read first by anything reading the page in
+order — a screen reader, a plain-text renderer, an email client stripping the
+styling. Whose document this is should not depend on a stylesheet arriving.
+
+**The letter of engagement does not take the swap.** A letter's letterhead
+belongs at the top left, and the block on its right is a date and a reference,
+not a title.
+
 ## 1.29.0 — 9 September 2026
 
 ### Added
