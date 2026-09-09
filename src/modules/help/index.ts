@@ -52,7 +52,14 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
       'That block is now headed \u201CThe Parties, the Scope of Work, the Fees (Legal and '
         + 'Disbursements) and the Payment Terms\u201D.',
       'The client is named as \u201CFOR: \u2026\u201D, and \u201CTelephone\u201D now reads '
-        + '\u201CMobile\u201D.',
+        + '\u201CMobile\u201D. \u201CLetter of engagement\u201D is off the top right corner \u2014 '
+        + 'the document already says what it is twice.',
+      'The 25mm margin now actually happens. The side margins are built into the document, where '
+        + 'no print setting can shrink them; the top and bottom still need the print box left on '
+        + 'Margins: Default, and the page says so beside the button.',
+      'Printed documents are smaller and tighter \u2014 10 point, closer line spacing, smaller '
+        + 'gaps between paragraphs. A five-page letter loses about a page without a word being '
+        + 'cut. Grey text prints black.',
     ],
   },
   {

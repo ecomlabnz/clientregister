@@ -215,48 +215,81 @@ describe('the new-thing button on a filter bar', () => {
 /**
  * What a printed document leaves round the edge.
  *
- * **Asked for on 9 September 2026**, looking at a real quotation: *"the margins
- * are too thin. they must be at least 25mm all around."* There was no `@page`
- * rule at all, so the margin was whatever the print dialogue happened to be set
- * to — on the file the practice sent, 8.5mm at the sides and 5.8mm at the top.
+ * **Asked for twice on 9 September 2026.** First *"the margins are too thin.
+ * they must be at least 25mm all around."* — answered with
+ * `@page { margin: 25mm }`, the standards-correct way to say it. The practice
+ * printed a letter the next hour that still measured 8.5mm at the sides and
+ * 5.8mm at the top, byte for byte what it had been before the fix.
+ *
+ * `@page` is a request. Chrome's print dialogue has a Margins control and every
+ * setting but "Default" overrides the document. A margin a contract depends on
+ * cannot sit behind a preference in somebody's print box, so the page margin is
+ * zero and the document carries its own 25mm as padding, which no print setting
+ * can reach.
  *
  * This is worth pinning because it is invisible on screen. Nothing about the
- * register looks wrong when this rule is missing; it only shows up on paper,
- * once, after a client has been sent the document.
+ * register looks wrong when it is missing; it shows up on paper, once, after a
+ * client has been sent the document.
  */
 describe('a printed document keeps a 25mm margin', () => {
-  const rule = /@page\s*\{([^}]*)\}/.exec(css);
+  // Anchored to the start of a line, so the worked example inside the comment
+  // above the rule — which shows the old `@page { margin: 25mm }` — is not
+  // mistaken for the rule itself. It was, and this test failed against correct
+  // CSS until it was.
+  const page = /^@page\s*\{([^}]*)\}/m.exec(css);
+  const blocks = [...css.matchAll(/@media print \{([\s\S]*?)\n\}/g)].map((m) => m[1]!);
+  const printBlock = blocks.find((b) => b.includes('.quote-doc {')) ?? '';
 
-  it('sets one at all', () => {
-    expect(rule, 'no @page rule; the printer decides the margin').not.toBeNull();
+  const asMm = (value: string): number => {
+    // A bare 0 is legal CSS and needs no unit, which is exactly what @page says.
+    if (/^0+(\.0+)?$/.test(value.trim())) return 0;
+    const parsed = /^([\d.]+)(mm|cm|in|pt|px)$/.exec(value.trim());
+    expect(parsed, `unreadable length: ${value}`).not.toBeNull();
+    const unit = { mm: 1, cm: 10, in: 25.4, pt: 25.4 / 72, px: 25.4 / 96 };
+    return Number(parsed![1]) * unit[parsed![2] as 'mm'];
+  };
+
+  it('takes its top and bottom from the page, and no sides', () => {
+    // Split deliberately. Padding cannot give a top margin at a page break —
+    // a block's padding falls at the start and end of the document, not of each
+    // page — and `@page` sides would double the padding below to 50mm.
+    expect(page, 'no @page rule at all').not.toBeNull();
+    const sides = /margin:\s*([^;]+);/.exec(page![1]!)![1]!.trim().split(/\s+/);
+    expect(sides.length, 'write it as "<top/bottom> <sides>"').toBe(2);
+    expect(asMm(sides[0]!)).toBeGreaterThanOrEqual(25);
+    expect(asMm(sides[1]!), 'the sides are the document\u2019s, not the page\u2019s').toBe(0);
   });
 
-  it('is at least 25mm, on every edge', () => {
-    const margin = /margin:\s*([^;]+);/.exec(rule![1]!);
-    expect(margin, '@page sets no margin').not.toBeNull();
-    const sides = margin![1]!.trim().split(/\s+/);
-    // One value means all four edges. Any other count has to be read out, so
-    // "25mm 10mm" cannot pass by looking like it starts with the right number.
-    expect(sides.length, 'write it as one value for all four edges').toBe(1);
-    const parsed = /^([\d.]+)(mm|cm|in|pt)$/.exec(sides[0]!);
-    expect(parsed, `unreadable margin: ${sides[0]}`).not.toBeNull();
-    const asMm = { mm: 1, cm: 10, in: 25.4, pt: 25.4 / 72 }[parsed![2] as 'mm'];
-    expect(Number(parsed![1]) * asMm).toBeGreaterThanOrEqual(25);
+  it('carries the side margin on the document, where a print setting cannot reach it', () => {
+    // This is the half that survives a dialogue set to anything but Default,
+    // and the sides are what the practice measured when it went wrong.
+    expect(printBlock, 'no print block styles the document').not.toBe('');
+    const padding = /\.quote-doc \{[^}]*padding:\s*([^;]+);/.exec(printBlock);
+    expect(padding, 'the document sets no print padding').not.toBeNull();
+    const sides = padding![1]!.trim().split(/\s+/);
+    expect(sides.length, 'write it as "<top/bottom> <sides>"').toBe(2);
+    expect(asMm(sides[0]!), 'the top and bottom belong to @page').toBe(0);
+    expect(asMm(sides[1]!)).toBeGreaterThanOrEqual(25);
   });
 
   it('does not force a paper size', () => {
     // Naming A4 makes a printer loaded with anything else scale the document
-    // down, and the margin shrinks with it — which is the fault this rule
-    // exists to fix, arriving by another road.
-    expect(rule![1]!).not.toMatch(/\bsize\s*:/);
+    // down, and the margin shrinks with it — which is the fault this exists to
+    // fix, arriving by another road.
+    expect(page![1]!).not.toMatch(/\bsize\s*:/);
   });
 
-  it('leaves the document no padding of its own to double it up', () => {
-    // The one that styles the document, not the one-liner further up that only
-    // repeats a table heading across pages.
-    const blocks = [...css.matchAll(/@media print \{([\s\S]*?)\n\}/g)].map((m) => m[1]!);
-    const printBlock = blocks.find((b) => b.includes('.quote-doc {')) ?? '';
-    expect(printBlock, 'no print block styles the document').not.toBe('');
-    expect(printBlock).toMatch(/\.quote-doc \{[^}]*padding: 0/);
+  it('sizes the type in points, for paper rather than for a screen', () => {
+    // Asked for the same day: "make sure the text is readable in any case",
+    // then "make font smaller and use tighter paragraph and line spacing".
+    // Points rather than pixels is the part that matters — a size set in
+    // points is the size it claims to be on paper, whatever 14 screen pixels
+    // happen to become. 10pt is the ordinary size of a legal document; below
+    // 9pt it stops being one somebody can read.
+    const body = /body \{[^}]*font-size:\s*([^;]+);/.exec(printBlock);
+    expect(body, 'the printed page sets no type size').not.toBeNull();
+    expect(body![1]!.trim()).toMatch(/pt$/);
+    expect(asMm(body![1]!)).toBeGreaterThanOrEqual(asMm('9pt'));
+    expect(asMm(body![1]!)).toBeLessThanOrEqual(asMm('11pt'));
   });
 });

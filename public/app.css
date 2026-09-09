@@ -1393,23 +1393,37 @@ details[open] > summary { margin-bottom: 12px; }
 
 /* The page itself, on paper.
  *
- * **Asked for on 9 September 2026**, looking at a real quotation: *"the margins
- * are too thin. they must be at least 25mm all around."* Quite right, and there
- * was no `@page` rule at all until now — the margin was whatever the print
- * dialogue happened to be set to, which on the file the practice sent was
- * 8.5mm at the sides and 5.8mm at the top. A quotation carrying the letter of
- * engagement is a contract; it gets filed, punched and copied, and a hole punch
- * does not care what Chrome's default was that day.
+ * **Asked for twice on 9 September 2026.** First *"the margins are too thin.
+ * they must be at least 25mm all around."* — answered with
+ * `@page { margin: 25mm }`, which is the standards-correct way to say it. The
+ * practice printed a letter within the hour that still measured 8.5mm at the
+ * sides, byte for byte what it had been before.
  *
- * 25mm on every edge, on every page. The paper size is deliberately not forced:
- * naming A4 here would make a printer loaded with anything else scale the whole
- * document down, taking the margin with it.
+ * The stylesheet was live and uncached, so the rule was there and was ignored.
+ * `@page` is a request: Chrome's print dialogue has a Margins control, and
+ * every setting but "Default" overrides the document. 8.5mm is about what its
+ * "Minimum" gives.
  *
- * One thing this cannot do is beat the browser. Chrome's print dialogue has a
- * Margins control, and "None" overrides this rule — so Help says to leave it on
- * Default. That is the only setting this depends on.
+ * So the margin is split between the two mechanisms, each doing the half it can
+ * actually hold:
+ *
+ *   - **The sides are padding on the document**, which no print setting can
+ *     reach, and which applies on every page because it insets every line.
+ *   - **The top and bottom are `@page`**, because padding cannot do them: a
+ *     block's padding falls at the start and end of the *document*, not at each
+ *     page break, so a two-page letter would get its 25mm at the top of page
+ *     one and nothing at the top of page two. That was measured, not assumed.
+ *
+ * `@page` sets no side margin, so the padding cannot double it to 50mm.
+ *
+ * What this still cannot do is force a top margin on a dialogue set to
+ * anything but Default. Nothing in a stylesheet can. The print page says so on
+ * screen, next to the button, and Help says it again.
+ *
+ * The paper size is deliberately not forced: naming A4 makes a printer loaded
+ * with anything else scale the document down and take the margin with it.
  */
-@page { margin: 25mm; }
+@page { margin: 25mm 0; }
 
 @media print {
   .print-only { display: block; font-size: 0.8em; color: #444; margin-top: 4px; }
@@ -1429,10 +1443,38 @@ details[open] > summary { margin-bottom: 12px; }
   }
   body { background: #fff; }
   .topbar, .footer, .no-print, .crumbs, .page-actions { display: none !important; }
+  /* The side margin, where no print setting can reach it. See the note by
+     `@page` above for why the top and bottom are not here too. */
   .quote-doc {
-    max-width: none; margin: 0; padding: 0; border: none; border-radius: 0;
+    max-width: none; margin: 0; padding: 0 25mm; border: none; border-radius: 0;
     background: #fff; color: #000;
   }
+
+  /* Sized for paper rather than for a screen.
+   *
+   * Asked for on 9 September 2026: *"make sure the text is readable in any
+   * case"*, then *"make font smaller and use tighter paragraph and line
+   * spacing"*. Those pull against each other only if size is confused with
+   * legibility: 10pt is the ordinary size of a legal document and is set in
+   * points, so it is the size it claims to be on paper rather than whatever
+   * 14 screen pixels happen to become.
+   *
+   * The tightening is where the space is actually won — 1.38 line spacing
+   * against the 1.6 the screen uses, and paragraph gaps a little over half what
+   * they were. A five-page letter loses about a page to this without a word
+   * being cut. */
+  body { font-size: 10pt; line-height: 1.38; }
+  .quote-doc .small, .quote-doc .hint, .quote-doc .prewrap.small { font-size: 9pt; }
+  .letter-doc p, .letter-doc ul, .letter-doc ol { line-height: 1.38; margin-bottom: 7px; }
+  .letter-doc li { margin-bottom: 3px; }
+  .letter-doc section { margin-bottom: 12px; }
+  .letter-doc h3 { margin-bottom: 4px; }
+  .letter-terms-start { margin: 18px 0 12px; padding-top: 10px; }
+
+  /* Grey on white loses more to a printer than it gains on a screen, and some
+     of this is the addressee's own contact details. */
+  .quote-doc, .quote-doc .muted, .quote-doc .hint, .quote-doc .small { color: #000; }
+
   .quote-doc a { color: #000; text-decoration: underline; }
   .main { padding: 0; }
   .bare-main { max-width: none; }
