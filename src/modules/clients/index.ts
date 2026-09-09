@@ -45,6 +45,7 @@ import {
 } from '../../core/timeline';
 import { casesForClient, relatedClients } from '../../core/parties';
 import { can } from '../../core/rbac';
+import { clientDeleteCard, deleteRefusal } from '../../core/deletes';
 import { preferencesFor } from '../../core/preferences';
 import { caseTypes, docCategories, englishTests, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
 import { renameMattersFor } from '../../core/casename';
@@ -1689,7 +1690,55 @@ export const clientsModule: AppModule = {
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { href: `/clients/${client.id}`, label: client.ref }, { label: 'Edit' }])}
         ${pageHeader(`Edit ${client.full_name}`)}
         ${clientForm(c, { ...client, passport_issued: primary?.issued_on ?? null, nationalities },
-                     users, organisations, englishTestOptions, visaTypeOptions)}`);
+                     users, organisations, englishTestOptions, visaTypeOptions)}
+        ${await clientDeleteCard(c, client)}`);
+    });
+
+    /**
+     * Delete a client.
+     *
+     * **Asked for on 9 September 2026:** *"the same for clients - must be able
+     * to delete"*, immediately after the same for matters, and for the same
+     * reason — an intake that ran twice left three empty people behind.
+     *
+     * For a record made by mistake, and nothing else. Everything that would
+     * make it something else is refused by migration 0076 rather than checked
+     * here, so a second route cannot forget: matters, invoices, a quotation
+     * that has gone out, documents, a note anybody wrote, or being named on
+     * somebody else's matter.
+     *
+     * The note rule is the one that will surprise, so the message says what to
+     * do instead. A note cannot be deleted and there is nowhere above a client
+     * to move it to, so a client who has been written about is archived, not
+     * removed — which keeps the file and stops the alerts.
+     */
+    r.post('/:id/delete', requirePermission('register:delete'), async (c) => {
+      const id = c.req.param('id')!;
+      const client = await one<ClientRow>(c.env.DB, 'SELECT * FROM clients WHERE id = ?', id);
+      if (!client) return c.notFound();
+
+      // Typing the reference survives a mis-click, a double submit, and a
+      // browser with scripting switched off, which the dialogue does not.
+      const f = new FormReader(await c.req.formData());
+      const typed = (f.optional('confirm_ref', { max: 20 }) ?? '').trim().toUpperCase();
+      if (typed !== client.ref.toUpperCase()) {
+        return redirectWith(c, `/clients/${id}/edit`,
+          `Type ${client.ref} exactly to delete it.`, 'err');
+      }
+
+      try {
+        await run(c.env.DB, 'DELETE FROM clients WHERE id = ?', id);
+      } catch (err) {
+        return redirectWith(c, `/clients/${id}/edit`,
+          deleteRefusal(err) ?? 'That client could not be deleted.', 'err');
+      }
+
+      await auditFrom(c, {
+        action: 'client.deleted_by_hand', entityType: 'client', entityId: id,
+        meta: { ref: client.ref, kind: client.kind, status: client.status },
+      });
+      return redirectWith(c, '/clients',
+        `${client.ref} deleted. The reference is retired and will not be reissued.`);
     });
 
     // --- Passports ----------------------------------------------------------

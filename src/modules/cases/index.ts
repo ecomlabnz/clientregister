@@ -38,6 +38,7 @@ import {
 } from '../../core/timeline';
 import { FLAG_LIVES, flagKinds, flagsForCase, isShowing } from '../../core/flags';
 import { can } from '../../core/rbac';
+import { caseDeleteCard, deleteRefusal } from '../../core/deletes';
 import { asPrefBoolean, preferencesFor } from '../../core/preferences';
 import { filesPanel, listCaseFiles, storeDocument } from '../documents';
 import {
@@ -1157,8 +1158,78 @@ export const casesModule: AppModule = {
       return page(c, { title: `Edit ${kase.ref}`, active: '/cases' }, html`
         ${breadcrumbs([{ href: '/cases', label: 'Cases' }, { href: `/cases/${kase.id}`, label: kase.ref }, { label: 'Edit' }])}
         ${pageHeader(`Edit ${kase.ref}`)}
-        ${caseForm(c, kase, clients, users, types)}`);
+        ${caseForm(c, kase, clients, users, types)}
+        ${await caseDeleteCard(c, kase)}`);
     });
+
+    /**
+     * Delete a matter.
+     *
+     * **Asked for on 9 September 2026:** *"owner must be able to delete a case
+     * - i have just created one - a duplicate!"*
+     *
+     * The database has audited case deletion since 0031 and taken the flags
+     * down with it, and that trigger had never once fired, because nothing in
+     * the application could delete a matter. What is new here is the way in —
+     * and migration 0076, which decides what a matter may not be deleted over.
+     *
+     * Those refusals live in the database rather than here, so a second route
+     * cannot forget them. This handler checks nothing about invoices or
+     * quotations; it attempts the delete and reports what the database said.
+     */
+    r.post('/:id/delete', requirePermission('register:delete'), async (c) => {
+      const id = c.req.param('id')!;
+      const kase = await one<CaseRow>(c.env.DB, 'SELECT * FROM cases WHERE id = ?', id);
+      if (!kase) return c.notFound();
+
+      // Typing the reference is the only confirmation that survives a
+      // mis-click, a double submit and a browser with scripting switched off,
+      // which the `data-confirm` dialogue does not.
+      const f = new FormReader(await c.req.formData());
+      const typed = (f.optional('confirm_ref', { max: 20 }) ?? '').trim().toUpperCase();
+      if (typed !== kase.ref.toUpperCase()) {
+        return redirectWith(c, `/cases/${id}/edit`,
+          `Type ${kase.ref} exactly to delete it.`, 'err');
+      }
+
+      // Counted before the delete, because afterwards there is nothing to count.
+      const toll = await one<{ entries: number; tasks: number; parties: number }>(
+        c.env.DB, `SELECT
+          (SELECT COUNT(*) FROM entries WHERE entity_type='case' AND entity_id=?1) AS entries,
+          (SELECT COUNT(*) FROM tasks WHERE entity_type='case' AND entity_id=?1) AS tasks,
+          (SELECT COUNT(*) FROM case_parties WHERE case_id=?1) AS parties`, id);
+
+      try {
+        await run(c.env.DB, 'DELETE FROM cases WHERE id = ?', id);
+      } catch (err) {
+        return redirectWith(c, `/cases/${id}/edit`,
+          deleteRefusal(err) ?? 'That matter could not be deleted.', 'err');
+      }
+
+      // The matter is gone; the person it was for keeps the trace. Written
+      // after the delete, so a refused delete leaves no note claiming one
+      // happened — the same ordering fault the inquiry delete was corrected for.
+      await addEntry(c.env, {
+        entityType: 'client', entityId: kase.client_id, kind: 'system',
+        body: `Matter ${kase.ref} (${kase.title}) was deleted by ${c.get('user')!.name}. `
+          + `${toll?.entries ?? 0} timeline entries, ${toll?.tasks ?? 0} tasks and `
+          + `${toll?.parties ?? 0} named parties went with it. `
+          + `The reference ${kase.ref} is retired and will not be reissued.`,
+        createdBy: c.get('user')!.id,
+      });
+
+      await auditFrom(c, {
+        action: 'case.deleted_by_hand', entityType: 'case', entityId: id,
+        meta: { ref: kase.ref, title: kase.title, client: kase.client_id,
+                status: kase.status, case_type: kase.case_type,
+                entries: toll?.entries ?? 0, tasks: toll?.tasks ?? 0,
+                parties: toll?.parties ?? 0 },
+      });
+
+      return redirectWith(c, `/clients/${kase.client_id}`,
+        `${kase.ref} deleted. A note of it is on this client's file.`);
+    });
+
 
     r.post('/:id', requirePermission('register:write'), async (c) => {
       const types = await caseTypes(c.env);

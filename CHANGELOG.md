@@ -7,6 +7,57 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.19.0 — 9 September 2026
+
+### Added
+**A matter or a client created by mistake can be deleted.** Asked for: *"owner
+must be able to delete a case - i have just created one - a duplicate!"*, then
+*"the same for clients - must be able to delete"*. An intake that ran twice had
+left a duplicate matter and three empty people, and there was no way to remove
+any of them.
+
+The button is at the foot of the **Edit** page, for the owner and administrators
+only. It always says what deleting would take with it, in numbers, and it asks
+you to type the reference — not to click "yes", which is not a decision.
+
+**What cannot be deleted, and why.** These are refusals the database makes, not
+checks on a screen, so a second button cannot forget them:
+
+- A matter with an **invoice** against it. An invoice has to say what it was for.
+- A matter or client with a **quotation already sent or accepted**. That letter
+  is a contract.
+- Anything holding **documents**. Remove them first, one at a time — otherwise
+  the files stay stored with nothing pointing at them.
+- A **client who still has matters**. Those come off one at a time, each its own
+  decision.
+- A **client anybody has written a note about**. Archive them instead, which
+  keeps the file and stops the alerts.
+- A **client named on somebody else's matter**.
+
+**What happens to the file notes.** They are not destroyed. When a matter is
+deleted its timeline **moves onto the client's own file**, word for word. The
+duplicate that prompted this carried a file note written four minutes earlier,
+from a consultation; deleting the matter must not be the thing that loses it.
+
+That was not a design decision so much as a discovery: the first version of the
+migration tried to delete the notes with the matter, and the database refused
+the whole deletion, because notes have been append-only since migration 0014.
+Rehearsing it is what found that. The rule is now stated more exactly — **what a
+note says is frozen; where it is filed is not** — which also means a note filed
+against the wrong matter can be moved at all, which it could not before.
+
+### Fixed
+**The specification was understating the register's own rules, and had been
+since it was written.** `docs/spec/invariants.md` claims to list everything the
+database refuses, in its own words, and a test holds it to that. Both the
+document and the test read only the **first** refusal in each trigger — so a
+trigger that refuses six things was documented as refusing one.
+
+Four of the five reasons an inquiry cannot be deleted had never been written
+down. The count moves from 71 to 85; nine of the fourteen are new rules from
+this release and five were always there, kept by the database and missing from
+the document that exists to describe it.
+
 ## 1.18.0 — 9 September 2026
 
 ### Added

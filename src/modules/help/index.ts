@@ -37,6 +37,24 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.19.0', date: '9 September 2026',
+    notes: [
+      'A matter or a client created by mistake can now be deleted \u2014 the button is at the '
+        + 'bottom of the Edit page, and only you and an administrator see it.',
+      'It tells you what deleting would take with it before you press, and asks you to type the '
+        + 'reference rather than click \u201Cyes\u201D.',
+      'Some things it will refuse, and say why: anything with an invoice, a quotation already '
+        + 'sent, or documents attached; a client who still has matters, who has notes on their '
+        + 'file, or who is named on somebody else\u2019s matter. For a client you have written '
+        + 'about, archive them instead \u2014 that keeps the file and stops the alerts.',
+      'File notes are never destroyed. Delete a matter and its notes move onto the client\u2019s '
+        + 'own file, word for word \u2014 so a consultation you wrote up minutes earlier is still '
+        + 'there afterwards.',
+      'This is for a record that should not exist. A matter that came to nothing is still closed '
+        + 'by setting it to Withdrawn or Closed, which keeps everything.',
+    ],
+  },
+  {
     version: '1.18.0', date: '9 September 2026',
     notes: [
       'A backup button, on Settings \u2192 Export. One press downloads the whole register \u2014 '

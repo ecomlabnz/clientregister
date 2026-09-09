@@ -11,9 +11,16 @@ guarantee in a handler lasts until somebody adds a second handler — and this
 register is written to by the application, by bulk loads, and occasionally by
 hand at a console. Everything below holds in all three cases.
 
-**71 refusals** across 23 tables, plus
+**85 refusals** across 23 tables, plus
 **10 uniqueness rules**. Each is quoted in the words the
 database itself uses, because that is what somebody will see.
+
+The count jumped by fourteen on 9 September 2026 and only nine of those are new
+rules. The other five had been kept by the database and left out of this
+document since it was written: a trigger may hold a list of refusals, and both
+this document and the test holding it honest read only the first. So four of
+the five reasons an inquiry cannot be deleted were never written down here.
+A trigger is not one refusal; it is a list, and the list is the point.
 
 Read from the schema as it finally stands, after every migration — not from the
 migrations as written, which still contain rules that were later replaced.
@@ -50,6 +57,9 @@ whether or not the rule exists is not a test.
 |---|---|
 | insert | a matter must be assigned to somebody |
 | update | a matter must be assigned to somebody |
+| delete | This matter has an invoice against it. An invoice has to say what it was for, so void or move the invoice first. |
+| delete | A quotation on this matter has already gone to the client. Withdraw it, or take the matter off it, before deleting. |
+| delete | This matter holds documents. Remove them one at a time first — deleting the matter would leave the files stored with nothing pointing at them. |
 
 ### `channel_threads`
 
@@ -88,6 +98,12 @@ whether or not the rule exists is not a test.
 | update | passport country must be an ISO 3166-1 alpha-2 country code |
 | insert | An INZ client number is six to twelve digits and nothing else. |
 | update | An INZ client number is six to twelve digits and nothing else. |
+| delete | This client has matters. Delete or move those first — each one is its own decision. |
+| delete | This client has an invoice. An invoice has to say who it was for, so void or move it first. |
+| delete | A quotation has already gone to this client. Withdraw it, or move it, before deleting them. |
+| delete | This client holds documents. Remove them one at a time first — deleting the client would leave the files stored with nothing pointing at them. |
+| delete | This client has notes on their file. A note cannot be deleted, and there is nowhere to move it to — archive them instead, which keeps the file and stops the alerts. |
+| delete | This client is named on another matter. Take them off it first. |
 
 ### `documents`
 
@@ -102,6 +118,7 @@ whether or not the rule exists is not a test.
 |---|---|
 | delete | entries are append-only: a note cannot be deleted |
 | update | entries are append-only: a note may be corrected only within five minutes of writing it, and only once |
+| update | a note can only be re-filed onto a client who exists |
 
 ### `flags`
 
@@ -126,6 +143,10 @@ whether or not the rule exists is not a test.
 |---|---|
 | delete | an inquiry that became a matter cannot be deleted |
 | update | an inquiry cannot be filed without a client or a matter to file it on |
+| delete | an inquiry that has been quoted cannot be deleted |
+| delete | an inquiry with documents cannot be deleted |
+| delete | an inquiry with tasks cannot be deleted |
+| delete | an inquiry with a file note cannot be deleted |
 
 ### `invoice_items`
 
