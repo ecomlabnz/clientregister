@@ -11,7 +11,7 @@ guarantee in a handler lasts until somebody adds a second handler — and this
 register is written to by the application, by bulk loads, and occasionally by
 hand at a console. Everything below holds in all three cases.
 
-**93 refusals** across 24 tables, plus
+**103 refusals** across 25 tables, plus
 **10 uniqueness rules**. Each is quoted in the words the
 database itself uses, because that is what somebody will see.
 
@@ -195,8 +195,9 @@ whether or not the rule exists is not a test.
 | update | an acceptance records who accepted and when, or neither |
 | update | an acceptance is the moment a contract was formed and cannot be changed. Issue a new quotation instead. |
 | update | only a quotation that has been sent can be accepted. This one is not out with the client. |
+| update | This quotation has been accepted by the client and cannot be changed. Issue a new quotation instead. |
 
-The last six arrived with migration 0078, which gives a quotation a private link
+The last six but one arrived with migration 0078, which gives a quotation a private link
 the client can open without an account, and a way for them to accept it.
 
 The link is 128 bits from the platform's cryptographic generator and is the only
@@ -213,10 +214,36 @@ answered with a new quotation, exactly as it would be on paper. And only a
 quotation that has actually been sent can come back accepted: a draft has
 reached nobody, and a withdrawn one has been taken back.
 
+**And once it is accepted, the quotation stops changing** — migration 0079,
+added within the hour, after the practice tried it: *"in quote 12 I managed to
+delete a line! should not be possible."* The only guard until then was
+`quote:write`, which asks whether somebody may edit quotations at all and never
+whether *this* quotation is still theirs to edit.
+
+What freezes is everything the client agreed to: the fee lines, the payment
+stages, the people named, the figures, the kind of work, the dates, whether a
+letter of engagement goes with it, and the note under the schedule. The status
+freezes too — there is no honest way to move a quotation off `accepted`.
+
+What does not freeze: the practice's own note on the file, which is not printed
+on the document and is not part of what anybody agreed, and `updated_at`, so
+ordinary bookkeeping still works.
+
+### `quote_items`
+
+| On | The database refuses |
+|---|---|
+| insert | This quotation has been accepted by the client and cannot be changed. Issue a new quotation instead. |
+| update | This quotation has been accepted by the client and cannot be changed. Issue a new quotation instead. |
+| delete | This quotation has been accepted by the client and cannot be changed. Issue a new quotation instead. |
+
 ### `quote_stages`
 
 | On | The database refuses |
 |---|---|
+| insert | This quotation has been accepted by the client and its payment schedule cannot be changed. Issue a new quotation instead. |
+| update | This quotation has been accepted by the client and its payment schedule cannot be changed. Issue a new quotation instead. |
+| delete | This quotation has been accepted by the client and its payment schedule cannot be changed. Issue a new quotation instead. |
 | insert | The payment stages would come to more than the quotation does. A schedule divides up the fees and disbursements; it cannot add to them. Lower a stage, or add the work to the items first. |
 | update | The payment stages would come to more than the quotation does. A schedule divides up the fees and disbursements; it cannot add to them. Lower a stage, or add the work to the items first. |
 
@@ -261,6 +288,9 @@ wrote it".
 | update | an administrative contact needs an email address or a phone number |
 | insert | an administrative contact cannot be the nominated representative |
 | update | an administrative contact cannot be the nominated representative |
+| insert | This quotation has been accepted by the client and the people named on it cannot be changed. Issue a new quotation instead. |
+| update | This quotation has been accepted by the client and the people named on it cannot be changed. Issue a new quotation instead. |
+| delete | This quotation has been accepted by the client and the people named on it cannot be changed. Issue a new quotation instead. |
 
 ### `kb_article_versions`
 

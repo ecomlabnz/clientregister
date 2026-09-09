@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { mountModule, fakeUser } from './support/d1';
 import { clientQuoteModule } from '../src/modules/clientquote';
+import { quotesModule } from '../src/modules/quotes';
 import { registeredModules } from '../src/registry';
 
 const AT = '2026-09-09T00:00:00Z';
@@ -135,6 +136,29 @@ describe('accepting', () => {
     expect(note.pinned).toBe(1);
   });
 
+  it('writes a full note on the quotation itself', async () => {
+    // **Asked for on 9 September 2026:** *"there is a note in the right side
+    // panel, but there should be a comprehensive note in the file note as well
+    // once it is accepted."* The panel is the record's current state; the file
+    // notes are what happened to it, which is what somebody reads a year later.
+    const h = seeded();
+    await accept(h);
+    const note = h.get<{ body: string; pinned: number }>(
+      `SELECT body, pinned FROM entries WHERE entity_type = 'quote' AND entity_id = 'q1'`)!;
+    expect(note, 'nothing written on the quotation').not.toBeNull();
+    expect(note.pinned).toBe(1);
+    expect(note.body).toContain('A Person');
+    // The two dates are different things and both are recorded: what the client
+    // said they signed on, and when it actually arrived.
+    expect(note.body).toMatch(/Signed as at/);
+    expect(note.body).toMatch(/Received/);
+    // What was accepted, in money.
+    expect(note.body).toContain('$8,050.00');
+    // And that it is now fixed, which is the thing somebody needs to know
+    // before they go looking for the edit button.
+    expect(note.body).toMatch(/cannot be edited/i);
+  });
+
   it('writes an audit row naming the client, not a user', async () => {
     const h = seeded();
     await accept(h);
@@ -176,6 +200,28 @@ describe('accepting', () => {
     expect(body).not.toContain('accept-form');
   });
 
+  it('stamps the quotation itself, in the accent that says accepted', async () => {
+    // **Asked for on 9 September 2026:** *"once it is accepted — there should
+    // be a green stamp at the top stating ACCEPTED and date and time and
+    // name."* On the document, not on the page around it, so it is there
+    // wherever the quotation is rendered — including on paper.
+    const h = seeded();
+    await accept(h);
+    const body = await (await h.request(`/q/${LINK}`)).text();
+    const stamp = /<p class="quote-doc-accepted">([\s\S]*?)<\/p>/.exec(body);
+    expect(stamp, 'no stamp on the accepted quotation').not.toBeNull();
+    expect(stamp![1]).toContain('Accepted');
+    expect(stamp![1], 'the stamp names who accepted').toContain('A Person');
+    // The date and the time, not one or the other.
+    expect(stamp![1]).toMatch(/September/);
+    expect(stamp![1]).toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it('does not stamp a quotation nobody has accepted', async () => {
+    const body = await (await seeded().request(`/q/${LINK}`)).text();
+    expect(body).not.toContain('quote-doc-accepted');
+  });
+
   it('shows the acceptance back to whoever opens the link afterwards', async () => {
     const h = seeded();
     await accept(h);
@@ -184,6 +230,151 @@ describe('accepting', () => {
     expect(body).toContain('A Person');
     expect(body).not.toContain('accept-form');
     expect(body).not.toContain('accept-bar');
+  });
+});
+
+describe('two letters go out when a client accepts', () => {
+  /**
+   * **Asked for on 9 September 2026:** *"the client did not receive a
+   * confirmation email about the fact that they have accepted the fee
+   * quotation and the link to that quotation"*, then *"remember — two emails
+   * should go out: one to the client confirming acceptance, and one to the
+   * lawyer confirming acceptance."*
+   *
+   * Two letters rather than one copied to both, because they answer different
+   * questions: the client's says what they agreed to and where to find it, the
+   * practice's says it arrived and what to do next.
+   */
+  const withEmail = (address: string | null = 'client@example.test') => {
+    const h = seeded();
+    h.db.prepare(`UPDATE clients SET email = ? WHERE id = 'c1'`).run(address);
+    // The practice's own address, which is where its copy goes unless they have
+    // nominated somewhere else.
+    h.db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES
+                    ('practice.contact_email', 'office@example.test', ?)`).run(AT);
+    return h;
+  };
+  const queued = (h: ReturnType<typeof seeded>) =>
+    h.db.prepare(`SELECT to_addr, subject, body_text FROM outbound_emails ORDER BY rowid`)
+      .all() as Array<{ to_addr: string; subject: string; body_text: string }>;
+
+  it('sends the client a confirmation carrying the link', async () => {
+    const h = withEmail();
+    await accept(h);
+    const client = queued(h).find((m) => m.to_addr === 'client@example.test');
+    expect(client, 'nothing was sent to the client').toBeDefined();
+    expect(client!.subject).toContain('Q-8001');
+    expect(client!.body_text).toContain(`/q/${LINK}`);
+    expect(client!.body_text).toContain('A Person');
+    expect(client!.body_text).toContain('$8,050.00');
+    // The promise that makes the link worth keeping, and which migration 0079
+    // is what actually makes true.
+    expect(client!.body_text).toMatch(/will not change now that they have been accepted/i);
+  });
+
+  it('tells the practice, with what it means for them', async () => {
+    const h = withEmail();
+    await accept(h);
+    const mine = queued(h).find((m) => m.to_addr !== 'client@example.test');
+    expect(mine, 'the practice was not told').toBeDefined();
+    expect(mine!.subject).toContain('accepted by A Person');
+    expect(mine!.body_text).toMatch(/is now fixed/i);
+    expect(mine!.body_text).toContain('issue a new quotation');
+    expect(mine!.body_text).toContain(`/q/${LINK}`);
+  });
+
+  it('still tells the practice when the client has no address on file', async () => {
+    // And says so, rather than letting them assume the client was written to.
+    const h = withEmail(null);
+    await accept(h);
+    const all = queued(h);
+    expect(all.length, 'only the practice should be written to').toBe(1);
+    expect(all[0]!.body_text).toMatch(/no email address is on their record/i);
+  });
+
+  it('does not let a letter stop the acceptance', async () => {
+    // A contract is formed by the client's act, not by our bookkeeping. An
+    // address the practice mistyped six weeks ago must not turn acceptance
+    // into an error page.
+    const h = withEmail('not an address at all');
+    await accept(h);
+    expect(h.get<{ accepted_at: string | null }>(
+      'SELECT accepted_at FROM quotes WHERE id = ?', 'q1')!.accepted_at).not.toBeNull();
+  });
+});
+
+describe('an accepted quotation is a contract', () => {
+  /**
+   * **Reported on 9 September 2026:** *"in quote 12 I managed to delete a line!
+   * should not be possible."* The only guard was `quote:write`, which asks
+   * whether somebody may edit quotations at all — never whether *this* one is
+   * still theirs to edit.
+   *
+   * The refusals are the database's (migration 0079) and are attacked directly
+   * in the rehearsal; what is checked here is that the application does not
+   * offer the buttons in the first place, because a button that appears and
+   * then fails is worse than no button.
+   */
+  it('takes the editing away once the client has accepted', async () => {
+    // The quotation page belongs to the quotes module, so this mounts that one
+    // and sets the acceptance directly — the acceptance itself is exercised
+    // above, and what is under test here is what the page offers afterwards.
+    const page = async (accepted: boolean) => {
+      const h = mountModule(quotesModule, { user: USER });
+      h.db.prepare(`INSERT INTO users (id, email, name, password_hash, role, status,
+                      created_at, updated_at)
+                    VALUES (?, ?, ?, 'x', 'admin', 'active', ?, ?)`)
+        .run(USER.id, USER.email, USER.name, AT, AT);
+      h.db.prepare(`INSERT INTO clients (id, ref, kind, full_name, status, created_at, updated_at)
+                    VALUES ('c1','CL-8001','individual','A Person','active',?,?)`).run(AT, AT);
+      h.db.prepare(`INSERT INTO quotes (id, ref, client_id, description, amount_cents, gst_cents,
+                      disbursements_cents, currency, status, created_by, created_at, updated_at)
+                    VALUES ('q1','Q-8001','c1','A matter',700000,105000,0,'NZD','sent',?,?,?)`)
+        .run(USER.id, AT, AT);
+      h.db.prepare(`INSERT INTO quote_items (id, quote_id, position, description, kind, unit_label,
+                      quantity_milli, unit_amount_cents, gst_treatment, gst_rate_bp,
+                      net_cents, gst_cents, gross_cents, created_at, updated_at)
+                    VALUES ('qi1','q1',0,'The work','professional','',1000,700000,'exclusive',1500,
+                            700000,105000,805000,?,?)`).run(AT, AT);
+      // Accepted last, because the freeze is real: a quotation cannot be given
+      // a fee line after it has been accepted, which is the whole point. The
+      // first version of this fixture built it the other way round and was
+      // refused by the trigger it exists to check.
+      if (accepted) {
+        h.db.prepare(`UPDATE quotes SET accepted_at = ?, accepted_name = 'A Person' WHERE id = 'q1'`)
+          .run(AT);
+      }
+      return (await h.request('/quotes/q1')).text();
+    };
+
+    const before = await page(false);
+    expect(before, 'a sent quotation is editable').toContain('Edit the lines');
+
+    const after = await page(true);
+    expect(after).not.toContain('Edit the lines');
+    expect(after).not.toContain('Add a line');
+    expect(after).not.toContain('Edit the stages');
+  });
+
+  it('refuses the edit even when the route is called directly', () => {
+    // The screen is the courtesy; this is the guarantee. Somebody with the URL
+    // and a form still cannot take a line off a contract.
+    const h = seeded();
+    h.db.exec(`UPDATE quotes SET accepted_at = '2026-09-09T00:00:00Z',
+                 accepted_name = 'A Person' WHERE id = 'q1'`);
+    expect(() => h.db.exec(`DELETE FROM quote_items WHERE quote_id = 'q1'`))
+      .toThrow(/accepted by the client/);
+    expect(h.count(`SELECT COUNT(*) AS n FROM quote_items WHERE quote_id = 'q1'`)).toBe(1);
+  });
+
+  it('still lets the practice write an internal note on it', () => {
+    // Frozen is not sealed. The practice's own note on the file is not part of
+    // what anybody agreed and is not printed on the document.
+    const h = seeded();
+    h.db.exec(`UPDATE quotes SET accepted_at = '2026-09-09T00:00:00Z',
+                 accepted_name = 'A Person' WHERE id = 'q1'`);
+    expect(() => h.db.exec(`UPDATE quotes SET notes = 'Rang the client' WHERE id = 'q1'`))
+      .not.toThrow();
   });
 });
 

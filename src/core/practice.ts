@@ -30,6 +30,11 @@ export const PRACTICE_SETTINGS: SettingsGroup = {
       help: 'Left empty, replies go back to the sending address. Set it when the address the '
         + 'provider is allowed to send from is not a mailbox anybody reads — a provider will only '
         + 'send from a domain verified with it, and that domain may have no mailbox behind it.' },
+    { key: 'practice.acceptance_notify', type: 'string', label: 'Tell us here when a quote is accepted',
+      default: '', maxLength: 320,
+      help: 'Where the register sends its note when a client accepts a quotation online. Left '
+        + 'empty it goes to the practice email above. Set it to reach somebody else \u2014 an '
+        + 'assistant, or a shared inbox \u2014 without changing the address clients see.' },
     { key: 'practice.contact_phone', type: 'string', label: 'Contact phone',
       default: '', maxLength: 60 },
     { key: 'practice.postal_address', type: 'text', label: 'Address',

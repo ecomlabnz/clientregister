@@ -1415,7 +1415,18 @@ details[open] > summary { margin-bottom: 12px; }
 /* The letter of engagement. A document a client reads and is asked to accept,
    so it is set as prose rather than as a page of the application: a measured
    line length, room between paragraphs, and headings that do not shout. */
-.letter-doc { max-width: 46rem; }
+/* The same width as the quotation.
+ *
+ * **Reported on 9 September 2026:** *"why are they of different width??"* The
+ * letter was 46rem and the quotation 210mm — a measure chosen for prose against
+ * a measure chosen for paper. That was invisible while each was on its own
+ * page, and obvious the moment the client's page put one directly under the
+ * other: two documents of one engagement, arriving at two widths.
+ *
+ * Paper wins. They are printed on the same sheet and read in the same envelope,
+ * and 170mm of text at 8.5pt is around sixty-five characters a line, which is
+ * where prose wants to be anyway. */
+.letter-doc { max-width: 210mm; }
 .letter-doc p { margin: 0 0 9px; line-height: 1.5; }
 .letter-doc section { margin-bottom: 15px; }
 .letter-doc ul, .letter-doc ol { margin: 0 0 12px; padding-left: 22px; line-height: 1.6; }
@@ -1726,7 +1737,37 @@ details[open] > summary { margin-bottom: 12px; }
 /* A note to the reader rather than part of the document, so it is not set as
    the document is and does not print with it. */
 .client-note { max-width: 210mm; margin: 10px auto; }
-.accept-panel { margin-top: 18px; }
+/* Air between the documents.
+ *
+ * **Asked for the same day:** *"can we put space in between these two?"* They
+ * are separate documents and were touching, which on a page carrying two of
+ * them reads as one long one. Nothing prints: on paper the letter starts its
+ * own page anyway. */
+.quote-doc + .quote-doc { margin-top: 26px; }
+.accept-panel { margin-top: 26px; }
+
+/* Accepted, said at the top of the document itself.
+ *
+ * **Asked for on 9 September 2026:** *"once it is accepted — there should be a
+ * green stamp at the top stating ACCEPTED and date and time and name."*
+ *
+ * On the document rather than on the page around it, so it is there wherever
+ * the quotation is rendered — the client's link, the practice's print view, and
+ * the paper. A quotation that has been accepted and does not say so is the one
+ * document in the register most likely to be filed as though it had not been.
+ *
+ * Dark green on pale green with a solid border, which survives a greyscale
+ * printer as a bordered band rather than disappearing into the page. */
+.quote-doc-accepted {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px;
+  margin: 0 0 18px; padding: 9px 14px;
+  border: 2px solid var(--green); border-radius: var(--radius);
+  background: var(--green-bg); color: var(--green);
+}
+.quote-doc-accepted strong {
+  font-size: 1.05rem; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.quote-doc-accepted span { font-size: 0.86rem; }
 .accept-panel h2 { margin: 0 0 10px; font-size: 1.15rem; }
 .accept-form { display: grid; gap: 14px; max-width: 26rem; margin-top: 14px; }
 .accept-form .field { margin: 0; }

@@ -20,7 +20,7 @@ import { emphasise, html, join, raw, type Raw } from '../../ui/html';
 import {
   actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, stamp, statusTone, table,
 } from '../../ui/components';
-import { dateInputValue, dateShort, money, printedAt } from '../../ui/format';
+import { dateInputValue, dateLong, dateShort, money, printedAt } from '../../ui/format';
 import {
   QUOTE_PARTY_KIND_LABELS, QUOTE_PARTY_KINDS, QUOTE_PARTY_ROLE_LABELS, QUOTE_PARTY_ROLES,
   QUOTE_STATUS_LABELS, QUOTE_STATUSES,
@@ -307,22 +307,28 @@ function totalRows(
 /**
  * A first draft of the covering email, for editing rather than sending as-is.
  *
- * **Rewritten on 9 September 2026.** It used to type the whole quotation into
- * the body — every line, the subtotal, the GST, the total — padded with spaces
- * so the figures lined up in a plain-text mail client. The practice sent one to
- * themselves and said what it was: *"the quote is not acceptable. no link, no
- * nice formatted page, no ACCEPT button, no letter of engagement — where is the
- * rest of the mechanics of it all??"*
+ * **The practice's own letter, given on 9 September 2026**, with the figures,
+ * the dates and the address filled in: *"use this as a template for the emails
+ * to the clients... adapt it but I like the contents so keep them as much as
+ * possible."* So the words are theirs and this file's job is to be careful
+ * about the handful of places where a sentence of theirs would be untrue of a
+ * particular quotation:
  *
- * A covering letter does not contain the documents. It says what is attached,
- * asks the reader to read it, and says what to do next. Everything that was in
- * this email is on the page the link opens, set as a document, with the letter
- * of engagement beneath it and a way to accept at the foot — and the figures
- * there cannot drift from the register, because they *are* the register.
+ * - **"and Letter of Engagement"** comes out when the quotation is going
+ *   without one. Promising a document that is not there is worse than a
+ *   shorter sentence.
+ * - **"inclusive of GST"** comes out when the practice is not GST registered,
+ *   and **"and the disbursements specified"** when there are none. Both are
+ *   statements about a figure on a contract.
+ * - **The capacity sentence** is the practice's `quotes.capacity_note` setting
+ *   where they have written one, and their sentence from this letter where they
+ *   have not — so the setting stays live rather than being said twice.
+ * - **The closing date** is left out entirely if the quotation has none, rather
+ *   than printing a sentence with a blank in it.
  *
- * The total stays, and only the total. It is the one number a person wants
- * before they decide whether to open anything, and it is the one that decides
- * whether they read the rest today or next week.
+ * The `**` marks are the practice's, kept as they wrote them: they print as
+ * bold when the email is sent formatted, and as asterisks in plain text, which
+ * is how emphasis has always been written in a plain-text letter.
  */
 export function defaultQuoteEmail(
   q: QuoteRow & { client_name: string | null },
@@ -336,33 +342,52 @@ export function defaultQuoteEmail(
     netCents: l.net_cents, gstCents: l.gst_cents, grossCents: l.gross_cents,
   })));
 
+  const withLetter = q.with_letter === 1;
+  const andLetter = withLetter ? ' and Letter of Engagement' : '';
+  const them = withLetter ? 'them' : 'it';
+  const hasDisbursements = items.some((l) => l.kind !== 'professional');
+
+  // What the total is inclusive *of*, said only where it is true.
+  const inclusive = [
+    totals.hasGst ? 'GST' : '',
+    hasDisbursements ? 'the disbursements specified in the quotation' : '',
+  ].filter(Boolean).join(' and ');
+
   const lines = [
     `Dear ${q.client_name ?? 'Sir or Madam'},`,
     '',
-    'Thank you for your enquiry. I am pleased to send you a fee quote for the work',
-    'we discussed.',
+    'Thank you for your enquiry and for discussing your matter with us.',
+    '',
+    `As discussed, I am pleased to provide you with our **fee quotation${andLetter}** for the`,
+    'proposed work.',
     '',
   ];
 
   if (items.length) {
-    lines.push(`The total, including GST and disbursements, is ${money(totals.totalCents, q.currency)}.`, '');
+    lines.push(
+      inclusive
+        ? `The total quoted amount is **${money(totals.totalCents, q.currency)}, inclusive of ${inclusive}**.`
+        : `The total quoted amount is **${money(totals.totalCents, q.currency)}**.`,
+      '',
+    );
   }
 
   if (link) {
     lines.push(
-      'You can read it here:',
+      `You can review and accept the quotation${andLetter} here:`,
       '',
       link,
       '',
-      'That page carries the quotation itself and the Letter of Engagement, which',
-      'together set out the parties, the scope of the work, the fees and when each',
-      'part falls due. Please read them both.',
+      `Please read the **Quotation${andLetter} carefully before accepting ${them}**.`,
+      withLetter
+        ? 'Together, these documents set out the proposed scope of our work, the applicable fees,'
+        : 'It sets out the proposed scope of our work, the applicable fees,',
+      'payment arrangements, and the terms on which we would act for you.',
       '',
     );
   } else {
-    // No link means the quotation has not been given one, which should not
-    // happen from the compose screen. Saying so is better than sending a
-    // covering note that covers nothing.
+    // Not reachable from the compose screen, which mints a link before
+    // drafting. Said plainly rather than sending a letter that points nowhere.
     lines.push(
       '[This quotation has no link yet. Open it in the register and press Email again',
       'so that one is created before sending.]',
@@ -372,19 +397,47 @@ export function defaultQuoteEmail(
 
   if (practice.termsUrl) {
     lines.push(
-      'This Quotation is also subject to the Standard Terms of Engagement, published at',
+      'The engagement is also subject to our **Standard Terms of Engagement**, which are',
+      'available here:',
+      '',
       practice.termsUrl,
       '',
     );
   }
 
-  if (q.valid_until) lines.push(`The quote is open for acceptance until ${dateShort(q.valid_until)}.`, '');
-  if (capacityNote) lines.push(capacityNote, '');
+  lines.push(
+    'Please note that **acceptance of the quotation does not constitute a guarantee that any',
+    'visa, immigration application or other outcome will be successful**. Immigration decisions',
+    'are made by Immigration New Zealand in accordance with the applicable legislation,',
+    'immigration instructions and its decision-making powers.',
+    '',
+  );
+
+  // The closing date and the capacity sentence are one paragraph in the
+  // practice's letter and two independent facts. A quotation with no closing
+  // date still needs the capacity sentence — the first draft of this dropped it
+  // with the date, so a quotation left open indefinitely was also the one that
+  // never told the client the engagement could still be declined. Caught by the
+  // test for the capacity note, on a fixture that happens to have no date.
+  const closing = q.valid_until
+    ? `The quotation is open for acceptance until **${dateLong(q.valid_until)}**.` : '';
+  const capacity = capacityNote
+    || 'Acceptance is also subject to our **availability and capacity to accept the engagement**'
+       + ' at that time.';
+  lines.push([closing, capacity].filter(Boolean).join(' '), '');
+
+  if (link) {
+    lines.push(
+      'If you are happy to proceed, please sign electronically at the end of the quotation',
+      'page. You will be asked to provide your full name and the date of acceptance.',
+      '',
+    );
+  }
 
   lines.push(
-    'If everything is acceptable, please sign at the foot of that page — you will be',
-    'asked for your full name and the date. If anything needs changing or explaining,',
-    'reply to this email and we will talk it through before you sign.',
+    'If you have any questions about the quotation, scope of work or terms of engagement,',
+    'please contact us before accepting it. We will be happy to clarify any aspect of the',
+    'proposed engagement.',
     '',
     'Kind regards,',
     practice.legalName,
@@ -958,7 +1011,17 @@ export const quotesModule: AppModule = {
       ]);
       const stageTotal = stages.reduce((sum, s) => sum + s.gross_cents, 0);
       const csrf = c.get('session')!.csrf;
-      const writable = can(c.get('user'), 'quote:write');
+      // Whether this quotation is still the practice's to change — which is two
+      // questions, not one.
+      //
+      // **Reported on 9 September 2026:** *"in quote 12 I managed to delete a
+      // line! should not be possible."* It asked only whether the user may edit
+      // quotations at all, never whether *this* quotation was still open, so an
+      // accepted one kept every button it had before the client signed.
+      //
+      // The database refuses it outright now (migration 0079). This is the
+      // courtesy: the buttons go away rather than appearing and then failing.
+      const writable = can(c.get('user'), 'quote:write') && !q.accepted_at;
       const totals = summariseQuote(lines.map((l) => ({
         kind: l.kind, lineAmountCents: l.unit_amount_cents,
         netCents: l.net_cents, gstCents: l.gst_cents, grossCents: l.gross_cents,
@@ -2818,6 +2881,23 @@ export function quotationArticle(
   } = d;
   return html`
         <article class="quote-doc">
+          ${'' /* Accepted, said at the top of the document itself.
+
+                 **Asked for on 9 September 2026:** *"once it is accepted —
+                 there should be a green stamp at the top stating ACCEPTED and
+                 date and time and name."*
+
+                 On the document rather than on the page around it, so it is
+                 there wherever the quotation is rendered: the client's link,
+                 the practice's print view, and the paper. A quotation that has
+                 been accepted and does not say so is the one document here most
+                 likely to be filed as though it had not been. */}
+          ${q.accepted_at ? html`
+            <p class="quote-doc-accepted">
+              <strong>Accepted</strong>
+              <span>${printedAt(q.accepted_at)}${q.accepted_name
+                ? html` by ${q.accepted_name}` : ''}</span>
+            </p>` : ''}
           ${'' /* Title left, practice right — the way the practice's own
                  Xero invoice is set, chosen by them on 9 September 2026 when
                  asked whether to match it. The letter of engagement keeps its
