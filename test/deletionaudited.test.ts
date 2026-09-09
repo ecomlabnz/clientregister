@@ -63,10 +63,34 @@ describe('a deletion writes its own audit row', () => {
     expect(JSON.parse(row!.meta_json!).ref).toBe('CASE-26-901');
   });
 
-  it('accounts for every matter that goes with a client, not just the client', () => {
-    // Deleting a client cascades to its matters. A cascade is exactly the case
-    // where a handler-written audit row is missed, because no handler ran.
+  /**
+   * **This used to be a cascade, and since migration 0076 it is a refusal.**
+   *
+   * Deleting a client took their matters with them, and the test below existed
+   * because a cascade is exactly where a handler-written audit row is missed —
+   * no handler runs. The database's own rows covered it.
+   *
+   * A silent cascade is still the wrong answer, though, and now that there is a
+   * delete button somebody can press by accident it is the wrong answer with a
+   * much shorter fuse: one confirmation would have taken a person's whole file
+   * and every matter on it. So the client is refused while any matter stands,
+   * and each matter is deleted on its own, with its own confirmation and its
+   * own audit row. The accounting the old test wanted is unchanged; what
+   * changed is that a person has to mean it once per matter.
+   */
+  it('refuses a client while a matter still stands', () => {
     const db = register();
+    expect(() => db.exec("DELETE FROM clients WHERE id = 'c1'"))
+      .toThrow(/has matters/);
+    expect((db.prepare('SELECT COUNT(*) n FROM clients') as any).all()).toEqual([{ n: 1 }]);
+    expect((db.prepare('SELECT COUNT(*) n FROM cases') as any).all()).toEqual([{ n: 1 }]);
+    // Nothing happened, so nothing is claimed to have happened.
+    expect(audit(db).length).toBe(0);
+  });
+
+  it('accounts for every matter and the client, one row each', () => {
+    const db = register();
+    db.exec("DELETE FROM cases WHERE id = 'k1'");
     db.exec("DELETE FROM clients WHERE id = 'c1'");
     const actions = audit(db).map((r) => r.action);
     expect(actions).toContain('client.deleted');
@@ -75,13 +99,15 @@ describe('a deletion writes its own audit row', () => {
 
   it('leaves the audit row behind — it cannot be deleted with the record', () => {
     const db = register();
+    db.exec("DELETE FROM cases WHERE id = 'k1'");
     db.exec("DELETE FROM clients WHERE id = 'c1'");
     expect(() => db.exec("DELETE FROM audit_log WHERE entity_id = 'c1'")).toThrow(/append-only/);
     expect(audit(db).length).toBe(2);
   });
 
-  it('writes a timestamp in the register’s own format', () => {
+  it('writes a timestamp in the register\u2019s own format', () => {
     const db = register();
+    db.exec("DELETE FROM cases WHERE id = 'k1'");
     db.exec("DELETE FROM clients WHERE id = 'c1'");
     // Say the number out loud, or a loop over no rows passes having checked
     // nothing — the vacuous test this suite has been bitten by before.

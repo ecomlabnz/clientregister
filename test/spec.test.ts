@@ -50,12 +50,18 @@ const tables: string[] = (db.prepare(
 const refusals: string[] = (db.prepare(
   `SELECT sql FROM sqlite_master WHERE type='trigger'`,
 ) as any).all()
-  .map((r: { sql: string }) => {
-    const message = /RAISE\(ABORT,\s*'((?:[^']|'')*)'\)/.exec(r.sql)?.[1];
+  .flatMap((r: { sql: string }) => {
+    // **Every** RAISE, not the first. This read one per trigger until
+    // 9 September 2026, which quietly excused ten refusals from the document —
+    // four of the five reasons an inquiry cannot be deleted were undocumented,
+    // and the two delete triggers added that day would have contributed one
+    // line between them for nine rules. A trigger is not one refusal; it is a
+    // list of them, and the list is the point.
     const when = /(?:BEFORE|AFTER)\s+(\w+)(?:\s+OF\s+[\w,\s]+)?\s+ON/i.exec(r.sql)?.[1];
-    return message && when ? `${when.toLowerCase()}|${message.replace(/''/g, "'")}` : null;
-  })
-  .filter((m: string | null): m is string => m !== null);
+    if (!when) return [];
+    return [...r.sql.matchAll(/RAISE\(ABORT,\s*'((?:[^']|'')*)'\)/g)]
+      .map((m) => `${when.toLowerCase()}|${m[1]!.replace(/''/g, "'")}`);
+  });
 
 /** Compare two bags, so a duplicated row is not the same as a single one. */
 function tally(items: string[]): Map<string, number> {

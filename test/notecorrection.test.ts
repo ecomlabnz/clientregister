@@ -119,15 +119,46 @@ describe('the database decides, not the screen', () => {
     expect(kept[0]!.meta_json).toContain('As written');
   });
 
-  it('never lets who wrote it, when it was written, or what it is on change', () => {
+  it('never lets who wrote it, or when it was written, change', () => {
     const db = seeded();
     note(db, 'e1');
     const at = now();
     for (const sql of [
       `UPDATE entries SET created_by=NULL, edited_at=? WHERE id='e1'`,
       `UPDATE entries SET created_at='2020-01-01T00:00:00Z', edited_at=? WHERE id='e1'`,
-      `UPDATE entries SET entity_id='cl2', edited_at=? WHERE id='e1'`,
     ]) expect(attempt(db, sql, at), sql).toMatch(/append-only/);
+  });
+
+  /**
+   * Where a note is filed used to be frozen with everything else, and since
+   * migration 0076 it is not. That is a deliberate narrowing of this rule, made
+   * so that deleting a matter can move its notes onto the client instead of
+   * destroying them — a note is a record of a conversation, not a record of
+   * which folder somebody first put it in.
+   *
+   * What the note *says* is untouched by that change, and the two tests below
+   * are the whole of the difference: it may be moved, and only somewhere real.
+   */
+  it('lets a note be re-filed onto a client who exists', () => {
+    const db = seeded();
+    db.prepare(`INSERT INTO clients (id,ref,kind,full_name,status,created_at,updated_at)
+                VALUES ('cl2','CL-2','individual','ANOTHER PERSON','active',?,?)`).run(AT, AT);
+    note(db, 'e1');
+    expect(attempt(db, `UPDATE entries SET entity_id='cl2' WHERE id='e1'`)).toBeNull();
+    const after = db.prepare("SELECT entity_id, body FROM entries WHERE id='e1'").all() as any[];
+    // Moved, and word for word what it was.
+    expect(after[0]).toEqual({ entity_id: 'cl2', body: 'As written' });
+  });
+
+  it('refuses to re-file a note onto something that is not there', () => {
+    const db = seeded();
+    note(db, 'e1');
+    for (const sql of [
+      `UPDATE entries SET entity_type='client', entity_id='nobody' WHERE id='e1'`,
+      `UPDATE entries SET entity_id='cl2' WHERE id='e1'`,
+      // Not a client at all: a note may only ever move up to the person.
+      `UPDATE entries SET entity_type='case', entity_id='k1' WHERE id='e1'`,
+    ]) expect(attempt(db, sql), sql).toMatch(/re-filed onto a client who exists/);
   });
 
   it('still refuses a delete', () => {
