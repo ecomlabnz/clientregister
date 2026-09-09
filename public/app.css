@@ -1551,18 +1551,66 @@ details[open] > summary { margin-bottom: 12px; }
  * on paper and on screen alike — it is the body text that must stay black, and
  * does. */
 .quote-doc h3 {
-  font-size: 0.78rem; margin: 16px 0 5px; text-transform: uppercase;
+  font-size: 0.72rem; margin: 14px 0 5px; text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--accent);
+  padding-bottom: 3px; border-bottom: 1px solid var(--accent);
 }
 .quote-doc-head {
   display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap;
   padding-bottom: 18px; border-bottom: 2px solid var(--border);
 }
 .quote-doc-ref { text-align: right; }
+/* Title on the left, the practice on the right.
+ *
+ * **Chosen by the practice on 9 September 2026**, when asked whether to match
+ * their own Xero invoice, which is set this way round. It reverses a layout
+ * they had settled by hand an hour earlier, which is why it was put to them
+ * rather than assumed from an example offered for its density.
+ *
+ * Done with `row-reverse` rather than by moving the markup, so the practice's
+ * own details are still read first by anything reading the page in order — a
+ * screen reader, a plain-text renderer, an email client stripping the styling.
+ * Whose document this is should not depend on a stylesheet arriving.
+ *
+ * The letter of engagement does not take this: a letter's letterhead belongs at
+ * the top left, and the block on its right is a date and a reference, not a
+ * title. */
+.quote-doc-head-swap { flex-direction: row-reverse; }
+.quote-doc-head-swap .quote-doc-ref { text-align: left; }
+.quote-doc-head-swap > div:not(.quote-doc-ref) { text-align: right; }
+.quote-doc-head-swap .quote-doc-meta { justify-content: start; }
+/* On the left of the page the labels align left, not right.
+ *
+ * The pairs were set labels-right/values-left in 1.22.1, at the practice's
+ * instruction — *"align it to each other in the middle"* — and that is right
+ * for a block sitting against the *right* margin: the values end flush and the
+ * labels reach in towards them. Moved to the left margin it inverts: the labels
+ * end flush and their left edge goes ragged against the margin, which is the
+ * very fault that instruction was fixing. So on this side they start flush and
+ * the values meet them on a shared axis, exactly as the practice's own invoice
+ * sets it. */
+.quote-doc-head-swap .quote-doc-meta dt { text-align: left; }
 @media print { .quote-doc-table thead { display: table-header-group; } }
+/* Set close to the way a Xero invoice is set.
+ *
+ * **Asked for on 9 September 2026**, with one of the practice's own invoices as
+ * the example: *"see how small and nice the font is, aim at compact format —
+ * our quotations and invoices must be close to that."*
+ *
+ * Measured off that file rather than eyeballed: 8pt body, hairline rules at
+ * 0.5pt in a light grey between rows, a heavier rule above the totals and
+ * another under the last of them, and — the detail that does most of the work —
+ * **the totals rules span only the right-hand columns**, not the width of the
+ * page. A full-width rule under "Subtotal" cuts the document in half; a short
+ * one gathers the figures into a block and leaves the description column alone.
+ *
+ * The column headings take the practice's accent, which is where the same
+ * document uses colour. */
 .quote-doc-table { margin-top: 10px; }
-.quote-doc-table th { padding: 6px 0; border-bottom: 1px solid var(--border); }
-.quote-doc-table td { padding: 7px 0; }
+.quote-doc-table th {
+  padding: 5px 0; border-bottom: 1px solid var(--text); color: var(--accent);
+}
+.quote-doc-table td { padding: 5px 0; border-bottom: 1px solid var(--border); }
 .quote-doc-table td:not(:first-child), .quote-doc-table th:not(:first-child) { padding-left: 14px; }
 /* Fees and disbursements are separated on the page as well as in the totals,
    because a client is entitled to see at a glance what is the practice's fee
@@ -1572,9 +1620,26 @@ details[open] > summary { margin-bottom: 12px; }
   text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
   border-bottom: none;
 }
-.quote-doc-table tfoot td { border-bottom: none; padding: 5px 0; }
-.quote-doc-table tfoot tr:first-child td { border-top: 1px solid var(--border); padding-top: 10px; }
-.quote-doc-table tfoot .totals-row td { border-top: 2px solid var(--border); padding-top: 10px; background: none; }
+/* The totals gather to the right.
+ *
+ * Every cell before the figures is left without a rule, so the line under
+ * "Subtotal" starts where the numbers start rather than at the margin — which
+ * is what makes a Xero invoice read as a document rather than as a spreadsheet.
+ * The empty label cell carries `border: none` and the figure cells carry the
+ * rule, so the span follows the columns rather than being a hand-set width. */
+.quote-doc-table tfoot td { border-bottom: none; padding: 4px 0; }
+.quote-doc-table tfoot td:first-child { border-top: none; }
+.quote-doc-table tfoot tr:first-child td + td { border-top: 1px solid var(--text); padding-top: 8px; }
+.quote-doc-table tfoot .totals-row td + td {
+  border-top: 1.5px solid var(--text); border-bottom: 1.5px solid var(--text);
+  padding-top: 6px; padding-bottom: 6px; background: none;
+}
+.quote-doc-table tfoot .totals-row td:first-child { border: none; }
+/* No shaded bar behind the total. The general table shades a totals row so it
+   is findable in a long list on screen; on a document the rules do that job,
+   and a grey band running the width of the page under a figure that is ruled
+   only at the right reads as two different ideas about where the total is. */
+.quote-doc-table .totals-row td { background: none; }
 /* Date, reference and matter, meeting on one line down the middle.
  *
  * Asked for on 9 September 2026: *"align it to each other in the middle, use :
@@ -1753,7 +1818,13 @@ details[open] > summary { margin-bottom: 12px; }
    * against the 1.6 the screen uses, and paragraph gaps a little over half what
    * they were. A five-page letter loses about a page to this without a word
    * being cut. */
-  body { font-size: 9.5pt; line-height: 1.18; }
+  body { font-size: 8.5pt; line-height: 1.2; }
+  /* The document sets its own size on screen (`.quote-doc` is 0.94rem), which
+     wins over the body's — so paper has to be told in the same place, or the
+     8.5pt above never reaches the one thing on the page it was written for.
+     Measured off the rendered PDF, not assumed: the body was still coming out
+     at 10.3pt with the rule above in place. */
+  .quote-doc { font-size: 8.5pt; }
 
   /* Tighter again, and only where it is rows.
    *
@@ -1772,7 +1843,7 @@ details[open] > summary { margin-bottom: 12px; }
   .quote-doc-conditions li { margin-bottom: 4px; }
   .quote-doc-parties, .quote-doc-bank { gap: 3px 16px; }
   .quote-doc-subhead { margin: 10px 0 4px; }
-  .quote-doc .small, .quote-doc .hint, .quote-doc .prewrap.small { font-size: 8.5pt; }
+  .quote-doc .small, .quote-doc .hint, .quote-doc .prewrap.small { font-size: 7.6pt; }
   .letter-doc p, .letter-doc ul, .letter-doc ol { line-height: 1.3; margin-bottom: 5px; }
   .letter-doc li { margin-bottom: 2px; }
   .letter-doc section { margin-bottom: 9px; }

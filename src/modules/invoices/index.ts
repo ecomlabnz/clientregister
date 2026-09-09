@@ -845,7 +845,9 @@ export const invoicesModule: AppModule = {
 
       return page(c, { title: `Invoice ${invoice.ref}`, bare: true, paper: true }, html`
         <article class="quote-doc">
-          <header class="quote-doc-head">
+          ${'' /* Title left, practice right, matching the practice's own Xero
+                 invoice. See the note on the quotation. */}
+          <header class="quote-doc-head quote-doc-head-swap">
             <div>
               <h1>${practice.legalName}</h1>
               ${practice.adviserDetails ? html`<p class="prewrap small">${practice.adviserDetails}</p>` : ''}

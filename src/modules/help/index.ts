@@ -37,6 +37,23 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.30.0', date: '9 September 2026',
+    notes: [
+      'Quotations and invoices are now set close to your own Xero invoice: 8.5pt type, hairline '
+        + 'rules between the rows, and the totals gathered to the right with short rules rather '
+        + 'than lines across the whole page.',
+      'Section headings are smaller, in your accent colour, with a rule under them \u2014 which '
+        + 'is where that invoice uses colour.',
+      'The shaded bar behind the total is gone; on a document the rules do that job.',
+      '\u201CFEE QUOTE\u201D and \u201CTax invoice\u201D now sit top left with your name and '
+        + 'contact details top right, matching your Xero invoice. The reference block\u2019s '
+        + 'labels align left on that side, so they start flush at the margin rather than going '
+        + 'ragged against it.',
+      'The letter of engagement keeps your letterhead at the top left, because a letter is not '
+        + 'an invoice.',
+    ],
+  },
+  {
     version: '1.29.0', date: '9 September 2026',
     notes: [
       'A quotation now has a private link the client opens \u2014 no account, no password. It '
