@@ -37,6 +37,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.23.2', date: '9 September 2026',
+    notes: [
+      'The administrative team now prints on the letter exactly as you type it in the box \u2014 '
+        + 'one line each, mobile and email and all. It had been pulling your line apart and '
+        + 'reprinting the numbers and addresses gathered at the bottom of the section.',
+      'Write those lines however you like: a name on its own, or a name with whatever contact '
+        + 'details you want the client to have. What you type is what prints.',
+      '\u201CQuotation\u201D is capitalised where the letter points at it, since your opening '
+        + 'defines it as a term.',
+    ],
+  },
+  {
     version: '1.23.1', date: '9 September 2026',
     notes: [
       '\u201CWhat the client confirms\u201D now holds 10,000 characters instead of 4,000. Your '
