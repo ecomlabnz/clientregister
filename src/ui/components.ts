@@ -593,6 +593,18 @@ export interface TableOpts {
    * script and survives a reload.
    */
   sort?: SortState;
+  /**
+   * Tighter rows, for a table that is read as a block rather than scanned.
+   *
+   * **Asked for on 9 September 2026:** *"think of making things compact."* A
+   * quotation's lines and its totals are one thing a person reads at once, and
+   * the ordinary row height — set for a list somebody scrolls, with a tap
+   * target on every row — spread eight rows over most of a screen.
+   *
+   * It is a density switch, not a smaller font: the type stays the size it was,
+   * so this costs nothing in legibility. Left off everywhere else.
+   */
+  compact?: boolean;
 }
 
 export function table(columns: Array<string | Column>, rows: Raw[], opts: TableOpts = {}): Raw {
@@ -601,7 +613,8 @@ export function table(columns: Array<string | Column>, rows: Raw[], opts: TableO
   const sized = cols.some((c) => c.width);
 
   const wrapClass = opts.sticky ? 'table-wrap table-sticky' : 'table-wrap';
-  const tableClass = opts.fixed ? 'table-fixed' : '';
+  const tableClass = [opts.fixed ? 'table-fixed' : '', opts.compact ? 'table-compact' : '']
+    .filter(Boolean).join(' ');
 
   return html`
     <div class="${wrapClass}">
@@ -735,7 +748,24 @@ export function actionButton(
   action: string,
   csrf: string,
   label: string,
-  opts: { className?: string; confirm?: string; fields?: Record<string, string> } = {},
+  opts: {
+    className?: string; confirm?: string; fields?: Record<string, string>;
+    /**
+     * Show this glyph instead of the words, keeping `label` for anyone who
+     * cannot see it.
+     *
+     * **Asked for on 9 September 2026:** *"remove the word 'remove', instead
+     * use a small red cross."* On a table of fee lines the word was the widest
+     * thing in its column and repeated down the page, which is the opposite of
+     * what a row of figures should draw the eye to.
+     *
+     * The label does not disappear — it becomes the button's accessible name
+     * and its tooltip. A button whose only content is a symbol reads out as
+     * "times" or as nothing at all, and this one deletes a line off a
+     * quotation.
+     */
+    icon?: string;
+  } = {},
 ): Raw {
   return html`
     <form method="post" action="${action}" class="inline-form"
@@ -744,7 +774,9 @@ export function actionButton(
       ${Object.entries(opts.fields ?? {}).map(
         ([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`,
       )}
-      <button type="submit" class="${opts.className ?? 'btn btn-secondary'}">${label}</button>
+      <button type="submit" class="${opts.className ?? 'btn btn-secondary'}"
+              ${opts.icon ? raw(`aria-label="${label.replace(/"/g, '&quot;')}" title="${label.replace(/"/g, '&quot;')}"`) : ''}
+        >${opts.icon ?? label}</button>
     </form>`;
 }
 

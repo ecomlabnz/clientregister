@@ -613,6 +613,27 @@ tr:last-child td { border-bottom: none; }
 .row-muted { opacity: 0.55; }
 .edit-table input { width: 100%; }
 .edit-table td { padding: 5px 6px; }
+/* A table read as a block rather than scrolled.
+ *
+ * **Asked for on 9 September 2026:** *"think of making things compact."* A
+ * quotation's lines and the five totals under them are one thing a person takes
+ * in at once, and the ordinary row height — set for a list somebody scrolls,
+ * with a tap target on every row — spread eight rows over most of a screen.
+ *
+ * Density only. The type stays the size it was, so nothing is harder to read;
+ * what goes is the air. The kind of line ("Professional fee") sits tight under
+ * its description rather than a line away from it, which is where it belongs:
+ * it is a fact about that line, not another line. */
+.table-compact td { padding: 4px 8px; }
+.table-compact th { padding: 4px 8px; }
+.table-compact td .small { margin-top: -1px; line-height: 1.25; }
+.table-compact .totals-row td { padding: 3px 8px; }
+/* The totals are one block, so only the first of them is ruled off from the
+   lines above. Five separate rules read as five separate things. */
+.table-compact .totals-row td { border-top: none; }
+.table-compact .totals-row:first-of-type td { border-top: 2px solid var(--border); }
+/* Just wide enough for the cross, and out of the way of the figures. */
+.row-action { width: 1%; white-space: nowrap; text-align: right; }
 
 /* --- Badges ------------------------------------------------------------- */
 
@@ -963,6 +984,26 @@ details[open] > summary { margin-bottom: 12px; }
 .btn-link, .btn-link-danger { background: none; border: none; padding: 2px 4px; text-decoration: underline; }
 .btn-link { color: var(--accent); }
 .btn-link-danger { color: var(--red); }
+/* Take a line off a quotation.
+ *
+ * **Asked for on 9 September 2026:** *"remove the word 'remove', instead use a
+ * small red cross."* On a table of fee lines the word was the widest thing in
+ * its column and repeated down the page, drawing the eye to the one thing on
+ * the row that is not a figure.
+ *
+ * It is a real button and keeps a real name — `actionButton` puts the words
+ * into `aria-label` and `title`, so it reads out as "Remove <the line>" and
+ * says so on hover. A symbol on its own is not a label. Sized so a thumb can
+ * hit it: 28px square is above the 24px minimum, and the glyph inside it is
+ * small, which is what was asked for. */
+.btn-remove {
+  background: none; border: none; padding: 0;
+  width: 28px; height: 28px; line-height: 1;
+  color: var(--red); font-size: 1.05rem; cursor: pointer;
+  border-radius: var(--radius);
+}
+.btn-remove:hover { background: var(--red-bg); }
+.btn-remove:focus-visible { outline: 2px solid var(--red); outline-offset: 1px; }
 .admin-links { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 
 .tabs {
@@ -1396,8 +1437,18 @@ details[open] > summary { margin-bottom: 12px; }
 .letter-signature { margin-top: 32px; }
 .letter-signature p { margin: 0 0 2px; }
 
+/* The practice's name at the head of the paper. Left in the text colour: it is
+   the one thing on the page that should read as ink, and an accent on it puts
+   the firm's name in competition with the headings below it. */
 .quote-doc h1 { font-size: 1.3rem; margin-bottom: 4px; }
-.quote-doc h2 { font-size: 1rem; }
+/* What the document is — "Tax invoice", "Short Form Terms of Engagement", the
+   addendum's title. In the practice's accent, the same as the section headings
+   below them.
+   **Asked for on 9 September 2026:** *"what about the theme colours in the
+   invoice and letter of engagement?"* — 1.23.2 put the colour back on `h3` and
+   stopped there, so the invoice, whose only h3s are "To" and "For", came out
+   almost entirely black, and the two headings that name a document did too. */
+.quote-doc h2 { font-size: 1rem; color: var(--accent); }
 /* Headings in the practice's accent rather than grey.
  *
  * Asked for on 9 September 2026: *"i like some theme colours in it - did not

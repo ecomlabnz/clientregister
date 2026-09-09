@@ -7,6 +7,60 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.26.0 — 9 September 2026
+
+### Fixed
+**The totals under a quotation's fee lines were sitting under the wrong
+column.** Reported: *"you swapped the columns but left the totals under gst —
+not acceptable."* Exactly right. Amount was moved to the right of GST earlier
+the same day and the totals block kept its old width, so the professional fees,
+the disbursements, the subtotal, the GST and the total payable all printed one
+column to the left of the figures they were adding up — under the GST heading.
+
+Two facts had to agree and each was written down separately, which is the
+arrangement that guarantees they will eventually disagree. There is one now: the
+columns are named in a single place and the totals take their width from it, so
+moving a column moves the totals with it. Pinned by a test that renders the page
+and counts the cells, rather than one that checks the code against itself.
+
+**The payment stages were formatted badly and disagreed with the paper.**
+Reported: *"do not like how this is formatted in the register."* Three faults,
+compounding:
+
+- The figure was the **net** amount with "+ GST" beside it and the inclusive
+  figure in grey beneath. The printed quotation had stopped doing that earlier
+  the same day, so the screen and the paper gave different numbers for the same
+  five payments — and the screen is where they are checked before they go out.
+  The screen now shows what the client pays.
+- It **broke across three lines**: "$2,000.00 +" / "GST" / "$2,300.00 incl." is
+  not a price. And "Stage 1" was splitting after "Stage". Both are held on one
+  line now.
+- **"+ GST" was untrue** of the INZ fee, which is GST inclusive — nothing is
+  added to it. What is under the figure now says how much of it *is* tax, which
+  is true whichever way a stage is treated.
+
+### Changed
+**A line comes off a quotation with a small red cross**, not the word "Remove".
+Asked for. On a table of fee lines the word was the widest thing in its column
+and repeated down the page, drawing the eye to the one thing on the row that is
+not a figure. It stays a real button with a real name — "Remove *the line*" is
+its accessible name and its tooltip, because a symbol on its own reads out as
+"times" and this one deletes a line off a contract.
+
+**The fee lines and the payment stages are compact.** Asked for: *"think of
+making things compact."* Density only — the type is the size it was, so nothing
+is harder to read; what goes is the air. The five totals read as one block
+rather than five ruled-off things. The items card is about a third shorter.
+
+**Colour on the invoice, and on the headings that name a document.** Asked:
+*"what about the theme colours in the invoice and letter of engagement?"* The
+release that put the colour back reached the section headings and stopped there
+— so the invoice, whose only section headings are "To" and "For", came out
+almost entirely black, and so did *Tax invoice*, *Short Form Terms of
+Engagement* and the addendum's title. Those now carry the accent. The practice's
+own name at the head of the paper stays in ink, where it should be the first
+thing read.
+
 ## 1.25.0 — 9 September 2026
 
 ### Changed
