@@ -37,6 +37,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.16.1', date: '8 September 2026',
+    notes: [
+      'A security advisory published today against a development tool was stopping every deploy. '
+        + 'It never touched the live register \u2014 the tool only runs on a developer\u2019s '
+        + 'machine \u2014 but nothing ships with a known high-severity advisory anywhere.',
+      'Updated and pinned to the patched version. Nothing about the register itself changed.',
+    ],
+  },
+  {
     version: '1.16.0', date: '8 September 2026',
     notes: [
       'Incoming opens on the Inbox now, and the Inbox tab is first. That is where the work is: '
