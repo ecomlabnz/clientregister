@@ -7,6 +7,22 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.30.1 — 9 September 2026
+
+### Fixed
+**The invoice's letterhead now matches the quotation's.** Two gaps, both of
+which only showed once the header was swapped to put the title top left — and
+both of which I shipped without rendering an invoice, which is the actual fault
+here.
+
+- **"INVOICE" is the size of a document title**, as "FEE QUOTE" is. It had been
+  an ordinary heading. They sit in the same corner of the same letterhead, and a
+  client often holds both.
+- **The practice's contact lines are labelled** — Mobile, Email, GST. The
+  quotation started labelling them on 9 September and the invoice was left
+  behind, so the same firm's details appeared two different ways on two
+  documents in the same envelope.
+
 ## 1.30.0 — 9 September 2026
 
 ### Changed
