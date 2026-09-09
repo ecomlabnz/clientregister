@@ -37,6 +37,25 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.18.0', date: '9 September 2026',
+    notes: [
+      'A backup button, on Settings \u2192 Export. One press downloads the whole register \u2014 '
+        + 'every client, matter, quotation, invoice, note and uploaded document \u2014 as a single '
+        + 'dated zip file.',
+      'It is yours alone. An administrator can do everything else in Settings and cannot take a '
+        + 'backup, because this one file is the practice\u2019s entire book of business.',
+      'It includes passport numbers, which the spreadsheet exports do not. A backup exists to put '
+        + 'the register back, and one missing a column cannot.',
+      'Treat the file the way you would treat the filing cabinet: not something to email, and a '
+        + 'copy on a laptop is a copy of everything about every client. Every time one is taken is '
+        + 'recorded in the audit log.',
+      'The file has been put back into an empty database to prove it works \u2014 every client, '
+        + 'every matter, every rule \u2014 and that rehearsal now runs on every change, so a '
+        + 'backup that would not restore cannot ship quietly.',
+      'This is still a button somebody has to press. Nothing takes one for you overnight yet.',
+    ],
+  },
+  {
     version: '1.17.0', date: '9 September 2026',
     notes: [
       'Four faults found by an audit, all fixed. Each one was a rule written into a single '
