@@ -344,6 +344,40 @@ files and now answering on a public address.
 
 Nothing to build. It is a decision and five minutes.
 
+### 17. Conversations earns its place, or goes
+
+**Raised 8 September 2026:** *"still do not see the use in conversations - can
+we delete it? do we need it??"* Answered *"keep conversation for now - will deal
+with them later"*, so it stays. This is the reasoning, so it does not have to be
+found again.
+
+Measured on the live register at the time:
+
+| | |
+|---|---:|
+| Conversations | 43 |
+| — linked to a client or matter | **0** |
+| Replies ever sent from the register | 2 |
+| Inbox pieces handled | 122 |
+
+**Why it cannot simply be deleted.** The thread page is the only place a reply
+or a forward can be sent from. Deleting the feature removes answering a client
+from inside the register altogether. It is also linked from five other places —
+the client page, the matter page, the dashboard and two kinds of search hit.
+
+**Why it feels useless, which is the real finding.** None of the 43 threads is
+attached to anybody. Linking is a manual step on the thread page and nobody has
+had a reason to take it, so the Conversations cards on client and matter pages
+are empty too — and the only way in is a flat list of 43 threads with no
+context. A list with nothing to offer.
+
+**The fix, when it is picked up:** link a thread automatically by matching the
+sender's address against `clients.email`, which every inbound message already
+carries. Then a client's page shows their correspondence, a matter shows its
+own, the tab becomes redundant, and the question answers itself. The two
+alternatives considered and not chosen were deleting it outright (loses reply
+and forward) and hiding the tab (leaves the natural route showing nothing).
+
 ### 8. Reading across from other sessions
 The **App field comparison review** session produced the nine fields above. Its
 own audit ended with no repository changes and a mail-DNS fix. Nothing else has
