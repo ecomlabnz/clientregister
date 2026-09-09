@@ -9,7 +9,7 @@ other two have to be written, and one of those is the one to read first.
 | | What it holds | How it is kept true |
 |---|---|---|
 | [`mistakes.md`](mistakes.md) | Every fault this register has actually suffered, and the rule that now prevents it | Written by hand, added to whenever something breaks |
-| [`invariants.md`](invariants.md) | The 69 things the database refuses to do, in its own words, and the 10 uniqueness rules | Extracted from the built schema, and held against it by a test |
+| [`invariants.md`](invariants.md) | The 71 things the database refuses to do, in its own words, and the 10 uniqueness rules | Extracted from the built schema, and held against it by a test |
 | [`data-model.md`](data-model.md) | 49 tables, every column | Extracted from the built schema, and held against it by a test |
 | [`routes.md`](routes.md) | 195 routes and the permission each requires | Extracted from the module registrations, and checked against the built router by a test |
 

@@ -37,6 +37,24 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.17.0', date: '9 September 2026',
+    notes: [
+      'Four faults found by an audit, all fixed. Each one was a rule written into a single '
+        + 'screen instead of into the database, which held until a second screen was written.',
+      'Opening a matter from a document no longer leaves a half-made client behind when it fails. '
+        + 'The owner is checked before anything is written, and Owner no longer offers "Nobody '
+        + 'yet" \u2014 a matter must have one.',
+      'A quotation can no longer be moved on to a different client from its matter\u2019s. The '
+        + 'letter of engagement would have printed one person\u2019s name over another\u2019s '
+        + 'file, and it is a contract.',
+      'The letter of engagement was still leaving out clauses \u2014 it looked at the matter\u2019s '
+        + 'kind of work or the fee lines\u2019, never both, and threw away the visa type you chose '
+        + 'when making the quotation. All three are kept and all three are read.',
+      'Converting an inquiry names the matter the way every other matter is named, rather than '
+        + 'after its own description.',
+    ],
+  },
+  {
     version: '1.16.1', date: '8 September 2026',
     notes: [
       'A security advisory published today against a development tool was stopping every deploy. '

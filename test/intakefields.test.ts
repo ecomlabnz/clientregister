@@ -198,13 +198,18 @@ describe('converting an inquiry to a matter', () => {
     case_type: 'wv_aewv', assigned_to: USER.id, nationality: 'NZ',
   });
 
-  it('names the matter by what it is about, and derives the title from it', async () => {
+  it('names the matter the way every matter is named, not after its description', async () => {
+    // The third writer of `title = descriptor`, and this test pinned the fault
+    // rather than the rule — it asserted the two were equal. `cases` and the
+    // assistant's intake were corrected on 8 September and this route was
+    // missed; Fable's audit found it the same night.
     const h = mount();
     seedInquiry(h);
     await convert(h);
     const kase = (h.db.prepare('SELECT title, descriptor FROM cases').all() as any[])[0];
     expect(kase.descriptor).toBe('Partner of a New Zealand citizen, living together since 2024');
-    expect(kase.title).toBe(kase.descriptor);
+    expect(kase.title).toBe('WV. AEWV — A TESTER');
+    expect(kase.title === kase.descriptor, 'named by its own description again').toBe(false);
   });
 
   it('writes the nationality to the table, not to a column that no longer exists', async () => {
