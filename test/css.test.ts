@@ -272,11 +272,28 @@ describe('a printed document keeps a 25mm margin', () => {
     expect(asMm(sides[1]!)).toBeGreaterThanOrEqual(25);
   });
 
-  it('does not force a paper size', () => {
-    // Naming A4 makes a printer loaded with anything else scale the document
-    // down, and the margin shrinks with it — which is the fault this exists to
-    // fix, arriving by another road.
-    expect(page![1]!).not.toMatch(/\bsize\s*:/);
+  it('names A4, because the practice prints A4', () => {
+    // Left to the printer until 9 September 2026, on the reasoning that forcing
+    // a size makes a printer loaded with anything else scale the document and
+    // shrink the margin with it. The practice overruled that: a New Zealand
+    // legal document silently coming out US Letter is the worse fault.
+    expect(page![1]!).toMatch(/\bsize\s*:\s*A4\b/i);
+  });
+
+  it('paints the document as paper in every medium, not only when printing', () => {
+    // The fault this closes: a PDF arrived with a near-black rectangle over
+    // every page and the print margins missing, because whatever produced it
+    // never applied `@media print`. A document that depends on the print
+    // stylesheet to look like a document is one render path away from going to
+    // a client in the application's dark theme.
+    const doc = /\n\.quote-doc \{([^}]*)\}/.exec(css);
+    expect(doc, 'no top-level .quote-doc rule').not.toBeNull();
+    expect(doc![1]!).toMatch(/background:\s*#fff/i);
+    expect(doc![1]!).toMatch(/color:\s*#111/i);
+    // And it redefines the palette for everything nested inside it, rather
+    // than relying on each descendant to be told.
+    expect(doc![1]!).toMatch(/--text:\s*#111/i);
+    expect(doc![1]!).toMatch(/--surface:\s*#fff/i);
   });
 
   it('sizes the type in points, for paper rather than for a screen', () => {

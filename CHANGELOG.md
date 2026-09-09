@@ -7,6 +7,67 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.23.0 — 9 September 2026
+
+### Fixed
+**The documents were printing in the dark theme, and that is why two releases of
+margin fixes had done nothing.** A PDF of a letter sent by the practice had a
+near-black rectangle covering all four of its pages, with margins of 4.2mm. Both
+facts had a single cause: whatever produced that PDF **never applied the print
+stylesheet**, so the document came out in the application's dark palette *and*
+without any of the print margins.
+
+Every margin fix so far had been written inside `@media print`. A document that
+needs the print stylesheet to run in order to look like a document is one render
+path away from reaching a client as white text on black.
+
+**So the paper is no longer a print-time idea.** A quotation and a letter of
+engagement now carry their own palette — black on white, A4 measure, real
+margins — in *every* medium: on screen, printed, saved as a PDF, screenshotted,
+or rendered by anything else. The print stylesheet is left with only the page
+around the document.
+
+Verified by producing the PDF **both ways** — the ordinary print path, and the
+path that ignores print styling entirely, which is the one that produced the
+black pages — from a browser forced into dark mode. Identical: A4, no dark
+areas at all, 25mm on every edge of every page.
+
+- **A4 is now named explicitly**, at the practice's instruction. It had been
+  left to the printer, on the reasoning that forcing a size makes a printer
+  loaded with anything else scale the page and shrink the margin with it. A New
+  Zealand legal document silently arriving as US Letter is the worse of the two.
+- **The shaded block behind the quotation reference is gone**, along with the
+  rest of the dark furniture. Clean rules and black type.
+
+### Added
+**A home for the Law Society information.** Asked: *"where do we attach this
+to?"*, with the Rules of Conduct and Client Care information a client must be
+given — fees, the Fidelity Fund, who is responsible, complaints, client care and
+service, limitations on liability.
+
+Nowhere, was the answer: the letter ended at its signature. It is an **addendum**
+— not this practice speaking to this client about this matter, but what every
+client of any New Zealand lawyer must be told — so it now follows the letter,
+after the signature, starting a page of its own. Settings → Letter of
+engagement, empty until written.
+
+### Changed
+**The administrative team box now reads what you actually type.** Written as
+`Name | Short name | Mobile | Email` and read by position, so a line typed the
+natural way —
+
+    Ms A B Example, Mobile: +64 21 000 0001 | Email: ann@example.test; and
+
+— gave a name with the number stuck to it, and **lost the email address off the
+letter entirely**: the second field is only ever printed in brackets beside a
+number, and with no number it was never printed at all.
+
+That is a fault in the format, not in the typing. The line is now read by
+recognising what things are: anything labelled `Email:` or containing an `@` is
+the address, anything labelled `Mobile:`/`Phone:`/`Tel:` or that is otherwise
+just digits is the number, and what is left is the name. Commas, pipes and a
+trailing "; and" all work. The four-field form still reads exactly as it did.
+
 ## 1.22.1 — 9 September 2026
 
 ### Changed

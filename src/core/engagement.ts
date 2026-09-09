@@ -93,6 +93,34 @@ export const ENGAGEMENT_SETTINGS: SettingsGroup = {
       help: 'Printed immediately under the block that points at the quotation. Blank lines '
         + 'separate paragraphs. Nothing is supplied: this is your wording, not the register’s.' },
 
+    // --- What the Law Society requires a client to be told -----------------
+    //
+    // **Asked on 9 September 2026:** *"where do we attach this to?"*, with the
+    // Rules of Conduct and Client Care information — fees, the Fidelity Fund,
+    // who is responsible, complaints, client care and service, limitations on
+    // liability.
+    //
+    // Nowhere, was the answer. The letter ended at the signature, and this is
+    // an addendum: it comes after the letter rather than inside it, because it
+    // is not the practice speaking to this client about this matter, it is the
+    // information every client of any New Zealand lawyer must be given.
+    //
+    // So it is its own section after the signature and it starts a new page
+    // when printed, which is what an addendum does and also keeps the signature
+    // on the page with the letter it signs.
+    //
+    // Empty by default, like every other set of words a client is asked to
+    // accept. The wording is prescribed by somebody other than this register.
+    { key: 'engagement.addendum_heading', type: 'string', maxLength: 200,
+      label: 'Addendum — heading',
+      default: 'Addendum 1 — Information for Clients',
+      help: 'Ignored when there is no wording below.' },
+    { key: 'engagement.addendum', type: 'text', maxLength: 12000,
+      label: 'Addendum — the wording', default: '',
+      help: 'Printed after the signature, starting a new page. For the information the Rules of '
+        + 'Conduct and Client Care require a client to be given. Blank lines separate paragraphs; '
+        + 'a line beginning “- ” prints as a bullet.' },
+
     // --- The administrative team ------------------------------------------
     //
     // **Asked for on 9 September 2026.** The practice's letter says that
@@ -158,19 +186,75 @@ export interface AdminContact {
 /**
  * The people on one line of the setting.
  *
- * `Name | Short | Mobile | Email`, and only the name is required — a practice
- * that lists a person with no mobile should get their name printed, not a
- * dangling "Mobile:" with nothing after it. Extra fields past the fourth are
- * ignored rather than run together into the email, because a stray pipe in
- * somebody's title should not put rubbish on a contract.
+ * **Rewritten on 9 September 2026, the day it shipped**, because the practice
+ * typed the natural thing and their clients' letters lost both email addresses:
+ *
+ *     Ms A B Example, Mobile: +64 21 000 0001 | Email: ann@example.test; and
+ *
+ * The first version read four fields *by position* — `Name | Short | Mobile |
+ * Email` — so that line gave a name of "Ms A B Example, Mobile: +64 21 000
+ * 0001", a short name of "Email: ann@example.test; and", and no mobile or
+ * email at all. The short name is only ever printed in brackets beside a
+ * number, so with no number it was never printed: the address vanished off a
+ * contract without a word.
+ *
+ * That is a fault in the format, not in the typing. A field that silently
+ * discards an email address is the wrong field. So the line is now read by
+ * **recognising** what things are rather than by counting separators:
+ *
+ *   - anything labelled `Email:`, or containing an `@`, is the email;
+ *   - anything labelled `Mobile:`, `Phone:` or `Tel:`, or that is otherwise
+ *     just digits and punctuation, is the number;
+ *   - what is left is the name, and a second leftover is the short name.
+ *
+ * Both separators are honoured — `|` and a comma before a label — and a
+ * trailing "; and", which is how a person writes a list, is dropped. The
+ * documented four-field form still parses exactly as it did, so the text the
+ * "Use as the template" button writes still round-trips.
  */
+const CONTACT_LABEL = /^\s*(?:e-?mail|mobile|phone|tel(?:ephone)?)\s*[:.]?\s*/i;
+const MOBILE_LABEL = /(?:^|[|,;])\s*(?:mobile|phone|tel(?:ephone)?)\s*[:.]\s*([^|,;]+)/i;
+const EMAIL_LABEL = /(?:^|[|,;])\s*e-?mail\s*[:.]\s*([^|,;]+)/i;
+
+/** Digits and the punctuation a telephone number is written with, nothing else. */
+function looksLikeNumber(value: string): boolean {
+  return /\d/.test(value) && /^[+()\d\s.-]+$/.test(value);
+}
+
 export function parseAdminTeam(raw: string): AdminContact[] {
-  return raw.split('\n')
-    .map((line) => line.split('|').map((part) => part.trim()))
-    .filter((parts) => (parts[0] ?? '') !== '')
-    .map((parts) => ({
-      name: parts[0]!, short: parts[1] ?? '', mobile: parts[2] ?? '', email: parts[3] ?? '',
-    }));
+  return raw.split('\n').map((original) => {
+    // "…; and" is how somebody writes a list, not part of anybody's address.
+    let line = original.replace(/[;,]?\s*\band\b\s*$/i, '').trim();
+    if (line === '') return null;
+
+    let email = '';
+    let mobile = '';
+
+    const labelledEmail = EMAIL_LABEL.exec(line);
+    if (labelledEmail) {
+      email = labelledEmail[1]!.trim();
+      line = line.replace(labelledEmail[0], ' ');
+    }
+    const labelledMobile = MOBILE_LABEL.exec(line);
+    if (labelledMobile) {
+      mobile = labelledMobile[1]!.trim();
+      line = line.replace(labelledMobile[0], ' ');
+    }
+
+    // What is left, once the labelled parts are out of the way.
+    const rest: string[] = [];
+    for (const part of line.split('|').map((x) => x.replace(/^[\s,;]+|[\s,;]+$/g, ''))) {
+      if (part === '') continue;
+      const bare = part.replace(CONTACT_LABEL, '').trim();
+      if (!email && bare.includes('@')) { email = bare; continue; }
+      if (!mobile && looksLikeNumber(bare)) { mobile = bare; continue; }
+      rest.push(part);
+    }
+
+    const name = (rest[0] ?? '').replace(/[\s,;]+$/, '');
+    if (name === '') return null;
+    return { name, short: rest[1] ?? '', mobile, email };
+  }).filter((row): row is AdminContact => row !== null);
 }
 
 export interface EngagementText {
@@ -180,6 +264,8 @@ export interface EngagementText {
   termsSubtitle: string;
   scopeHeading: string;
   scopeTerms: string;
+  addendumHeading: string;
+  addendum: string;
   adminTeamHeading: string;
   adminTeamIntro: string;
   adminTeam: AdminContact[];
@@ -203,6 +289,8 @@ export async function engagementText(env: Env): Promise<EngagementText> {
     termsSubtitle: (v['engagement.terms_subtitle'] ?? '').trim(),
     scopeHeading: (v['engagement.scope_heading'] ?? '').trim(),
     scopeTerms: (v['engagement.scope_terms'] ?? '').trim(),
+    addendumHeading: (v['engagement.addendum_heading'] ?? '').trim(),
+    addendum: (v['engagement.addendum'] ?? '').trim(),
     adminTeamHeading: (v['engagement.admin_team_heading'] ?? '').trim(),
     adminTeamIntro: (v['engagement.admin_team_intro'] ?? '').trim(),
     adminTeam: parseAdminTeam(v['engagement.admin_team'] ?? ''),
