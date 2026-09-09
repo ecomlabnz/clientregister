@@ -7,6 +7,54 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.27.0 — 9 September 2026
+
+### Fixed
+**The black pages, for the third and last time.** A quotation printed today came
+out with a near-black rectangle over both pages, at 8.5mm margins.
+
+1.23.0 had already answered a black PDF by moving the paper palette onto the
+document itself, so it would not depend on the print stylesheet running. That
+reasoning was right and did not cover this. **The print stylesheet did run** —
+the application's header and buttons are correctly absent from the file — and
+the document itself was white. What was black was the **canvas**: the sheet
+behind the page, which a browser paints from `color-scheme` on the *root*
+element. The print rule set it on the body, which cannot reach the canvas. Tick
+**Background graphics** in the print box and that dark sheet is printed, under
+a document that is correctly white.
+
+**So the fix is not another print rule.** A page carrying a document is now
+served in light mode. There is no dark canvas to print, in any medium, and
+nothing left for a render path to skip — and the practice sees on the screen
+exactly what comes out of the printer, which is the property that was wanted
+all along. The sign-in page is unaffected; it is not a document.
+
+Verified in Chromium with **Background graphics on** — which is what the
+practice had — through the print path and through the path that ignores print
+styling entirely, from a browser forced into dark mode: six files, **no dark
+fill anywhere**, and 20mm on every edge of the printed ones.
+
+### Added
+**Every document says which printing it is.** Asked for: *"it is better if —
+when Print button is clicked — a clean PDF is generated with full date and time
+stamp."*
+
+At the foot of the quotation, the letter of engagement and the invoice, above
+the buttons (which are not printed):
+
+> Printed Wednesday, 9 September 2026 at 11:40 pm NZST
+
+Long-form on purpose. It is read off paper by somebody who may be holding two
+copies of the same reference, so the day is named, the month is in words, the
+time is to the minute and the zone is said rather than assumed. It is written
+by the server at the moment the page is asked for — there is no script on these
+pages and the register does not read the reader's clock — and it is New Zealand
+time, not the machine's.
+
+It shows on the screen as well as on the paper. A document that shows one thing
+on screen and another on paper is the fault the whole day has gone into
+removing.
+
 ## 1.26.1 — 9 September 2026
 
 ### Changed

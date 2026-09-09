@@ -168,6 +168,32 @@
 :root[data-mode="dark"] { color-scheme: dark; }
 :root[data-mode="system"] { color-scheme: light dark; }
 
+/* A page that is a document.
+ *
+ * **The third and last attempt at the black rectangle.** A quotation printed on
+ * 9 September 2026 came out with a near-black fill over both pages, at 8.5mm
+ * margins. The print stylesheet had run — the application's header and buttons
+ * are correctly absent from that file — so the fault was not the one fixed in
+ * 1.23.0, which had made `.quote-doc` carry its own paper palette in every
+ * medium.
+ *
+ * The colour was the **canvas**: the sheet behind the page, painted by the
+ * browser from `color-scheme` on the *root* element. The print block set it on
+ * `body`, which cannot reach it. Tick "Background graphics" in the print box
+ * and the dark canvas is printed, under a document that is correctly white.
+ *
+ * Document pages are now served with `data-mode="light"` and this attribute, so
+ * there is no dark canvas to print. It is not a media query and not an
+ * override: the page carrying a document is simply not a dark page, in any
+ * medium, and the practice sees on screen exactly what comes out of the
+ * printer. Paper is white rather than the interface's off-white, because the
+ * one thing a document must match is the sheet it is printed on. */
+:root[data-paper], :root[data-paper][data-mode] {
+  color-scheme: light;
+  background: #fff;
+}
+:root[data-paper] body { background: #fff; color: #111; }
+
 /* Dark, applied either because the user chose it or because they follow the
    device and the device is dark. The two selectors cannot both match. */
 
@@ -1529,6 +1555,13 @@ details[open] > summary { margin-bottom: 12px; }
    468px of buttons in a 390px window, which scrolls the whole document
    sideways. A row of actions has no reason to be one line. */
 .quote-doc-foot { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 8px; }
+/* Which printing of the document this is. Quiet, small, and above the buttons
+   rather than below them, so it is the last thing on the paper — the buttons
+   are not printed at all. */
+.quote-doc-stamp {
+  margin: 26px 0 0; padding-top: 8px; border-top: 1px solid var(--border);
+  font-size: 0.75rem; color: var(--muted); text-align: right;
+}
 
 /* Shown only on paper: a hyperlink is no use to somebody holding a printout,
    so the address itself appears there and nowhere else. */
@@ -1584,7 +1617,11 @@ details[open] > summary { margin-bottom: 12px; }
   .print-only { display: block; font-size: 0.8em; color: #444; margin-top: 4px; }
 
   /* The document carries its own paper palette in every medium now — see the
-     note on `.quote-doc` — so all that is left here is the page around it. */
+     note on `.quote-doc` — so all that is left here is the page around it.
+     `color-scheme` is set on the root as well as on the body: the canvas behind
+     the sheet is painted from the root, and setting it only on `body` is what
+     put a near-black rectangle over a printed quotation on 9 September 2026. */
+  :root, :root[data-mode] { color-scheme: light; background: #fff; }
   body { background: #fff; color: #111; color-scheme: light; }
   .topbar, .footer, .no-print, .crumbs, .page-actions { display: none !important; }
   /* The side margin, where no print setting can reach it. See the note by
