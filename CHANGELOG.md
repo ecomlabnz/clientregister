@@ -7,6 +7,26 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.23.2 — 9 September 2026
+
+### Fixed
+**The administrative team prints as it is typed.** Reported: *"not acceptable
+formatting on the print — they must appear in the same way as in the back end."*
+
+This was cleverer twice and wrong twice. Read by position, a line typed the
+natural way lost both email addresses off the letter. Read by recognising the
+parts, the addresses came back — printed gathered onto their own "Mobile:" and
+"Email:" lines at the foot of the section, which is not what anybody wrote.
+
+The second version was the first mistake with more machinery: the register was
+taking a sentence apart in order to put it back together differently from how
+somebody wrote it, and nothing else needed the pieces. **One line in, one line
+out.** Whatever the practice writes about how to reach somebody is between them
+and their client.
+
+- **"Quotation" is capitalised** where the letter points at it. The opening
+  defines it as a term, and a defined term is capitalised wherever it appears.
+
 ## 1.23.1 — 9 September 2026
 
 ### Fixed
