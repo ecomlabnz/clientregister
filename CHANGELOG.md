@@ -7,6 +7,26 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.22.1 — 9 September 2026
+
+### Changed
+Four corrections to the head of a printed document, all from reading a real one.
+
+- **Date, reference and matter now line up with each other**, and each label
+  ends with a colon. Both columns had been right-aligned, so the labels ended at
+  a ragged left edge and the values at a ragged one of their own — three pairs
+  that never quite met. Labels right, values left, meeting on a shared axis.
+- **The practice's contact lines are labelled** — `Mobile:`, `Email:`, `GST:`.
+  A bare address and a bare number under a firm's name are two lines a reader
+  has to work out.
+- **The GST number is on the letter of engagement too.** It had been on the
+  quotation only, and it is the other thing a client copies off a fee document.
+- **"(Direct Access)" is off the terms heading**, which now reads simply
+  *Immigration Legal Services* under *Short Form Terms of Engagement*.
+
+A line the practice has not filled in is left out rather than printed as a bare
+label with nothing after it.
+
 ## 1.22.0 — 9 September 2026
 
 ### Added

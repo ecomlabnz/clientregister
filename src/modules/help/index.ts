@@ -37,6 +37,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.22.1', date: '9 September 2026',
+    notes: [
+      'On printed documents, Date, Our reference and Matter now line up with each other and each '
+        + 'label ends with a colon.',
+      'Your contact lines are labelled \u2014 Mobile:, Email:, GST: \u2014 and your GST number is '
+        + 'on the letter of engagement as well as the quotation.',
+      '\u201C(Direct Access)\u201D is off the terms heading, which now reads simply '
+        + '\u201CImmigration Legal Services\u201D.',
+    ],
+  },
+  {
     version: '1.22.0', date: '9 September 2026',
     notes: [
       'New quotations can start from a shape you choose. Open one you are happy with and press '

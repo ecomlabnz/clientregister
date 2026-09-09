@@ -71,7 +71,7 @@ export const ENGAGEMENT_SETTINGS: SettingsGroup = {
         + 'Leave blank and no dividing heading is printed.' },
     { key: 'engagement.terms_subtitle', type: 'string', maxLength: 200,
       label: 'And under that heading',
-      default: 'Immigration Legal Services (Direct Access)',
+      default: 'Immigration Legal Services',
       help: 'Ignored when the heading above is blank.' },
 
     // --- The scope of the retainer -----------------------------------------
