@@ -16,7 +16,7 @@ import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
-import { html, join, raw } from '../../ui/html';
+import { emphasise, html, join, raw } from '../../ui/html';
 import {
   actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, stamp, statusTone, table,
 } from '../../ui/components';
@@ -1428,8 +1428,8 @@ export const quotesModule: AppModule = {
         return html`${blocks.map((block) => {
           const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
           return lines.every((line) => line.startsWith('- '))
-            ? html`<ul>${lines.map((line) => html`<li>${line.slice(2)}</li>`)}</ul>`
-            : html`<p>${lines.join(' ')}</p>`;
+            ? html`<ul>${lines.map((line) => html`<li>${emphasise(line.slice(2))}</li>`)}</ul>`
+            : html`<p>${emphasise(lines.join(' '))}</p>`;
         })}`;
       };
 
@@ -1610,10 +1610,11 @@ export const quotesModule: AppModule = {
 
           ${text.acknowledgements.length ? html`
             <section>
-              <h3>What you confirm by accepting</h3>
+              ${text.acknowledgementsHeading
+                ? html`<h3>${text.acknowledgementsHeading}</h3>` : ''}
               ${text.acknowledgementsIntro ? html`<p>${text.acknowledgementsIntro}</p>` : ''}
               <ol class="letter-acknowledgements">
-                ${text.acknowledgements.map((line) => html`<li>${line}</li>`)}
+                ${text.acknowledgements.map((line) => html`<li>${emphasise(line)}</li>`)}
               </ol>
             </section>` : ''}
 
