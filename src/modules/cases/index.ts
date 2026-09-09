@@ -659,9 +659,10 @@ export const casesModule: AppModule = {
       const docsEnabled = Boolean(c.env.DOCS);
       const aiAvailable = isAiEnabled(c.env) && can(viewer, 'ai:run');
       const brief = aiAvailable ? await latestBrief(c.env, id) : null;
-      const kase = await one<CaseRow & { client_name: string; client_ref: string; assignee_name: string | null }>(
+      const kase = await one<CaseRow & {
+        client_name: string; client_ref: string; client_kind: string; assignee_name: string | null }>(
         c.env.DB,
-        `SELECT k.*, cl.full_name AS client_name, cl.ref AS client_ref,
+        `SELECT k.*, cl.full_name AS client_name, cl.ref AS client_ref, cl.kind AS client_kind,
                 cl.inz_client_number AS inz_client_number, u.name AS assignee_name
            FROM cases k JOIN clients cl ON cl.id = k.client_id
            LEFT JOIN users u ON u.id = k.assigned_to
@@ -714,6 +715,21 @@ export const casesModule: AppModule = {
       // than not. Once the role is taken it cannot be given again, so the
       // sensible default changes to the next most common one.
       const hasPrincipal = parties.some((p: any) => p.role === 'principal_applicant');
+
+      // The person the matter is *for* is a fact of `cases.client_id`, and they
+      // may or may not also have a `case_parties` row. Where they do not, the
+      // Parties list used to show everyone on the file except the applicant
+      // themselves — dependent children and a supporting partner, with nobody
+      // for them to be dependent on or supporting.
+      //
+      // Asked for on 9 September 2026: *"i see the principal applicant is noted
+      // in the right side, but i would love to see them in the main screen as
+      // well - under Parties - just above the secondary applicants"*.
+      //
+      // Shown, not stored: `cases.client_id` stays the one owner of who the
+      // client is. Writing a second copy into `case_parties` would be two
+      // records of one fact, free to disagree.
+      const clientIsAParty = parties.some((p: any) => p.client_id === kase.client_id);
 
       const nextStatuses = CASE_TRANSITIONS[kase.status] ?? [];
       const deadlineWarning = DEADLINE_CASE_STATUSES.includes(kase.status) && kase.decision_due_at;
@@ -785,29 +801,40 @@ export const casesModule: AppModule = {
                 </details>` : ''}`)}
 
             ${foldingCard('Parties', html`
-              ${parties.length === 0 ? emptyState('No parties recorded.') : html`
-                <ul class="party-list">
-                  ${parties.map((party) => html`
-                    <li>
-                      <div>
-                        <a href="/clients/${party.client_id}">${party.client_name}</a>
-                        ${badge(PARTY_ROLE_LABELS[party.role] ?? party.role,
-                                party.role === 'principal_applicant' ? 'blue'
-                                : party.role === 'employer' ? 'amber' : 'neutral')}
-                        <div class="muted small">
-                          <code>${party.client_ref}</code>
-                          ${party.client_kind === 'organisation' ? ' · organisation' : ''}
-                          ${party.notes ? ` · ${party.notes}` : ''}
-                        </div>
+              <ul class="party-list">
+                ${clientIsAParty ? '' : html`
+                  <li>
+                    <div>
+                      <a href="/clients/${kase.client_id}">${kase.client_name}</a>
+                      ${badge('Client', 'blue')}
+                      <div class="muted small">
+                        <code>${kase.client_ref}</code>
+                        ${kase.client_kind === 'organisation' ? ' · organisation' : ''}
+                        · the matter is in their name
                       </div>
-                      ${writable && party.client_id !== kase.client_id
-                        ? actionButton(`/cases/${kase.id}/parties/${party.id}/remove`, csrf,
-                            `Take ${party.client_name ?? 'this person'} off this matter`,
-                            { className: 'btn-remove', icon: '\u00d7',
-                              confirm: 'Remove this party from the case?' })
-                        : ''}
-                    </li>`)}
-                </ul>`}
+                    </div>
+                  </li>`}
+                ${parties.map((party) => html`
+                  <li>
+                    <div>
+                      <a href="/clients/${party.client_id}">${party.client_name}</a>
+                      ${badge(PARTY_ROLE_LABELS[party.role] ?? party.role,
+                              party.role === 'principal_applicant' ? 'blue'
+                              : party.role === 'employer' ? 'amber' : 'neutral')}
+                      <div class="muted small">
+                        <code>${party.client_ref}</code>
+                        ${party.client_kind === 'organisation' ? ' · organisation' : ''}
+                        ${party.notes ? ` · ${party.notes}` : ''}
+                      </div>
+                    </div>
+                    ${writable && party.client_id !== kase.client_id
+                      ? actionButton(`/cases/${kase.id}/parties/${party.id}/remove`, csrf,
+                          `Take ${party.client_name ?? 'this person'} off this matter`,
+                          { className: 'btn-remove', icon: '\u00d7',
+                            confirm: 'Remove this party from the case?' })
+                      : ''}
+                  </li>`)}
+              </ul>
               ${writable ? html`
                 <details class="add-block" ${parties.length <= 1 ? raw('open') : ''}>
                   <summary>Add a party</summary>
