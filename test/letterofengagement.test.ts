@@ -397,10 +397,13 @@ describe('reading the administrative team setting', () => {
     expect(parseAdminTeam('| | +64 21 000 0001 |')).toEqual([]);
   });
 
-  it('ignores anything past the fourth field', () => {
-    // A stray pipe in a title should not run rubbish into the email address.
+  it('does not promote something into a number or an address just because of where it sits', () => {
+    // This used to read four fields by position, so "C" printed as a telephone
+    // number and "D" as an email address on a contract. Nothing becomes a
+    // number unless it looks like one, and nothing becomes an address unless it
+    // has an @ in it or says Email.
     expect(parseAdminTeam('A | B | C | D | E')).toEqual([
-      { name: 'A', short: 'B', mobile: 'C', email: 'D' },
+      { name: 'A', short: 'B', mobile: '', email: '' },
     ]);
   });
 });
@@ -562,5 +565,154 @@ describe('the practice at the head of the page', () => {
                VALUES ('practice.gst_number', '', '${AT}')`);
     const body = await (await h.request('/quotes/q1/letter')).text();
     expect(body).not.toContain('GST:');
+  });
+});
+
+/**
+ * How the administrative team is actually typed.
+ *
+ * **Found on 9 September 2026, the day the box shipped.** The practice typed
+ * the natural thing and both email addresses vanished off a client's letter:
+ * the format read four fields by position, so a labelled email landed in the
+ * "short name" slot, which is only ever printed in brackets beside a number —
+ * and with no number, never printed at all.
+ *
+ * A field that silently discards an email address from a contract is the wrong
+ * field. These are the shapes a person actually writes.
+ */
+describe('reading a line of the administrative team however it is written', () => {
+  const one = (line: string) => parseAdminTeam(line)[0]!;
+
+  it('reads the way the practice wrote it, labels and commas and a trailing “and”', () => {
+    expect(one('Ms A B Example, Mobile: +64 21 000 0001 | Email: ann@example.test; and')).toEqual({
+      name: 'Ms A B Example', short: '', mobile: '+64 21 000 0001', email: 'ann@example.test',
+    });
+    expect(one('Mr C D Sample, Mobile: +64 21 000 0002 | Email: colin@example.test')).toEqual({
+      name: 'Mr C D Sample', short: '', mobile: '+64 21 000 0002', email: 'colin@example.test',
+    });
+  });
+
+  it('still reads the four-field form the button writes, so capture round-trips', () => {
+    expect(one('Ms A B Example | Ann | +64 21 000 0001 | ann@example.test')).toEqual({
+      name: 'Ms A B Example', short: 'Ann', mobile: '+64 21 000 0001', email: 'ann@example.test',
+    });
+  });
+
+  it('recognises an address and a number with no labels at all', () => {
+    expect(one('Ms A B Example | ann@example.test | +64 21 000 0001')).toEqual({
+      name: 'Ms A B Example', short: '', mobile: '+64 21 000 0001', email: 'ann@example.test',
+    });
+  });
+
+  it('does not mistake a name for a number, or a number for a name', () => {
+    // A name is never only digits and punctuation; a number never has letters
+    // in it beyond the label that was already taken off.
+    expect(one('Ms A B Example')).toEqual({ name: 'Ms A B Example', short: '', mobile: '', email: '' });
+    expect(one('Ms 2 Example | +64 (21) 000-0001')).toEqual({
+      name: 'Ms 2 Example', short: '', mobile: '+64 (21) 000-0001', email: '',
+    });
+  });
+
+  it('takes “E-mail” and “Telephone” as readily as the short forms', () => {
+    expect(one('Ms A B Example, Telephone: +64 21 000 0001, E-mail: ann@example.test')).toEqual({
+      name: 'Ms A B Example', short: '', mobile: '+64 21 000 0001', email: 'ann@example.test',
+    });
+  });
+
+  it('drops a line that is only a label, rather than printing an empty person', () => {
+    expect(parseAdminTeam('Email: nobody@example.test')).toEqual([
+      // The address is recognised, but there is no one to attribute it to, so
+      // there is nothing to put on a lettered list.
+    ]);
+    expect(parseAdminTeam('  \n | | \n')).toEqual([]);
+  });
+
+  it('puts both people’s details on the letter, which is what went wrong', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    h.db.exec(`INSERT OR REPLACE INTO settings (key, value, updated_at)
+               VALUES ('engagement.admin_team',
+                 'Ms A B Example, Mobile: +64 21 000 0001 | Email: ann@example.test; and
+Mr C D Sample, Mobile: +64 21 000 0002 | Email: colin@example.test', '${AT}')`);
+
+    const body = await (await h.request('/quotes/q1/letter')).text();
+    expect(body).toContain('Ms A B Example');
+    expect(body).toContain('Mr C D Sample');
+    expect(body).toContain('+64 21 000 0001; +64 21 000 0002');
+    expect(body).toContain('ann@example.test; colin@example.test');
+    // And the number is no longer sitting inside the name.
+    expect(body).not.toContain('Ms A B Example, Mobile');
+  });
+});
+
+/**
+ * The Law Society information, and where it goes.
+ *
+ * **Asked on 9 September 2026:** *"where do we attach this to?"* — with the
+ * Rules of Conduct and Client Care information a client must be given: fees,
+ * the Fidelity Fund, who is responsible, complaints, client care and service,
+ * limitations on liability.
+ *
+ * Nowhere, was the answer: the letter ended at the signature. It is an
+ * addendum, so it follows the letter rather than sitting inside it — it is not
+ * this practice speaking to this client about this matter, it is what every
+ * client of any New Zealand lawyer must be told.
+ */
+describe('the addendum', () => {
+  const withAddendum = (h: ReturnType<typeof mount>, body: string) =>
+    h.db.exec(`INSERT OR REPLACE INTO settings (key, value, updated_at)
+               VALUES ('engagement.addendum', '${body}', '${AT}')`);
+
+  it('is not there until the practice writes it', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    const body = await (await h.request('/quotes/q1/letter')).text();
+    // The heading has a default and must not print above nothing.
+    expect(body).not.toContain('Information for Clients');
+  });
+
+  it('comes after the signature, not before it', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    withAddendum(h, 'The following information is required by the Rules of Conduct.');
+
+    const body = await (await h.request('/quotes/q1/letter')).text();
+    expect(body).toContain('Addendum 1 — Information for Clients');
+    expect(body).toContain('required by the Rules of Conduct');
+    expect(body.indexOf('Yours faithfully'))
+      .toBeLessThan(body.indexOf('Addendum 1 — Information for Clients'));
+  });
+
+  it('keeps its paragraphs and its bullets, and escapes what is typed', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    withAddendum(h, `1. Fees
+
+The basis is set out in the Terms.
+
+- Act competently
+- Charge a fee that is fair
+
+<b>Not markup</b>`);
+
+    const body = await (await h.request('/quotes/q1/letter')).text();
+    expect(body).toContain('<li>Act competently</li>');
+    expect(body).toContain('<li>Charge a fee that is fair</li>');
+    expect(body).toContain('&lt;b&gt;Not markup&lt;/b&gt;');
+    expect(body).not.toContain('<b>Not markup</b>');
+  });
+
+  it('is on the letter and never on the quotation', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    withAddendum(h, 'Lawyers Fidelity Fund information.');
+    const body = await (await h.request('/quotes/q1/print')).text();
+    expect(body).not.toContain('Lawyers Fidelity Fund information.');
+    expect(body).not.toContain('Information for Clients');
   });
 });
