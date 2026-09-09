@@ -16,6 +16,31 @@ export interface PageOpts {
   active?: string;
   /** Rendered without the nav chrome (login, setup). */
   bare?: boolean;
+  /**
+   * This page **is** a document — a quotation, a letter of engagement, an
+   * invoice — and is served as paper whatever the reader's theme.
+   *
+   * **The fault this closes, for the third time.** A quotation printed by the
+   * practice on 9 September 2026 arrived with a near-black rectangle over both
+   * pages. 1.23.0 had already moved the paper palette onto `.quote-doc` so the
+   * document would not depend on the print stylesheet running — and it did run:
+   * the application's header and buttons are correctly absent from that PDF.
+   *
+   * What the print stylesheet could not reach is the **canvas**. The colour
+   * behind the whole page comes from `color-scheme` on the *root* element, and
+   * the print block set it on `body`. With the browser's "Background graphics"
+   * ticked, the dark canvas printed, under a document that was white.
+   *
+   * So a document page no longer renders in a dark theme at all. It is served
+   * with `data-mode="light"`, which is what it has always been: this is not a
+   * print rule, a media query or an override, and there is nothing left for a
+   * render path to skip. What the practice sees on the screen is now what comes
+   * out of the printer, which is the property that was wanted all along.
+   *
+   * The sign-in page is `bare` too and is not paper, which is why this is its
+   * own flag rather than being read off `bare`.
+   */
+  paper?: boolean;
   /** The public website: no application chrome — the page supplies its own. */
   landing?: boolean;
   /** Meta description, for the one page that has an audience outside the office. */
@@ -43,10 +68,11 @@ export function page(c: Context<AppContext>, opts: PageOpts, body: Raw): Respons
   // record: no theme script, nothing extra to load, and no flash of the wrong
   // colours. Signed-out pages get the defaults.
   const theme = themeOf(user ?? null);
-  const mode = colourModeOf(user ?? null);
+  // A document is paper. See `paper` above for why this is not a print rule.
+  const mode = opts.paper ? 'light' : colourModeOf(user ?? null);
 
   const doc = html`<!doctype html>
-<html lang="en-NZ" data-theme="${theme}" data-mode="${mode}">
+<html lang="en-NZ" data-theme="${theme}" data-mode="${mode}"${opts.paper ? raw(' data-paper') : ''}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
