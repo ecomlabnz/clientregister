@@ -37,6 +37,28 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.29.0', date: '9 September 2026',
+    notes: [
+      'A quotation now has a private link the client opens \u2014 no account, no password. It '
+        + 'carries the quotation, the letter of engagement beneath it, and a way to accept them '
+        + 'both, on one page.',
+      'The Accept panel sits at the foot, after both documents, so it cannot be pressed before '
+        + 'they are scrolled past. A quiet bar follows the reader saying it has not been accepted '
+        + 'yet, with a link down to the panel.',
+      'Accepting takes their full name, the date and a tick. The register records that plus the '
+        + 'moment it arrived and the address it came from, writes a file note on the matter, and '
+        + 'moves the quotation to Accepted. An acceptance can never be changed or removed \u2014 '
+        + 'issue a new quotation instead.',
+      'The email is a covering email now: the total, the link, the documents named, and a request '
+        + 'to read them and sign if acceptable. It no longer retypes the whole quotation.',
+      'The Money menu no longer opens by itself when you are on Quotes or Invoices.',
+      '\u201CFEE QUOTE\u201D no longer sits almost on the edge of the paper when your print box '
+        + 'has margins set to anything but Default.',
+      'The printed quotation is tighter again \u2014 less space between rows, the same space '
+        + 'above the headings.',
+    ],
+  },
+  {
     version: '1.28.1', date: '9 September 2026',
     notes: [
       '\u201CFEE QUOTE\u201D is in capitals now, and at twice its original size rather than '

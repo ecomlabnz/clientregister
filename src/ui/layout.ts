@@ -118,8 +118,22 @@ ${opts.landing
       : html`
         ${'' /* name="topnav" makes the menus an exclusive set: opening one
                  closes the other, in the browser, with no script. */}
-        <details class="nav-group" name="topnav"
-                 ${entry.items.some((i) => i.href === opts.active) ? raw('open') : ''}>
+        ${'' /* Closed on arrival, always.
+
+                 **Reported on 9 September 2026:** *"the Money menu keeps
+                 opening on its own — why?"* Because it did: the group was
+                 rendered `open` whenever the page you were on sat inside it, so
+                 every visit to Quotes or Invoices arrived with a panel hanging
+                 over the page and covering the search box.
+
+                 The intention was to show where you are, and that part was
+                 right — but a dropdown is absolutely positioned, so "open"
+                 means "covering the page", not "highlighted". Where you are is
+                 said by the summary carrying `current`, which is how every
+                 other item in the bar says it. On a phone the panel is laid out
+                 in the flow rather than over the page, so it opened harmlessly
+                 there and only looked broken on a desktop. */}
+        <details class="nav-group" name="topnav">
           <summary class="${entry.items.some((i) => i.href === opts.active) ? 'nav-link current' : 'nav-link'}">
             ${entry.label}
           </summary>

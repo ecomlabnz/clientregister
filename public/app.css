@@ -1513,13 +1513,19 @@ details[open] > summary { margin-bottom: 12px; }
      Three times the original size was too big; twice is the figure the practice
      settled on. In capitals, which is how the practice writes it.
 
-     It is pulled up above the practice's name beside it and given four lines of
-     air underneath, so it reads as the title of the page rather than as a label
-     on the reference block below — and the reference block stays where it was
-     rather than rising with it. The negative top margin is small enough that
+     Room underneath, so it reads as the title of the page rather than as a
+     label on the reference block below. Four lines of air was the first figure
+     asked for and was too much on the page; the block beneath was lifted by
+     half.
+
+     It was also pulled *up* by 9px for a while, and that came out on 9 September
+     2026 for a reason worth keeping: a document printed with the browser's
+     Margins set to Minimum had this title 2mm from the edge of the paper. The
+     margin loss is the print box's doing and no stylesheet can prevent it — but
+     nothing here should be spending the little that is left. The negative top margin is small enough that
      the type still sits inside the document's own 20mm margin: a title touching
      the edge of the paper is the fault this avoids at the other end. */
-  margin: -0.55rem 0 5.25rem; font-size: 2rem; font-weight: 650;
+  margin: 0 0 2.6rem; font-size: 2rem; font-weight: 650;
   text-transform: uppercase; letter-spacing: 0.01em; line-height: 1.05;
   color: var(--accent);
   /* It sits at the head of the right-hand column and must not wrap into two
@@ -1623,6 +1629,49 @@ details[open] > summary { margin-bottom: 12px; }
   font-size: 0.75rem; color: var(--muted); text-align: right;
 }
 
+/* --- The page a client opens ---------------------------------------------
+ *
+ * **Built on 9 September 2026**, after the practice sent a test quote and got
+ * plain text: *"no link, no nice formatted page, no ACCEPT button, no letter of
+ * engagement — where is the rest of the mechanics of it all??"*
+ *
+ * The documents themselves are `.quote-doc` and are not restyled here: what a
+ * client reads is byte for byte what the practice prints, which is the whole
+ * point of there being one template each. What is added is the furniture around
+ * them, and none of it prints. */
+
+/* A reminder that follows the reader, not a button that does.
+ *
+ * The practice asked whether the Accept button should float as the client
+ * scrolls. It should not: a button that follows the reader down the page can be
+ * pressed on the first screen, and what it records is that somebody clicked,
+ * not that they read. This bar says the quotation is not accepted yet and takes
+ * them to the panel at the foot, past both documents.
+ *
+ * Sticky and an ordinary anchor, so it needs no script — this is the one page
+ * in the register opened by somebody the practice cannot help if it fails. */
+.accept-bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; flex-wrap: wrap; gap: 10px 16px;
+  align-items: center; justify-content: center;
+  padding: 10px 16px; margin-bottom: 14px;
+  background: var(--amber-bg); color: var(--amber);
+  border-bottom: 1px solid var(--border); font-size: 0.9rem;
+}
+/* A note to the reader rather than part of the document, so it is not set as
+   the document is and does not print with it. */
+.client-note { max-width: 210mm; margin: 10px auto; }
+.accept-panel { margin-top: 18px; }
+.accept-panel h2 { margin: 0 0 10px; font-size: 1.15rem; }
+.accept-form { display: grid; gap: 14px; max-width: 26rem; margin-top: 14px; }
+.accept-form .field { margin: 0; }
+/* Bigger than an ordinary button. It is the only thing on the page a client is
+   asked to do, and it is a contract. */
+.btn-accept { padding: 11px 20px; font-size: 1rem; }
+@media print {
+  .accept-bar, .accept-panel .accept-form, .client-note { display: none !important; }
+}
+
 /* Shown only on paper: a hyperlink is no use to somebody holding a printout,
    so the address itself appears there and nowhere else. */
 .print-only { display: none; }
@@ -1704,7 +1753,25 @@ details[open] > summary { margin-bottom: 12px; }
    * against the 1.6 the screen uses, and paragraph gaps a little over half what
    * they were. A five-page letter loses about a page to this without a word
    * being cut. */
-  body { font-size: 9.5pt; line-height: 1.3; }
+  body { font-size: 9.5pt; line-height: 1.18; }
+
+  /* Tighter again, and only where it is rows.
+   *
+   * **Asked for on 9 September 2026:** *"make it even more compact — reduce the
+   * line spacing but keep it as is where the subheadings are."* So the rows of
+   * a table lose their air and the headings above them keep theirs: the space
+   * before PROFESSIONAL FEES is what tells the eye a new group has started, and
+   * closing it up would save four millimetres and cost the structure of the
+   * page. `.quote-doc h3` and `.quote-doc-group` are deliberately absent. */
+  .quote-doc-table td { padding: 3px 0; }
+  .quote-doc-table th { padding: 4px 0; }
+  .quote-doc-table tfoot td { padding: 3px 0; }
+  .quote-doc-table tfoot tr:first-child td { padding-top: 7px; }
+  .quote-doc-table tfoot .totals-row td { padding-top: 7px; }
+  .quote-doc-conditions { line-height: 1.35; }
+  .quote-doc-conditions li { margin-bottom: 4px; }
+  .quote-doc-parties, .quote-doc-bank { gap: 3px 16px; }
+  .quote-doc-subhead { margin: 10px 0 4px; }
   .quote-doc .small, .quote-doc .hint, .quote-doc .prewrap.small { font-size: 8.5pt; }
   .letter-doc p, .letter-doc ul, .letter-doc ol { line-height: 1.3; margin-bottom: 5px; }
   .letter-doc li { margin-bottom: 2px; }

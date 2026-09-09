@@ -10,7 +10,7 @@ import { Hono } from 'hono';
 import type { AppContext, Env } from '../../types';
 import type { AppModule } from '../../core/module';
 import { everyTermClausePlain } from '../../core/search';
-import { all, count, nextRef, nowIso, one, run } from '../../core/db';
+import { all, count, getSetting, nextRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
@@ -44,6 +44,8 @@ import { asInteger, readSettings, type SettingsGroup } from '../../core/settings
 import { caseTypes, labelFor, type Term } from '../../core/vocabulary';
 import { quoteNameFrom } from '../../core/casename';
 import { practiceDetails } from '../../core/practice';
+import { shareTokenFor, shareUrl } from '../../core/quotelink';
+import { canonicalBaseFrom } from '../landing';
 import {
   ENGAGEMENT_SETTINGS, allClauses, clauseTypes, clausesFor, engagementText, type ClauseRow,
 } from '../../core/engagement';
@@ -231,6 +233,12 @@ export interface QuoteRow {
   issued_on: string | null; validity_days: number | null; stage_note: string | null;
   /** 1, 0, or null when nobody has yet decided. See migration 0067. */
   with_letter: number | null;
+  /** The client's private link, minted when the quotation is emailed. See 0078. */
+  share_token: string | null;
+  /** Set together, once, and never again. See 0078. */
+  accepted_at: string | null;
+  accepted_name: string | null;
+  accepted_from: string | null;
 }
 
 function quoteTotal(q: Pick<QuoteRow, 'amount_cents' | 'gst_cents' | 'disbursements_cents'>): number {
@@ -298,83 +306,85 @@ function totalRows(
 
 /**
  * A first draft of the covering email, for editing rather than sending as-is.
- * It states the figures and points at the terms, which are the two things a
- * quote must not leave ambiguous.
+ *
+ * **Rewritten on 9 September 2026.** It used to type the whole quotation into
+ * the body — every line, the subtotal, the GST, the total — padded with spaces
+ * so the figures lined up in a plain-text mail client. The practice sent one to
+ * themselves and said what it was: *"the quote is not acceptable. no link, no
+ * nice formatted page, no ACCEPT button, no letter of engagement — where is the
+ * rest of the mechanics of it all??"*
+ *
+ * A covering letter does not contain the documents. It says what is attached,
+ * asks the reader to read it, and says what to do next. Everything that was in
+ * this email is on the page the link opens, set as a document, with the letter
+ * of engagement beneath it and a way to accept at the foot — and the figures
+ * there cannot drift from the register, because they *are* the register.
+ *
+ * The total stays, and only the total. It is the one number a person wants
+ * before they decide whether to open anything, and it is the one that decides
+ * whether they read the rest today or next week.
  */
 export function defaultQuoteEmail(
   q: QuoteRow & { client_name: string | null },
   practice: { legalName: string; termsLabel: string; termsUrl: string; contactEmail: string; contactPhone: string },
   items: QuoteItemRow[] = [],
   capacityNote = '',
+  link = '',
 ): string {
   const totals = summariseQuote(items.map((l) => ({
     kind: l.kind, lineAmountCents: l.unit_amount_cents,
     netCents: l.net_cents, gstCents: l.gst_cents, grossCents: l.gross_cents,
   })));
 
-  // Padded so the figures line up in a plain-text mail client, which is where a
-  // quote is most often read. A description longer than the column takes its own
-  // line rather than being cut off — a truncated description on a fee quote is
-  // worse than an untidy one.
-  const WIDTH = 58;
-  const row = (label: string, amount: number) => {
-    const figure = money(amount, q.currency).padStart(12);
-    return label.length <= WIDTH ? `${label.padEnd(WIDTH)}${figure}` : `${label}\n${''.padEnd(WIDTH)}${figure}`;
-  };
-  const itemRow = (l: QuoteItemRow) => {
-    const qty = l.quantity_milli === 1000
-      ? ''
-      : ` (${formatQuantity(l.quantity_milli)} ${pluraliseUnit(l.unit_label, l.quantity_milli)} × ${money(l.unit_amount_cents, q.currency)})`;
-    return row(`  ${l.description}${qty}`, l.net_cents);
-  };
-
-  const fees = items.filter((l) => l.kind === 'professional');
-  const disbursements = items.filter((l) => l.kind !== 'professional');
-
   const lines = [
     `Dear ${q.client_name ?? 'Sir or Madam'},`,
     '',
-    'Thank you for your enquiry. I am pleased to quote for the following work:',
-    '',
-    q.description,
+    'Thank you for your enquiry. I am pleased to send you a fee quote for the work',
+    'we discussed.',
     '',
   ];
 
-  if (fees.length) lines.push('Professional fees', ...fees.map(itemRow), '');
-  if (disbursements.length) {
-    lines.push('Disbursements — paid on your behalf', ...disbursements.map(itemRow), '');
+  if (items.length) {
+    lines.push(`The total, including GST and disbursements, is ${money(totals.totalCents, q.currency)}.`, '');
   }
-  lines.push(row('Subtotal', totals.subtotalNetCents));
-  if (totals.hasGst) lines.push(row('GST', totals.gstCents));
-  lines.push(row('Total payable', totals.totalCents), '');
 
-  if (q.valid_until) lines.push(`This quote is valid until ${dateShort(q.valid_until)}.`, '');
-  if (capacityNote) lines.push(capacityNote, '');
-  if (disbursements.length) {
+  if (link) {
     lines.push(
-      'Disbursements are amounts paid to third parties on your behalf and are passed',
-      'on to you without margin.',
+      'You can read it here:',
+      '',
+      link,
+      '',
+      'That page carries the quotation itself and the Letter of Engagement, which',
+      'together set out the parties, the scope of the work, the fees and when each',
+      'part falls due. Please read them both.',
+      '',
+    );
+  } else {
+    // No link means the quotation has not been given one, which should not
+    // happen from the compose screen. Saying so is better than sending a
+    // covering note that covers nothing.
+    lines.push(
+      '[This quotation has no link yet. Open it in the register and press Email again',
+      'so that one is created before sending.]',
       '',
     );
   }
 
   if (practice.termsUrl) {
     lines.push(
-      // The same sentence the quotation itself carries, given by the practice
-      // on 9 September 2026. It names all three documents rather than only the
-      // one with an address, and the email and the quotation must not describe
-      // the engagement differently — they arrive together.
-      'This Quotation (fee quote) is subject to the Letter of Engagement, Short Form and',
-      'Standard Terms of Engagement. The Standard Terms are published at',
+      'This Quotation is also subject to the Standard Terms of Engagement, published at',
       practice.termsUrl,
-      '',
-      'Please read them before accepting this quote.',
       '',
     );
   }
 
+  if (q.valid_until) lines.push(`The quote is open for acceptance until ${dateShort(q.valid_until)}.`, '');
+  if (capacityNote) lines.push(capacityNote, '');
+
   lines.push(
-    'Please let me know if you would like to proceed, or if anything above needs clarifying.',
+    'If everything is acceptable, please sign at the foot of that page — you will be',
+    'asked for your full name and the date. If anything needs changing or explaining,',
+    'reply to this email and we will talk it through before you sign.',
     '',
     'Kind regards,',
     practice.legalName,
@@ -1443,6 +1453,34 @@ export const quotesModule: AppModule = {
           </div>
 
           <div class="col-side">
+            ${'' /* Where the client is up to, above everything else on the
+                   side, because it is the question the practice opens this page
+                   to answer once a quotation has gone out.
+
+                   It shows the link only when there is one. A quotation gets
+                   its link when the practice presses Email, so a draft has none
+                   and there is nothing to explain. */}
+            ${q.accepted_at ? html`
+              ${card('Accepted by the client', html`
+                <p class="alert alert-ok"><strong>${q.accepted_name ?? 'The client'}</strong>
+                   accepted this quotation.</p>
+                <dl class="kv">
+                  <dt>Received</dt><dd>${printedAt(q.accepted_at)}</dd>
+                  ${q.accepted_from ? html`<dt>Recorded</dt><dd class="small">${q.accepted_from}</dd>` : ''}
+                </dl>
+                <p class="hint">An acceptance cannot be changed or removed — it is the moment the
+                   contract was formed. If it was made in error, issue a new quotation.</p>`)}`
+              : q.share_token ? html`
+              ${card('The client\u2019s link', html`
+                <p class="small">This is the address the client opens. It carries the quotation
+                   ${q.with_letter === 1 ? 'and the letter of engagement ' : ''}and the acceptance
+                   form.</p>
+                <p><a class="break-url small" href="/q/${q.share_token}" target="_blank"
+                      rel="noopener">/q/${q.share_token}</a></p>
+                <p class="hint">Anybody holding this address can read the quotation, so treat it as
+                   you would the email it went in. It does not change once sent.</p>`)}`
+              : ''}
+
             ${card('Status', html`
               <p>${badge(QUOTE_STATUS_LABELS[q.status], statusTone(q.status))}</p>
               ${writable ? html`
@@ -1523,628 +1561,29 @@ export const quotesModule: AppModule = {
      */
     r.get('/:id/letter', requirePermission('register:read'), async (c) => {
       const id = c.req.param('id')!;
-      const q = await one<QuoteRow & { client_name: string | null; client_phone: string | null;
-                                       client_email: string | null; case_ref: string | null }>(
-        c.env.DB,
-        `SELECT q.*, cl.full_name AS client_name, cl.phone AS client_phone,
-                cl.email AS client_email, k.ref AS case_ref
-           FROM quotes q
-           LEFT JOIN clients cl ON cl.id = q.client_id
-           LEFT JOIN cases k ON k.id = q.case_id
-          WHERE q.id = ?`,
-        id,
-      );
-      if (!q) return c.notFound();
-
-      const [practice, text, lines, parties, types] = await Promise.all([
-        practiceDetails(c.env), engagementText(c.env), quoteLines(c.env, id),
-        quoteParties(c.env, id), caseTypes(c.env),
-      ]);
-
-      // Which clauses belong on this letter depends on the work, and the work
-      // is the quotation's. A quotation covering more than one kind of matter
-      // gets the clauses of all of them — see `clausesFor`.
-      // Every kind of work on the quotation, from all three places one can be
-      // recorded — and the union, not one instead of the others.
-      //
-      // This read the matter's type *or* the lines', never both, so a quotation
-      // covering a partnership residence application and a dependent child got
-      // the clauses of whichever branch won. The comment above it promised the
-      // opposite. Found by Fable's audit, 8 September 2026.
-      //
-      // `quotes.case_type` is the third, added by 0075: the New quote form asked
-      // for the kind of work and then threw it away, so a quotation with no
-      // matter and no case-type line had none recorded anywhere and printed
-      // with no work-specific clauses at all.
-      const kinds = [...new Set([
-        q.case_type,
-        q.case_id
-          ? (await one<{ case_type: string }>(
-              c.env.DB, 'SELECT case_type FROM cases WHERE id = ?', q.case_id))?.case_type ?? null
-          : null,
-        ...lines.map((l) => l.case_type),
-      ].filter(Boolean))] as string[];
-      const clauses = await clausesFor(c.env, kinds);
-
-      const issuedOn = q.issued_on ?? q.created_at.slice(0, 10);
-      const representative = parties.find((p) => p.is_representative === 1) ?? null;
+      const d = await loadLetter(c.env, id);
+      if (!d) return c.notFound();
       await auditFrom(c, { action: 'quote.letter_printed', entityType: 'quote', entityId: id });
-
-      /** Blank lines separate paragraphs; a line starting "- " is a bullet. */
-      const prose = (body: string) => {
-        const blocks = body.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
-        return html`${blocks.map((block) => {
-          const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
-          return lines.every((line) => line.startsWith('- '))
-            ? html`<ul>${lines.map((line) => html`<li>${emphasise(line.slice(2))}</li>`)}</ul>`
-            : html`<p>${emphasise(lines.join(' '))}</p>`;
-        })}`;
-      };
-
-      return page(c, { title: `Letter of engagement — ${q.ref}`, bare: true, paper: true }, html`
-        <article class="quote-doc letter-doc">
-          <header class="quote-doc-head">
-            <div>
-              <h1>${practice.legalName}</h1>
-              ${practice.adviserDetails ? html`<p class="prewrap small">${practice.adviserDetails}</p>` : ''}
-              ${practice.postalAddress ? html`<p class="prewrap small">${practice.postalAddress}</p>` : ''}
-              <p class="small">
-                ${practice.contactPhone ? html`Mobile: ${practice.contactPhone}<br>` : ''}
-                ${practice.contactEmail ? html`Email: ${practice.contactEmail}<br>` : ''}
-                ${practice.gstNumber ? html`GST: ${practice.gstNumber}` : ''}
-              </p>
-            </div>
-            <div class="quote-doc-ref">
-              ${'' /* No "Letter of engagement" label here, removed on the
-                     practice's instruction of 9 September 2026. The document
-                     says what it is twice over — the RE: line names it, and the
-                     rule further down heads the terms — and a third label in the
-                     corner only competed with the practice's own name beside
-                     it, which is the thing a reader should see first. */}
-              <dl class="quote-doc-meta">
-                <dt>Date</dt><dd>${dateShort(issuedOn)}</dd>
-                <dt>Our Ref</dt><dd class="strong">${q.ref}</dd>
-                ${q.case_ref ? html`<dt>Matter</dt><dd>${q.case_ref}</dd>` : ''}
-              </dl>
-            </div>
-          </header>
-
-          ${'' /* To whom, and how they are being written to.
-
-                 **No postal address, by the practice's instruction of
-                 9 September 2026:** *"The address is not required - it should
-                 only have email and phone number."* It is a letter that goes by
-                 email, to clients who are often between addresses — one of them
-                 read "Summer Place (joint tenancy address; full address not
-                 stated)", which is a note to the file rather than an address,
-                 printed on a contract. How to reach somebody is what this block
-                 is for. */}
-          <section class="letter-to">
-            ${'' /* "FOR:" rather than a bare name, asked for on 9 September
-                   2026. The block sits under the practice's own contact details
-                   and above the client's, and a name on its own between two sets
-                   of contact details does not say which of them it belongs to.
-                   Two characters settle it. */}
-            <p class="strong">FOR: ${q.client_name ?? '—'}</p>
-            ${q.client_email ? html`<p class="small">By email: ${q.client_email}</p>` : ''}
-            ${'' /* "Mobile", not "Telephone": what the register holds for a
-                   client is the number they answer, and every one of them is a
-                   mobile. Asked for on 9 September 2026. */}
-            ${q.client_phone ? html`<p class="small">Mobile: ${q.client_phone}</p>` : ''}
-          </section>
-
-          ${text.subject ? html`<p class="letter-re"><strong>RE: ${text.subject}</strong></p>` : ''}
-
-          ${'' /* The salutation, which the letter had never had. Asked for on
-                 9 September 2026: *"the letter of engagement must start with
-                 'Dear CLIENT'S FULL NAME,'"*. It opened straight into "I am
-                 pleased to act for you" under a bare name, which reads as a
-                 form rather than as a letter from a person.
-
-                 The full name as the register holds it, so it matches the name
-                 the client signs under and the name on the quotation beside it.
-                 A client with no name recorded cannot be greeted, so the line
-                 is left out rather than printing "Dear ,". */}
-          ${q.client_name ? html`<p class="letter-salutation">Dear ${q.client_name},</p>` : ''}
-
-          ${text.configured
-            ? prose(text.opening)
-            : html`<p class="alert alert-error">This letter has no wording yet. It is set under
-                     Settings → Letter of engagement, and the clauses under Quotes → Letter
-                     clauses. Nothing is supplied by the register: the words a client is asked to
-                     accept are the practice's own.</p>`}
-
-          ${'' /* Where the covering letter ends and the terms begin.
-
-                 **Asked for on 9 September 2026**, with a line drawn across a
-                 screenshot at exactly this point: everything above is the
-                 covering letter, everything below is the practice's short-form
-                 terms. Two documents on one page, and nothing said where one
-                 stopped.
-
-                 It matters beyond tidiness, because the letter points at a
-                 *second* set of terms — the Standard Terms of Engagement,
-                 published at a web address further down. A client who cannot
-                 see that the page in their hand is itself a set of terms has no
-                 way to tell the two apart. */}
-          ${text.termsTitle ? html`
-            <div class="letter-terms-start">
-              <h2>${text.termsTitle}</h2>
-              ${text.termsSubtitle ? html`<p class="small">${text.termsSubtitle}</p>` : ''}
-            </div>` : ''}
-
-          ${'' /* The one thing the letter says about the work: where to find it.
-                   The quotation carries the parties, the scope and the fees, and
-                   is attached. The heading names all four, at the practice's
-                   choice of 9 September 2026 — "the work" was too narrow for a
-                   document that also settles who the parties are and when the
-                   money falls due. */}
-          <section class="letter-brief">
-            <h3>The Parties, the Scope of Work, the Fees (Legal and Disbursements)
-                and the Payment Terms</h3>
-            ${'' /* "Quotation" capitalised: the opening defines it as a term
-                   ("the \"Quotation\"") and a defined term is capitalised
-                   wherever it appears. Asked for on 9 September 2026. */}
-            <p>These are set out in <strong>Quotation ${q.ref}</strong>, which accompanies this
-               letter and forms part of it${representative
-                 ? html`, and in which <strong>${representative.full_name}</strong> is nominated to
-                        give instructions on behalf of all parties named`
-                 : ''}. Please read it alongside this letter.</p>
-          </section>
-
-          ${'' /* And immediately under it, what the retainer does not cover.
-                 Its own section rather than inside the block above, by the
-                 practice's choice: the block says where the work is written
-                 down, this says the limits of it. Blank until the practice
-                 writes it — the register does not compose the paragraph that
-                 tells a client what their lawyer will not do. */}
-          ${text.scopeTerms ? html`
-            <section>
-              ${text.scopeHeading ? html`<h3>${text.scopeHeading}</h3>` : ''}
-              ${prose(text.scopeTerms)}
-            </section>` : ''}
-
-          ${clauses.map((clause) => html`
-            <section>
-              <h3>${clause.heading}</h3>
-              ${prose(clause.body)}
-            </section>`)}
-
-          ${'' /* Who the client actually deals with day to day.
-
-                 **Asked for on 9 September 2026.** The letter says that
-                 day-to-day contact is with an administrative team whose role is
-                 limited to support — no legal advice, no professional
-                 judgement, no representation. That paragraph names people, and
-                 the people change while the paragraph does not.
-
-                 So the paragraph is a clause in the practice's own words, and
-                 the people are settings. No name is written into this
-                 repository.
-
-                 It sits after the clauses, so the paragraph that explains the
-                 limit is read before the names it applies to. It is on the
-                 letter and not on the quotation, by the same instruction: the
-                 quotation is the work and the fees; who answers the telephone
-                 is a term of the engagement. */}
-          ${text.adminTeam.length ? html`
-            <section>
-              ${text.adminTeamHeading ? html`<h3>${text.adminTeamHeading}</h3>` : ''}
-              ${text.adminTeamIntro ? html`<p>${text.adminTeamIntro}</p>` : ''}
-              ${'' /* Each line as the practice wrote it. The register used to
-                     take the line apart and print the numbers and addresses
-                     gathered at the foot of the section; the practice looked at
-                     that and asked for the print to match the box they typed
-                     into, which it now does. */}
-              <ol class="letter-admin-team">
-                ${text.adminTeam.map((line) => html`<li>${line}</li>`)}
-                ${text.adminTeamAlso ? html`<li>${text.adminTeamAlso}</li>` : ''}
-              </ol>
-            </section>` : ''}
-
-          ${practice.termsUrl ? html`
-            <section>
-              <h3>Standard terms of engagement</h3>
-              ${'' /* Not justified. A web address cannot be broken between
-                     words, so the line before it is stretched to the full
-                     measure around whatever few words fit — which on the letter
-                     read "published" ... "at" with most of a line of white
-                     between them. Justification is for prose, and a paragraph
-                     carrying an address is only mostly prose. */}
-              <p class="letter-terms-link">This engagement is on the ${practice.termsLabel}, whose current edition is
-                 ${'' /* A live link, asked for on 9 September 2026. The
-                        address stays visible as the link's own text rather
-                        than hidden behind words, because this document is
-                        read on paper as often as on a screen and a printout
-                        of "click here" is worth nothing. */}
-                 published at <a class="break-url" href="${practice.termsUrl}"
-                    target="_blank" rel="noopener noreferrer">${practice.termsUrl}</a>. Please read them
-                 before accepting.</p>
-            </section>` : ''}
-
-          ${text.acknowledgements.length ? html`
-            <section>
-              ${text.acknowledgementsHeading
-                ? html`<h3>${text.acknowledgementsHeading}</h3>` : ''}
-              ${text.acknowledgementsIntro ? html`<p>${text.acknowledgementsIntro}</p>` : ''}
-              <ol class="letter-acknowledgements">
-                ${text.acknowledgements.map((line) => html`<li>${emphasise(line)}</li>`)}
-              </ol>
-            </section>` : ''}
-
-          ${text.closing ? html`<section>${prose(text.closing)}</section>` : ''}
-
-          <section class="letter-signature">
-            <p>Yours faithfully,</p>
-            <p class="strong">${text.signatureName || practice.legalName}</p>
-            ${text.signatureTitle ? html`<p class="small">${text.signatureTitle}</p>` : ''}
-          </section>
-
-          ${'' /* The one thing the stylesheet cannot hold.
-                 The document asks for a 20mm margin and Chrome's print dialogue
-                 overrides it on any Margins setting but Default — which is how a
-                 letter went out at 8.5mm on 9 September 2026 with the rule
-                 correctly in place and live. Said here, beside the button,
-                 because Help is not where somebody is standing when they press
-                 it. */}
-          <p class="hint no-print">In the print box, leave <strong>Margins</strong> on
-             <strong>Default</strong>. Any other setting overrides the 20mm this document asks
-             for.</p>
-          ${'' /* After the signature, and on a page of its own.
-                 It is not the practice speaking to this client about this
-                 matter — it is what every client of any New Zealand lawyer must
-                 be told — so it follows the letter rather than sitting inside
-                 it, and starting a new page also keeps the signature on the
-                 page with the letter it signs. */}
-          ${text.addendum ? html`
-            <section class="letter-addendum">
-              ${text.addendumHeading ? html`<h2>${text.addendumHeading}</h2>` : ''}
-              ${prose(text.addendum)}
-            </section>` : ''}
-
-          ${'' /* Which printing of this document the reader is holding.
-
-                 **Asked for on 9 September 2026:** *"it is better if — when
-                 Print button is clicked — a clean PDF is generated with full
-                 date and time stamp."* A quotation is revised before it goes
-                 out, and two printings of the same reference are otherwise
-                 indistinguishable once they are on paper: the reference says
-                 which document, this says which printing of it.
-
-                 Rendered by the server at the moment the page is asked for,
-                 which is what makes it honest — there is no script on these
-                 pages and the register does not read the reader's clock. It is
-                 on the screen as well as on the paper, because a document that
-                 shows one thing on screen and another on paper is the fault
-                 this register has spent the day removing. */}
-          <p class="quote-doc-stamp">Printed ${printedAt(nowIso())}</p>
+      return page(c, { title: `Letter of engagement — ${d.q.ref}`, bare: true, paper: true },
+        letterArticle(d, html`
           <footer class="quote-doc-foot no-print">
             <button class="btn btn-primary" data-print type="button">Print this letter</button>
-            <a class="btn btn-secondary" href="/quotes/${q.id}/print">The quotation</a>
-            <a class="btn btn-secondary" href="/quotes/${q.id}">Back to the quote</a>
-          </footer>
-        </article>`);
+            <a class="btn btn-secondary" href="/quotes/${id}/print">The quotation</a>
+            <a class="btn btn-secondary" href="/quotes/${id}">Back to the quote</a>
+          </footer>`));
     });
 
     r.get('/:id/print', requirePermission('register:read'), async (c) => {
       const id = c.req.param('id')!;
-      const q = await one<QuoteRow & { client_name: string | null; case_ref: string | null }>(
-        c.env.DB,
-        `SELECT q.*, cl.full_name AS client_name, k.ref AS case_ref FROM quotes q
-           LEFT JOIN clients cl ON cl.id = q.client_id
-           LEFT JOIN cases k ON k.id = q.case_id
-          WHERE q.id = ?`,
-        id,
-      );
-      if (!q) return c.notFound();
-      const [practice, lines, qs, stages, parties] = await Promise.all([
-        practiceDetails(c.env), quoteLines(c.env, id), quoteSettings(c.env), quoteStages(c.env, id),
-        quoteParties(c.env, id),
-      ]);
-
-      const totals = summariseQuote(lines.map((l) => ({
-        kind: l.kind, lineAmountCents: l.unit_amount_cents,
-        netCents: l.net_cents, gstCents: l.gst_cents, grossCents: l.gross_cents,
-      })));
-      const issuedOn = q.issued_on ?? q.created_at.slice(0, 10);
-      const validTo = q.valid_until ?? validUntil(issuedOn, q.validity_days ?? qs.validityDays);
-      const fees = lines.filter((l) => l.kind === 'professional');
-      const disbursements = lines.filter((l) => l.kind !== 'professional');
+      const d = await loadQuotation(c.env, id);
+      if (!d) return c.notFound();
       await auditFrom(c, { action: 'quote.printed', entityType: 'quote', entityId: id });
-
-      // Split once rather than filtered three times inside the template, so the
-      // document's order is stated in one place and reads the way the letter
-      // reads: applicants, then the people whose details the application needs,
-      // then the people who may be told things.
-      const applicants = parties.filter((p) => p.role === 'applicant');
-      const associated = parties.filter((p) => p.role === 'associated');
-      const contacts = parties.filter((p) => p.role === 'admin_contact');
-      const representative = parties.find((p) => p.is_representative === 1) ?? null;
-
-      /** Their relationship, birthday and how to reach them, in one line. */
-      const partyDetail = (p: QuotePartyRow) => {
-        const bits = [
-          p.relationship,
-          p.date_of_birth ? `born ${dateShort(p.date_of_birth)}` : null,
-          p.email, p.phone,
-        ].filter(Boolean) as string[];
-        return bits.length ? html`<div class="small">${bits.join(' · ')}</div>` : '';
-      };
-
-      const lineRows = (rows: QuoteItemRow[]) => rows.map((l) => html`
-        <tr>
-          <td>${l.description}</td>
-          <td class="num">${formatQuantity(l.quantity_milli)} ${pluraliseUnit(l.unit_label, l.quantity_milli)}</td>
-          <td class="num">${money(l.unit_amount_cents, q.currency)}</td>
-          <td class="num">${money(l.net_cents, q.currency)}</td>
-        </tr>`);
-
-      return page(c, { title: `Quote ${q.ref}`, bare: true, paper: true }, html`
-        <article class="quote-doc">
-          <header class="quote-doc-head">
-            <div>
-              <h1>${practice.legalName}</h1>
-              ${practice.adviserDetails ? html`<p class="prewrap small">${practice.adviserDetails}</p>` : ''}
-              ${practice.postalAddress ? html`<p class="prewrap small">${practice.postalAddress}</p>` : ''}
-              ${'' /* Labelled, at the practice's instruction of 9 September
-                     2026. A bare address and a bare number under a firm's name
-                     are two lines a reader has to work out; two words settle
-                     it, and the GST number belongs with them because it is the
-                     other thing a client copies off a fee document. */}
-              <p class="small">
-                ${practice.contactPhone ? html`Mobile: ${practice.contactPhone}<br>` : ''}
-                ${practice.contactEmail ? html`Email: ${practice.contactEmail}<br>` : ''}
-                ${practice.gstNumber ? html`GST: ${practice.gstNumber}` : ''}
-              </p>
-            </div>
-            <div class="quote-doc-ref">
-              ${'' /* What the document is, said large.
-
-                     **Asked for on 9 September 2026**, then refined the same
-                     hour: *"the word Fee Quote needs to be moved — into the
-                     header above my name — x3 larger in font"*, and then
-                     *"keep the position where it is but align it as the rest of
-                     the text — on the right margin — and increase its font."*
-
-                     So it stays at the head of the right-hand column, flush to
-                     the right margin with the reference block beneath it, and
-                     is simply much larger: it was set at the size of an
-                     ordinary heading, which made it read as a label on the
-                     reference rather than as the name of the document. */}
-              <p class="quote-doc-kind">Fee quote</p>
-              ${'' /* "Re", not a Scope paragraph. The name says what the
-                       quotation is for in one line, the way a letter's subject
-                       does; the items below say what that means. Taking the old
-                       Scope section out left the document saying only "Fee
-                       quote" and a reference, which a client cannot place. */}
-              <dl class="quote-doc-meta">
-                ${'' /* No "Re" line. **Asked for on 9 September 2026:**
-                       *"remove the Re RV. Partner bit completely — the body of
-                       the quote is telling enough."* Right: the items below name
-                       the work, line by line, with a figure against each. A
-                       heading that says "RV. Partner" above a list beginning
-                       "RV. Partner" is the document repeating itself. */}
-                <dt>Quote</dt><dd class="strong">${q.ref}</dd>
-                <dt>Issued</dt><dd>${dateShort(issuedOn)}</dd>
-                <dt>Valid until</dt><dd class="strong">${dateShort(validTo)}</dd>
-                ${q.case_ref ? html`<dt>Matter</dt><dd>${q.case_ref}</dd>` : ''}
-              </dl>
-            </div>
-          </header>
-
-          ${'' /* The parties, as the letter of engagement states them — because
-                   the letter will not state them itself. The practice's
-                   decision, 8 September 2026: the letter is a covering letter
-                   and the quotation attached to it is the substance, so this
-                   document has to be able to stand as the record of who the
-                   engagement is with.
-
-                   Everybody is named in the same section rather than the
-                   client in one place and the rest in another: a contract that
-                   lists its parties in two lists invites the question of
-                   whether the second list is party to it. */}
-          <section>
-            <h3>The parties</h3>
-            <dl class="kv quote-doc-parties">
-              ${'' /* "The Lawyer" and "The Client" are the defined terms the
-                     letter and the terms of engagement use, so they are
-                     capitalised here as they are there. */}
-              <dt>The Lawyer</dt><dd>${practice.legalName}</dd>
-              <dt>The Client</dt>
-              ${'' /* The nomination sits beside the name in brackets rather
-                     than on a line of its own beneath it: it qualifies who this
-                     person is, and read underneath it looked like a second
-                     fact about them. Smaller, because it is an aside. */}
-              <dd><strong>${q.client_name ?? '—'}</strong>${
-                representative
-                  ? ''
-                  : html` <span class="small muted">(Nominated representative for all
-                          parties)</span>`}</dd>
-              ${applicants.map((p) => html`
-                <dt>Applicant</dt>
-                <dd><strong>${p.full_name}</strong>${partyDetail(p)}</dd>`)}
-              ${associated.map((p) => html`
-                <dt>Associated party</dt>
-                <dd><strong>${p.full_name}</strong>${partyDetail(p)}</dd>`)}
-            </dl>
-            ${representative ? html`
-              <p class="small"><strong>${representative.full_name}</strong> is nominated to give
-                 instructions on behalf of all parties named above.</p>` : ''}
-            ${contacts.length ? html`
-              <h4 class="quote-doc-subhead">Day-to-day administrative contact</h4>
-              <dl class="kv quote-doc-parties">
-                ${contacts.map((p) => html`
-                  <dt>${p.organisation || 'Contact'}</dt>
-                  <dd><strong>${p.full_name}</strong>${partyDetail(p)}</dd>`)}
-              </dl>
-              <p class="small">Their role is limited to administrative and clerical support on this
-                 matter — collecting and organising documents, passing on progress, and dealing with
-                 Immigration New Zealand on administrative matters only. They are not authorised to
-                 give legal advice, to exercise professional judgement, or to act as your legal
-                 representative. All legal advice and all decisions come from the lawyer named
-                 above.</p>` : ''}
-          </section>
-
-          ${'' /* No Scope section. The practice, on the box that fed it: "this
-                   field called Scope seems superfluous. why do i need to enter
-                   details in it when that will be in the quotation?" Right about
-                   the paragraph — the items below are the scope, and a sentence
-                   beside them can only repeat them or disagree with them. The
-                   value itself stays as the quotation's name, at the top. */}
-
-          ${lines.length === 0
-            ? html`<p class="muted">No items have been added to this quote yet.</p>`
-            : html`
-          <table class="quote-doc-table">
-            <thead>
-              <tr><th>Description</th><th class="num">Quantity</th><th class="num">Unit price</th><th class="num">Amount</th></tr>
-            </thead>
-            <tbody>
-              ${fees.length ? html`
-                <tr class="quote-doc-group"><td colspan="4">Professional fees</td></tr>
-                ${lineRows(fees)}` : ''}
-              ${disbursements.length ? html`
-                <tr class="quote-doc-group"><td colspan="4">Disbursements — paid on your behalf</td></tr>
-                ${lineRows(disbursements)}` : ''}
-            </tbody>
-            <tfoot>
-              ${fees.length && disbursements.length ? html`
-                <tr><td colspan="3">Professional fees</td>
-                    <td class="num">${money(totals.feesNetCents, q.currency)}</td></tr>
-                <tr><td colspan="3">Disbursements</td>
-                    <td class="num">${money(totals.disbursementsNetCents, q.currency)}</td></tr>` : ''}
-              <tr><td colspan="3">Subtotal</td>
-                  <td class="num">${money(totals.subtotalNetCents, q.currency)}</td></tr>
-              ${totals.hasGst
-                ? html`<tr><td colspan="3">GST</td>
-                           <td class="num">${money(totals.gstCents, q.currency)}</td></tr>`
-                : html`<tr><td colspan="4" class="small muted">No GST applies to this quote.</td></tr>`}
-              <tr class="totals-row">
-                <td colspan="3" class="strong">Total payable</td>
-                <td class="num strong">${money(totals.totalCents, q.currency)}</td></tr>
-            </tfoot>
-          </table>`}
-
-          ${stages.length ? html`
-          <section>
-            <h3>Payment stages</h3>
-            <table class="quote-doc-table">
-              <thead><tr><th>Description</th><th class="num">Amount</th></tr></thead>
-              <tbody>
-                ${stages.map((s) => html`
-                  <tr>
-                    <td>${s.label ? html`<strong>${s.label}</strong> ` : ''}${s.description}</td>
-                    ${'' /* The figure the client pays, not the figure plus a
-                           promise of tax. Asked for on 9 September 2026: the
-                           stages "should already be showing the GST inclusive
-                           amounts". A schedule of payments whose rows have to
-                           be added to a percentage before they mean anything is
-                           a schedule the client has to do arithmetic on, and
-                           the total underneath was already inclusive — so the
-                           rows and the total were in different currencies. */}
-                    <td class="num">${money(s.gross_cents, q.currency)}</td>
-                  </tr>`)}
-              </tbody>
-              <tfoot>
-                <tr class="totals-row">
-                  <td class="strong">Total including GST</td>
-                  <td class="num strong">${money(stages.reduce((n, s) => n + s.gross_cents, 0), q.currency)}</td>
-                </tr>
-              </tfoot>
-            </table>
-            ${q.stage_note ? html`<p class="small prewrap quote-doc-note"><strong>Note:</strong> ${q.stage_note}</p>` : ''}
-          </section>` : ''}
-
-          ${practice.showBankOnQuote && practice.bankAccountNumber ? html`
-          <section>
-            <h3>Payment</h3>
-            <dl class="kv quote-doc-bank">
-              ${practice.bankAccountHolder ? html`<dt>Account holder</dt><dd>${practice.bankAccountHolder}</dd>` : ''}
-              ${practice.bankName ? html`<dt>Bank</dt><dd>${practice.bankName}</dd>` : ''}
-              <dt>Account</dt><dd><strong>${practice.bankAccountNumber}</strong></dd>
-            </dl>
-            <p class="small muted">Please quote <strong>${q.ref}</strong> as the reference. If you
-               receive an email appearing to change these details, telephone this office on the
-               number above before paying anything.</p>
-          </section>` : ''}
-
-          <section class="quote-doc-terms">
-            <h3>Conditions</h3>
-            <ul class="quote-doc-conditions">
-              <li>This quote is valid until <strong>${dateShort(validTo)}</strong>.</li>
-              ${qs.capacityNote ? html`<li>${qs.capacityNote}</li>` : ''}
-              ${qs.paymentTerms ? html`<li>${qs.paymentTerms}</li>` : ''}
-              ${disbursements.length
-                ? html`<li>Disbursements are amounts paid to third parties on your behalf and are
-                           passed on to you without margin. Where an exact figure is not yet known,
-                           the amount shown is an estimate and you will be told before it is
-                           incurred.</li>`
-                : ''}
-              ${'' /* What the client is agreeing to, named.
-
-                     **The practice's own sentence, given on 9 September 2026**,
-                     replacing one that named a single document: *"This
-                     Quotation (fee quote) is subject to the Letter of
-                     Engagement, Short Form and Standard Terms of Engagement.
-                     Please read them before accepting."*
-
-                     Three documents rather than one, which is what a client is
-                     actually held to — the covering letter, the short-form
-                     terms printed under it, and the standard terms published
-                     online. Naming only the last of them was the omission.
-
-                     "Standard Terms of Engagement" is the linked phrase because
-                     it is the only one of the three with an address of its own;
-                     the other two are in the client's hand. It is written here
-                     rather than taken from `practice.terms_label`, because it
-                     is now part of a sentence that names three documents rather
-                     than a label standing on its own. If a practice ever needs
-                     to call it something else, that is a setting to add, not a
-                     reason to keep the old sentence.
-
-                     The address still prints beneath, and only on paper, where
-                     a hyperlink is worth nothing. */}
-              ${practice.termsUrl
-                ? html`<li>This Quotation (fee quote) is subject to the Letter of Engagement,
-                           Short Form and
-                           <a href="${practice.termsUrl}" rel="noopener"><strong>Standard Terms of
-                           Engagement</strong></a>. Please read them before accepting.
-                           <span class="print-only break-url">${practice.termsUrl}</span></li>`
-                : ''}
-            </ul>
-          </section>
-
-          ${'' /* The one thing the stylesheet cannot hold.
-                 The document asks for a 20mm margin and Chrome's print dialogue
-                 overrides it on any Margins setting but Default — which is how a
-                 letter went out at 8.5mm on 9 September 2026 with the rule
-                 correctly in place and live. Said here, beside the button,
-                 because Help is not where somebody is standing when they press
-                 it. */}
-          <p class="hint no-print">In the print box, leave <strong>Margins</strong> on
-             <strong>Default</strong>. Any other setting overrides the 20mm this document asks
-             for.</p>
-          ${'' /* Which printing of this document the reader is holding.
-
-                 **Asked for on 9 September 2026:** *"it is better if — when
-                 Print button is clicked — a clean PDF is generated with full
-                 date and time stamp."* A quotation is revised before it goes
-                 out, and two printings of the same reference are otherwise
-                 indistinguishable once they are on paper: the reference says
-                 which document, this says which printing of it.
-
-                 Rendered by the server at the moment the page is asked for,
-                 which is what makes it honest — there is no script on these
-                 pages and the register does not read the reader's clock. It is
-                 on the screen as well as on the paper, because a document that
-                 shows one thing on screen and another on paper is the fault
-                 this register has spent the day removing. */}
-          <p class="quote-doc-stamp">Printed ${printedAt(nowIso())}</p>
+      return page(c, { title: `Quote ${d.q.ref}`, bare: true, paper: true },
+        quotationArticle(d, html`
           <footer class="quote-doc-foot no-print">
             <button class="btn btn-primary" data-print type="button">Print this quote</button>
-            <a class="btn btn-secondary" href="/quotes/${q.id}">Back to the quote</a>
-          </footer>
-        </article>`);
+            <a class="btn btn-secondary" href="/quotes/${id}">Back to the quote</a>
+          </footer>`));
     });
 
     /** Compose an email of the quote. It is queued and recorded, never sent blind. */
@@ -2163,6 +1602,20 @@ export const quotesModule: AppModule = {
       ]);
       const csrf = c.get('session')!.csrf;
       const configured = mailConfigured(c.env);
+
+      // The client's link, minted here if the quotation has not got one.
+      //
+      // Here rather than when the quotation is created, because this is the
+      // moment it is about to leave the office. A quotation that is never sent
+      // never gets a link, and there is nothing to guess at.
+      //
+      // The address is the practice's own where they have set one, so a client
+      // reads their fee quote at the firm's address rather than at
+      // workers.dev — the same rule the reminder emails follow.
+      const token = await shareTokenFor(c.env, id);
+      const base = canonicalBaseFrom(
+        await getSetting(c.env, 'website.canonical_url', ''), new URL(c.req.url).origin);
+      const shareLink = token ? shareUrl(base, token) : '';
 
       return page(c, { title: `Email ${q.ref}`, active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { href: `/quotes/${q.id}`, label: q.ref }, { label: 'Email' }])}
@@ -2224,7 +1677,7 @@ export const quotesModule: AppModule = {
 
           <label class="visually-hidden" for="f_body">Message</label>
           <textarea id="f_body" name="body" rows="24" required maxlength="20000"
-                    class="compose-body">${defaultQuoteEmail(q, practice, items, qs.capacityNote)}</textarea>
+                    class="compose-body">${defaultQuoteEmail(q, practice, items, qs.capacityNote, shareLink)}</textarea>
 
           <div class="compose-actions">
             <button class="btn btn-primary" type="submit">Queue this email</button>
@@ -2821,12 +2274,21 @@ export const quotesModule: AppModule = {
         });
 
         const intended = planned.reduce((sum, p) => sum + p.gross, 0);
+        const current = existing.reduce((sum, stage) => sum + stage.gross_cents, 0);
         if (intended > budget) {
+          // Nothing is written, so the schedule on the page is still the one
+          // that was there before. **Said explicitly on 9 September 2026**,
+          // when the practice saw this message over a schedule showing a third
+          // figure and asked why there were two warnings: the refusal talks
+          // about what was typed, the warning underneath the schedule talks
+          // about what is saved, and without a sentence joining them the two
+          // read as the register contradicting itself.
           return redirectWith(c, `/quotes/${id}`,
             `That schedule comes to ${money(intended, q.currency)}, which is `
             + `${money(intended - budget, q.currency)} more than the quotation's `
-            + `${money(budget, q.currency)}. Nothing was saved. A schedule divides up the fees `
-            + 'and disbursements; it cannot add to them.', 'err');
+            + `${money(budget, q.currency)}. Nothing was saved, so the schedule below still shows `
+            + `the ${money(current, q.currency)} it was at. A schedule divides up the fees and `
+            + 'disbursements; it cannot add to them.', 'err');
         }
 
         for (const stage of removing) {
@@ -2969,6 +2431,655 @@ export const quotesModule: AppModule = {
     app.route('/quotes', r);
   },
 };
+
+/* ---------------------------------------------------------------------------
+ * The two documents, in one place each.
+ *
+ * **Split out on 9 September 2026**, so that a client reading their quotation
+ * at a private link reads the *same* document the practice prints — not a
+ * second rendering of it. These are contracts. Two templates for one contract
+ * is the "one fact, one owner" rule broken in the place it matters most: they
+ * would agree the day they were written and drift the first time only one of
+ * them was corrected.
+ *
+ * Each is a loader and a renderer. The loader gathers what the document needs
+ * and answers `null` for a quotation that is not there; the renderer takes that
+ * and a footer, which is the one part that genuinely differs — the practice
+ * gets Print and Back, the client gets the acceptance panel.
+ * ------------------------------------------------------------------------ */
+
+/** Blank lines separate paragraphs; a line starting "- " is a bullet. */
+function prose(body: string): Raw {
+  const blocks = body.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
+  return html`${blocks.map((block) => {
+    const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
+    return lines.every((line) => line.startsWith('- '))
+      ? html`<ul>${lines.map((line) => html`<li>${emphasise(line.slice(2))}</li>`)}</ul>`
+      : html`<p>${emphasise(lines.join(' '))}</p>`;
+  })}`;
+}
+
+export async function loadLetter(env: Env, id: string) {
+    const q = await one<QuoteRow & { client_name: string | null; client_phone: string | null;
+                                     client_email: string | null; case_ref: string | null }>(
+      env.DB,
+      `SELECT q.*, cl.full_name AS client_name, cl.phone AS client_phone,
+              cl.email AS client_email, k.ref AS case_ref
+         FROM quotes q
+         LEFT JOIN clients cl ON cl.id = q.client_id
+         LEFT JOIN cases k ON k.id = q.case_id
+        WHERE q.id = ?`,
+      id,
+    );
+    if (!q) return null;
+
+    const [practice, text, lines, parties, types] = await Promise.all([
+      practiceDetails(env), engagementText(env), quoteLines(env, id),
+      quoteParties(env, id), caseTypes(env),
+    ]);
+
+    // Which clauses belong on this letter depends on the work, and the work
+    // is the quotation's. A quotation covering more than one kind of matter
+    // gets the clauses of all of them — see `clausesFor`.
+    // Every kind of work on the quotation, from all three places one can be
+    // recorded — and the union, not one instead of the others.
+    //
+    // This read the matter's type *or* the lines', never both, so a quotation
+    // covering a partnership residence application and a dependent child got
+    // the clauses of whichever branch won. The comment above it promised the
+    // opposite. Found by Fable's audit, 8 September 2026.
+    //
+    // `quotes.case_type` is the third, added by 0075: the New quote form asked
+    // for the kind of work and then threw it away, so a quotation with no
+    // matter and no case-type line had none recorded anywhere and printed
+    // with no work-specific clauses at all.
+    const kinds = [...new Set([
+      q.case_type,
+      q.case_id
+        ? (await one<{ case_type: string }>(
+            env.DB, 'SELECT case_type FROM cases WHERE id = ?', q.case_id))?.case_type ?? null
+        : null,
+      ...lines.map((l) => l.case_type),
+    ].filter(Boolean))] as string[];
+    const clauses = await clausesFor(env, kinds);
+
+    const issuedOn = q.issued_on ?? q.created_at.slice(0, 10);
+    const representative = parties.find((p) => p.is_representative === 1) ?? null;
+  return { q, practice, text, clauses, issuedOn, representative };
+}
+
+export function letterArticle(
+  d: NonNullable<Awaited<ReturnType<typeof loadLetter>>>, footer: Raw,
+): Raw {
+  const { q, practice, text, clauses, issuedOn, representative } = d;
+  return html`
+        <article class="quote-doc letter-doc">
+          <header class="quote-doc-head">
+            <div>
+              <h1>${practice.legalName}</h1>
+              ${practice.adviserDetails ? html`<p class="prewrap small">${practice.adviserDetails}</p>` : ''}
+              ${practice.postalAddress ? html`<p class="prewrap small">${practice.postalAddress}</p>` : ''}
+              <p class="small">
+                ${practice.contactPhone ? html`Mobile: ${practice.contactPhone}<br>` : ''}
+                ${practice.contactEmail ? html`Email: ${practice.contactEmail}<br>` : ''}
+                ${practice.gstNumber ? html`GST: ${practice.gstNumber}` : ''}
+              </p>
+            </div>
+            <div class="quote-doc-ref">
+              ${'' /* No "Letter of engagement" label here, removed on the
+                     practice's instruction of 9 September 2026. The document
+                     says what it is twice over — the RE: line names it, and the
+                     rule further down heads the terms — and a third label in the
+                     corner only competed with the practice's own name beside
+                     it, which is the thing a reader should see first. */}
+              <dl class="quote-doc-meta">
+                <dt>Date</dt><dd>${dateShort(issuedOn)}</dd>
+                <dt>Our Ref</dt><dd class="strong">${q.ref}</dd>
+                ${q.case_ref ? html`<dt>Matter</dt><dd>${q.case_ref}</dd>` : ''}
+              </dl>
+            </div>
+          </header>
+
+          ${'' /* To whom, and how they are being written to.
+
+                 **No postal address, by the practice's instruction of
+                 9 September 2026:** *"The address is not required - it should
+                 only have email and phone number."* It is a letter that goes by
+                 email, to clients who are often between addresses — one of them
+                 read "Summer Place (joint tenancy address; full address not
+                 stated)", which is a note to the file rather than an address,
+                 printed on a contract. How to reach somebody is what this block
+                 is for. */}
+          <section class="letter-to">
+            ${'' /* "FOR:" rather than a bare name, asked for on 9 September
+                   2026. The block sits under the practice's own contact details
+                   and above the client's, and a name on its own between two sets
+                   of contact details does not say which of them it belongs to.
+                   Two characters settle it. */}
+            <p class="strong">FOR: ${q.client_name ?? '—'}</p>
+            ${q.client_email ? html`<p class="small">By email: ${q.client_email}</p>` : ''}
+            ${'' /* "Mobile", not "Telephone": what the register holds for a
+                   client is the number they answer, and every one of them is a
+                   mobile. Asked for on 9 September 2026. */}
+            ${q.client_phone ? html`<p class="small">Mobile: ${q.client_phone}</p>` : ''}
+          </section>
+
+          ${text.subject ? html`<p class="letter-re"><strong>RE: ${text.subject}</strong></p>` : ''}
+
+          ${'' /* The salutation, which the letter had never had. Asked for on
+                 9 September 2026: *"the letter of engagement must start with
+                 'Dear CLIENT'S FULL NAME,'"*. It opened straight into "I am
+                 pleased to act for you" under a bare name, which reads as a
+                 form rather than as a letter from a person.
+
+                 The full name as the register holds it, so it matches the name
+                 the client signs under and the name on the quotation beside it.
+                 A client with no name recorded cannot be greeted, so the line
+                 is left out rather than printing "Dear ,". */}
+          ${q.client_name ? html`<p class="letter-salutation">Dear ${q.client_name},</p>` : ''}
+
+          ${text.configured
+            ? prose(text.opening)
+            : html`<p class="alert alert-error">This letter has no wording yet. It is set under
+                     Settings → Letter of engagement, and the clauses under Quotes → Letter
+                     clauses. Nothing is supplied by the register: the words a client is asked to
+                     accept are the practice's own.</p>`}
+
+          ${'' /* Where the covering letter ends and the terms begin.
+
+                 **Asked for on 9 September 2026**, with a line drawn across a
+                 screenshot at exactly this point: everything above is the
+                 covering letter, everything below is the practice's short-form
+                 terms. Two documents on one page, and nothing said where one
+                 stopped.
+
+                 It matters beyond tidiness, because the letter points at a
+                 *second* set of terms — the Standard Terms of Engagement,
+                 published at a web address further down. A client who cannot
+                 see that the page in their hand is itself a set of terms has no
+                 way to tell the two apart. */}
+          ${text.termsTitle ? html`
+            <div class="letter-terms-start">
+              <h2>${text.termsTitle}</h2>
+              ${text.termsSubtitle ? html`<p class="small">${text.termsSubtitle}</p>` : ''}
+            </div>` : ''}
+
+          ${'' /* The one thing the letter says about the work: where to find it.
+                   The quotation carries the parties, the scope and the fees, and
+                   is attached. The heading names all four, at the practice's
+                   choice of 9 September 2026 — "the work" was too narrow for a
+                   document that also settles who the parties are and when the
+                   money falls due. */}
+          <section class="letter-brief">
+            <h3>The Parties, the Scope of Work, the Fees (Legal and Disbursements)
+                and the Payment Terms</h3>
+            ${'' /* "Quotation" capitalised: the opening defines it as a term
+                   ("the \"Quotation\"") and a defined term is capitalised
+                   wherever it appears. Asked for on 9 September 2026. */}
+            <p>These are set out in <strong>Quotation ${q.ref}</strong>, which accompanies this
+               letter and forms part of it${representative
+                 ? html`, and in which <strong>${representative.full_name}</strong> is nominated to
+                        give instructions on behalf of all parties named`
+                 : ''}. Please read it alongside this letter.</p>
+          </section>
+
+          ${'' /* And immediately under it, what the retainer does not cover.
+                 Its own section rather than inside the block above, by the
+                 practice's choice: the block says where the work is written
+                 down, this says the limits of it. Blank until the practice
+                 writes it — the register does not compose the paragraph that
+                 tells a client what their lawyer will not do. */}
+          ${text.scopeTerms ? html`
+            <section>
+              ${text.scopeHeading ? html`<h3>${text.scopeHeading}</h3>` : ''}
+              ${prose(text.scopeTerms)}
+            </section>` : ''}
+
+          ${clauses.map((clause) => html`
+            <section>
+              <h3>${clause.heading}</h3>
+              ${prose(clause.body)}
+            </section>`)}
+
+          ${'' /* Who the client actually deals with day to day.
+
+                 **Asked for on 9 September 2026.** The letter says that
+                 day-to-day contact is with an administrative team whose role is
+                 limited to support — no legal advice, no professional
+                 judgement, no representation. That paragraph names people, and
+                 the people change while the paragraph does not.
+
+                 So the paragraph is a clause in the practice's own words, and
+                 the people are settings. No name is written into this
+                 repository.
+
+                 It sits after the clauses, so the paragraph that explains the
+                 limit is read before the names it applies to. It is on the
+                 letter and not on the quotation, by the same instruction: the
+                 quotation is the work and the fees; who answers the telephone
+                 is a term of the engagement. */}
+          ${text.adminTeam.length ? html`
+            <section>
+              ${text.adminTeamHeading ? html`<h3>${text.adminTeamHeading}</h3>` : ''}
+              ${text.adminTeamIntro ? html`<p>${text.adminTeamIntro}</p>` : ''}
+              ${'' /* Each line as the practice wrote it. The register used to
+                     take the line apart and print the numbers and addresses
+                     gathered at the foot of the section; the practice looked at
+                     that and asked for the print to match the box they typed
+                     into, which it now does. */}
+              <ol class="letter-admin-team">
+                ${text.adminTeam.map((line) => html`<li>${line}</li>`)}
+                ${text.adminTeamAlso ? html`<li>${text.adminTeamAlso}</li>` : ''}
+              </ol>
+            </section>` : ''}
+
+          ${practice.termsUrl ? html`
+            <section>
+              <h3>Standard terms of engagement</h3>
+              ${'' /* Not justified. A web address cannot be broken between
+                     words, so the line before it is stretched to the full
+                     measure around whatever few words fit — which on the letter
+                     read "published" ... "at" with most of a line of white
+                     between them. Justification is for prose, and a paragraph
+                     carrying an address is only mostly prose. */}
+              <p class="letter-terms-link">This engagement is on the ${practice.termsLabel}, whose current edition is
+                 ${'' /* A live link, asked for on 9 September 2026. The
+                        address stays visible as the link's own text rather
+                        than hidden behind words, because this document is
+                        read on paper as often as on a screen and a printout
+                        of "click here" is worth nothing. */}
+                 published at <a class="break-url" href="${practice.termsUrl}"
+                    target="_blank" rel="noopener noreferrer">${practice.termsUrl}</a>. Please read them
+                 before accepting.</p>
+            </section>` : ''}
+
+          ${text.acknowledgements.length ? html`
+            <section>
+              ${text.acknowledgementsHeading
+                ? html`<h3>${text.acknowledgementsHeading}</h3>` : ''}
+              ${text.acknowledgementsIntro ? html`<p>${text.acknowledgementsIntro}</p>` : ''}
+              <ol class="letter-acknowledgements">
+                ${text.acknowledgements.map((line) => html`<li>${emphasise(line)}</li>`)}
+              </ol>
+            </section>` : ''}
+
+          ${text.closing ? html`<section>${prose(text.closing)}</section>` : ''}
+
+          <section class="letter-signature">
+            <p>Yours faithfully,</p>
+            <p class="strong">${text.signatureName || practice.legalName}</p>
+            ${text.signatureTitle ? html`<p class="small">${text.signatureTitle}</p>` : ''}
+          </section>
+
+          ${'' /* The one thing the stylesheet cannot hold.
+                 The document asks for a 20mm margin and Chrome's print dialogue
+                 overrides it on any Margins setting but Default — which is how a
+                 letter went out at 8.5mm on 9 September 2026 with the rule
+                 correctly in place and live. Said here, beside the button,
+                 because Help is not where somebody is standing when they press
+                 it. */}
+          <p class="hint no-print">In the print box, leave <strong>Margins</strong> on
+             <strong>Default</strong>. Any other setting overrides the 20mm this document asks
+             for.</p>
+          ${'' /* After the signature, and on a page of its own.
+                 It is not the practice speaking to this client about this
+                 matter — it is what every client of any New Zealand lawyer must
+                 be told — so it follows the letter rather than sitting inside
+                 it, and starting a new page also keeps the signature on the
+                 page with the letter it signs. */}
+          ${text.addendum ? html`
+            <section class="letter-addendum">
+              ${text.addendumHeading ? html`<h2>${text.addendumHeading}</h2>` : ''}
+              ${prose(text.addendum)}
+            </section>` : ''}
+
+          ${'' /* Which printing of this document the reader is holding.
+
+                 **Asked for on 9 September 2026:** *"it is better if — when
+                 Print button is clicked — a clean PDF is generated with full
+                 date and time stamp."* A quotation is revised before it goes
+                 out, and two printings of the same reference are otherwise
+                 indistinguishable once they are on paper: the reference says
+                 which document, this says which printing of it.
+
+                 Rendered by the server at the moment the page is asked for,
+                 which is what makes it honest — there is no script on these
+                 pages and the register does not read the reader's clock. It is
+                 on the screen as well as on the paper, because a document that
+                 shows one thing on screen and another on paper is the fault
+                 this register has spent the day removing. */}
+          <p class="quote-doc-stamp">Printed ${printedAt(nowIso())}</p>
+          ${footer}
+        </article>`;
+}
+
+export async function loadQuotation(env: Env, id: string) {
+    const q = await one<QuoteRow & { client_name: string | null; case_ref: string | null }>(
+      env.DB,
+      `SELECT q.*, cl.full_name AS client_name, k.ref AS case_ref FROM quotes q
+         LEFT JOIN clients cl ON cl.id = q.client_id
+         LEFT JOIN cases k ON k.id = q.case_id
+        WHERE q.id = ?`,
+      id,
+    );
+    if (!q) return null;
+    const [practice, lines, qs, stages, parties] = await Promise.all([
+      practiceDetails(env), quoteLines(env, id), quoteSettings(env), quoteStages(env, id),
+      quoteParties(env, id),
+    ]);
+
+    const totals = summariseQuote(lines.map((l) => ({
+      kind: l.kind, lineAmountCents: l.unit_amount_cents,
+      netCents: l.net_cents, gstCents: l.gst_cents, grossCents: l.gross_cents,
+    })));
+    const issuedOn = q.issued_on ?? q.created_at.slice(0, 10);
+    const validTo = q.valid_until ?? validUntil(issuedOn, q.validity_days ?? qs.validityDays);
+    const fees = lines.filter((l) => l.kind === 'professional');
+    const disbursements = lines.filter((l) => l.kind !== 'professional');
+
+    // Split once rather than filtered three times inside the template, so the
+    // document's order is stated in one place and reads the way the letter
+    // reads: applicants, then the people whose details the application needs,
+    // then the people who may be told things.
+    const applicants = parties.filter((p) => p.role === 'applicant');
+    const associated = parties.filter((p) => p.role === 'associated');
+    const contacts = parties.filter((p) => p.role === 'admin_contact');
+    const representative = parties.find((p) => p.is_representative === 1) ?? null;
+
+    /** Their relationship, birthday and how to reach them, in one line. */
+    const partyDetail = (p: QuotePartyRow) => {
+      const bits = [
+        p.relationship,
+        p.date_of_birth ? `born ${dateShort(p.date_of_birth)}` : null,
+        p.email, p.phone,
+      ].filter(Boolean) as string[];
+      return bits.length ? html`<div class="small">${bits.join(' · ')}</div>` : '';
+    };
+
+    const lineRows = (rows: QuoteItemRow[]) => rows.map((l) => html`
+      <tr>
+        <td>${l.description}</td>
+        <td class="num">${formatQuantity(l.quantity_milli)} ${pluraliseUnit(l.unit_label, l.quantity_milli)}</td>
+        <td class="num">${money(l.unit_amount_cents, q.currency)}</td>
+        <td class="num">${money(l.net_cents, q.currency)}</td>
+      </tr>`);
+  return {
+    q, practice, qs, lines, stages, totals, issuedOn, validTo, fees, disbursements,
+    applicants, associated, contacts, representative, partyDetail, lineRows,
+  };
+}
+
+export function quotationArticle(
+  d: NonNullable<Awaited<ReturnType<typeof loadQuotation>>>, footer: Raw,
+): Raw {
+  const {
+    q, practice, qs, lines, stages, totals, issuedOn, validTo, fees, disbursements,
+    applicants, associated, contacts, representative, partyDetail, lineRows,
+  } = d;
+  return html`
+        <article class="quote-doc">
+          <header class="quote-doc-head">
+            <div>
+              <h1>${practice.legalName}</h1>
+              ${practice.adviserDetails ? html`<p class="prewrap small">${practice.adviserDetails}</p>` : ''}
+              ${practice.postalAddress ? html`<p class="prewrap small">${practice.postalAddress}</p>` : ''}
+              ${'' /* Labelled, at the practice's instruction of 9 September
+                     2026. A bare address and a bare number under a firm's name
+                     are two lines a reader has to work out; two words settle
+                     it, and the GST number belongs with them because it is the
+                     other thing a client copies off a fee document. */}
+              <p class="small">
+                ${practice.contactPhone ? html`Mobile: ${practice.contactPhone}<br>` : ''}
+                ${practice.contactEmail ? html`Email: ${practice.contactEmail}<br>` : ''}
+                ${practice.gstNumber ? html`GST: ${practice.gstNumber}` : ''}
+              </p>
+            </div>
+            <div class="quote-doc-ref">
+              ${'' /* What the document is, said large.
+
+                     **Asked for on 9 September 2026**, then refined the same
+                     hour: *"the word Fee Quote needs to be moved — into the
+                     header above my name — x3 larger in font"*, and then
+                     *"keep the position where it is but align it as the rest of
+                     the text — on the right margin — and increase its font."*
+
+                     So it stays at the head of the right-hand column, flush to
+                     the right margin with the reference block beneath it, and
+                     is simply much larger: it was set at the size of an
+                     ordinary heading, which made it read as a label on the
+                     reference rather than as the name of the document. */}
+              <p class="quote-doc-kind">Fee quote</p>
+              ${'' /* "Re", not a Scope paragraph. The name says what the
+                       quotation is for in one line, the way a letter's subject
+                       does; the items below say what that means. Taking the old
+                       Scope section out left the document saying only "Fee
+                       quote" and a reference, which a client cannot place. */}
+              <dl class="quote-doc-meta">
+                ${'' /* No "Re" line. **Asked for on 9 September 2026:**
+                       *"remove the Re RV. Partner bit completely — the body of
+                       the quote is telling enough."* Right: the items below name
+                       the work, line by line, with a figure against each. A
+                       heading that says "RV. Partner" above a list beginning
+                       "RV. Partner" is the document repeating itself. */}
+                <dt>Quote</dt><dd class="strong">${q.ref}</dd>
+                <dt>Issued</dt><dd>${dateShort(issuedOn)}</dd>
+                <dt>Valid until</dt><dd class="strong">${dateShort(validTo)}</dd>
+                ${q.case_ref ? html`<dt>Matter</dt><dd>${q.case_ref}</dd>` : ''}
+              </dl>
+            </div>
+          </header>
+
+          ${'' /* The parties, as the letter of engagement states them — because
+                   the letter will not state them itself. The practice's
+                   decision, 8 September 2026: the letter is a covering letter
+                   and the quotation attached to it is the substance, so this
+                   document has to be able to stand as the record of who the
+                   engagement is with.
+
+                   Everybody is named in the same section rather than the
+                   client in one place and the rest in another: a contract that
+                   lists its parties in two lists invites the question of
+                   whether the second list is party to it. */}
+          <section>
+            <h3>The parties</h3>
+            <dl class="kv quote-doc-parties">
+              ${'' /* "The Lawyer" and "The Client" are the defined terms the
+                     letter and the terms of engagement use, so they are
+                     capitalised here as they are there. */}
+              <dt>The Lawyer</dt><dd>${practice.legalName}</dd>
+              <dt>The Client</dt>
+              ${'' /* The nomination sits beside the name in brackets rather
+                     than on a line of its own beneath it: it qualifies who this
+                     person is, and read underneath it looked like a second
+                     fact about them. Smaller, because it is an aside. */}
+              <dd><strong>${q.client_name ?? '—'}</strong>${
+                representative
+                  ? ''
+                  : html` <span class="small muted">(Nominated representative for all
+                          parties)</span>`}</dd>
+              ${applicants.map((p) => html`
+                <dt>Applicant</dt>
+                <dd><strong>${p.full_name}</strong>${partyDetail(p)}</dd>`)}
+              ${associated.map((p) => html`
+                <dt>Associated party</dt>
+                <dd><strong>${p.full_name}</strong>${partyDetail(p)}</dd>`)}
+            </dl>
+            ${representative ? html`
+              <p class="small"><strong>${representative.full_name}</strong> is nominated to give
+                 instructions on behalf of all parties named above.</p>` : ''}
+            ${contacts.length ? html`
+              <h4 class="quote-doc-subhead">Day-to-day administrative contact</h4>
+              <dl class="kv quote-doc-parties">
+                ${contacts.map((p) => html`
+                  <dt>${p.organisation || 'Contact'}</dt>
+                  <dd><strong>${p.full_name}</strong>${partyDetail(p)}</dd>`)}
+              </dl>
+              <p class="small">Their role is limited to administrative and clerical support on this
+                 matter — collecting and organising documents, passing on progress, and dealing with
+                 Immigration New Zealand on administrative matters only. They are not authorised to
+                 give legal advice, to exercise professional judgement, or to act as your legal
+                 representative. All legal advice and all decisions come from the lawyer named
+                 above.</p>` : ''}
+          </section>
+
+          ${'' /* No Scope section. The practice, on the box that fed it: "this
+                   field called Scope seems superfluous. why do i need to enter
+                   details in it when that will be in the quotation?" Right about
+                   the paragraph — the items below are the scope, and a sentence
+                   beside them can only repeat them or disagree with them. The
+                   value itself stays as the quotation's name, at the top. */}
+
+          ${lines.length === 0
+            ? html`<p class="muted">No items have been added to this quote yet.</p>`
+            : html`
+          <table class="quote-doc-table">
+            <thead>
+              <tr><th>Description</th><th class="num">Quantity</th><th class="num">Unit price</th><th class="num">Amount</th></tr>
+            </thead>
+            <tbody>
+              ${fees.length ? html`
+                <tr class="quote-doc-group"><td colspan="4">Professional fees</td></tr>
+                ${lineRows(fees)}` : ''}
+              ${disbursements.length ? html`
+                <tr class="quote-doc-group"><td colspan="4">Disbursements — paid on your behalf</td></tr>
+                ${lineRows(disbursements)}` : ''}
+            </tbody>
+            <tfoot>
+              ${fees.length && disbursements.length ? html`
+                <tr><td colspan="3">Professional fees</td>
+                    <td class="num">${money(totals.feesNetCents, q.currency)}</td></tr>
+                <tr><td colspan="3">Disbursements</td>
+                    <td class="num">${money(totals.disbursementsNetCents, q.currency)}</td></tr>` : ''}
+              <tr><td colspan="3">Subtotal</td>
+                  <td class="num">${money(totals.subtotalNetCents, q.currency)}</td></tr>
+              ${totals.hasGst
+                ? html`<tr><td colspan="3">GST</td>
+                           <td class="num">${money(totals.gstCents, q.currency)}</td></tr>`
+                : html`<tr><td colspan="4" class="small muted">No GST applies to this quote.</td></tr>`}
+              <tr class="totals-row">
+                <td colspan="3" class="strong">Total payable</td>
+                <td class="num strong">${money(totals.totalCents, q.currency)}</td></tr>
+            </tfoot>
+          </table>`}
+
+          ${stages.length ? html`
+          <section>
+            <h3>Payment stages</h3>
+            <table class="quote-doc-table">
+              <thead><tr><th>Description</th><th class="num">Amount</th></tr></thead>
+              <tbody>
+                ${stages.map((s) => html`
+                  <tr>
+                    <td>${s.label ? html`<strong>${s.label}</strong> ` : ''}${s.description}</td>
+                    ${'' /* The figure the client pays, not the figure plus a
+                           promise of tax. Asked for on 9 September 2026: the
+                           stages "should already be showing the GST inclusive
+                           amounts". A schedule of payments whose rows have to
+                           be added to a percentage before they mean anything is
+                           a schedule the client has to do arithmetic on, and
+                           the total underneath was already inclusive — so the
+                           rows and the total were in different currencies. */}
+                    <td class="num">${money(s.gross_cents, q.currency)}</td>
+                  </tr>`)}
+              </tbody>
+              <tfoot>
+                <tr class="totals-row">
+                  <td class="strong">Total including GST</td>
+                  <td class="num strong">${money(stages.reduce((n, s) => n + s.gross_cents, 0), q.currency)}</td>
+                </tr>
+              </tfoot>
+            </table>
+            ${q.stage_note ? html`<p class="small prewrap quote-doc-note"><strong>Note:</strong> ${q.stage_note}</p>` : ''}
+          </section>` : ''}
+
+          ${practice.showBankOnQuote && practice.bankAccountNumber ? html`
+          <section>
+            <h3>Payment</h3>
+            <dl class="kv quote-doc-bank">
+              ${practice.bankAccountHolder ? html`<dt>Account holder</dt><dd>${practice.bankAccountHolder}</dd>` : ''}
+              ${practice.bankName ? html`<dt>Bank</dt><dd>${practice.bankName}</dd>` : ''}
+              <dt>Account</dt><dd><strong>${practice.bankAccountNumber}</strong></dd>
+            </dl>
+            <p class="small muted">Please quote <strong>${q.ref}</strong> as the reference. If you
+               receive an email appearing to change these details, telephone this office on the
+               number above before paying anything.</p>
+          </section>` : ''}
+
+          <section class="quote-doc-terms">
+            <h3>Conditions</h3>
+            <ul class="quote-doc-conditions">
+              <li>This quote is valid until <strong>${dateShort(validTo)}</strong>.</li>
+              ${qs.capacityNote ? html`<li>${qs.capacityNote}</li>` : ''}
+              ${qs.paymentTerms ? html`<li>${qs.paymentTerms}</li>` : ''}
+              ${disbursements.length
+                ? html`<li>Disbursements are amounts paid to third parties on your behalf and are
+                           passed on to you without margin. Where an exact figure is not yet known,
+                           the amount shown is an estimate and you will be told before it is
+                           incurred.</li>`
+                : ''}
+              ${'' /* What the client is agreeing to, named.
+
+                     **The practice's own sentence, given on 9 September 2026**,
+                     replacing one that named a single document: *"This
+                     Quotation (fee quote) is subject to the Letter of
+                     Engagement, Short Form and Standard Terms of Engagement.
+                     Please read them before accepting."*
+
+                     Three documents rather than one, which is what a client is
+                     actually held to — the covering letter, the short-form
+                     terms printed under it, and the standard terms published
+                     online. Naming only the last of them was the omission.
+
+                     "Standard Terms of Engagement" is the linked phrase because
+                     it is the only one of the three with an address of its own;
+                     the other two are in the client's hand. It is written here
+                     rather than taken from `practice.terms_label`, because it
+                     is now part of a sentence that names three documents rather
+                     than a label standing on its own. If a practice ever needs
+                     to call it something else, that is a setting to add, not a
+                     reason to keep the old sentence.
+
+                     The address still prints beneath, and only on paper, where
+                     a hyperlink is worth nothing. */}
+              ${practice.termsUrl
+                ? html`<li>This Quotation (fee quote) is subject to the Letter of Engagement,
+                           Short Form and
+                           <a href="${practice.termsUrl}" rel="noopener"><strong>Standard Terms of
+                           Engagement</strong></a>. Please read them before accepting.
+                           <span class="print-only break-url">${practice.termsUrl}</span></li>`
+                : ''}
+            </ul>
+          </section>
+
+          ${'' /* The one thing the stylesheet cannot hold.
+                 The document asks for a 20mm margin and Chrome's print dialogue
+                 overrides it on any Margins setting but Default — which is how a
+                 letter went out at 8.5mm on 9 September 2026 with the rule
+                 correctly in place and live. Said here, beside the button,
+                 because Help is not where somebody is standing when they press
+                 it. */}
+          <p class="hint no-print">In the print box, leave <strong>Margins</strong> on
+             <strong>Default</strong>. Any other setting overrides the 20mm this document asks
+             for.</p>
+          ${'' /* Which printing of this document the reader is holding.
+
+                 **Asked for on 9 September 2026:** *"it is better if — when
+                 Print button is clicked — a clean PDF is generated with full
+                 date and time stamp."* A quotation is revised before it goes
+                 out, and two printings of the same reference are otherwise
+                 indistinguishable once they are on paper: the reference says
+                 which document, this says which printing of it.
+
+                 Rendered by the server at the moment the page is asked for,
+                 which is what makes it honest — there is no script on these
+                 pages and the register does not read the reader's clock. It is
+                 on the screen as well as on the paper, because a document that
+                 shows one thing on screen and another on paper is the fault
+                 this register has spent the day removing. */}
+          <p class="quote-doc-stamp">Printed ${printedAt(nowIso())}</p>
+          ${footer}
+        </article>`;
+}
 
 /** The catalogue form, read the same way whether adding or editing. */
 function readCatalogueForm(f: FormReader) {
