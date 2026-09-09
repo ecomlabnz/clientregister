@@ -15,6 +15,7 @@ import { clientsModule } from './modules/clients';
 import { casesModule } from './modules/cases';
 import { inquiriesModule } from './modules/inquiries';
 import { quotesModule } from './modules/quotes';
+import { clientQuoteModule } from './modules/clientquote';
 import { invoicesModule } from './modules/invoices';
 import { tasksModule } from './modules/tasks';
 import { calendarModule } from './modules/calendar';
@@ -35,6 +36,14 @@ export const registeredModules: AppModule[] = [
   // Ahead of the dashboard: both answer for '/', and the website only takes it
   // when nobody is signed in.
   landingModule,
+  // Ahead of the dashboard for a harder reason. The dashboard mounts at '/'
+  // and puts `requireAuth` on '*', which in Hono is every path in the
+  // application — so anything registered after it is behind a sign-in whatever
+  // its own routes say. This is the one page in the register that a client
+  // opens with no account at all, and it was silently redirecting them to a
+  // login screen until this line moved. Found by opening the link as a client
+  // would, in a browser with no session, which is the only way it shows.
+  clientQuoteModule,
   dashboardModule,
   alertsModule,
   inboxModule,

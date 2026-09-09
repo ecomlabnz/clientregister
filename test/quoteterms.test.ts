@@ -48,16 +48,29 @@ describe('the covering email a quote drafts', () => {
     expect(body).toContain('https://www.immigration.kiwi/terms');
   });
 
-  it('names all three documents the quotation is subject to', () => {
-    // **The practice's own sentence, given on 9 September 2026.** What replaced
-    // it named one document; a client is held to three — the covering letter,
-    // the short-form terms printed under it, and the standard terms published
-    // online. Only the last of them has an address, which is why it was the
-    // only one being named.
-    const body = defaultQuoteEmail(quote, practice);
+  it('names the documents and sends the client to them', () => {
+    // **Rewritten on 9 September 2026.** The email used to type the whole
+    // quotation into its body. The practice sent one to themselves: *"no link,
+    // no nice formatted page, no ACCEPT button, no letter of engagement —
+    // where is the rest of the mechanics of it all??"*
+    //
+    // A covering letter does not contain the documents. It says what is
+    // waiting, where, and what to do — and the page the link opens carries the
+    // quotation, the letter of engagement and the way to accept them.
+    const body = defaultQuoteEmail(quote, practice, [], '', 'https://app.example.test/q/abc');
+    expect(body).toContain('https://app.example.test/q/abc');
     expect(body).toContain('Letter of Engagement');
-    expect(body).toContain('Short Form');
     expect(body).toContain('Standard Terms of Engagement');
+    // And it no longer retypes the itemisation.
+    expect(body).not.toContain('Subtotal');
+    expect(body).not.toContain('Professional fees');
+  });
+
+  it('says so plainly when the quotation has no link yet', () => {
+    // Rather than sending a covering note that covers nothing. This should not
+    // be reachable from the compose screen, which mints a link before drafting.
+    const body = defaultQuoteEmail(quote, practice);
+    expect(body).toMatch(/has no link yet/i);
   });
 
   it('does not tell the client to download a page', () => {
@@ -73,16 +86,23 @@ describe('the covering email a quote drafts', () => {
     // them on a page wondering where the terms are. What is pinned now is that
     // the email does not call the *link* a file, and does say where the current
     // edition comes from.
-    const body = defaultQuoteEmail(quote, practice);
+    const body = defaultQuoteEmail(quote, practice, [], '', 'https://app.example.test/q/abc');
     expect(body).not.toMatch(/download (the|these|those) terms/i);
     // And it still says where the standard terms come from, which is the half
-    // of the old sentence worth keeping: the other two documents are in the
-    // client's hand, this one is not.
-    expect(body).toMatch(/Standard Terms are published at/i);
+    // of the old sentence worth keeping: the other two documents are on the
+    // page the link opens, this one is not.
+    expect(body).toMatch(/Standard Terms of Engagement, published at/i);
   });
 
-  it('asks the client to read them before accepting', () => {
-    expect(defaultQuoteEmail(quote, practice)).toMatch(/read them before accepting/i);
+  it('asks the client to read them, and to sign if they are content', () => {
+    // The practice's instruction: *"refer to the letter of engagement and
+    // standard terms and ask the client to read and if acceptable — sign."*
+    const body = defaultQuoteEmail(quote, practice, [], '', 'https://app.example.test/q/abc');
+    expect(body).toMatch(/Please read them both/i);
+    expect(body).toMatch(/please sign at the foot of that page/i);
+    // And an invitation to ask first, which is the thing a client most needs
+    // permission to do before signing a contract.
+    expect(body).toMatch(/reply to this email/i);
   });
 
   it('says nothing about terms when no address is configured', () => {

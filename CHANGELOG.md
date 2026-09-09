@@ -7,6 +7,86 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.29.0 — 9 September 2026
+
+### Added
+**A quotation the client can open, read and accept.** Asked for after a test
+quote went out as plain text: *"the quote is not acceptable. no link, no nice
+formatted page, no ACCEPT button, no letter of engagement — where is the rest of
+the mechanics of it all??"* There was no rest of it. This is the rest of it.
+
+**One link, one page.** The quotation, then the letter of engagement beneath it,
+then the panel that accepts them both. They are one engagement — the letter
+states the terms and points at the quotation for the parties, the scope and the
+fees — and two links would mean two chances to accept having read half of it.
+
+**The documents are the same documents.** Not a second rendering: the quotation
+and the letter were moved into one template each, and the practice's print view
+and the client's page both call them. Two templates for one contract would agree
+the day they were written and drift the first time only one was corrected.
+
+**Where the Accept button sits.** At the foot, after both documents — not
+floating over them. A button that follows the reader can be pressed on the first
+screen, and what that records is a click, not a reading. What does follow the
+reader is a quiet bar saying the quotation has not been accepted yet, with a
+link to the panel. It needs no scripting at all, which matters here more than
+anywhere else in the register: this is the one page opened by somebody the
+practice cannot help if it fails.
+
+**Accepting** takes the client's full name, the date, and a tick to say they
+have read the documents. What is recorded is that, plus the moment the register
+received it and the address it came from — the typed date is the client's word
+and the received moment is the register's, and both are kept because a document
+recording only one of them would be less use in the argument it exists for.
+
+It writes a **file note on the matter** and an **audit row** naming the client
+rather than a user, moves the quotation to Accepted, and shows the practice who
+accepted and when. **An acceptance can never be changed or removed**, by
+anybody, including the owner — it is the moment a contract was formed. A
+quotation accepted in error is answered with a new quotation, exactly as on
+paper.
+
+**The link** is 128 bits, unguessable, minted when the quotation is emailed and
+fixed thereafter. There is no account: a client who has to register to read
+their own fee quote will telephone instead. An unknown link and a link that was
+never ours get the same answer, so nobody can learn which quotations exist by
+trying.
+
+### Changed
+**The covering email is a covering email.** It used to type the whole quotation
+into the body — every line, the subtotal, the GST — padded so the figures lined
+up in a plain-text mail client. It now says the total, gives the link, names the
+Letter of Engagement and the Standard Terms, asks the client to read them, and
+asks them to sign at the foot of that page if everything is acceptable — with an
+invitation to reply first if anything needs explaining, which is the thing a
+client most needs permission to do before signing a contract.
+
+### Fixed
+**The Money menu opened on its own.** Reported: *"the Money menu keeps opening
+on its own — why?"* Because it did: a group was rendered open whenever the page
+you were on sat inside it, so every visit to Quotes or Invoices arrived with a
+panel hanging over the page and covering the search box. The intention — showing
+where you are — was right, but a dropdown is positioned over the page, so "open"
+meant "covering it". Where you are is now said by the heading being marked
+current, as every other item in the bar says it.
+
+**Two warnings that read as a contradiction.** A refused save talks about the
+schedule you typed; the warning under the schedule talks about the one that is
+saved. Without a sentence joining them they looked like the register arguing
+with itself. The refusal now says what the schedule below is still showing, and
+why.
+
+**"FEE QUOTE" was 2mm from the edge of the paper** on a document printed with
+the browser's margins set to Minimum. The margin loss is the print box's doing
+and no stylesheet can prevent it — but the title had also been lifted 9px for
+the screen, and it should not be spending the little that is left. That lift is
+gone.
+
+**The printed quotation is tighter again**, at the practice's instruction:
+*"reduce the line spacing but keep it as is where the subheadings are."* So the
+rows lose their air and the headings keep theirs — the space before PROFESSIONAL
+FEES is what tells the eye a new group has started.
+
 ## 1.28.1 — 9 September 2026
 
 ### Changed
