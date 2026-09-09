@@ -44,7 +44,7 @@ import type { AppModule } from '../../core/module';
 import { html, raw } from '../../ui/html';
 import { page } from '../../ui/layout';
 import { csrfField } from '../../ui/components';
-import { dateShort, printedAt } from '../../ui/format';
+import { dateShort, money, printedAt } from '../../ui/format';
 import { nowIso } from '../../core/db';
 import { audit, clientIp } from '../../core/audit';
 import { addEntry } from '../../core/timeline';
@@ -54,6 +54,7 @@ import { one } from '../../core/db';
 import {
   acceptQuote, quoteByToken, whyNotAcceptable, type SharedQuote,
 } from '../../core/quotelink';
+import { acceptedQuoteFor, queueAcceptanceEmails } from '../../core/acceptmail';
 import { loadLetter, loadQuotation, letterArticle, quotationArticle } from '../quotes';
 
 /** New Zealand's today, which is the day a client is signing on. */
@@ -136,8 +137,9 @@ export const clientQuoteModule: AppModule = {
             <p><strong>Thank you.</strong> This quotation was accepted
                ${shared.accepted_name ? html`by <strong>${shared.accepted_name}</strong>` : ''}
                on ${printedAt(shared.accepted_at ?? nowIso())}.</p>
-            <p>We will be in touch. Please keep this page, or the email it came from, for
-               your records — you can return to this address at any time.</p>`
+            <p>A confirmation has been emailed to you. Please keep it: this address goes on
+               showing the document you accepted, and it will not change now.</p>
+            <p>We will be in touch shortly about the next steps.</p>`
             : typeof blocked === 'string' ? html`
             <p class="alert alert-warn">${blocked}</p>`
             : html`
@@ -197,11 +199,24 @@ export const clientQuoteModule: AppModule = {
       if (!result.ok) return back(result.message);
 
       await recordAcceptance(c.env, shared, name, signedOn, at, clientIp(c.req.raw));
+
+      // Two letters: one to the client saying what they agreed to and where to
+      // find it, one to the practice saying it arrived. Asked for on
+      // 9 September 2026. Neither is allowed to hold up the acceptance — a
+      // contract is formed by the client's act, not by our bookkeeping — so
+      // this is after the record is written and its result only informs the
+      // note below.
+      const url = new URL(c.req.url);
+      const detail = await acceptedQuoteFor(c.env, shared.id, `${url.origin}/q/${token}`);
+      const mailed = detail
+        ? await queueAcceptanceEmails(c.env, detail, { name, signedOn, at })
+        : { toClient: false, toPractice: false };
+
       await audit(c.env, {
         action: 'quote.accepted_by_client', entityType: 'quote', entityId: shared.id,
         actorLabel: `client: ${name}`, ip: clientIp(c.req.raw),
         userAgent: c.req.header('user-agent') ?? null,
-        meta: { ref: shared.ref, signedOn },
+        meta: { ref: shared.ref, signedOn, ...mailed },
       });
       return c.redirect(`/q/${token}#accept`, 303);
     });
@@ -233,11 +248,52 @@ async function recordAcceptance(
     : q.client_id ? { entityType: 'client' as const, entityId: q.client_id } : null;
   if (!entity) return;
 
+  const detail = `Quotation ${shared.ref} accepted online by ${name}, dated ${dateShort(signedOn)}. `
+    + `Received ${printedAt(at)}${from ? ` from ${from}` : ''}.`;
+
   await addEntry(env, {
-    ...entity,
+    ...entity, kind: 'system', body: detail, occurredAt: at, createdBy: null, pinned: true,
+  });
+
+  // And on the quotation's own file notes.
+  //
+  // **Asked for on 9 September 2026:** *"there is a note in the right side
+  // panel, but there should be a comprehensive note in the file note as well
+  // once it is accepted."* Right: the panel is a summary of the record's
+  // current state, and the file notes are what happened to it. Somebody reading
+  // the quotation's history a year from now should find the acceptance in the
+  // history, not have to notice a card in the margin.
+  //
+  // Fuller than the note on the matter, because this is the quotation's own
+  // file: what was accepted, for how much, by whom, when they say they signed
+  // and when it actually arrived — the two dates being different things, and
+  // both worth having if either is ever questioned.
+  const totals = await one<{ amount: number; gst: number; disb: number; currency: string;
+                             with_letter: number | null }>(
+    env.DB,
+    `SELECT amount_cents AS amount, gst_cents AS gst, disbursements_cents AS disb,
+            currency, with_letter FROM quotes WHERE id = ?`, shared.id);
+  const total = totals
+    ? money(totals.amount + totals.gst + totals.disb, totals.currency) : null;
+
+  await addEntry(env, {
+    entityType: 'quote',
+    entityId: shared.id,
     kind: 'system',
-    body: `Quotation ${shared.ref} accepted online by ${name}, dated ${dateShort(signedOn)}. `
-      + `Received ${printedAt(at)}${from ? ` from ${from}` : ''}.`,
+    body: [
+      `Accepted online by ${name}.`,
+      '',
+      `Signed as at: ${dateShort(signedOn)} (the date the client gave)`,
+      `Received: ${printedAt(at)}`,
+      from ? `From: ${from}` : '',
+      total ? `Total accepted: ${total}` : '',
+      totals?.with_letter === 1
+        ? 'Accepted with the letter of engagement, which was on the same page.'
+        : 'The quotation was sent without a letter of engagement.',
+      '',
+      'The client confirmed they had read the documents before accepting. This quotation '
+        + 'is now fixed and cannot be edited — issue a new one if anything needs to change.',
+    ].filter((line, i, all) => line !== '' || (all[i - 1] ?? '') !== '').join('\n'),
     occurredAt: at,
     createdBy: null,
     pinned: true,

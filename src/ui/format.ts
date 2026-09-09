@@ -26,6 +26,22 @@ export function dateTime(value: string | null | undefined): string {
 }
 
 /**
+ * A date written out in full, for prose rather than for a column.
+ *
+ * "15 September 2026", not "15 Sept 2026". A date inside a sentence a client
+ * reads once — the day a quotation closes — is worth the extra characters; a
+ * date in a table of a hundred rows is not, which is what `dateShort` is for.
+ */
+export function dateLong(value: string | null | undefined): string {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-NZ', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: TZ,
+  }).format(d);
+}
+
+/**
  * The moment a document was produced, in full, for the foot of that document.
  *
  * **Asked for on 9 September 2026:** *"it is better if — when Print button is
