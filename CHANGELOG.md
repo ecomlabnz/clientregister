@@ -7,6 +7,14 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.23.1 — 9 September 2026
+
+### Fixed
+**"What the client confirms" now takes 10,000 characters**, up from 4,000. The
+practice's own list of confirmations had outgrown the box and it was refusing
+the rest. It is one item per line and the list keeps growing, so the cap is the
+thing that moves rather than the list that gets cut.
+
 ## 1.23.0 — 9 September 2026
 
 ### Changed

@@ -154,8 +154,12 @@ export const ENGAGEMENT_SETTINGS: SettingsGroup = {
       label: 'And anyone else', default: 'or any other person nominated by them',
       help: 'Printed as the last item of the list. Leave blank to name only the people above.' },
 
+    // 10,000 at the practice's request of 9 September 2026, urgently: their own
+    // list of confirmations had outgrown 4,000 and the box was refusing the
+    // rest. It is one item per line and the practice keeps adding items, so the
+    // cap is the thing that has to move rather than the list that has to be cut.
     { key: 'engagement.acknowledgements', type: 'text', label: 'What the client confirms',
-      maxLength: 4000, default: '',
+      maxLength: 10000, default: '',
       help: 'One per line. Printed as a numbered list above the signature, introduced by the line '
         + 'below. Leave blank to print no list at all.' },
     { key: 'engagement.acknowledgements_intro', type: 'string', maxLength: 300,
