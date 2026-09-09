@@ -11,6 +11,12 @@
  * actually escapes, so the export says only whether a passport is on file. If
  * the whole set is genuinely needed, that is a deliberate operation and should
  * look like one, rather than riding along inside a routine download.
+ *
+ * The backup below is that deliberate operation, and it is a different thing
+ * from an export. An export is for reading somewhere else; a backup is for
+ * putting the register back, so it holds every table and every column,
+ * passport numbers included. It is the owner's button alone, it posts rather
+ * than links, and taking one is recorded.
  */
 
 import type { Hono } from 'hono';
@@ -19,9 +25,12 @@ import { requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { all } from '../../core/db';
 import { exportFilename, toCsv } from '../../core/csv';
+import { backupFilename, makeBackup } from '../../core/backup';
+import { can } from '../../core/rbac';
+import { APP_VERSION } from '../../version';
 import { page } from '../../ui/layout';
 import { html } from '../../ui/html';
-import { card, pageHeader, table } from '../../ui/components';
+import { card, csrfField, pageHeader, table } from '../../ui/components';
 import { adminTabs } from './index';
 
 interface Dataset {
@@ -265,18 +274,81 @@ export function registerExportRoutes(r: Hono<AppContext>): void {
             <td><a class="btn btn-secondary btn-small" href="${`/admin/export/${set.key}.csv`}">Download</a></td>
           </tr>`), { fixed: true })}`)}
 
+      ${can(c.get('user')!, 'backup:take') ? card('A copy of everything', html`
+        <p class="small">The exports above are for reading somewhere else. This is the other thing:
+           a copy of the <strong>whole register</strong> — every table, every column, every file —
+           in one zip, for putting the register back if it is ever lost.</p>
+        <p class="small"><strong>It includes passport numbers.</strong> A backup that leaves a
+           column out cannot restore the register, and a backup you cannot restore from is a file
+           that makes people feel safe without being safe. That is why this button is yours alone
+           and nobody else's, and why the file says on the outside what it holds.</p>
+        <form method="post" action="/admin/backup">
+          ${csrfField(c.get('session')!.csrf)}
+          <button class="btn btn-primary" type="submit">Download a full backup</button>
+        </form>
+        <p class="hint">It takes a few seconds and arrives as one file, dated. Treat it the way you
+           would treat the filing cabinet: not something to email, and a copy on a laptop is a copy
+           of everything about every client. Taking one is recorded in the audit log.</p>`) : ''}
+
       ${card('Two things worth knowing', html`
-        <p class="small"><strong>Passport numbers are not in any of these.</strong> They are the one
-           field the register encrypts, and writing them in the clear into a file that lands in a
-           downloads folder would undo that in a single click. The client export says whether a
-           passport is held; the number is revealed one at a time on the client's page, and every
-           reveal is recorded.</p>
+        <p class="small"><strong>Passport numbers are not in any of these.</strong> They stay out of
+           the CSVs by the practice's decision of 30 August 2026: a spreadsheet in a downloads
+           folder is the copy that actually escapes, and nothing about reading a number on a
+           client's page requires making that easier. The client export says only whether a
+           passport is held.</p>
         <p class="small"><strong>Every download is recorded</strong> in the audit log — what was
            taken, by whom, and when. An export is a copy of the practice's file leaving the
            building, and that is worth a line.</p>
         <p class="small muted">Reading data back in is a separate job and is not built yet: an
            import has to decide what to do about records that already exist, and getting that
            wrong is worse than not having it.</p>`)}`);
+  });
+
+  /**
+   * The whole register, in one file.
+   *
+   * A POST rather than a link, though it only reads: this is the practice's
+   * entire client file leaving the building, and the file's own words are that
+   * such a thing "should look like one, rather than riding along inside a
+   * routine download". A form with a token cannot be triggered by a link
+   * somebody was sent.
+   *
+   * `backup:take` belongs to the owner and to nobody else — not even to an
+   * administrator, who can otherwise do everything here. That is the practice's
+   * decision of 9 September 2026 and the reason the archive is allowed to carry
+   * passport numbers at all.
+   *
+   * The audit row is written before the bytes go out, so a backup that was
+   * started is recorded even if the download is abandoned. What it cannot say
+   * is where the file went afterwards; nothing can.
+   */
+  r.post('/backup', requirePermission('backup:take'), async (c) => {
+    const user = c.get('user')!;
+    const { zip, summary } = await makeBackup(c.env, {
+      version: APP_VERSION,
+      takenBy: `${user.name} <${user.email}>`,
+    });
+
+    await auditFrom(c, {
+      action: 'admin.backup_taken', entityType: 'backup', entityId: summary.takenAt,
+      meta: {
+        tables: summary.tables.length,
+        rows: summary.tables.reduce((n, t) => n + t.rows, 0),
+        files: summary.files,
+        file_bytes: summary.fileBytes,
+        zip_bytes: summary.bytes,
+        contains_passport_numbers: true,
+      },
+    });
+
+    return new Response(zip, {
+      headers: {
+        'content-type': 'application/zip',
+        'content-disposition': `attachment; filename="${backupFilename(summary.takenAt)}"`,
+        'content-length': String(zip.length),
+        'cache-control': 'no-store',
+      },
+    });
   });
 
   r.get('/export/:key{.+\\.csv}', requirePermission('admin:settings'), async (c) => {

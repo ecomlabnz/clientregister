@@ -21,12 +21,21 @@ export const PERMISSIONS = [
   'audit:read',
   'admin:users',
   'admin:settings',
+  // Taking a copy of the whole register — every table, every column, the
+  // passport numbers included. It is the one thing that hands somebody the
+  // practice's entire client file in a single press, so it belongs to the
+  // owner alone and to no other role. Asked for on 9 September 2026: "one
+  // button - but only available to owner".
+  'backup:take',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   owner: [...PERMISSIONS],
+  // Everything except `backup:take`, which no role but owner has. An
+  // administrator manages users and settings; they do not take the register
+  // home.
   admin: [
     'register:read', 'register:write', 'register:delete', 'quote:write', 'ingest:triage',
     'document:read', 'document:write', 'mail:send', 'ai:run', 'audit:read',
