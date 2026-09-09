@@ -37,6 +37,21 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.25.0', date: '9 September 2026',
+    notes: [
+      'The letter of engagement is now justified \u2014 the text is straight down both edges, '
+        + 'the way a legal document is set.',
+      'Only the paragraphs. The address block, the RE line, \u201CDear \u2026,\u201D, your '
+        + 'signature and the headings keep their ordinary ragged edge, because stretching a '
+        + 'two-word line across the page is what makes justified text look wrong.',
+      'The quotation is left as it was on purpose: it is a table of figures, and a justified '
+        + 'line of two words in a narrow column is a row of gaps.',
+      'Margins are now 20mm rather than 25mm, on the quotation, the letter and the invoice. '
+        + '25mm was the figure asked for while documents were printing at about 8mm; now that '
+        + 'the margin is actually being applied, 20mm is the width you wanted.',
+    ],
+  },
+  {
     version: '1.24.0', date: '9 September 2026',
     notes: [
       'Put **two asterisks** around a phrase in your letter wording and it prints in bold. Works '
@@ -2152,7 +2167,7 @@ function sections(origin: string): Section[] {
            when GST applies and simply <em>Invoice</em> when it does not.</p>
         <h4>Margins, when you save one as a PDF</h4>
         <p>Every document the register prints — quotation, letter of engagement, invoice —
-           leaves <strong>25mm clear on all four sides</strong>. There is one setting that can
+           leaves <strong>20mm clear on all four sides</strong>. There is one setting that can
            override it: in the browser’s print box, <strong>Margins</strong> must be left on
            <em>Default</em>. Set to <em>None</em> and the browser ignores what the document asks
            for and prints to the edge of the paper.</p>
