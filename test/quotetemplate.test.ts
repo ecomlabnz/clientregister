@@ -41,10 +41,12 @@ function seed(h: Harness) {
 /** A quotation with the shape the practice wants reused, and real money on it. */
 function priced(h: Harness) {
   h.db.exec(`
-    INSERT INTO quotes (id, ref, client_id, description, case_type, amount_cents, status,
-                        issued_on, created_at, updated_at)
-      VALUES ('q_src', 'Q-0001', 'cl1', 'RV. Partner — Duc Manh BUI', 'rv_partner', 250000,
-              'draft', '2026-09-01', '${AT}', '${AT}');
+    -- The header figures match the two items, as the register keeps them: since
+    -- migration 0077 a schedule cannot promise more than the quotation does.
+    INSERT INTO quotes (id, ref, client_id, description, case_type, amount_cents, gst_cents,
+                        disbursements_cents, status, issued_on, created_at, updated_at)
+      VALUES ('q_src', 'Q-0001', 'cl1', 'RV. Partner — Duc Manh BUI', 'rv_partner', 250000, 37500,
+              153000, 'draft', '2026-09-01', '${AT}', '${AT}');
     INSERT INTO quote_items (id, quote_id, position, description, kind, unit_label,
                              quantity_milli, unit_amount_cents, gst_treatment, gst_rate_bp,
                              net_cents, gst_cents, gross_cents, created_at, updated_at)

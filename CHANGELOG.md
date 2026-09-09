@@ -7,6 +7,78 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.28.0 — 9 September 2026
+
+### Added
+**A schedule of payments cannot promise more than the quotation does.** Asked
+for: *"make sure that it also tells how much is left to allocate, and that it
+does not allow for allocating more than the total fee from the fees and
+disbursements section."*
+
+Both halves:
+
+- **What is left to allocate** now sits under the schedule, beside what has been
+  allocated — the figure a person is actually working out in their head while
+  they type, and the one number the page did not show. It says *"$4,000.00
+  allocated of $7,632.70. $3,632.70 left to allocate."*, and says the whole
+  quotation is allocated when it is.
+- **Over-allocating is refused**, by the database (migration 0077) rather than
+  by the form, because four routes write payment stages and a rule in one of
+  them holds until somebody writes a fifth. Stages that came to more than the
+  fees and disbursements would ask a client to pay twice for part of the work,
+  in a document that is a contract.
+
+Saving the whole schedule now reads the form before writing any of it, so a
+schedule that would go over is refused whole and nothing is half-applied — and
+so that a **rebalance** is not refused in the middle of itself. Moving $1,000
+from the last stage to the first, row by row, briefly asks for $1,000 more than
+the quotation; the save now takes every stage to nil and builds it back up.
+
+One direction is deliberately not blocked: lowering a fee line under a schedule
+already written. That guard would have to sit on the quotation and would block
+an ordinary correction to an item until the schedule was taken apart. It is
+reported under the schedule instead.
+
+### Changed
+**"Fee quote" is the size of a document title.** Asked for. It sits at the head
+of the right-hand column, flush to the right margin above the reference block,
+at roughly two and a half times its old size. It had been set at the size of an
+ordinary heading, which made it read as a label on the reference rather than as
+the name of the document.
+
+**The word "Remove" is a small red cross everywhere it appeared.** Asked for:
+*"wherever there is a word remove — needs to be redone like this."* Seven
+places: a party on a matter, a fee line on an invoice, a party's share of an
+invoice, a passport, a certificate, a file on a knowledge article, and the
+tick-to-remove boxes in both editing tables on a quotation.
+
+Every one keeps a real name — "Remove this passport", "Remove *the line*" — as
+the button's accessible name and its tooltip, because a symbol on its own reads
+out as "times" and several of these delete something off a contract. The tag
+crosses that were already crosses gained the same spoken name.
+
+The tick boxes stay tick boxes underneath, because those are a batch: nothing
+happens until you save, so several rows can go at once and a slip can be
+untangled by unticking it. The cross **fills solid red when ticked**, so what is
+about to go is visible before saving.
+
+### Fixed
+**The money columns sat in a different place on every quotation.** Reported:
+*"the money figures move from one quote to another — slightly — why? They must
+be fixed, but the columns must be flexible when changing the width of the
+window."*
+
+Because the columns were sized by their contents: a quotation whose largest
+figure is $598.00 gave its money columns less room than one whose largest is
+$7,000.00, so the same column landed in a different place each time — and they
+are read side by side.
+
+They are shares of the table now rather than pixels, which is what makes both
+halves of that true at once: the same proportions on every quotation, and still
+giving and taking as the window changes. Description takes whatever is left,
+because it is the one column whose content genuinely varies. Checked at two
+window widths across two quotations: identical to a tenth of a percent.
+
 ## 1.27.1 — 9 September 2026
 
 ### Fixed

@@ -1318,7 +1318,8 @@ export const clientsModule: AppModule = {
                                 : ''}
                               ${writable && pp.is_primary !== 1
                                 ? actionButton(`/clients/${client.id}/passports/${pp.id}/remove`, csrf,
-                                    'Remove', { className: 'btn btn-danger btn-small',
+                                    'Remove this passport',
+                                    { className: 'btn-remove', icon: '\u00d7',
                                       confirm: 'Remove this passport from the file?' })
                                 : ''}
                             </div>
@@ -1418,8 +1419,9 @@ export const clientsModule: AppModule = {
                                 <div>
                                   ${cert.expires_on ? expiryCell(cert.expires_on) : ''}
                                   ${writable ? actionButton(`/clients/${client.id}/certificates/${cert.id}/remove`, csrf,
-                                      'Remove', { className: 'btn btn-danger btn-small',
-                                                  confirm: 'Remove this certificate? Its history goes with it.' }) : ''}
+                                      'Remove this certificate',
+                                      { className: 'btn-remove', icon: '\u00d7',
+                                        confirm: 'Remove this certificate? Its history goes with it.' }) : ''}
                                 </div>
                               </li>`)}
                           </ul>`;
@@ -1639,7 +1641,9 @@ export const clientsModule: AppModule = {
                       ${writable ? html`
                         <form method="post" action="/clients/${client.id}/tags/${tag.id}/remove" class="inline-form">
                           ${csrfField(csrf)}
-                          <button class="btn-tag-remove" type="submit" title="Remove ${tag.name}">×</button>
+                          <button class="btn-tag-remove" type="submit"
+                                  aria-label="Remove the tag ${tag.name}"
+                                  title="Remove the tag ${tag.name}">×</button>
                         </form>` : ''}
                     </span>`)}</div>`}
               ${writable ? html`
