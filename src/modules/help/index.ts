@@ -37,6 +37,23 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.23.0', date: '9 September 2026',
+    notes: [
+      'Quotations and letters now print as black on white paper whatever your screen is set to. '
+        + 'A letter you sent had every page filled with a near-black rectangle \u2014 the document '
+        + 'had been coming out in the dark theme, and that is also why the margin fixes seemed to '
+        + 'do nothing.',
+      'The margins and the A4 size are part of the document itself now, not something the print '
+        + 'box has to be persuaded to apply. Checked both ways of making a PDF: A4, nothing dark, '
+        + '25mm on every edge.',
+      'There is a home for the Law Society \u201CInformation for Clients\u201D \u2014 it prints '
+        + 'as an addendum after your signature, on a page of its own. Settings \u2192 Letter of '
+        + 'engagement.',
+      'The administrative team box now understands however you type it. Written with labels and '
+        + 'commas, it was losing the email addresses off the letter completely.',
+    ],
+  },
+  {
     version: '1.22.1', date: '9 September 2026',
     notes: [
       'On printed documents, Date, Our reference and Matter now line up with each other and each '

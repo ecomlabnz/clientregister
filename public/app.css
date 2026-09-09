@@ -1281,9 +1281,35 @@ details[open] > summary { margin-bottom: 12px; }
 
 /* --- Printable documents ------------------------------------------------- */
 
+/* A quotation or a letter of engagement is a piece of paper.
+ *
+ * **It is white in every medium, and that is the fix for a real fault.** On
+ * 9 September 2026 the practice sent a PDF of a letter whose every page carried
+ * a near-black rectangle over the whole sheet, with the margins unchanged by
+ * two releases that had changed them. Both facts had one cause: whatever made
+ * that PDF never applied `@media print`, so the document came out in the
+ * application's dark theme *and* without the print margins.
+ *
+ * Putting the paper palette here rather than only in the print block means the
+ * document does not depend on the print stylesheet running to look like a
+ * document. Anything that renders the page — printing, "save as PDF", a
+ * screenshot, an extension, a phone — now gets black on white.
+ *
+ * The variables are redefined on this element rather than the colours set on
+ * each descendant: everything inside a document reads its palette from here,
+ * so a card, a table or a badge nested in it is light without knowing it.
+ */
 .quote-doc {
-  max-width: 720px; margin: 0 auto; padding: 32px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  --bg: #fff; --surface: #fff; --surface-2: #f5f7f9;
+  --border: #d5dade; --text: #111; --muted: #444;
+  --accent: #14425f; --accent-text: #fff; --shadow: none;
+  --green: #1b5e20; --green-bg: #eef6ef; --amber: #7a4f01; --amber-bg: #fdf5e6;
+  --red: #8a1c1c; --red-bg: #fbeeee; --blue: #14425f; --blue-bg: #eef3f7;
+  --grey: #444; --grey-bg: #f2f4f6;
+  color-scheme: light;
+  max-width: 210mm; margin: 0 auto; padding: 20mm;
+  background: #fff; color: #111;
+  border: 1px solid var(--border); border-radius: var(--radius);
 }
 /* The letter of engagement. A document a client reads and is asked to accept,
    so it is set as prose rather than as a page of the application: a measured
@@ -1320,6 +1346,12 @@ details[open] > summary { margin-bottom: 12px; }
    numbered 1.4 gives two competing numbering schemes on one page. */
 .letter-admin-team { list-style-type: lower-alpha; margin: 8px 0 12px; padding-left: 24px; }
 .letter-admin-team li { margin-bottom: 2px; }
+/* The Law Society information, after the letter it belongs to. A rule above it
+   and a new page when printed: it is an addendum, not another section. */
+.letter-addendum { margin-top: 32px; padding-top: 18px; border-top: 2px solid var(--text); }
+.letter-addendum h2 {
+  margin: 0 0 12px; font-size: 1.05rem; letter-spacing: 0.04em; text-transform: uppercase;
+}
 .letter-brief { padding: 12px 14px; border-left: 3px solid var(--accent); background: var(--surface-2); }
 .letter-acknowledgements li { margin-bottom: 8px; }
 .letter-signature { margin-top: 32px; }
@@ -1432,28 +1464,21 @@ details[open] > summary { margin-bottom: 12px; }
  * anything but Default. Nothing in a stylesheet can. The print page says so on
  * screen, next to the button, and Help says it again.
  *
- * The paper size is deliberately not forced: naming A4 makes a printer loaded
- * with anything else scale the document down and take the margin with it.
+ * **A4 is named**, at the practice's instruction of 9 September 2026: *"it must
+ * be A4, and the margins must be maintained."* It was left to the printer
+ * before, on the reasoning that forcing a size makes a printer loaded with
+ * anything else scale the document and shrink the margin with it. The practice
+ * prints A4 and wants A4, and a New Zealand legal document that silently came
+ * out US Letter would be the worse fault of the two.
  */
-@page { margin: 25mm 0; }
+@page { size: A4; margin: 25mm 0; }
 
 @media print {
   .print-only { display: block; font-size: 0.8em; color: #444; margin-top: 4px; }
 
-  /* Print on paper, always in the light palette. */
-  :root {
-    --bg: var(--l-bg); --surface: var(--l-surface); --surface-2: var(--l-surface-2);
-    --border: var(--l-border); --text: var(--l-text); --muted: var(--l-muted);
-    --accent: var(--l-accent); --accent-text: var(--l-accent-text);
-    --green: var(--l-green); --green-bg: var(--l-green-bg);
-    --amber: var(--l-amber); --amber-bg: var(--l-amber-bg);
-    --red: var(--l-red); --red-bg: var(--l-red-bg);
-    --blue: var(--l-blue); --blue-bg: var(--l-blue-bg);
-    --grey: var(--l-grey); --grey-bg: var(--l-grey-bg);
-    --shadow: none;
-    color-scheme: light;
-  }
-  body { background: #fff; }
+  /* The document carries its own paper palette in every medium now — see the
+     note on `.quote-doc` — so all that is left here is the page around it. */
+  body { background: #fff; color: #111; color-scheme: light; }
   .topbar, .footer, .no-print, .crumbs, .page-actions { display: none !important; }
   /* The side margin, where no print setting can reach it. See the note by
      `@page` above for why the top and bottom are not here too. */
@@ -1482,6 +1507,9 @@ details[open] > summary { margin-bottom: 12px; }
   .letter-doc section { margin-bottom: 12px; }
   .letter-doc h3 { margin-bottom: 4px; }
   .letter-terms-start { margin: 18px 0 12px; padding-top: 10px; }
+  /* An addendum begins a page of its own, which is what an addendum is, and
+     keeps the signature on the page with the letter it signs. */
+  .letter-addendum { break-before: page; page-break-before: always; margin-top: 0; border-top: none; }
 
   /* Grey on white loses more to a printer than it gains on a screen, and some
      of this is the addressee's own contact details. */

@@ -1606,6 +1606,18 @@ export const quotesModule: AppModule = {
           <p class="hint no-print">In the print box, leave <strong>Margins</strong> on
              <strong>Default</strong>. Any other setting overrides the 25mm this document asks
              for.</p>
+          ${'' /* After the signature, and on a page of its own.
+                 It is not the practice speaking to this client about this
+                 matter — it is what every client of any New Zealand lawyer must
+                 be told — so it follows the letter rather than sitting inside
+                 it, and starting a new page also keeps the signature on the
+                 page with the letter it signs. */}
+          ${text.addendum ? html`
+            <section class="letter-addendum">
+              ${text.addendumHeading ? html`<h2>${text.addendumHeading}</h2>` : ''}
+              ${prose(text.addendum)}
+            </section>` : ''}
+
           <footer class="quote-doc-foot no-print">
             <button class="btn btn-primary" data-print type="button">Print this letter</button>
             <a class="btn btn-secondary" href="/quotes/${q.id}/print">The quotation</a>
