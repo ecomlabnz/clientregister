@@ -9,6 +9,24 @@ The user-facing version of this list, one line per release, is in the app under
 
 ## 1.23.0 — 9 September 2026
 
+### Changed
+Four more corrections to the fee documents, all from reading real ones.
+
+- **On a quotation, "Re" now names the kind of work and not the client** — *RV.
+  Partner*, rather than *RV. Partner — <client>*. The client is already at the
+  head of the document, so a reference line repeating them said nothing new. It
+  is worked out from the kind of work recorded on the quotation rather than cut
+  off the front of its name, because splitting a name on an em dash works until
+  somebody's matter has one in it.
+- **Amount now sits to the right of GST** on the items table.
+- **The unit can be cleared.** *"for some reason cannot remove 'item' word even
+  if i edit it"* — and it could not be removed by anybody: both routes that
+  wrote the column ended in "or the default", so an empty box was
+  indistinguishable from an absent one and became *item* again on the way to the
+  database. Clearing the field and saving looked exactly like not having tried.
+  An empty unit now stays empty, and a line reads "1" rather than "1 item".
+- **"Our reference" is shortened to "Our Ref"** on the letter of engagement.
+
 ### Fixed
 **The documents were printing in the dark theme, and that is why two releases of
 margin fixes had done nothing.** A PDF of a letter sent by the practice had a
