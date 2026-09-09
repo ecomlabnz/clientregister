@@ -91,7 +91,8 @@ export const ENGAGEMENT_SETTINGS: SettingsGroup = {
     { key: 'engagement.scope_terms', type: 'text', maxLength: 4000,
       label: 'Scope of the retainer — the wording', default: '',
       help: 'Printed immediately under the block that points at the quotation. Blank lines '
-        + 'separate paragraphs. Nothing is supplied: this is your wording, not the register’s.' },
+        + 'separate paragraphs; **two asterisks** around a phrase print it in bold. Nothing is '
+        + 'supplied: this is your wording, not the register’s.' },
 
     // --- What the Law Society requires a client to be told -----------------
     //
@@ -119,7 +120,8 @@ export const ENGAGEMENT_SETTINGS: SettingsGroup = {
       label: 'Addendum — the wording', default: '',
       help: 'Printed after the signature, starting a new page. For the information the Rules of '
         + 'Conduct and Client Care require a client to be given. Blank lines separate paragraphs; '
-        + 'a line beginning “- ” prints as a bullet.' },
+        + 'a line beginning “- ” prints as a bullet; **two asterisks** around a phrase print it '
+        + 'in bold.' },
 
     // --- The administrative team ------------------------------------------
     //
@@ -159,8 +161,13 @@ export const ENGAGEMENT_SETTINGS: SettingsGroup = {
     // cap is the thing that has to move rather than the list that has to be cut.
     { key: 'engagement.acknowledgements', type: 'text', label: 'What the client confirms',
       maxLength: 10000, default: '',
-      help: 'One per line. Printed as a numbered list above the signature, introduced by the line '
-        + 'below. Leave blank to print no list at all.' },
+      help: 'One per line, printed as a numbered list above the signature. Numbering you paste in '
+        + '(“1.”, “2)”, a bullet) is taken off, so the list is not numbered twice. Put **two '
+        + 'asterisks** around a phrase to print it in bold. Leave blank to print no list at all.' },
+    { key: 'engagement.acknowledgements_heading', type: 'string', maxLength: 200,
+      label: 'What the client confirms — heading',
+      default: 'What you confirm by accepting',
+      help: 'The heading above the numbered list. Ignored when the list is empty.' },
     { key: 'engagement.acknowledgements_intro', type: 'string', maxLength: 300,
       label: 'The line that introduces that list',
       default: 'By accepting these terms, the client confirms that they:',
@@ -215,6 +222,7 @@ export interface EngagementText {
   adminTeamIntro: string;
   adminTeam: string[];
   adminTeamAlso: string;
+  acknowledgementsHeading: string;
   acknowledgements: string[];
   acknowledgementsIntro: string;
   closing: string;
@@ -242,8 +250,18 @@ export async function engagementText(env: Env): Promise<EngagementText> {
     adminTeamAlso: (v['engagement.admin_team_also'] ?? '').trim(),
     // One per line, blanks dropped — a stray empty line in a settings box would
     // otherwise print as an empty numbered item in a contract.
+    acknowledgementsHeading: (v['engagement.acknowledgements_heading'] ?? '').trim(),
+    // **Any numbering the practice typed is taken off**, because the list is
+    // printed as a numbered list and two sets of numbers is worse than either.
+    // Asked for on 9 September 2026 with a list of twenty-five items pasted
+    // from a document where they were already numbered — and one of them
+    // carried a stray bullet in front of its number, which is what pasting from
+    // a word processor does. A line that is *only* a number is dropped rather
+    // than printed empty.
     acknowledgements: (v['engagement.acknowledgements'] ?? '')
-      .split('\n').map((line) => line.trim()).filter(Boolean),
+      .split('\n')
+      .map((line) => line.trim().replace(/^[•\-*\u2022]?\s*\d+\s*[.)]\s*/, '').trim())
+      .filter(Boolean),
     acknowledgementsIntro: (v['engagement.acknowledgements_intro'] ?? '').trim(),
     closing: (v['engagement.closing'] ?? '').trim(),
     signatureName: (v['engagement.signature_name'] ?? '').trim(),

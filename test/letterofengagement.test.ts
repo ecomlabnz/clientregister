@@ -645,3 +645,88 @@ describe('the length of what a client confirms', () => {
     expect((body.match(/<li>confirm item number /g) ?? []).length).toBe(120);
   });
 });
+
+/**
+ * The list of what a client confirms.
+ *
+ * **Asked urgently on 9 September 2026**, with twenty-five items pasted from a
+ * document where they were already numbered — and one of them carrying a stray
+ * bullet in front of its number, which is what pasting from a word processor
+ * does. The list prints as a numbered list, so two sets of numbers would be
+ * worse than either.
+ */
+describe('what the client confirms', () => {
+  const list = (h: ReturnType<typeof mount>, value: string) =>
+    h.db.exec(`INSERT OR REPLACE INTO settings (key, value, updated_at)
+               VALUES ('engagement.acknowledgements', '${value}', '${AT}')`);
+
+  const letter = async (h: ReturnType<typeof mount>) =>
+    (await h.request('/quotes/q1/letter')).text();
+
+  it('takes the numbering off what was pasted, so it is not numbered twice', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    list(h, '1. acknowledges the first thing;\n'
+          + '2) acknowledges the second thing;\n'
+          + '\u2022 25. agrees to the last thing.');
+
+    const body = await letter(h);
+    expect(body).toContain('<li>acknowledges the first thing;</li>');
+    expect(body).toContain('<li>acknowledges the second thing;</li>');
+    expect(body).toContain('<li>agrees to the last thing.</li>');
+    expect(body).not.toContain('<li>1.');
+    expect(body).not.toContain('\u2022 25.');
+  });
+
+  it('leaves a number that is part of the sentence alone', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    list(h, 'agrees to pay within 10 working days;\n'
+          + '2020 was the year of the Privacy Act, and it applies.');
+
+    const body = await letter(h);
+    expect(body).toContain('<li>agrees to pay within 10 working days;</li>');
+    // Only a leading number *followed by a full stop or bracket* is numbering.
+    expect(body).toContain('<li>2020 was the year of the Privacy Act, and it applies.</li>');
+  });
+
+  it('drops a line that is only a number rather than printing it empty', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    list(h, '1.\n2. a real item;');
+    const body = await letter(h);
+    expect(body).not.toContain('<li></li>');
+    expect(body).toContain('<li>a real item;</li>');
+  });
+
+  it('lets the practice head the section in their own words', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    list(h, 'a real item;');
+    h.db.exec(`INSERT OR REPLACE INTO settings (key, value, updated_at)
+               VALUES ('engagement.acknowledgements_heading',
+                       'Client Acknowledgements and Consents', '${AT}')`);
+
+    const body = await letter(h);
+    expect(body).toContain('Client Acknowledgements and Consents');
+    expect(body).not.toContain('What you confirm by accepting');
+  });
+
+  it('holds a list of twenty-five items of the length these actually run to', async () => {
+    const h = mount();
+    withWording(h);
+    quote(h);
+    const items = Array.from({ length: 25 }, (_, i) =>
+      `${i + 1}. acknowledges item number ${i + 1}, a clause of the length these run to in a `
+      + 'letter of engagement, which is to say a long one that carries several conditions;');
+    list(h, items.join('\n'));
+
+    const body = await letter(h);
+    expect((body.match(/<li>acknowledges item number /g) ?? []).length).toBe(25);
+    expect(body).toContain('acknowledges item number 25,');
+  });
+});

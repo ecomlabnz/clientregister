@@ -7,6 +7,32 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.24.0 — 9 September 2026
+
+### Added
+**`**bold**` in your own wording.** Asked for while writing a twenty-five item
+list of acknowledgements: put two asterisks around a phrase and it prints in
+bold. It works in the clauses, the opening and closing, the scope of the
+retainer, the addendum and the acknowledgements.
+
+Two asterisks and nothing else — no italics, no links, no headings. A contract
+is not a document anybody should be able to restructure by accident, and every
+other syntax somebody might type stays visible as the characters they typed. The
+text is escaped first and the tags are added second, so the only markup that can
+ever come out is the emphasis itself.
+
+**A heading you own for the acknowledgements.** It was fixed at "What you
+confirm by accepting"; it is a setting now, so it can read "Client
+Acknowledgements and Consents" or whatever the practice writes.
+
+### Fixed
+**Pasted numbering no longer numbers the list twice.** The list prints numbered,
+so a list pasted from a document where the items were already numbered came out
+as "1. 1. acknowledges…". Leading numbering is taken off — "1.", "2)", and a
+stray bullet in front of a number, which is what pasting from a word processor
+does. A number that is part of the sentence is left alone, and a line that is
+only a number is dropped rather than printed empty.
+
 ## 1.23.2 — 9 September 2026
 
 ### Fixed
