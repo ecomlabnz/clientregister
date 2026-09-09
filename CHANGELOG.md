@@ -10,6 +10,19 @@ The user-facing version of this list, one line per release, is in the app under
 ## 1.32.1 — 9 September 2026
 
 ### Changed
+**The client now appears in the Parties panel on a matter.** *"i see the
+principal applicant is noted in the right side, but i would love to see them in
+the main screen as well — under Parties — just above the secondary applicants."*
+A partnership matter was listing two dependent children and a supporting partner
+and nobody for them to be dependent on or supporting. The person the matter is
+for now heads the list, badged **Client**, linking to their page.
+
+Shown, not stored: `cases.client_id` stays the one owner of who the client is.
+Writing a second copy into `case_parties` would be two records of one fact, free
+to disagree. Where the client already has a party row of their own they are
+listed once, under the role recorded there, and there is no way to take them off
+their own matter.
+
 **Tags moved to the bottom of a matter's side column.** *"tags in a case should
 move to the bottom, Key Details are much more important."* The panel a person
 opens a matter to read — client, type, status, INZ numbers, what is due — was

@@ -39,6 +39,9 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
   {
     version: '1.32.1', date: '9 September 2026',
     notes: [
+      'The client now appears at the top of the Parties panel on a matter, badged Client, above '
+        + 'the children and partners on the file. Their page is one click away, and they cannot be '
+        + 'taken off their own matter.',
       'Tags on a matter have moved to the bottom of the right-hand column. Key details \u2014 who '
         + 'the client is, the INZ numbers, what is due \u2014 now come first, which is what you '
         + 'open a file to read.',
