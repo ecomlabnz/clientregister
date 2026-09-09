@@ -1308,7 +1308,7 @@ details[open] > summary { margin-bottom: 12px; }
   --grey: #444; --grey-bg: #f2f4f6;
   color-scheme: light;
   max-width: 210mm; margin: 0 auto; padding: 20mm;
-  background: #fff; color: #111;
+  background: #fff; color: #111; font-size: 0.94rem;
   border: 1px solid var(--border); border-radius: var(--radius);
 }
 /* The letter of engagement. A document a client reads and is asked to accept,
@@ -1500,8 +1500,8 @@ details[open] > summary { margin-bottom: 12px; }
    * against the 1.6 the screen uses, and paragraph gaps a little over half what
    * they were. A five-page letter loses about a page to this without a word
    * being cut. */
-  body { font-size: 10pt; line-height: 1.38; }
-  .quote-doc .small, .quote-doc .hint, .quote-doc .prewrap.small { font-size: 9pt; }
+  body { font-size: 9.5pt; line-height: 1.35; }
+  .quote-doc .small, .quote-doc .hint, .quote-doc .prewrap.small { font-size: 8.5pt; }
   .letter-doc p, .letter-doc ul, .letter-doc ol { line-height: 1.38; margin-bottom: 7px; }
   .letter-doc li { margin-bottom: 3px; }
   .letter-doc section { margin-bottom: 12px; }

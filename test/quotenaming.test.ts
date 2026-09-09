@@ -291,3 +291,72 @@ describe('the Re line on a printed quotation', () => {
     expect(body).toContain('<dt>Re</dt><dd>Advice — one hour</dd>');
   });
 });
+
+/**
+ * The payment schedule, in the figures the client actually pays.
+ *
+ * **Asked on 9 September 2026:** the stages *"should already be showing the GST
+ * inclusive amounts"*. Each row read "$2,000.00 + GST" while the total beneath
+ * them was inclusive — so the rows and their own total were in different
+ * currencies, and a client had to do arithmetic on a payment schedule before it
+ * meant anything.
+ */
+describe('the payment stages on a printed quotation', () => {
+  const staged = async (h: ReturnType<typeof mount>) => {
+    await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '0' });
+    const id = h.get<{ id: string }>('SELECT id FROM quotes')!.id;
+    // $2,000 plus 15% GST, and an INZ fee that is already inclusive.
+    h.db.exec(`INSERT INTO quote_stages (id, quote_id, position, label, description, amount_cents,
+                 gst_treatment, gst_rate_bp, net_cents, gst_cents, gross_cents, created_at, updated_at)
+               VALUES ('s1', '${id}', 0, 'Stage 1', 'On instruction', 200000,
+                       'exclusive', 1500, 200000, 30000, 230000, '${AT}', '${AT}'),
+                      ('s2', '${id}', 1, 'Stage 2', 'INZ fee', 153000,
+                       'inclusive', 1500, 133043, 19957, 153000, '${AT}', '${AT}')`);
+    return (await h.request(`/quotes/${id}/print`)).text();
+  };
+
+  it('shows what is payable, not a figure plus a promise of tax', async () => {
+    const h = mount();
+    const body = await staged(h);
+    expect(body).toContain('$2,300.00');
+    expect(body).not.toContain('$2,000.00 + GST');
+    expect(body).not.toContain('+ GST');
+  });
+
+  it('leaves an inclusive stage exactly as it stands', async () => {
+    const h = mount();
+    const body = await staged(h);
+    expect(body).toContain('$1,530.00');
+  });
+
+  it('adds up to the total printed beneath it', async () => {
+    // The rows and the total are now the same kind of number, which is the
+    // whole complaint: 2,300 + 1,530 = 3,830.
+    const h = mount();
+    const body = await staged(h);
+    expect(body).toContain('$3,830.00');
+  });
+});
+
+describe('the parties block', () => {
+  it('uses the defined terms, capitalised as the letter uses them', async () => {
+    const h = mount();
+    await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '0' });
+    const id = h.get<{ id: string }>('SELECT id FROM quotes')!.id;
+    const body = await (await h.request(`/quotes/${id}/print`)).text();
+    expect(body).toContain('<dt>The Lawyer</dt>');
+    expect(body).toContain('<dt>The Client</dt>');
+    expect(body).not.toContain('<dt>The lawyer</dt>');
+  });
+
+  it('puts the nomination beside the name, in brackets, rather than under it', async () => {
+    const h = mount();
+    await h.post('/quotes', { client_id: 'cl1', case_type: 'rv_partner', with_letter: '0' });
+    const id = h.get<{ id: string }>('SELECT id FROM quotes')!.id;
+    const body = await (await h.request(`/quotes/${id}/print`)).text();
+    expect(body).toMatch(/<\/strong>\s*<span class="small muted">\(Nominated representative/);
+    // Not on a line of its own beneath the name, where it read as a second
+    // fact about them rather than a note about which name this is.
+    expect(body).not.toContain('<div class="small">Nominated representative');
+  });
+});
