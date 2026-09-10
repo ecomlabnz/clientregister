@@ -178,7 +178,8 @@ src/
                   channels, csv, timeline, parties, tags
   ai/             provider interface, Anthropic, Workers AI, triage, brief, intake
   ingest/         email, Telegram, WhatsApp webhooks → one pipeline
-  mail/           outbound queue, Gmail and Resend providers
+  mail/           outbound queue, Gmail and Resend providers, and reading
+                  back what was sent
   modules/        one folder per feature
   ui/             html escaping, layout, components, formatting
 migrations/       numbered, forward-only, applied by CI before deploy

@@ -52,7 +52,15 @@ describe('the manual keeps up with the application', () => {
       // These have no manual section of their own by design: the landing page
       // is documented under "website", auth under "account", the dashboard
       // under "getting-around", search likewise, and help is this page.
-      && !['landing', 'auth', 'dashboard', 'help', 'documents', 'workflows', 'inbox'].includes(name));
+      //
+      // `mail` is here for the same reason, and the claim is kept true: it has
+      // no entry in the menu and no page of its own to find — the only way in
+      // is a link on a file note or on a record's list of what has been sent —
+      // so it is described under Quotes, where the practice meets it, rather
+      // than as a thing of its own. If it ever gains a menu entry, take this
+      // out and write it a section.
+      && !['landing', 'auth', 'dashboard', 'help', 'documents', 'workflows', 'inbox',
+           'mail'].includes(name));
     expect(undocumented, `no manual section: ${undocumented.join(', ')}`).toEqual([]);
   });
 });

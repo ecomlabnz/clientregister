@@ -13,6 +13,12 @@
    appearance picker uses this to draw its swatches from the real tokens
    instead of repeating the hex codes. */
 
+/* One green for the client-facing accept controls, defined once at the root so
+   it reads the same inside a document (where `.quote-doc` redefines the
+   palette) and outside it in the sticky bar. See ".accept-bar .btn-primary"
+   below for why it is pinned rather than inherited. */
+:root { --accept-green: #1b5e20; }
+
 :root, [data-theme="slate"] {
   --l-bg: #f6f7f9;      --d-bg: #12171d;
   --l-surface: #ffffff; --d-surface: #1a2128;
@@ -1624,6 +1630,58 @@ details[open] > summary { margin-bottom: 12px; }
   padding-top: 10px;
   font-size: 0.825rem;
 }
+/* Everything between those headings, a little tighter.
+ *
+ * **Asked for on 11 September 2026**, looking at a printed fee quote carrying
+ * the headings above: *"the print spacing and fonts - can see - good - make
+ * the lines slightly more compact otherwise, except for where the headings
+ * sit - so the whole takes less space on the screen vertically"*. So the air
+ * the headings were given stays exactly where it is — the 28px above an `h3`,
+ * the 10px above the column headings, the space before PROFESSIONAL FEES —
+ * and the rows, the prose and the lists between them give back roughly a
+ * sixth of theirs.
+ *
+ * "Slightly" is their word, and *"I like how all looks now - do not break it,
+ * just need some surgical changes"* was the instruction before it: nothing
+ * here moves by more than 2px or a tenth of a line, and nothing about size,
+ * weight, colour, rules or the horizontal is touched at all.
+ *
+ * Scoped to the quotation wherever the class is shared — `.quote-doc-table`
+ * is the invoice's table too, `p` belongs to every document there is, and
+ * neither was in front of them. Where a class is the quotation's alone
+ * (`.quote-doc-parties`, `.quote-doc-conditions`, `.quote-doc-note`) the
+ * figure is tightened where it already stands instead, because a scoped copy
+ * of it would also outrank the phone rules at the foot of this file and quietly
+ * undo them.
+ */
+/* The rows of both tables: 5px above and below a cell → 4px. The group rows
+   are excluded by name — the space before "Professional fees" is a heading's
+   space, and print has always left it alone for the same reason. */
+.quote-doc.quote-doc-quotation .quote-doc-table tbody tr:not(.quote-doc-group) > td {
+  padding-top: 4px; padding-bottom: 4px;
+}
+/* The totals. The gap that lifts the block off the last item keeps most of its
+   air — 8px → 6px — so the figures still gather away from the items above. */
+.quote-doc.quote-doc-quotation .quote-doc-table tfoot td { padding-top: 3px; padding-bottom: 3px; }
+.quote-doc.quote-doc-quotation .quote-doc-table tfoot tr:first-child td + td { padding-top: 6px; }
+.quote-doc.quote-doc-quotation .quote-doc-table tfoot .totals-row td + td {
+  padding-top: 5px; padding-bottom: 5px;
+}
+/* The prose — the paragraphs inside the sections, and the practice's own
+   details at the head of the page. Line spacing 1.55 → 1.45, and 10px between
+   paragraphs → 8px.
+   Written as `section p` and `p.small` rather than as a bare `p` so that the
+   three paragraphs that are not prose keep the room each was given on purpose:
+   the ACCEPTED stamp, the FEE QUOTE title, and the printed-at line at the
+   foot. */
+.quote-doc.quote-doc-quotation section p,
+.quote-doc.quote-doc-quotation .quote-doc-head p.small { line-height: 1.45; }
+.quote-doc.quote-doc-quotation section p:not(:last-child),
+.quote-doc.quote-doc-quotation .quote-doc-head p.small:not(:last-child) { margin-bottom: 8px; }
+/* The bank block belongs to the invoice as well, so only the quotation's copy
+   of it closes up. Its row gap is left where it is: raising the weight of that
+   figure here would also beat the one-column rule a phone uses. */
+.quote-doc.quote-doc-quotation .quote-doc-bank { margin-bottom: 8px; }
 .quote-doc-head {
   display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap;
   padding-bottom: 18px; border-bottom: 2px solid var(--border);
@@ -1724,13 +1782,21 @@ details[open] > summary { margin-bottom: 12px; }
 .quote-doc-meta dt { color: var(--muted); text-align: right; }
 .quote-doc-meta dt::after { content: ':'; }
 .quote-doc-meta dd { margin: 0; text-align: left; }
-.quote-doc-conditions { margin: 0; padding-left: 18px; font-size: 0.88rem; line-height: 1.6; }
-.quote-doc-conditions li { margin-bottom: 7px; }
-.quote-doc-note { margin-top: 10px; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius); }
+/* The conditions, and the note under the payment stages. Both are the fee
+   quote's alone, so the 11 September tightening — *"make the lines slightly
+   more compact"* — is made here rather than restated at a heavier weight:
+   line spacing 1.6 → 1.5, 7px between conditions → 5px, and the note's box
+   10px → 8px above and inside. Its side padding does not move. */
+.quote-doc-conditions { margin: 0; padding-left: 18px; font-size: 0.88rem; line-height: 1.5; }
+.quote-doc-conditions li { margin-bottom: 5px; }
+.quote-doc-note { margin-top: 8px; padding: 8px 12px; background: var(--surface-2); border-radius: var(--radius); }
 .quote-doc-bank { grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0 0 10px; font-size: 0.9rem; }
 /* The parties block on a quotation. Same two-column shape as the bank details
    above it, with room for the line of detail under each name. */
-.quote-doc-parties { grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0 0 10px; font-size: 0.9rem; }
+/* The 11 September tightening again: 6px between the rows → 4px, and 10px
+   under the block → 8px. Made here, not in a scoped copy, so the one-column
+   rule a phone applies to `.kv` still wins where it should. */
+.quote-doc-parties { grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0 0 8px; font-size: 0.9rem; }
 .quote-doc-parties > dd { margin: 0; }
 .quote-doc-subhead { margin: 14px 0 6px; font-size: 0.95rem; }
 .quote-doc-terms { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); }
@@ -1955,8 +2021,38 @@ details[open] > summary { margin-bottom: 12px; }
   .quote-doc-table tfoot td { padding: 3px 0; }
   .quote-doc-table tfoot tr:first-child td { padding-top: 7px; }
   .quote-doc-table tfoot .totals-row td { padding-top: 7px; }
-  .quote-doc-conditions { line-height: 1.35; }
-  .quote-doc-conditions li { margin-bottom: 4px; }
+
+  /* The quotation's own tightening of 11 September 2026, against the figures
+     paper already uses rather than the screen's carried across: a row 3px →
+     2.5px, the lift above the totals 7px → 5.5px. Proportional, because paper
+     starts from a tighter place than the screen does.
+
+     The selectors are word for word the scoped ones above, which is the point
+     of writing them out again: those are scoped to the quotation and so
+     outrank the two plain `.quote-doc-table` lines here, and without these the
+     screen's 4px rows would simply print. Same selector, later in the file, so
+     each of these wins on order — the invoice's own rows are untouched by
+     both. */
+  .quote-doc.quote-doc-quotation .quote-doc-table tbody tr:not(.quote-doc-group) > td {
+    padding-top: 2.5px; padding-bottom: 2.5px;
+  }
+  .quote-doc.quote-doc-quotation .quote-doc-table tfoot td { padding-top: 2.5px; padding-bottom: 2.5px; }
+  .quote-doc.quote-doc-quotation .quote-doc-table tfoot tr:first-child td + td { padding-top: 5.5px; }
+  .quote-doc.quote-doc-quotation .quote-doc-table tfoot .totals-row td + td {
+    padding-top: 5.5px; padding-bottom: 5.5px;
+  }
+  /* On paper the paragraphs keep the document's own line spacing — the 1.2 set
+     on `body` above, which is tighter than the 1.45 the screen rule asks for.
+     `inherit` rather than the figure repeated, so the two cannot drift. Their
+     8px margins do carry across: that gap is 10px on paper today, the same as
+     on screen, so it tightens by the same fifth. */
+  .quote-doc.quote-doc-quotation section p,
+  .quote-doc.quote-doc-quotation .quote-doc-head p.small { line-height: inherit; }
+
+  /* 1.35 → 1.3 and 4px → 3px between the conditions, the same proportional
+     step. */
+  .quote-doc-conditions { line-height: 1.3; }
+  .quote-doc-conditions li { margin-bottom: 3px; }
   .quote-doc-parties, .quote-doc-bank { gap: 3px 16px; }
   .quote-doc-subhead { margin: 10px 0 4px; }
   .quote-doc .small, .quote-doc .hint, .quote-doc .prewrap.small { font-size: 7.6pt; }
@@ -2661,3 +2757,29 @@ body.site { background: var(--bg); }
 .test-mark-offer > summary { cursor: pointer; color: var(--muted); }
 .test-mark-offer > summary:hover { color: var(--text); }
 .test-mark-offer .hint { margin-bottom: 8px; }
+
+/* The green a client accepts in.
+ *
+ * **Asked for on 11 September 2026:** *"accept this quotation button should be
+ * the same green as the one saying Go to accept"* and *"the tick colours should
+ * be the same green"*.
+ *
+ * They were different because of where each sits. The sticky bar is page
+ * furniture and took the practice's own theme accent, which happens to be
+ * green; the button is inside the document, and `.quote-doc` redefines
+ * `--accent` to the document's navy so that everything nested in a page of
+ * paper is set as paper. Two correct rules, one odd-looking page.
+ *
+ * So both are pinned here to one fixed green rather than either inheriting.
+ * That also settles a question nobody had asked yet: a client's copy of a
+ * contract should not change colour because the practice changed their theme.
+ * It is the same green as the ACCEPTED stamp the document wears afterwards,
+ * which is the right relation between the two — the button that forms the
+ * contract and the mark that says it was formed. */
+.accept-bar .btn-primary,
+.btn-accept {
+  background: var(--accept-green);
+  border-color: var(--accept-green);
+  color: #fff;
+}
+.accept-form input[type="checkbox"] { accent-color: var(--accept-green); }

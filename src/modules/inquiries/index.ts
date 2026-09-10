@@ -31,6 +31,7 @@ import { setNationalityStatements } from '../../core/nationalities';
 import { clientOptions, isAssignable, userOptions } from '../../core/lookups';
 import { composeFullName, familyNameFor, givenNamesFor, plainAscii, splitFullName } from '../../core/names';
 import { caseNameFrom } from '../../core/casename';
+import { emailsForEntity, mailLinkFor, recordMailHref } from '../../mail/stored';
 import {
   CORRECTION_WINDOW_MINUTES, addEntry, correctable, listEntries,
 } from '../../core/timeline';
@@ -353,11 +354,17 @@ export const inquiriesModule: AppModule = {
       );
       if (!inq) return c.notFound();
 
-      const [entries, clients, users, quotes] = await Promise.all([
+      // Emails the register has sent about this record, so a note of one can
+      // offer the letter itself. Read only for somebody who may open one —
+      // `mail:send`, see `src/modules/mail` — so nothing is queried for a
+      // reader who would be shown no link.
+      const canReadMail = can(c.get('user'), 'mail:send');
+      const [entries, clients, users, quotes, sentMail] = await Promise.all([
         listEntries(c.env, 'inquiry', id),
         clientOptions(c.env),
         userOptions(c.env),
         all<any>(c.env.DB, 'SELECT id, ref, status FROM quotes WHERE inquiry_id = ? ORDER BY created_at DESC', id),
+        canReadMail ? emailsForEntity(c.env, 'inquiry', id) : Promise.resolve([]),
       ]);
       const csrf = c.get('session')!.csrf;
       const writable = can(c.get('user'), 'register:write');
@@ -500,6 +507,7 @@ export const inquiriesModule: AppModule = {
                   ${timelineItem({
                     entry: e,
                     kindLabel: ENTRY_KIND_LABELS[e.kind] ?? e.kind,
+                    mail: canReadMail ? mailLinkFor(e, sentMail, recordMailHref('inquiry', inq.id)) : null,
                     happened: stamp(e.occurred_at),
                     written: stamp(e.created_at),
                     correction: writable && correctable(e, c.get('user')?.id ?? null)

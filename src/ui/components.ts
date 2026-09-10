@@ -370,6 +370,18 @@ export function timelineItem(opts: {
   written: Raw;
   /** Null when this note can no longer be corrected, which is the usual case. */
   correction: { csrf: string; kindOptions: Array<{ value: string; label: string }>; minutes: number } | null;
+  /**
+   * The stored email this note is about, when there is one and the reader may
+   * open it.
+   *
+   * **The practice, 11 September 2026:** *"why do we not have the entire email
+   * that was sent out in the file note, recorded as an email?"* The letter was
+   * always kept; the note only summarised it. Passed in rather than looked up
+   * here — a component runs no queries — and worked out at render time by
+   * `mail/stored.ts`, because file notes are append-only and a link written
+   * into an old note would be a rewrite of the record.
+   */
+  mail?: { href: string; label: string } | null;
 }): Raw {
   const { entry } = opts;
   return html`
@@ -389,6 +401,9 @@ export function timelineItem(opts: {
         ? html`<p class="small mt">
                  <a href="/documents/${entry.document_id}">${entry.document_name ?? 'Attached file'}</a>
                </p>`
+        : ''}
+      ${opts.mail
+        ? html`<p class="small mt"><a href="${opts.mail.href}">${opts.mail.label}</a></p>`
         : ''}
       ${opts.correction ? html`
         <details class="reveal-inline">

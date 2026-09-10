@@ -34,6 +34,7 @@ import { clientOptions, isAssignable, userOptions } from '../../core/lookups';
 import { threadsFor } from '../../core/channels';
 import { addParty, partiesForCase, removeParty } from '../../core/parties';
 import { findOrCreateTag, listTags, tagCase, tagsForCase, tagsForCases, untagCase } from '../../core/tags';
+import { emailsForEntity, mailLinkFor, recordMailHref } from '../../mail/stored';
 import {
   CORRECTION_WINDOW_MINUTES, addEntry, correctable, listEntries,
 } from '../../core/timeline';
@@ -685,10 +686,13 @@ export const casesModule: AppModule = {
       const decided = isDecidedStatus(kase.status);
       const elapsed = elapsedLine(kase, new Date().toISOString().slice(0, 10));
 
-      const [entries, history, tasks, quotes, users, invoicesPanel, caseFlags, flagKindTerms,
+      // See the inquiry page for why the sent mail is read here and guarded.
+      const canReadMail = can(c.get('user'), 'mail:send');
+      const [entries, sentMail, history, tasks, quotes, users, invoicesPanel, caseFlags, flagKindTerms,
              parties, caseTags, allTags, clients,
              threads, caseFiles, docCats, linkableDocs] = await Promise.all([
         listEntries(c.env, 'case', id),
+        canReadMail ? emailsForEntity(c.env, 'case', id) : Promise.resolve([]),
         all<any>(c.env.DB, `SELECT h.*, u.name AS by_name FROM case_status_history h
                               LEFT JOIN users u ON u.id = h.by_user_id
                              WHERE h.case_id = ? ORDER BY h.at DESC LIMIT 30`, id),
@@ -1081,6 +1085,7 @@ export const casesModule: AppModule = {
                   ${entries.map((e) => timelineItem({
                     entry: e,
                     kindLabel: ENTRY_KIND_LABELS[e.kind] ?? e.kind,
+                    mail: canReadMail ? mailLinkFor(e, sentMail, recordMailHref('case', kase.id)) : null,
                     happened: stamp(e.occurred_at),
                     written: stamp(e.created_at),
                     correction: writable && correctable(e, c.get('user')?.id ?? null)

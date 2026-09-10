@@ -42,6 +42,7 @@ import {
   QUOTE_STATUS_LABELS, type ClientStatus,
 } from '../../domain';
 import { organisationOptions, userOptions } from '../../core/lookups';
+import { emailsForEntity, mailLinkFor, recordMailHref } from '../../mail/stored';
 import {
   CORRECTION_WINDOW_MINUTES, addEntry, correctable, listEntries,
 } from '../../core/timeline';
@@ -1154,7 +1155,8 @@ export const clientsModule: AppModule = {
         tagsForClient(c.env, id), listTags(c.env),
       ]);
 
-      const [cases, quotes, inquiries, entries, tasks, partyCases, related, employer, people,
+      const canReadMail = can(c.get('user'), 'mail:send');
+      const [cases, quotes, inquiries, entries, sentMail, tasks, partyCases, related, employer, people,
              feesByCase, englishTestTerms, visaTerms, certificates, passports, threads,
              clientFiles, docCats] = await Promise.all([
         all<any>(c.env.DB, `SELECT id, ref, title, case_type, status, priority, next_action, next_action_due, updated_at
@@ -1164,6 +1166,8 @@ export const clientsModule: AppModule = {
         all<any>(c.env.DB, `SELECT id, ref, source, subject, status, received_at
                               FROM inquiries WHERE client_id = ? ORDER BY received_at DESC LIMIT 20`, id),
         listEntries(c.env, 'client', id),
+        // See the inquiry page for why this is read here and why it is guarded.
+        canReadMail ? emailsForEntity(c.env, 'client', id) : Promise.resolve([]),
         all<any>(c.env.DB, `SELECT id, title, status, due_at FROM tasks
                              WHERE entity_type = 'client' AND entity_id = ? AND status IN ('open','in_progress','blocked')
                              ORDER BY due_at`, id),
@@ -1285,6 +1289,7 @@ export const clientsModule: AppModule = {
                   ${entries.map((e) => timelineItem({
                     entry: e,
                     kindLabel: ENTRY_KIND_LABELS[e.kind] ?? e.kind,
+                    mail: canReadMail ? mailLinkFor(e, sentMail, recordMailHref('client', client.id)) : null,
                     happened: stamp(e.occurred_at),
                     written: stamp(e.created_at),
                     correction: writable && correctable(e, c.get('user')?.id ?? null)
