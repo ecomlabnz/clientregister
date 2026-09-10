@@ -64,6 +64,19 @@ export function normalisedNzbn(value: string | null): string | null {
  *    meant, and that decision belongs to a person on a screen that shows both.
  *  - **`notes`** — free text somebody wrote. Additions go to a file note, which
  *    is append-only and says where they came from.
+ *  - **`inz_client_number`** — a plain fact and safe to fill, but the column is
+ *    unique across the register, so a clash would abort the whole statement and
+ *    lose every other box with it. It has its own writer below.
+ *  - **`national_id_number`, `national_id_country`** — a pair. The database
+ *    refuses either half without the other (migration 0084), and this merge
+ *    writes column by column, so offering one of them alone would abort the
+ *    press. They have their own writer below, which puts both in one statement.
+ *
+ * The seven added on 11 September 2026 — title, gender, relationship status,
+ * other names, and the three halves of a place of birth — pass the same test as
+ * everything above them: a plain fact a document states about a person, owned
+ * by this record and nothing else, with no second column depending on it. See
+ * `docs/pipeline.md` item 0b.
  */
 export const CLIENT_FILLABLE = [
   { column: 'preferred_name', label: 'Known as' },
@@ -74,6 +87,13 @@ export const CLIENT_FILLABLE = [
   { column: 'current_visa_type', label: 'Current visa' },
   { column: 'current_visa_expiry', label: 'Current visa expiry' },
   { column: 'nzbn', label: 'NZBN' },
+  { column: 'title', label: 'Title' },
+  { column: 'gender', label: 'Gender' },
+  { column: 'relationship_status', label: 'Relationship status' },
+  { column: 'other_names', label: 'Other names ever used' },
+  { column: 'birth_country', label: 'Country of birth' },
+  { column: 'birth_region', label: 'Region of birth' },
+  { column: 'birth_town', label: 'Town of birth' },
 ] as const;
 
 export type ClientFillColumn = (typeof CLIENT_FILLABLE)[number]['column'];
@@ -147,6 +167,38 @@ export async function setInzClientNumber(
       WHERE id = ? AND COALESCE(TRIM(inz_client_number), '') = ''
         AND NOT EXISTS (SELECT 1 FROM clients o WHERE o.inz_client_number = ? AND o.id <> ?)`,
     number, nowIso(), clientId, number, clientId,
+  );
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * Put a national identity number and its country on a client, if it is safe to.
+ *
+ * Both halves in one statement, and never over what is recorded. The pair is
+ * the whole reason this is not one of `CLIENT_FILLABLE`: migration 0084 refuses
+ * a number without the country that issued it and a country without a number,
+ * so a merge that offered the two columns separately could write half a fact
+ * and abort the press — taking every other box on the screen down with it.
+ *
+ * Only where the client holds neither. A record that already carries a number
+ * is left entirely alone, including its country: correcting one half of a pair
+ * from a document is a decision a person makes on a screen showing both.
+ *
+ * Both conditions live in the `WHERE`, for the same reason the merge above
+ * does: checked and written in one statement, or not checked at all.
+ */
+export async function setNationalIdentity(
+  env: Env, clientId: string, number: string | null, country: string | null,
+): Promise<boolean> {
+  const value = (number ?? '').trim();
+  const issuer = (country ?? '').trim();
+  if (!value || !issuer) return false;
+  const result = await run(
+    env.DB,
+    `UPDATE clients SET national_id_number = ?, national_id_country = ?, updated_at = ?
+      WHERE id = ? AND COALESCE(TRIM(national_id_number), '') = ''
+        AND COALESCE(TRIM(national_id_country), '') = ''`,
+    value, issuer, nowIso(), clientId,
   );
   return (result.meta?.changes ?? 0) > 0;
 }

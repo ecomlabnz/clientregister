@@ -17,7 +17,7 @@
 
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { AppContext } from '../../types';
+import type { AppContext, Env } from '../../types';
 import type { AppModule } from '../../core/module';
 import { searchTerms } from '../../core/search';
 import { all, nextRef, nowIso, one, run } from '../../core/db';
@@ -50,7 +50,10 @@ import { casesForClient, relatedClients } from '../../core/parties';
 import { can } from '../../core/rbac';
 import { clientDeleteCard, deleteRefusal } from '../../core/deletes';
 import { preferencesFor } from '../../core/preferences';
-import { caseTypes, docCategories, englishTests, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
+import {
+  caseTypes, docCategories, englishTests, genders, isTerm, labelFor, relationshipStatuses,
+  termOptions, titles, visaTypes, type Term,
+} from '../../core/vocabulary';
 import { renameMattersFor } from '../../core/casename';
 import { detachTag, attachTag, findOrCreateTag, listTags, tagsForClient, tagsForClients } from '../../core/tags';
 import { filesPanel, listDocuments } from '../documents';
@@ -106,6 +109,21 @@ export interface ClientRow {
   current_visa_expiry: string | null;
   current_visa_expiry_rule: string | null;
   inz_client_number: string | null;
+  /**
+   * The flat facts an application form asks for and nothing here held until
+   * migration 0084. Every one of them is a plain fact about the person, so it
+   * is a column here like everything else on this record. `title`, `gender` and
+   * `relationship_status` are vocabulary keys, edited in Settings; the two
+   * country columns are ISO codes like every other country in the register.
+   *
+   * `other_names` is *not* middle names — `given_names` is where those go and
+   * always has been. This is the separate question INZ asks: other names the
+   * person has actually used.
+   */
+  title: string | null; gender: string | null; relationship_status: string | null;
+  other_names: string | null;
+  birth_country: string | null; birth_region: string | null; birth_town: string | null;
+  national_id_number: string | null; national_id_country: string | null;
   address: string | null; status: ClientStatus; assigned_to: string | null; notes: string | null;
   created_at: string; updated_at: string; created_by: string | null;
 }
@@ -138,13 +156,38 @@ type ClientFormValues = Partial<ClientRow> & {
   nationalities?: string[];
 };
 
+/**
+ * Every editable list this form offers, read once.
+ *
+ * Passed to `clientForm` *and* to `readClientForm`, deliberately together: the
+ * list somebody chose from and the list their choice is checked against have to
+ * be the same list. Read twice, an administrator editing a vocabulary between
+ * the two reads would have the form refuse a value it had just offered.
+ */
+interface ClientVocabularies {
+  englishTests: Term[];
+  visaTypes: Term[];
+  titles: Term[];
+  genders: Term[];
+  relationshipStatuses: Term[];
+}
+
+async function clientVocabularies(env: Env): Promise<ClientVocabularies> {
+  const [english, visas, titleTerms, genderTerms, statusTerms] = await Promise.all([
+    englishTests(env), visaTypes(env), titles(env), genders(env), relationshipStatuses(env),
+  ]);
+  return {
+    englishTests: english, visaTypes: visas, titles: titleTerms,
+    genders: genderTerms, relationshipStatuses: statusTerms,
+  };
+}
+
 function clientForm(
   c: any,
   values: ClientFormValues,
   users: Array<{ value: string; label: string }>,
   organisations: Array<{ value: string; label: string }>,
-  englishTestOptions: Array<{ value: string; label: string }>,
-  visaTypeOptions: Array<{ value: string; label: string }>,
+  vocab: ClientVocabularies,
   errors?: Record<string, string>,
 ): Raw {
   const csrf = c.get('session').csrf;
@@ -219,8 +262,15 @@ function clientForm(
                  without it. The script re-computes this when the record type
                  changes without a reload. */}
         <div data-kind="individual" ${kind === 'individual' ? '' : raw('hidden')}>
+          ${'' /* How they are addressed. First because it is first on the form
+                   and first in a letter, and a vocabulary rather than a fixed
+                   list because the honorifics a practice uses are its own
+                   business — a client who is a doctor or a professor should not
+                   need a deployment to be addressed properly. */}
+          ${select({ label: 'Title', name: 'title', value: values.title ?? '',
+                     options: termOptions(vocab.titles), includeBlank: 'Not recorded' })}
           ${field({ label: 'Given names', name: 'given_names', value: givenNames, maxlength: 120,
-                    hint: 'As they appear in the passport.' })}
+                    hint: 'As they appear in the passport, including any middle names.' })}
           ${'' /* Not marked required in the HTML, deliberately. This box lives in
                    the individual half of the form, and when the record type is a
                    company that half is hidden. A hidden field the browser thinks
@@ -236,6 +286,17 @@ function clientForm(
           ${field({ label: 'Family name', name: 'family_name', value: familyName, maxlength: 120 })}
           ${field({ label: 'Preferred name', name: 'preferred_name', value: values.preferred_name, maxlength: 120,
                     hint: 'What to call them in conversation, if different.' })}
+          ${'' /* INZ asks this separately from the given names, and it is not a
+                   box for middle names: those go in "Given names" and always
+                   have. This is for names the person has actually used and been
+                   documented under — a maiden name, a name before a legal
+                   change, a name their old passport spells differently. Free
+                   text because the answer is: "also as Oanh TRUONG-SMITH until
+                   2019" has no fields. */}
+          ${field({ label: 'Other names ever used', name: 'other_names', type: 'textarea',
+                    value: values.other_names, rows: 2, maxlength: 500,
+                    hint: 'A maiden name, a name before a legal change, a different spelling on an '
+                      + 'older document. Not middle names \u2014 those belong in Given names.' })}
           ${'' /* One box per nationality held, and always one spare. Dual and
                    triple nationality are ordinary in immigration work — they
                    decide whether somebody needs a visa at all, which police
@@ -259,6 +320,39 @@ function clientForm(
                   ? 'Fill this in and save to add another.' : undefined),
           }))}
           ${field({ label: 'Date of birth', name: 'date_of_birth', type: 'date', value: dateInputValue(values.date_of_birth) })}
+
+          ${'' /* Three boxes and not one, because INZ asks three and answers
+                   them separately \u2014 a province is not a city, and "Nghe An,
+                   Vinh" typed into one box cannot be taken apart again. Kept in
+                   a group of their own so they do not scatter into three
+                   different rows with a field between them.
+
+                   The country is a code from the same list as nationality and
+                   passport country, and the database refuses one that is not on
+                   it (migration 0084). */}
+          <fieldset class="field-group">
+            <legend>Place of birth</legend>
+            ${select({ label: 'Country of birth', name: 'birth_country',
+                       value: values.birth_country ?? '', options: countryOptions(),
+                       includeBlank: 'Not recorded' })}
+            ${field({ label: 'Region, state or province', name: 'birth_region',
+                      value: values.birth_region, maxlength: 120 })}
+            ${field({ label: 'Town or city', name: 'birth_town',
+                      value: values.birth_town, maxlength: 120 })}
+          </fieldset>
+
+          ${'' /* Both are lists an administrator owns, not enums in the code.
+                   Gender is seeded with Immigration New Zealand's own three
+                   values so what is recorded here matches what the form asks
+                   for; relationship status decides a whole category of
+                   application, and "Separated" is a different answer from
+                   "Divorced". */}
+          ${select({ label: 'Gender', name: 'gender', value: values.gender ?? '',
+                     options: termOptions(vocab.genders), includeBlank: 'Not recorded' })}
+          ${select({ label: 'Relationship status', name: 'relationship_status',
+                     value: values.relationship_status ?? '',
+                     options: termOptions(vocab.relationshipStatuses),
+                     includeBlank: 'Not recorded' })}
 
           ${'' /* These two are one fact in two boxes: which company, and what
                    they do there. Left to flow with everything else they landed
@@ -324,6 +418,26 @@ function clientForm(
                   value: dateInputValue(values.passport_issued ?? null) })}
         ${field({ label: 'Passport expiry', name: 'passport_expiry', type: 'date', value: dateInputValue(values.passport_expiry),
                   hint: 'Watched on the alerts page — a passport expiring mid-application stalls it.' })}
+        ${'' /* A passport is not the only identity document a client carries,
+                 and the one that turned up on 11 September 2026 was a
+                 Vietnamese Citizen Identity Card whose number had nowhere to
+                 go. Two boxes and never one: a twelve-digit number is a
+                 Vietnamese CCCD, an Indian Aadhaar or a typing slip depending
+                 entirely on who issued it. The database refuses either half on
+                 its own \u2014 see migration 0084 \u2014 and the server says so
+                 against the box before it gets that far. */}
+        <fieldset class="field-group">
+          <legend>National identity card</legend>
+          ${field({ label: 'National identity number', name: 'national_id_number',
+                    value: values.national_id_number, maxlength: 60,
+                    hint: 'A national ID card number where the country issues one \u2014 a Vietnamese '
+                      + 'Citizen Identity Card, an Indian Aadhaar. Not the passport.' })}
+          ${select({ label: 'Country that issued it', name: 'national_id_country',
+                     value: values.national_id_country ?? '', options: countryOptions(),
+                     includeBlank: 'Not recorded',
+                     hint: 'Required with the number, and refused without it: a number nobody can '
+                       + 'say the issuer of cannot be put on a form.' })}
+        </fieldset>
         <div class="settings-cell-wide">
           <p class="hint">These boxes are the <strong>primary</strong> passport — the travel document
              this file works from. A client may hold more than one: a dual national holds two at
@@ -357,7 +471,7 @@ function clientForm(
               + 'lives here rather than on each matter, and every matter reads it from here. '
               + 'Leave it blank only until INZ has issued one.' })}</div>
           <div class="settings-cell">${select({ label: 'Current visa', name: 'current_visa_type',
-            value: values.current_visa_type ?? '', options: visaTypeOptions,
+            value: values.current_visa_type ?? '', options: termOptions(vocab.visaTypes),
             includeBlank: 'Not recorded',
             hint: 'What they hold now, not what is being applied for. “None — offshore” is an '
               + 'answer, and so is “None — unlawful”.' })}</div>
@@ -404,7 +518,7 @@ function clientForm(
 
           <p class="settings-head subhead">English</p>
           <div class="settings-cell">${select({ label: 'Test or exemption', name: 'english_test_type',
-                    value: values.english_test_type ?? '', options: englishTestOptions,
+                    value: values.english_test_type ?? '', options: termOptions(vocab.englishTests),
                     includeBlank: 'Not recorded' })}</div>
           <div class="settings-cell">${field({ label: 'Score', name: 'english_test_score', value: values.english_test_score, maxlength: 40,
                     hint: 'As the certificate states it — 6.5, 58, B2. The tests do not share a scale.' })}</div>
@@ -430,11 +544,59 @@ function clientForm(
 }
 
 /**
+ * The two halves of a national identity number, refused unless both are there.
+ *
+ * The rule is the database's (migration 0084) and this is only the place that
+ * makes it say so against the right box. Without it a person who fills the
+ * number and forgets the country gets a 500 from a trigger, which tells them
+ * nothing and loses the rest of what they typed.
+ *
+ * A number with no country identifies nobody: twelve digits are a Vietnamese
+ * CCCD, an Indian Aadhaar or a typing slip depending entirely on who issued
+ * them. A country with no number says even less.
+ */
+function nationalIdentity(f: FormReader): {
+  national_id_number: string | null; national_id_country: string | null;
+} {
+  const number = f.optional('national_id_number', { max: 60 });
+  const country = countryCodeFor(f.optional('national_id_country', { max: 100 }));
+  if (number && !country) {
+    f.errors['national_id_country'] = 'Say which country issued the national identity number.';
+  }
+  if (country && !number) {
+    f.errors['national_id_number'] = 'Enter the national identity number, or clear the country.';
+  }
+  return { national_id_number: number, national_id_country: country };
+}
+
+/**
  * Read the client form. The required fields depend on which kind of client it
  * is, and `full_name` is derived rather than accepted from the browser.
  */
-function readClientForm(f: FormReader) {
+function readClientForm(f: FormReader, vocab: ClientVocabularies) {
   const kind = f.enum('kind', ['individual', 'organisation'] as const, { fallback: 'individual' })!;
+
+  /**
+   * A value from one of the practice's own lists, or an error against the box.
+   *
+   * The list lives in `settings`, so the database cannot check it — a trigger
+   * reading a setting would be a rule that changes when somebody edits a text
+   * box. Membership is therefore checked here, exactly as a matter's type and a
+   * warning's kind already are (`isTerm`), and for the same reason: a value
+   * that is not on the list would show as its own raw key wherever every other
+   * value shows as a label.
+   *
+   * A blank is always allowed. None of these is a fact the register may insist
+   * on knowing about somebody.
+   */
+  const fromList = (name: string, terms: Term[], label: string): string | null => {
+    const value = f.optional(name, { max: 60 });
+    if (value && !isTerm(terms, value)) {
+      f.errors[name] = `That is not one of the ${label} you have configured.`;
+      return null;
+    }
+    return value;
+  };
 
   // Names are recorded in plain English letters and the family name in
   // capitals. Applied here, once, rather than left to whoever typed the record.
@@ -500,6 +662,19 @@ function readClientForm(f: FormReader) {
     current_visa_expiry: f.date('current_visa_expiry'),
     current_visa_expiry_rule: f.optional('current_visa_expiry_rule', { max: 200 }),
     inz_client_number: inzClientNumber,
+    // --- the flat facts an application form asks for (migration 0084) -------
+    title: fromList('title', vocab.titles, 'titles'),
+    gender: fromList('gender', vocab.genders, 'genders'),
+    relationship_status: fromList('relationship_status', vocab.relationshipStatuses,
+      'relationship statuses'),
+    other_names: f.optional('other_names', { max: 500 }),
+    // A dropdown, so this is already a code \u2014 resolved anyway, so a request
+    // built by hand carrying "Vietnam" lands as VN rather than as a 500 from
+    // the trigger that guards the column.
+    birth_country: countryCodeFor(f.optional('birth_country', { max: 100 })),
+    birth_region: f.optional('birth_region', { max: 120 }),
+    birth_town: f.optional('birth_town', { max: 120 }),
+    ...nationalIdentity(f),
     address: f.optional('address', { max: 500 }),
     status: f.enum('status', CLIENT_STATUSES, { fallback: 'prospect' })!,
     assigned_to: f.optional('assigned_to', { max: 60 }),
@@ -936,10 +1111,8 @@ export const clientsModule: AppModule = {
 
     // --- Create -------------------------------------------------------------
     r.get('/new', requirePermission('register:write'), async (c) => {
-      const [users, organisations, tests] = await Promise.all([
-        userOptions(c.env), organisationOptions(c.env), englishTests(c.env)]);
-      const englishTestOptions = termOptions(tests);
-      const visaTypeOptions = termOptions(await visaTypes(c.env));
+      const [users, organisations, vocab] = await Promise.all([
+        userOptions(c.env), organisationOptions(c.env), clientVocabularies(c.env)]);
       const kind = c.req.query('kind') === 'organisation' ? 'organisation' : 'individual';
 
       // The assistant, or any other page, may propose a starting point through
@@ -965,7 +1138,7 @@ export const clientsModule: AppModule = {
           ? html`<div class="alert alert-ok">Filled in from what the assistant read. Check it before
                    saving — it is a reading, not a fact.</div>`
           : ''}
-        ${clientForm(c, proposed, users, organisations, englishTestOptions, visaTypeOptions)}`);
+        ${clientForm(c, proposed, users, organisations, vocab)}`);
     });
 
     // --- NZBN register lookup ----------------------------------------------
@@ -1080,14 +1253,13 @@ export const clientsModule: AppModule = {
     r.post('/', requirePermission('register:write'), async (c) => {
       const user = c.get('user')!;
       const f = new FormReader(await c.req.formData());
-      const v = readClientForm(f);
+      const vocab = await clientVocabularies(c.env);
+      const v = readClientForm(f, vocab);
       if (!f.valid) {
-        const [users, organisations, tests] = await Promise.all([
-        userOptions(c.env), organisationOptions(c.env), englishTests(c.env)]);
-      const englishTestOptions = termOptions(tests);
-      const visaTypeOptions = termOptions(await visaTypes(c.env));
+        const [users, organisations] = await Promise.all([
+          userOptions(c.env), organisationOptions(c.env)]);
         return page(c, { title: 'New client', active: '/clients', status: 400 }, html`
-          ${pageHeader('New client')}${clientForm(c, v as ClientFormValues, users, organisations, englishTestOptions, visaTypeOptions, f.errors)}`);
+          ${pageHeader('New client')}${clientForm(c, v as ClientFormValues, users, organisations, vocab, f.errors)}`);
       }
 
       const id = newId('cli');
@@ -1105,14 +1277,20 @@ export const clientsModule: AppModule = {
             date_of_birth,
             english_test_type, english_test_score, english_test_date,
             current_visa_type, current_visa_start, current_visa_expiry, current_visa_expiry_rule, inz_client_number,
+            title, gender, relationship_status, other_names,
+            birth_country, birth_region, birth_town,
+            national_id_number, national_id_country,
             address, status, assigned_to, notes,
             created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, ref, v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
         v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
         v.current_visa_type, v.current_visa_start, v.current_visa_expiry, v.current_visa_expiry_rule, v.inz_client_number,
+        v.title, v.gender, v.relationship_status, v.other_names,
+        v.birth_country, v.birth_region, v.birth_town,
+        v.national_id_number, v.national_id_country,
         v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), nowIso(), user.id,
       );
@@ -1158,7 +1336,7 @@ export const clientsModule: AppModule = {
       const canReadMail = can(c.get('user'), 'mail:send');
       const [cases, quotes, inquiries, entries, sentMail, tasks, partyCases, related, employer, people,
              feesByCase, englishTestTerms, visaTerms, certificates, passports, threads,
-             clientFiles, docCats] = await Promise.all([
+             clientFiles, docCats, titleTerms, genderTerms, relationshipTerms] = await Promise.all([
         all<any>(c.env.DB, `SELECT id, ref, title, case_type, status, priority, next_action, next_action_due, updated_at
                               FROM cases WHERE client_id = ? ORDER BY updated_at DESC`, id),
         all<any>(c.env.DB, `SELECT id, ref, description, amount_cents, gst_cents, disbursements_cents, currency, status, created_at
@@ -1202,6 +1380,13 @@ export const clientsModule: AppModule = {
         threadsFor(c.env, 'client', id),
         listDocuments(c.env, 'client', id),
         docCategories(c.env),
+        // The three lists added with the application-form fields (0084). Read
+        // here rather than on the form alone, because a stored key shows as its
+        // own raw word without its label, and "gender_diverse" on a client page
+        // is the register talking to itself.
+        titles(c.env),
+        genders(c.env),
+        relationshipStatuses(c.env),
       ]);
 
       // Cases where this client is a party but not the file owner — an
@@ -1565,6 +1750,17 @@ export const clientsModule: AppModule = {
                     <dt>INZ client no.</dt><dd>${client.inz_client_number
                       ? html`<code>${client.inz_client_number}</code>`
                       : html`${badge('not recorded', 'amber')}`}</dd>
+                    ${'' /* The flat facts every application form asks for
+                             (0084). They sit with the rest of the identity
+                             because that is what they are, and each is shown
+                             even when empty for the same reason the INZ number
+                             is: a blank here is a box somebody will have to
+                             fill before a form can be lodged, and a row that
+                             disappears when empty is a gap nobody sees. */}
+                    <dt>Title</dt><dd>${client.title
+                      ? labelFor(titleTerms, client.title) : html`<span class="muted">—</span>`}</dd>
+                    <dt>Other names used</dt><dd>${client.other_names
+                      ? html`${client.other_names}` : html`<span class="muted">—</span>`}</dd>
                     ${'' /* Plural, because a person may be. Listed in the
                              order the practice entered them: the first is the
                              passport an application is likely to be made on. */}
@@ -1580,6 +1776,19 @@ export const clientsModule: AppModule = {
                       ageYears(client.date_of_birth) === null
                         ? ''
                         : html` <span class="muted">· ${ageYears(client.date_of_birth)}</span>`}</dd>
+                    ${'' /* Town, region, country — read outwards, the way it is
+                             said aloud and the way it is written on the form. */}
+                    <dt>Place of birth</dt><dd>${(() => {
+                      const parts = [client.birth_town, client.birth_region,
+                                     countryName(client.birth_country) || null].filter(Boolean);
+                      return parts.length
+                        ? html`${parts.join(', ')}` : html`<span class="muted">—</span>`;
+                    })()}</dd>
+                    <dt>Gender</dt><dd>${client.gender
+                      ? labelFor(genderTerms, client.gender) : html`<span class="muted">—</span>`}</dd>
+                    <dt>Relationship status</dt><dd>${client.relationship_status
+                      ? labelFor(relationshipTerms, client.relationship_status)
+                      : html`<span class="muted">—</span>`}</dd>
                     <dt>Passport</dt><dd>${passports.length === 0
                       ? html`<span class="muted">—</span>`
                       : html`${countryName(client.passport_country) || 'Primary'}${
@@ -1587,6 +1796,14 @@ export const clientsModule: AppModule = {
                              ${passports.length > 1
                                ? html`<div class="muted small"><a href="#passports">${passports.length} passports on file</a></div>`
                                : html`<div class="muted small"><a href="#passports">Details</a></div>`}`}</dd>
+                    ${'' /* Beside the passport, because it is the other
+                             identity document a client hands over, and never
+                             without its issuing country — which the database
+                             guarantees, so this cannot print half of one. */}
+                    <dt>National ID</dt><dd>${client.national_id_number
+                      ? html`<code>${client.national_id_number}</code>
+                             <div class="muted small">${countryName(client.national_id_country)}</div>`
+                      : html`<span class="muted">—</span>`}</dd>
                     ${'' /* The grant, not only its end. The period is what
                              almost every question about a temporary visa turns
                              on — maximum continuous stay counts from the start
@@ -1758,18 +1975,16 @@ export const clientsModule: AppModule = {
     r.get('/:id/edit', requirePermission('register:write'), async (c) => {
       const client = await one<ClientRow>(c.env.DB, 'SELECT * FROM clients WHERE id = ?', c.req.param('id')!);
       if (!client) return c.notFound();
-      const [users, organisations, tests, passports] = await Promise.all([
-        userOptions(c.env), organisationOptions(c.env), englishTests(c.env),
+      const [users, organisations, vocab, passports] = await Promise.all([
+        userOptions(c.env), organisationOptions(c.env), clientVocabularies(c.env),
         passportsFor(c.env, client.id)]);
-      const englishTestOptions = termOptions(tests);
-      const visaTypeOptions = termOptions(await visaTypes(c.env));
       const primary = passports.find((row) => row.is_primary === 1) ?? null;
       const nationalities = await nationalitiesFor(c.env, client.id);
       return page(c, { title: `Edit ${client.full_name}`, active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { href: `/clients/${client.id}`, label: client.ref }, { label: 'Edit' }])}
         ${pageHeader(`Edit ${client.full_name}`)}
         ${clientForm(c, { ...client, passport_issued: primary?.issued_on ?? null, nationalities },
-                     users, organisations, englishTestOptions, visaTypeOptions)}
+                     users, organisations, vocab)}
         ${await clientDeleteCard(c, client)}`);
     });
 
@@ -2037,15 +2252,14 @@ export const clientsModule: AppModule = {
       if (!existing) return c.notFound();
 
       const f = new FormReader(await c.req.formData());
-      const v = readClientForm(f);
+      const vocab = await clientVocabularies(c.env);
+      const v = readClientForm(f, vocab);
       if (!f.valid) {
-        const [users, organisations, tests] = await Promise.all([
-        userOptions(c.env), organisationOptions(c.env), englishTests(c.env)]);
-      const englishTestOptions = termOptions(tests);
-      const visaTypeOptions = termOptions(await visaTypes(c.env));
+        const [users, organisations] = await Promise.all([
+          userOptions(c.env), organisationOptions(c.env)]);
         return page(c, { title: 'Edit client', active: '/clients', status: 400 }, html`
           ${pageHeader(`Edit ${existing.full_name}`)}
-          ${clientForm(c, { ...existing, ...v } as ClientFormValues, users, organisations, englishTestOptions, visaTypeOptions, f.errors)}`);
+          ${clientForm(c, { ...existing, ...v } as ClientFormValues, users, organisations, vocab, f.errors)}`);
       }
 
       // Three outcomes, and the contradictory one is refused rather than
@@ -2063,6 +2277,9 @@ export const clientsModule: AppModule = {
            date_of_birth=?,
            english_test_type=?, english_test_score=?, english_test_date=?,
            current_visa_type=?, current_visa_start=?, current_visa_expiry=?, current_visa_expiry_rule=?, inz_client_number=?,
+           title=?, gender=?, relationship_status=?, other_names=?,
+           birth_country=?, birth_region=?, birth_town=?,
+           national_id_number=?, national_id_country=?,
            address=?, status=?, assigned_to=?, notes=?, updated_at=?
          WHERE id=?`,
         v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
@@ -2071,6 +2288,9 @@ export const clientsModule: AppModule = {
         v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
         v.current_visa_type, v.current_visa_start, v.current_visa_expiry, v.current_visa_expiry_rule, v.inz_client_number,
+        v.title, v.gender, v.relationship_status, v.other_names,
+        v.birth_country, v.birth_region, v.birth_town,
+        v.national_id_number, v.national_id_country,
         v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), id,
       );

@@ -37,6 +37,22 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.43.0', date: '11 September 2026',
+    notes: [
+      'A quotation can now actually go to more than one person. It never could: a second address '
+        + 'was refused outright, and the compose box has been inviting a list since 8 September.',
+      'The To and Copy-to boxes now offer the people already in the register, by name \u2014 this '
+        + 'quotation\u2019s client and parties first. You can still type an address that is not there.',
+      'Send to an address that is on no client record and the preview says so, with a link to add '
+        + 'it to the right person. The register does not keep a second list of addresses: the name '
+        + 'belongs on the client record, where it stays correct.',
+      'A client can now hold their title, gender, relationship status, other names ever used, '
+        + 'place of birth, and a national identity number with the country that issued it \u2014 '
+        + 'the things an application form asks for that had nowhere to go.',
+      'Title, gender and relationship status are lists you can edit under Settings.',
+    ],
+  },
+  {
     version: '1.42.0', date: '11 September 2026',
     notes: [
       'You can now point the reading at a matter that already exists: open it, drop in a passport, '

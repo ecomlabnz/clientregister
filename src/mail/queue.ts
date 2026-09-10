@@ -5,7 +5,7 @@ import { newId } from '../core/ids';
 import { all, getSetting, nowIso, one, run } from '../core/db';
 import { audit } from '../core/audit';
 import {
-  MAX_ATTACHMENT_TOTAL_BYTES, getMailProvider, looksLikeEmail, type OutboundMessage,
+  MAX_ATTACHMENT_TOTAL_BYTES, addressList, getMailProvider, looksLikeEmail, type OutboundMessage,
 } from './provider';
 
 export interface QueuedEmail {
@@ -36,7 +36,20 @@ export async function queueEmail(
     documentIds?: string[];
   },
 ): Promise<string> {
-  if (!looksLikeEmail(message.to)) throw new Error('invalid recipient address');
+  // Every address in the field, not the field as one address. A list arrives
+  // here joined with commas — see `addressList` in `mail/provider.ts` for the
+  // fault this replaced. One bad address refuses the whole message rather than
+  // being dropped: a message the practice believes went to three people and
+  // went to two is worse than one that did not send.
+  const recipients = addressList(message.to);
+  if (recipients.length === 0 || !recipients.every(looksLikeEmail)) {
+    throw new Error('invalid recipient address');
+  }
+  for (const field of [message.cc, message.bcc, message.replyTo]) {
+    if (field && !addressList(field).every(looksLikeEmail)) {
+      throw new Error('invalid recipient address');
+    }
+  }
 
   // Resolved here rather than at each call site: every outbound message wants
   // the same answer, and a setting read in one place cannot drift from itself.

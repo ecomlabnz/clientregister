@@ -244,6 +244,80 @@ unknown | Not established yet`,
 
 
 /**
+ * How a person is addressed.
+ *
+ * On the form because INZ asks for it separately from the name, and every
+ * letter the practice sends opens with it. A vocabulary rather than an enum for
+ * the ordinary reason: the honorifics a practice uses are its own business, and
+ * a client who is a doctor, a professor or a judge should not need a deployment
+ * to be addressed properly.
+ */
+export const TITLE_VOCAB: VocabularyDef = {
+  key: 'vocab.titles',
+  label: 'Titles',
+  help: 'One per line, written as “key | Label”. Offered on a client record and used when '
+    + 'addressing them. Blank lines and lines starting with # are ignored.',
+  defaults: `mr | Mr
+mrs | Mrs
+ms | Ms
+miss | Miss
+mx | Mx
+dr | Dr
+prof | Professor`,
+};
+
+/**
+ * Gender, as INZ asks it.
+ *
+ * The seeded three are Immigration New Zealand's own values on the application
+ * forms — Male, Female, Gender diverse — because a register whose answers do
+ * not match the form's answers makes somebody translate at the moment of
+ * copying, which is where a mistake gets made.
+ *
+ * Seeded, not fixed. This is a list about people, written by an agency, and the
+ * words on that form have changed twice in ten years; an administrator can
+ * change them here without waiting for anybody. That is also why it is not a
+ * `CHECK` constraint in the schema — see migration 0084.
+ */
+export const GENDER_VOCAB: VocabularyDef = {
+  key: 'vocab.genders',
+  label: 'Genders',
+  help: 'One per line, written as “key | Label”. Seeded with Immigration New Zealand’s own three '
+    + 'values, so what is recorded here matches what the form asks for. Blank lines and lines '
+    + 'starting with # are ignored.',
+  defaults: `male | Male
+female | Female
+gender_diverse | Gender diverse`,
+};
+
+/**
+ * Partnership or relationship status.
+ *
+ * The one fact on this list that decides a whole category of application: a
+ * partnership case turns on whether the relationship is a marriage, a civil
+ * union or a de facto partnership, and INZ asks it of the applicant, the
+ * partner, both parents and every sibling.
+ *
+ * "Separated" is on the list and is not the same as divorced — it is the answer
+ * that most often changes what can be applied for — and both are kept rather
+ * than folded into one.
+ */
+export const RELATIONSHIP_STATUS_VOCAB: VocabularyDef = {
+  key: 'vocab.relationship_statuses',
+  label: 'Relationship statuses',
+  help: 'One per line, written as “key | Label”. Offered on a client record as “Relationship '
+    + 'status”. Blank lines and lines starting with # are ignored.',
+  defaults: `single | Single
+married | Married
+civil_union | Civil union
+de_facto | De facto
+engaged | Engaged
+separated | Separated
+divorced | Divorced
+widowed | Widowed`,
+};
+
+/**
  * The headings of the file vault. A document uploaded to a client or matter
  * carries one of these, and the Files panel groups under them in this order.
  * "Other" is the resting place, not an error: a file that fits no heading is
@@ -289,7 +363,9 @@ other | Other`,
 };
 
 export const VOCABULARIES: VocabularyDef[] = [
-  CASE_TYPE_VOCAB, VISA_TYPE_VOCAB, ENGLISH_TEST_VOCAB, DOC_CATEGORY_VOCAB, FLAG_KIND_VOCAB,
+  CASE_TYPE_VOCAB, VISA_TYPE_VOCAB,
+  TITLE_VOCAB, GENDER_VOCAB, RELATIONSHIP_STATUS_VOCAB,
+  ENGLISH_TEST_VOCAB, DOC_CATEGORY_VOCAB, FLAG_KIND_VOCAB,
 ];
 
 export const VOCABULARY_SETTINGS: SettingsGroup = {
@@ -370,4 +446,16 @@ export async function visaTypes(env: Env): Promise<Term[]> {
 
 export async function docCategories(env: Env): Promise<Term[]> {
   return vocabulary(env, DOC_CATEGORY_VOCAB);
+}
+
+export async function titles(env: Env): Promise<Term[]> {
+  return vocabulary(env, TITLE_VOCAB);
+}
+
+export async function genders(env: Env): Promise<Term[]> {
+  return vocabulary(env, GENDER_VOCAB);
+}
+
+export async function relationshipStatuses(env: Env): Promise<Term[]> {
+  return vocabulary(env, RELATIONSHIP_STATUS_VOCAB);
 }

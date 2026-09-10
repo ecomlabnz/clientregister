@@ -45,7 +45,12 @@ describe('replies can be directed somewhere else', () => {
   });
 
   it('is sent to Resend in the shape it expects', () => {
-    expect(resend).toContain('...(message.replyTo ? { reply_to: [message.replyTo] } : {}),');
+    // Resend wants an array. It used to be built by hand as `[message.replyTo]`,
+    // which was right for one address and wrong for a list — see
+    // `test/manyrecipients.test.ts` for the fault that found. `addressList`
+    // returns the array either way, so the shape Resend expects is unchanged
+    // and a second reply-to address now survives the trip.
+    expect(resend).toContain('...(message.replyTo ? { reply_to: addressList(message.replyTo) } : {}),');
   });
 });
 

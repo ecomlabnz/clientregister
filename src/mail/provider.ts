@@ -129,3 +129,29 @@ export async function getMailProvider(env: Env): Promise<MailProvider | null> {
 export function looksLikeEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
+
+/**
+ * One recipient field, as the list it may actually be.
+ *
+ * **Found on 11 September 2026**, building the recipient picker. The compose
+ * screen has invited several addresses since 8 September — *"Several addresses,
+ * comma or semicolon separated"* — and stores them joined with commas. Nothing
+ * below that point knew: `queueEmail` refused the whole string because
+ * `looksLikeEmail` anchors at both ends, and Resend was handed `to: [message.to]`,
+ * a single array element holding "a@b.test, c@d.test", which is not an address.
+ *
+ * So a second recipient failed, and would have failed the moment the practice
+ * used the feature they asked for. Gmail was the one path that worked, because
+ * `To: a@b.test, c@d.test` is a valid RFC 5322 header and it was writing the
+ * string straight into one.
+ *
+ * The stored form does not change — one column, addresses joined with commas,
+ * which is what the file note and the sent-email viewer already read. This only
+ * gives the senders the list that was always in there.
+ */
+export function addressList(value: string | null | undefined): string[] {
+  return (value ?? '')
+    .split(/[,;]/)
+    .map((part) => part.trim())
+    .filter((part) => part !== '');
+}
