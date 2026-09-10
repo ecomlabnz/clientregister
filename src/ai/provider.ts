@@ -16,6 +16,7 @@ import type { Env } from '../types';
 import type { SettingsGroup } from '../core/settings';
 import { settingValue } from '../core/settings';
 import { codesFromText } from '../core/nationalities';
+import { countryCodeFor } from '../core/countries';
 
 export interface TriageResult {
   /** Best guess at who wrote in. */
@@ -123,6 +124,45 @@ export interface IntakePerson {
   date_of_birth: string | null;
   /** One of the register's party roles, or null when it is not clear. */
   role: string | null;
+
+  /**
+   * The flat facts an application form asks for (migration 0084).
+   *
+   * `title`, `gender` and `relationship_status` come back **as the document
+   * words them** — "Male", "Married", "Mr" — and not as keys. They are
+   * vocabularies the practice owns, so the reading may not assume what is on
+   * the list; `ai/casefill.ts` resolves each against the configured list and
+   * reports one that will not resolve as a gap, exactly as it already does for
+   * a visa type.
+   *
+   * The two countries are the exception: they are normalised to ISO codes here,
+   * the way nationalities already are, because the register's country list is
+   * not the practice's to edit and a code either resolves or it does not.
+   */
+  title: string | null;
+  gender: string | null;
+  relationship_status: string | null;
+  /** Names actually used, not middle names — those are part of `given_names`. */
+  other_names: string | null;
+  /** ISO 3166-1 alpha-2, or null where nothing recognisable was written. */
+  birth_country: string | null;
+  birth_region: string | null;
+  birth_town: string | null;
+  /**
+   * A national identity card number and who issued it.
+   *
+   * Not the passport, which is deliberately never extracted: that column is
+   * encrypted at rest and reading one is an audited action. This is an ordinary
+   * column holding a number printed on a card the client hands over, of the
+   * same order as an INZ client number — and the practice hit one on 11
+   * September 2026, a Vietnamese Citizen Identity Card, that had nowhere to go.
+   *
+   * The two travel together or not at all: the database refuses half a national
+   * identity number, because twelve digits are a Vietnamese CCCD, an Indian
+   * Aadhaar or a typing slip depending entirely on who issued them.
+   */
+  national_id_number: string | null;
+  national_id_country: string | null;
 }
 
 export interface IntakeResult {
@@ -214,6 +254,24 @@ company's registered office or trading address), and for a company its NZBN
 where the document prints one. Employment agreements and INZ correspondence
 routinely carry all three.
 
+Return these where the document states them, and null where it does not. They
+are the plain facts an application form asks about a person, so return them for
+every person named, not only the applicant:
+- "title" as written: Mr, Mrs, Ms, Miss, Mx, Dr.
+- "gender" as written.
+- "relationship_status" as written: single, married, civil union, de facto,
+  separated, divorced, widowed.
+- "other_names": any other name the person has used or been documented under —
+  a maiden name, a name before a legal change, a different spelling on an older
+  document. NOT middle names: those belong in given_names.
+- "birth_country", "birth_region" and "birth_town": the place of birth, split
+  into the country, the region or province, and the town or city. A document
+  that writes "Vinh, Nghe An, Vietnam" is naming all three.
+- "national_id_number" and "national_id_country": a national identity card
+  number and the country that issued it — a Vietnamese Citizen Identity Card, an
+  Indian Aadhaar. Return both or neither: a number with no issuer identifies
+  nobody. This is not the passport, which you must still never extract.
+
 Return next_action where the document says what happens next — "employer to
 provide the signed IEA", "await the job check outcome". Not a guess about what
 should happen: what the document says will.
@@ -265,6 +323,15 @@ export function normaliseIntake(input: Partial<IntakeResult>): IntakeResult {
       nzbn: str(p.nzbn, 20),
       date_of_birth: isoDate(p.date_of_birth),
       role: str(p.role, 40),
+      title: str(p.title, 40),
+      gender: str(p.gender, 40),
+      relationship_status: str(p.relationship_status, 40),
+      other_names: str(p.other_names, 300),
+      birth_country: countryCodeFor(str(p.birth_country, 80)),
+      birth_region: str(p.birth_region, 120),
+      birth_town: str(p.birth_town, 120),
+      national_id_number: str(p.national_id_number, 60),
+      national_id_country: countryCodeFor(str(p.national_id_country, 80)),
     };
   };
 

@@ -7,6 +7,58 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.43.0 — 11 September 2026
+
+### Fixed
+**A quotation could only ever go to one person.** The compose box has invited
+several addresses since 8 September — *"Several addresses, comma or semicolon
+separated"* — and nothing below it knew. A second address was refused outright
+as "invalid recipient address", and the one provider that did accept it was
+handed `a@b.com, c@d.com` as a single address. It has never worked. Found while
+building the recipient list, which would have made adding a second address easy
+and walked straight into it.
+
+Every address in a field is now checked and sent on its own. One bad address
+still refuses the whole message rather than quietly dropping it: a message you
+believe went to three people and went to two is worse than one that did not
+send.
+
+### Added
+**The compose box knows who you write to.** *"is this not a case that 99% of
+emails from the system are to be sent to those who are already in the register?
+... should we not be able to find the email that is already in the system and
+the name of the person holding it?"*
+
+Yes — and the register's own data settled it. Every genuine recipient it has
+ever sent to is already a client record, agencies included. So there is **no
+new address book**: the To and Copy-to boxes now offer the people already in
+the register, as *Name — address*, with this quotation's own client and the
+people on it first, then the matter's parties, then everyone else. You can
+still type an address that is not there.
+
+**And when you send to an address on no client record, the preview says so** —
+naming it, with a link to find who holds it or add them — rather than
+remembering it somewhere else. The name then lives in one place and stays
+right.
+
+**The flat facts an application form asks for** (migration 0084), the ones the
+pipeline note said needed no decision beyond doing them: **title**, **gender**,
+**relationship status**, **other names ever used**, **place of birth** (country,
+region and town) and **national identity number with the country that issued
+it**. All on the individual half of the client form; a company has none of them.
+
+Gender, title and relationship status are **lists you can edit** under Settings,
+not fixed choices in the program. The database refuses a national identity
+number without the country that issued it, and refuses either country field
+unless it names a real country.
+
+The document reading fills them too, and reports a value that is not on your
+list as a gap in the file note rather than writing it raw.
+
+*Not built, deliberately: the histories — countries lived in, employment,
+education, travel — and the character and health declarations. Those need
+decisions that have not been made, and the pipeline note says why.*
+
 ## 1.42.0 — 11 September 2026
 
 ### Added

@@ -35,9 +35,9 @@ import { addEntry } from '../../core/timeline';
 import { can } from '../../core/rbac';
 import { nationalitiesFor } from '../../core/nationalities';
 import { countryName } from '../../core/countries';
-import { visaTypes } from '../../core/vocabulary';
+import { genders, relationshipStatuses, titles, visaTypes } from '../../core/vocabulary';
 import {
-  fillEmptyClientFields, fillEmptyNationalities, setInzClientNumber,
+  fillEmptyClientFields, fillEmptyNationalities, setInzClientNumber, setNationalIdentity,
   type ClientFillColumn, type ClientFillValues,
 } from '../../core/clientfill';
 import { attachStagedTo, stageUpload, stagedFor } from '../../core/intakefiles';
@@ -57,7 +57,10 @@ const CASE_COLUMNS = `id, ref, descriptor, inz_application_number, lodged_at,
                       decision_due_at, next_action, summary, client_id`;
 const CLIENT_COLUMNS = `id, ref, full_name, kind, given_names, family_name, preferred_name,
                         email, phone, address, date_of_birth, current_visa_type,
-                        current_visa_expiry, nzbn, inz_client_number`;
+                        current_visa_expiry, nzbn, inz_client_number,
+                        title, gender, relationship_status, other_names,
+                        birth_country, birth_region, birth_town,
+                        national_id_number, national_id_country`;
 
 /**
  * The card on the matter's own page: drop a document in.
@@ -325,14 +328,29 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
 
     // --- the client's boxes --------------------------------------------------
     const clientChosen = plan.clientFill.filter((p) => approved.has(p.key));
+    // Two of the client's boxes are not part of the column-by-column merge and
+    // are named here rather than merely skipped. The INZ client number is
+    // unique across the register, and a national identity number is half of a
+    // pair the database refuses to see broken — each would abort the whole
+    // statement and lose every other box with it, so each has its own writer.
+    const SEPARATELY_WRITTEN = ['inz_client_number', 'national_id_number'];
     const values: ClientFillValues = {};
-    for (const p of clientChosen.filter((p) => p.column !== 'inz_client_number')) {
+    for (const p of clientChosen.filter((p) => !SEPARATELY_WRITTEN.includes(p.column))) {
       values[p.column as ClientFillColumn] = p.proposed;
     }
     await fillEmptyClientFields(c.env, client.id, values);
     const inzChosen = clientChosen.find((p) => p.column === 'inz_client_number');
     const inzWritten = inzChosen
       ? await setInzClientNumber(c.env, client.id, inzChosen.proposed)
+      : false;
+    // The number and the country that issued it, in one statement. The country
+    // is read back off the plan rather than off the form: the review screen
+    // offers the pair as one tick, so there is no separate answer to read.
+    const idChosen = clientChosen.find((p) => p.column === 'national_id_number');
+    const idPerson = plan.match?.person ?? null;
+    const nationalIdWritten = idChosen && idPerson
+      ? await setNationalIdentity(c.env, client.id, idChosen.proposed,
+                                  idPerson.national_id_country)
       : false;
     const nationalitiesWritten = plan.nationalities?.offer && approved.has('client:nationalities')
       ? await fillEmptyNationalities(c.env, client.id, plan.nationalities.proposed)
@@ -348,7 +366,7 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     const landed = (p: Placement, after: Record<string, unknown> | null): boolean =>
       String((after?.[p.column] ?? '')).trim() === p.proposed;
     const filledCase = caseChosen.filter((p) => landed(p, caseAfter as never));
-    const filledClient = clientChosen.filter((p) => p.column !== 'inz_client_number'
+    const filledClient = clientChosen.filter((p) => !SEPARATELY_WRITTEN.includes(p.column)
       && landed(p, clientAfter as never));
 
     // --- what has no box ------------------------------------------------------
@@ -376,6 +394,7 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
       ...filledCase.map((p) => `${p.label} on the matter`),
       ...filledClient.map((p) => `${p.label} on ${client.ref}`),
       ...(inzWritten ? [`INZ client number on ${client.ref}`] : []),
+      ...(nationalIdWritten ? [`national identity number on ${client.ref}`] : []),
       ...(nationalitiesWritten.length
         ? [`nationality on ${client.ref} (${nationalitiesWritten.map((code) => countryName(code)).join(' and ')})`]
         : []),
@@ -398,6 +417,7 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
         case_fields: filledCase.map((p) => p.column),
         client_fields: filledClient.map((p) => p.column),
         inz_client_number: inzWritten,
+        national_id: nationalIdWritten,
         nationalities: nationalitiesWritten,
         note: Boolean(noteId), files: attached,
         matched: plan.match?.how ?? 'none',
@@ -443,12 +463,16 @@ async function load(
     env.DB, `SELECT ${CLIENT_COLUMNS} FROM clients WHERE id = ?`, kase.client_id);
   if (!client) return { error: 'That matter has no client.' };
 
-  const [held, visaTerms] = await Promise.all([
+  const [held, visaTerms, titleTerms, genderTerms, relationshipTerms] = await Promise.all([
     nationalitiesFor(env, client.id),
     visaTypes(env),
+    titles(env),
+    genders(env),
+    relationshipStatuses(env),
   ]);
   const plan = planReading({
-    reading: found.result, kase, client, heldNationalities: held, visaTerms,
+    reading: found.result, kase, client, heldNationalities: held,
+    visaTerms, titleTerms, genderTerms, relationshipTerms,
   });
   return {
     kase, client, plan,

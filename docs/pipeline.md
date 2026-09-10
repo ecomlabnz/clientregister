@@ -157,12 +157,25 @@ dates.
 
 #### What we hold nothing for
 
+**The flat facts are built (11 September 2026, migration 0084).** The four rows
+struck through below are now columns on `clients`, offered on the client form
+and shown on the client page: a place of birth as three fields, a title, a
+gender, a relationship status, other names ever used, and a national identity
+number with the country that issued it. Title, gender and relationship status
+are vocabularies an administrator edits in Settings, seeded with INZ's own
+values; the two country columns take an ISO code the database checks; and the
+database refuses a national identity number without its issuing country, or the
+reverse. The document reading fills any of them that a document states and it
+finds empty, and reports a value the practice's own list does not carry rather
+than writing it in raw. **Everything below that is not struck through is
+untouched, and the decisions it waits on are still open.**
+
 | | |
 |---|---|
-| Place of birth | country, region, town — three fields, on **every** person named |
-| Gender, title, partnership status | asked for the applicant, the partner, both parents and every sibling |
-| Middle names, other names ever used | INZ separates these from given names; we hold one "preferred name" |
-| National identity number and its country | a Vietnamese ID number on the file read |
+| ~~Place of birth~~ | ~~country, region, town — three fields, on **every** person named~~ — **built**: `birth_country`, `birth_region`, `birth_town`. On the client record only; a form asks it of every person named, and the others are not in the register |
+| ~~Gender, title, partnership status~~ | ~~asked for the applicant, the partner, both parents and every sibling~~ — **built**: `gender`, `title`, `relationship_status`, each a vocabulary. Again for the client only |
+| ~~Middle names, other names ever used~~ | ~~INZ separates these from given names; we hold one "preferred name"~~ — **built**: `other_names`. Middle names were never missing: `given_names` holds them and always has |
+| ~~National identity number and its country~~ | ~~a Vietnamese ID number on the file read~~ — **built**: `national_id_number` and `national_id_country`, which the database refuses to hold one without the other |
 | Structured addresses | residential, postal, and **most recent overseas** — country, lines, town, region, postcode. We hold one free-text box |
 | Countries lived in 12+ months in the last 10 years since 17 | the police-certificate driver. We hold nothing |
 | Employment history | chronological, no gaps |
@@ -181,7 +194,9 @@ Everything above divides into two kinds, and they want different shapes.
 **Flat facts about a person** — place of birth, gender, title, partnership
 status, national ID. These are columns on `clients`, like everything else there.
 Small, obvious, and they appear on every form. No decision needed beyond doing
-it.
+it. **Done on 11 September 2026** — *"the application-form field gaps - lets
+build in those that are easy"* — as migration 0084. What that leaves is the two
+kinds below, which are still questions rather than work.
 
 **Histories** — countries lived in, employment, education, travel. These are
 *rows*, one per period, each with a start, an end, and a few fields. Three ways

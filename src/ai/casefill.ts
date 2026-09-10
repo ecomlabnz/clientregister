@@ -75,6 +75,16 @@ export interface ClientFacts {
   current_visa_expiry: string | null;
   nzbn: string | null;
   inz_client_number: string | null;
+  /** The flat facts an application form asks for. Migration 0084. */
+  title: string | null;
+  gender: string | null;
+  relationship_status: string | null;
+  other_names: string | null;
+  birth_country: string | null;
+  birth_region: string | null;
+  birth_town: string | null;
+  national_id_number: string | null;
+  national_id_country: string | null;
 }
 
 /**
@@ -246,15 +256,34 @@ export function planReading(input: {
   client: ClientFacts;
   heldNationalities: string[];
   visaTerms: Term[];
+  /** The three lists added with the application-form fields. Migration 0084. */
+  titleTerms: Term[];
+  genderTerms: Term[];
+  relationshipTerms: Term[];
 }): ReadingPlan {
-  const { reading, kase, client, heldNationalities, visaTerms } = input;
+  const {
+    reading, kase, client, heldNationalities,
+    visaTerms, titleTerms, genderTerms, relationshipTerms,
+  } = input;
   const match = personForClient(reading, client);
   const person = match?.person ?? null;
+
+  // Columns whose stored value is a key from one of the practice's own lists.
+  // A key shown raw on the review screen — "gender_diverse", "wv_aewv" — is the
+  // register talking to itself, so each is drawn with its configured label.
+  const labelled: Record<string, Term[]> = {
+    current_visa_type: visaTerms,
+    title: titleTerms,
+    gender: genderTerms,
+    relationship_status: relationshipTerms,
+  };
 
   const shown = (column: string, value: string | null): string => {
     if (empty(value)) return '';
     if (DATE_COLUMNS.has(column)) return dateShort(value);
-    if (column === 'current_visa_type') return labelFor(visaTerms, value);
+    const terms = labelled[column];
+    if (terms) return labelFor(terms, value);
+    if (column === 'birth_country') return countryName(value);
     return clean(value);
   };
 
@@ -293,19 +322,32 @@ export function planReading(input: {
   // page.
   const clientPlacements: Placement[] = [];
   if (person) {
-    // A visa type is vocabulary the practice edits, not free text. A visa the
-    // register's own list does not carry is not written into the column — it
-    // would show as its own raw words wherever every other visa shows as a
-    // label — it is reported instead, which is the register learning that its
-    // list has a gap.
-    let visaType: string | null = null;
-    if (!empty(person.current_visa_type)) {
-      const term = visaTerms.find((t) => t.key === person.current_visa_type)
-        ?? visaTerms.find((t) => key(t.label) === key(person.current_visa_type));
-      if (term) visaType = term.key;
-      else unplaceable.push(`A visa the practice's own list does not carry: `
-        + `"${clean(person.current_visa_type)}". Add it under Settings if it belongs there.`);
-    }
+    // A value from one of the practice's own lists, or nothing and a line for
+    // the note.
+    //
+    // Written once and used four times, because the rule is the same for all of
+    // them and was already the rule for a visa type: a value the register's own
+    // list does not carry is **not** written into the column — it would show as
+    // its own raw words wherever every other value shows as a label — it is
+    // reported instead. That is the register learning that one of its lists has
+    // a gap an administrator can close in Settings, which is worth more than a
+    // column quietly holding a word nothing else recognises.
+    //
+    // Matched on the key first and then on the label, because a document says
+    // "Married" and the register stores `married`.
+    const fromVocabulary = (
+      raw: string | null, terms: Term[], what: string,
+    ): string | null => {
+      if (empty(raw)) return null;
+      const term = terms.find((t) => t.key === raw)
+        ?? terms.find((t) => key(t.label) === key(raw));
+      if (term) return term.key;
+      unplaceable.push(`A ${what} the practice's own list does not carry: `
+        + `"${clean(raw)}". Add it under Settings if it belongs there.`);
+      return null;
+    };
+    const visaType = person.kind === 'organisation'
+      ? null : fromVocabulary(person.current_visa_type, visaTerms, 'visa');
     const proposed: ClientFillValues & { inz_client_number?: string | null } = {
       preferred_name: person.preferred_name,
       email: person.email,
@@ -315,6 +357,21 @@ export function planReading(input: {
       current_visa_type: person.kind === 'organisation' ? null : visaType,
       current_visa_expiry: person.kind === 'organisation' ? null : person.current_visa_expiry,
       nzbn: person.kind === 'organisation' ? normalisedNzbn(person.nzbn) : null,
+      // None of these is a fact about a company. An organisation has no gender,
+      // no birthplace and no relationship status, and the client form hides
+      // every one of them for a company — so a reading must not write one
+      // either, however confidently a document words it.
+      title: person.kind === 'organisation'
+        ? null : fromVocabulary(person.title, titleTerms, 'title'),
+      gender: person.kind === 'organisation'
+        ? null : fromVocabulary(person.gender, genderTerms, 'gender'),
+      relationship_status: person.kind === 'organisation'
+        ? null : fromVocabulary(person.relationship_status, relationshipTerms,
+                                'relationship status'),
+      other_names: person.kind === 'organisation' ? null : person.other_names,
+      birth_country: person.kind === 'organisation' ? null : person.birth_country,
+      birth_region: person.kind === 'organisation' ? null : person.birth_region,
+      birth_town: person.kind === 'organisation' ? null : person.birth_town,
     };
     for (const { column, label } of CLIENT_FILLABLE) {
       const p = place('client', column, label,
@@ -327,6 +384,36 @@ export function planReading(input: {
     const inz = place('client', 'inz_client_number', 'INZ client number',
       client.inz_client_number, reading.inz_client_number);
     if (inz) clientPlacements.push(inz);
+
+    // A national identity number and the country that issued it are one fact in
+    // two columns, and the database refuses either half without the other
+    // (migration 0084). So they are offered as **one** tick and written by
+    // `setNationalIdentity` in one statement — the same arrangement the INZ
+    // client number has. Offered as two ticks, somebody could approve the
+    // number and not its country, and the press would abort against a trigger
+    // and lose every other box on the screen with it.
+    const idNumber = clean(person.national_id_number);
+    const idCountry = clean(person.national_id_country);
+    if (person.kind !== 'organisation' && idNumber && idCountry) {
+      clientPlacements.push({
+        key: 'client:national_id_number', scope: 'client', column: 'national_id_number',
+        label: 'National identity number',
+        now: client.national_id_number ?? null,
+        nowShown: empty(client.national_id_number) ? ''
+          : `${clean(client.national_id_number)} · ${countryName(client.national_id_country)}`,
+        proposed: idNumber,
+        proposedShown: `${idNumber} · ${countryName(idCountry)}`,
+      });
+    } else if (person.kind !== 'organisation' && (idNumber || idCountry)) {
+      // Half of one. Not written, because half a national identity number
+      // identifies nobody — a twelve-digit string is a Vietnamese CCCD, an
+      // Indian Aadhaar or a typing slip depending entirely on who issued it.
+      unplaceable.push(idNumber
+        ? `A national identity number with no country named for it: "${idNumber}". `
+          + 'Enter it on the client with the country that issued it.'
+        : `A national identity card said to be issued by ${countryName(idCountry)}, `
+          + 'with no number read from it.');
+    }
   }
 
   // --- everything with nowhere to go ---------------------------------------

@@ -56,6 +56,7 @@ import { renderEmailHtml, renderRichText, toPlainText } from '../../core/richtex
 import { mailConfigured } from '../../mail/provider';
 import { flushQueue, queueEmail } from '../../mail/queue';
 import { emailsForEntity, mailLinkFor, recordMailHref, sendState } from '../../mail/stored';
+import { quoteRecipients, unrecognisedRecipients } from '../../mail/recipients';
 
 /**
  * **A paragraph is one line, however long.**
@@ -1869,8 +1870,11 @@ export const quotesModule: AppModule = {
       );
       if (!q) return c.notFound();
 
-      const [practice, items, qs] = await Promise.all([
+      const [practice, items, qs, recipients] = await Promise.all([
         practiceDetails(c.env), quoteLines(c.env, id), quoteSettings(c.env),
+        // Everybody the register can already write to, best first. One query;
+        // see `mail/recipients.ts` for why there is no address book behind it.
+        quoteRecipients(c.env, q),
       ]);
       const csrf = c.get('session')!.csrf;
       const configured = mailConfigured(c.env);
@@ -1931,16 +1935,45 @@ export const quotesModule: AppModule = {
         <form method="post" action="/quotes/${q.id}/email/preview" class="compose js-compose">
           ${csrfField(csrf)}
 
+          ${'' /* **The people already in the register, offered — not a second
+                   place to keep addresses.** The practice's question is what
+                   settled it: *"is this not a case that 99% of emails from the
+                   system are to be sent to those who are already in the
+                   register? if so - why create separate email register? should
+                   we not be able to find the email that is already in the
+                   system and the name of the person holding it?"*
+
+                   A `<datalist>` rather than a widget, because the register
+                   works with JavaScript switched off: with scripting on it is a
+                   suggestion list, and with it off the box beside it is an
+                   ordinary text input that still takes an address nobody has
+                   ever written to. It is attached to the input rather than
+                   replacing it for the same reason a `<select>` was wrong —
+                   a list you cannot type past is a list that refuses a new
+                   client's first email.
+
+                   The `label` carries "Name — address" so the writer sees who
+                   they are picking; the `value` is the bare address, which is
+                   what lands in the box and what `FormReader.emails()` parses,
+                   unchanged. */}
+          ${recipients.length ? html`
+            <datalist id="known-recipients">
+              ${recipients.map((p) => html`
+                <option value="${p.address}" label="${p.name} — ${p.address}"></option>`)}
+            </datalist>` : ''}
+
           <div class="compose-headers">
             <div class="compose-row">
               <label for="f_to">To</label>
               <input id="f_to" name="to" type="text" required maxlength="2000"
                      value="${q.client_email ?? ''}" autocomplete="off"
+                     ${recipients.length ? raw('list="known-recipients"') : ''}
                      placeholder="somebody@example.com">
             </div>
             <div class="compose-row">
               <label for="f_cc">Copy to</label>
               <input id="f_cc" name="cc" type="text" maxlength="2000" autocomplete="off"
+                     ${recipients.length ? raw('list="known-recipients"') : ''}
                      placeholder="Separate several with commas">
             </div>
             <div class="compose-row">
@@ -1949,6 +1982,12 @@ export const quotesModule: AppModule = {
                      value="${subject}">
             </div>
           </div>
+
+          ${recipients.length ? html`
+            <p class="hint">Start typing a name or an address in <strong>To</strong> or
+               <strong>Copy to</strong> and the register offers the people it already holds —
+               clients and agencies both. An address that is on nobody’s record can still be
+               typed in full; the next screen will say so before anything is sent.</p>` : ''}
 
           <div class="compose-bar">
             <div class="compose-tools">
@@ -2077,8 +2116,15 @@ export const quotesModule: AppModule = {
           Object.values(f.errors)[0] ?? 'Invalid message.', 'err');
       }
 
-      const [practice, items, qs] = await Promise.all([
+      const [practice, items, qs, strangers] = await Promise.all([
         practiceDetails(c.env), quoteLines(c.env, id), quoteSettings(c.env),
+        // Which of these addresses the register does not hold on anybody.
+        //
+        // Split here only to ask the question — the addresses themselves are
+        // parsed once, by `FormReader.emails()` on the send route, and that
+        // parsing is untouched: it still refuses the whole list if one address
+        // is bad, and it still accepts an address nobody has written to before.
+        unrecognisedRecipients(c.env, [...to.split(/[,;]/), ...cc.split(/[,;]/)]),
       ]);
       const token = await shareTokenFor(c.env, id);
       const address = await publicBase(c.env, new URL(c.req.url).origin);
@@ -2089,6 +2135,10 @@ export const quotesModule: AppModule = {
       ].filter((v, i, all) => all.indexOf(v) === i);
 
       const csrf = c.get('session')!.csrf;
+      // The offer to put an unknown address on a client record is only made to
+      // somebody who could act on it. `mail:send` reaches this screen; writing
+      // to the register is a separate permission.
+      const canAddClient = can(c.get('user'), 'register:write');
       const carry = { to, cc, subject, body, format: asHtml ? 'html' : 'text',
                       ...(markSent ? { mark_sent: 'on' } : {}) };
       const backTo = `/quotes/${id}/email?subject=${encodeURIComponent(subject)}`
@@ -2122,6 +2172,28 @@ export const quotesModule: AppModule = {
                 <dt>Subject</dt><dd><strong>${subject}</strong></dd>
                 <dt>Sent as</dt><dd>${asHtml ? 'Formatted, with a plain-text copy' : 'Plain text'}</dd>
               </dl>
+              ${'' /* **An address on nobody's record is named, not remembered.**
+                       This is the other half of the practice's answer about a
+                       separate email register: if the register does not know an
+                       address, the fix is to put it on the record of the person
+                       who holds it, so there is one name for it and one place
+                       that name is kept. Storing it here instead would create
+                       the second owner they said not to create.
+
+                       Said before the send button rather than after it, because
+                       at this point it is still a typo somebody can correct. */}
+              ${strangers.length ? html`
+                <p class="hint" data-unknown-recipients>
+                  ${strangers.length === 1
+                    ? 'This address is on nobody’s record in the register:'
+                    : 'These addresses are on nobody’s record in the register:'}
+                  ${join(strangers.map((a) => html`<strong>${a}</strong>${canAddClient ? html`
+                    (<a href="/clients?q=${encodeURIComponent(a)}">find who holds it</a> or
+                     <a href="/clients/new?email=${encodeURIComponent(a)}">add them as a client</a>)` : ''}`), '; ')}.
+                  ${strangers.length === 1 ? 'It will still be sent' : 'They will still be sent'} —
+                  the register is not keeping the address anywhere; it belongs on the record of the
+                  person who holds it.
+                </p>` : ''}
               <div class="email-preview">
                 ${'' /* Plain text is previewed with the emphasis marks off, because
                          that is what the client will receive. Reported 11 September

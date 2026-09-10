@@ -1,6 +1,6 @@
 /** Resend transport. */
 
-import type { MailProvider, OutboundMessage } from './provider';
+import { addressList, type MailProvider, type OutboundMessage } from './provider';
 
 export function createResendProvider(apiKey: string): MailProvider {
   return {
@@ -14,10 +14,10 @@ export function createResendProvider(apiKey: string): MailProvider {
         },
         body: JSON.stringify({
           from,
-          to: [message.to],
-          ...(message.cc ? { cc: [message.cc] } : {}),
-          ...(message.bcc ? { bcc: [message.bcc] } : {}),
-          ...(message.replyTo ? { reply_to: [message.replyTo] } : {}),
+          to: addressList(message.to),
+          ...(message.cc ? { cc: addressList(message.cc) } : {}),
+          ...(message.bcc ? { bcc: addressList(message.bcc) } : {}),
+          ...(message.replyTo ? { reply_to: addressList(message.replyTo) } : {}),
           subject: message.subject,
           text: message.text,
           ...(message.html ? { html: message.html } : {}),

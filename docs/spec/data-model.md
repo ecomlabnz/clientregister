@@ -311,6 +311,15 @@ later replaced still sits in the file that created it.
 | `inz_client_number` | TEXT | yes | — |
 | `current_visa_start` | TEXT | yes | — |
 | `is_test` | INTEGER | no | `0` |
+| `title` | TEXT | yes | — |
+| `gender` | TEXT | yes | — |
+| `relationship_status` | TEXT | yes | — |
+| `other_names` | TEXT | yes | — |
+| `birth_country` | TEXT | yes | — |
+| `birth_region` | TEXT | yes | — |
+| `birth_town` | TEXT | yes | — |
+| `national_id_number` | TEXT | yes | — |
+| `national_id_country` | TEXT | yes | — |
 
 ## `counters`
 
