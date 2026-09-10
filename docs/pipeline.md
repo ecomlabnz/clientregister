@@ -44,6 +44,204 @@ Also unsettled: whether the INZ pages are stable enough to read reliably, and
 what happens when one moves. Nobody has looked yet.
 
 
+### 0b. What the register would need to fill in an application form
+
+**Asked 10 September 2026**, after reading a completed Partner Resident Visa
+application (Immigration Online, November 2025 V23.2, 11 pages) beside the
+client record it was made from: *"do we need more fields for data that may be
+missing from the case or client profiles - generally? it seems that we are not
+collecting enough data to, one day, automatically fill in these kind of
+applications."*
+
+Yes. The register holds who somebody is and where they stand today. It holds
+almost nothing about where they have been, and the application form is mostly
+about where they have been.
+
+**This entry is one form's worth of gap.** Other application types ask for other
+things — an AEWV asks about the employer and the role, a student visa about the
+course and the funds, a parent category about the sponsor's income. The list
+below is therefore a floor, not a ceiling, and each new form read against the
+register will add to it. Read one before building anything, rather than
+generalising from this one.
+
+#### What we already hold and would fill correctly
+
+Name, date of birth, passport (number, country, expiry), INZ client number,
+nationalities, current visa with its grant and expiry dates, email, phone, one
+address, the partner as a party on the matter, medical and police certificate
+dates.
+
+#### What we hold nothing for
+
+| | |
+|---|---|
+| Place of birth | country, region, town — three fields, on **every** person named |
+| Gender, title, partnership status | asked for the applicant, the partner, both parents and every sibling |
+| Middle names, other names ever used | INZ separates these from given names; we hold one "preferred name" |
+| National identity number and its country | a Vietnamese ID number on the file read |
+| Structured addresses | residential, postal, and **most recent overseas** — country, lines, town, region, postcode. We hold one free-text box |
+| Countries lived in 12+ months in the last 10 years since 17 | the police-certificate driver. We hold nothing |
+| Employment history | chronological, no gaps |
+| Education history | from high school |
+| Travel history | dates, country, port of entry, purpose |
+| Countries visited 3+ months in the last 5 years | drives TB screening |
+| Family | parents and every sibling, each with date of birth, gender, partnership status, citizenship, country of residence, country of birth and **occupation**. Five siblings on the file read |
+| Health declarations | tuberculosis, dialysis, hospital care, residential care, pregnancy |
+| Character declarations | convictions, removals, refusals, arrest warrants, and the four race / war-crimes / terrorism questions |
+| "Previously provided to INZ" | whether a medical or police certificate went with an earlier application, and when. INZ asks this **before** asking for a new one |
+
+#### The decision to make first: what shape a history is
+
+Everything above divides into two kinds, and they want different shapes.
+
+**Flat facts about a person** — place of birth, gender, title, partnership
+status, national ID. These are columns on `clients`, like everything else there.
+Small, obvious, and they appear on every form. No decision needed beyond doing
+it.
+
+**Histories** — countries lived in, employment, education, travel. These are
+*rows*, one per period, each with a start, an end, and a few fields. Three ways
+to hold them, and the choice is not obvious:
+
+1. **A table per history.** `client_employment`, `client_education`,
+   `client_residence`, `client_travel`. Clearest to query, four migrations, four
+   screens.
+2. **One `client_periods` table with a kind column.** One migration, one screen,
+   one set of rules — a period cannot end before it starts, periods of the same
+   kind should not overlap, gaps are reportable. The fields differ per kind
+   though, so either some columns are usually null or the extras live in a JSON
+   column, which the register has avoided everywhere else.
+3. **Per application rather than per person.** Because the answers are given as
+   at a date and a later form may contradict an earlier one. This is how the
+   forms themselves work.
+
+**A note in favour of (2), and against it.** The register's own strength is that
+a rule lives in the database. "No gaps since 17" and "no overlapping periods"
+are exactly that kind of rule, and they are the thing INZ actually checks — the
+form says *"Do not leave any gaps in the timeline/periods"* twice. One table
+means writing that rule once. Against: an employment period wants an employer,
+a supervisor and an industry; a travel period wants a port of entry. Those do
+not belong in the same row shape.
+
+**And the declarations are a third thing again.** "Have you ever been convicted"
+is not a fact about a person that the register should assert on its own
+authority — it is an answer the client gave, on a date, on a form. If it is held
+at all it belongs to the application, not to the client, and the register does
+not yet have a place that means "an application" as distinct from a matter.
+
+#### Before any of this is built
+
+- **Read two or three more forms** against the register — an AEWV, a student
+  visa, a parent category — and add what they ask for. Building the shape around
+  one form guarantees rebuilding it for the second.
+- **Decide whether the goal is filling forms or holding facts.** They are not the
+  same. INZ Online has no import; filling a form means a person copying from a
+  screen, so the value is in having it all in one place correctly, not in
+  automation. That may change, and the register should not be shaped around a
+  hope that it will.
+- **Nothing here is filled by the AI without a person pressing the button.** The
+  standing rule holds, and it holds harder here than anywhere: a fabricated
+  employment date on an immigration application is a misrepresentation.
+
+This is the largest single addition the register has had. It is written down
+here so it is not started at two in the morning.
+
+### 0c. The extraction skill drifts from the register's own lists
+
+**Noticed 10 September 2026** while reviewing `SKILL: Case Data Extraction`,
+which the practice loads into its working project folders so a conversation can
+be turned into a register handover.
+
+The skill carries copies of the case-type, visa-type and flag-kind lists, with a
+note saying that if a list changes in Settings it must be changed in the skill
+too. It had not been. Two case types added since 6 September were missing:
+`vv_parent_grandparent` and `wv_aewv_gws`. A missing key does not fail loudly —
+the skill proposes the nearest old one, and the matter is filed as the wrong
+type.
+
+A rule that depends on somebody remembering is not a rule. Two ways out:
+
+1. **The skill reads the lists from the register** instead of carrying them, at
+   an address it is told to fetch first. One place to change. Needs the lists to
+   be readable without a session, which is a small public route and a decision
+   about whether the practice's own vocabulary is something to publish.
+2. **The register renders the lists in the skill's exact format**, on a page
+   under Settings, so updating the skill is copy-and-paste rather than retyping.
+   Smaller, and it makes the drift visible instead of silent.
+
+(2) is the one to build. It is half a day and it removes the retyping, which is
+where the error came from.
+
+Also outstanding: a client now has a visa **grant** date as well as an expiry
+(1.36.0), and the intake reader does not accept it. Until it does, the skill
+must not list `current_visa_start` — it would be written and silently dropped.
+
+### 0d. Sixty-six urgent alerts nobody can act on
+
+**Raised 10 September 2026**, discussing what a visa's dates mean: *"the visa
+issue and start dates - these can be different - and do not often know when the
+client enters NZ - which is the trigger for visa activation - do not want to be
+bombarded with alerts unnecessarily."*
+
+Measured against production the same day:
+
+| | |
+|---|---:|
+| Clients showing **"Visa expiry not yet fixed" at urgent severity** | **66** |
+| Clients with an actual visa expiry date | 17 |
+| Clients in total | 242 |
+
+So the alert list is dominated, four to one, by an item that says *a date is not
+yet knowable*. The check itself is right and the comment in `alerts/index.ts`
+defends it well — the row exists so somebody asks whether the event has
+happened, and it clears the moment the date is written down. What is wrong is
+the **severity**. Marking something urgent that nobody can act on today is how a
+practice learns to scroll past its own alerts, and once that habit is formed the
+real ones go past too.
+
+#### What the dates actually are
+
+Worth stating, because it is the root of it and the register only holds two of
+the three:
+
+- **Granted on** — the date on the letter. Always knowable. Held since 1.36.0.
+- **Expires on** — knowable for most grants; for an offshore grant carrying a
+  travel condition it is expressed as a rule ("24 months from first arrival")
+  and is genuinely not a date yet. Held, with `current_visa_expiry_rule` for
+  the rule.
+- **Activated on** — first arrival in New Zealand, which is what starts the
+  clock on a travel-conditioned grant. **Not held, and mostly not known**: the
+  practice does not see the client cross the border.
+
+The register should not gain a field for the third. A box labelled "activated
+on" invites a guess, and an expiry computed from a guessed activation is a
+guessed deadline in a list of real ones — mistake 25 in the ledger, made once
+already.
+
+#### The fix, in order of what it buys
+
+1. **Downgrade `expiry_unfixed` from urgent.** It is a *waiting on the world*
+   item, not a deadline. One line, and it takes 66 rows out of the urgent count
+   immediately. Do this first and separately.
+2. **Let the practice say when to start asking.** An optional "do not raise
+   before" date on the client — set it to when the client is expected to travel,
+   and the row stays quiet until then. This is the honest version of a snooze:
+   it records a judgement the practice made rather than pretending the date is
+   known.
+3. **Group the row rather than listing it 66 times.** One line saying "66 clients
+   have a visa expiry that is not yet fixed", opening a list. An alert list is
+   read at a glance or not at all.
+
+(1) alone probably settles the complaint. (2) and (3) are worth doing only if it
+does not.
+
+#### The rule to keep out of it
+
+Do not try to infer arrival — from a matter's status, from a note, from a
+lodgement date. The register would be guessing at the one fact that fixes a
+deadline, and it would be right often enough to be trusted and wrong often
+enough to matter.
+
 ### 0. Shrink a PDF on the way in
 **Asked 8 September 2026:** *"in the pipeline — we will need to add a PDF reducer
 into the app — automatic. We already built it, it will need to be copied. Make
