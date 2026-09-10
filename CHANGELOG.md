@@ -7,6 +7,38 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.38.0 — 11 September 2026
+
+### Added
+**The quotation email is now a letter the practice owns.** Asked plainly:
+*"where do i change my email template when quotation is going out to client?"*
+The answer was: nowhere. The covering letter was written in TypeScript, and the
+only way to change a word was to retype it in the compose box for that one
+client — where it was forgotten again by the next quotation. That is the
+standing rule broken, since a covering letter is about as practice-specific as a
+thing can be.
+
+Both the **subject line and the body** now live under **Settings → Quotes**, and
+what is saved there is what the compose box opens with every time. The letter
+that was in the code is the starting text, so nothing reads differently until
+somebody changes it.
+
+A word in braces is filled in from the matter — `{client_name}`, `{quote_ref}`,
+`{total}`, `{link}` and the rest, listed beside the compose box and again on the
+preview screen. There are no conditions and no loops: a template language grows
+until somebody needs a debugger to see why a client got a blank paragraph, and
+this is a letter, not a program.
+
+**A misspelled placeholder prints as written.** `{clietn_name}` comes out as the
+literal text `{clietn_name}` rather than quietly disappearing — a letter with a
+visible fault is safer than one that reads almost right and has a hole in it.
+
+**Nothing goes out unseen.** The compose box's button now says **Preview**, and
+the preview screen shows the letter exactly as the client will receive it — To,
+Cc, subject and body — with **Send** and **Back to edit** beneath it. Any word
+in braces the register cannot fill is named there before the letter leaves the
+office.
+
 ## 1.37.0 — 11 September 2026
 
 ### Fixed

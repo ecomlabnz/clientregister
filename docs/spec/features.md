@@ -26,7 +26,7 @@ dashboard, and why a test holds them there.
 | 9 | `inquiries` | Inquiries | `/inquiries` | 12 | Incoming |
 | 10 | `clients` | Clients | `/clients` | 23 | Clients |
 | 11 | `cases` | Cases | `/cases` | 15 | Cases |
-| 12 | `quotes` | Quotes | `/quotes` | 28 | Money → Quotes |
+| 12 | `quotes` | Quotes | `/quotes` | 29 | Money → Quotes |
 | 13 | `invoices` | Invoices | `/invoices` | 12 | Money → Invoices |
 | 14 | `tasks` | Tasks | `/tasks` | 8 | Tasks |
 | 15 | `calendar` | Calendar | `/calendar` | 1 | Calendar |
@@ -222,6 +222,7 @@ Settings: **Lists and dropdowns** (5 keys), **Decisions and chasing INZ** (4 key
 | GET | `/quotes/:id/edit` |
 | GET | `/quotes/:id/email` |
 | POST | `/quotes/:id/email` |
+| POST | `/quotes/:id/email/preview` |
 | POST | `/quotes/:id/invoice` |
 | POST | `/quotes/:id/issue` |
 | POST | `/quotes/:id/items` |
@@ -244,7 +245,7 @@ Settings: **Lists and dropdowns** (5 keys), **Decisions and chasing INZ** (4 key
 | POST | `/quotes/clauses/:clauseId/toggle` |
 | GET | `/quotes/new` |
 
-Settings: **Quotes** (6 keys), **Letter of engagement** (18 keys)
+Settings: **Quotes** (8 keys), **Letter of engagement** (18 keys)
 
 ### `invoices` — Invoices
 
