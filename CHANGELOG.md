@@ -42,6 +42,14 @@ alongside it, so a client whose mail reader will not show formatting still gets
 a readable letter. The choice now also survives **Back to edit**, which used to
 reset it.
 
+**The quotation is about a tenth shorter on the page.** *"make the lines
+slightly more compact otherwise, except for where the headings sit - so the
+whole takes less space on the screen vertically."* Row padding, paragraph
+spacing and line heights are all trimmed a little between the headings; the
+extra room above the headings, added earlier the same day, is untouched. About
+90px on screen and 12mm on paper for a typical quotation. Nothing changed size,
+weight or colour — vertical spacing only.
+
 **The accept button and its tick boxes are one green.** *"accept this quotation
 button should be the same green as the one saying Go to accept"* and *"the tick
 colours should be the same green."* They differed because of where each sat:

@@ -46,6 +46,9 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
       'The quotation email is sent formatted by default now, with plain text one click away. The '
         + 'plain version still goes alongside it either way.',
       'The accept button and its tick boxes are the same green as the "Go to accept" button.',
+      'The printed quotation is about a tenth shorter: the lines between the headings are a little '
+        + 'tighter, while the space above each heading stays as it was. Nothing changed size or '
+        + 'colour.',
     ],
   },
   {
