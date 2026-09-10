@@ -75,7 +75,7 @@ const invariants = readFileSync('docs/spec/invariants.md', 'utf8');
 
 describe('data-model.md', () => {
   const documented = new Set(
-    [...dataModel.matchAll(/^### `([a-z0-9_]+)`$/gm)].map((m) => m[1]!),
+    [...dataModel.matchAll(/^## `([a-z0-9_]+)`$/gm)].map((m) => m[1]!),
   );
 
   it('describes every table the migrations build', () => {
@@ -165,8 +165,41 @@ describe('the numbers on the front page of the specification', () => {
   });
 
   it('says how many routes there are, and is right', () => {
-    const routes = (readFileSync('docs/spec/routes.md', 'utf8')
-      .match(/^\| (?:GET|POST|PUT|DELETE) /gm) ?? []).length;
+    // Counted from the complete list only. The public routes are deliberately
+    // printed twice — once on their own, because that short list *is* the
+    // public surface and is the thing to read first, and again in the full
+    // table — so counting every row in the file counts those twice.
+    const doc = readFileSync('docs/spec/routes.md', 'utf8');
+    const complete = doc.slice(doc.indexOf('## Every route'));
+    const routes = (complete.match(/^\| (?:GET|POST|PUT|DELETE) /gm) ?? []).length;
+    expect(routes, 'the complete route table is missing').toBeGreaterThan(100);
     expect(stated('routes and the permission')).toBe(routes);
+  });
+
+  it('lists every module that is actually mounted', async () => {
+    const { registeredModules } = await import('../src/registry');
+    const features = readFileSync('docs/spec/features.md', 'utf8');
+    const missing = registeredModules.map((m) => m.name).filter((n) => !features.includes(`\`${n}\``));
+    expect(missing, `not in features.md: ${missing.join(', ')}`).toEqual([]);
+    expect(stated('modules')).toBe(registeredModules.length);
+  });
+
+  it('lists every permission there is', async () => {
+    const { PERMISSIONS } = await import('../src/core/rbac');
+    const doc = readFileSync('docs/spec/permissions.md', 'utf8');
+    const missing = [...PERMISSIONS].filter((p) => !doc.includes(`\`${p}\``));
+    expect(missing, `not in permissions.md: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('lists every setting an administrator can change', async () => {
+    // The list that answers "what may differ between two practices", so a
+    // setting missing from it is a gap in the plan, not just in a document.
+    const { registeredModules } = await import('../src/registry');
+    const keys = registeredModules.flatMap((m) => (m.settings ?? []).flatMap(
+      (g: { settings: Array<{ key: string }> }) => g.settings.map((s) => s.key)));
+    const doc = readFileSync('docs/spec/settings.md', 'utf8');
+    const missing = keys.filter((k) => !doc.includes(`\`${k}\``));
+    expect(missing, `not in settings.md: ${missing.join(', ')}`).toEqual([]);
+    expect(stated('settings —')).toBe(keys.length);
   });
 });

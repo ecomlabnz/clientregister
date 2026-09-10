@@ -15,7 +15,8 @@
     "build:check": "wrangler deploy --dry-run --outdir=.wrangler/dry",
     "db:migrate:local": "wrangler d1 migrations apply clientregister-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply clientregister-db --remote",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "spec": "node scripts/spec.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

@@ -55,6 +55,28 @@ does to client links.
 **To finish it:** point a domain at the register in Cloudflare, then put that
 address in the box. Every link written afterwards uses it.
 
+### Documentation
+**The specification is now written by one command, and there are three more of
+it.** *"make sure all of this is documented so when we are architecting the
+system — every single bit of it is known to the minute feature and detail"*, and
+*"not just this issue, but all other issues with the client register we came
+across and overcame."*
+
+`npm run spec` rewrites six documents from the code itself: the features, the
+data model, the routes, the database's refusals, and — new — every setting an
+administrator can change and the permissions matrix. Three of them already said
+they were generated and one had drifted anyway: the front page claimed 195
+routes while the routes document said 178. A test now fails when what is on disk
+is not what the command would write.
+
+The mistakes ledger grows from 28 entries to 38, covering everything found since:
+a client page silently behind a sign-in because of mounting order, an accepted
+quotation guarded by a permission that cannot express state, a branch of
+rewritten history that would have deleted four releases, a print size that never
+reached paper, a page shipped without being looked at, a fallback web address
+that leaked in silence, and four smaller ones. Each says what happened and the
+rule that replaced it.
+
 ### The lists themselves
 Six document lists are now in the knowledge base. **Relationship documents** in
 **English, Russian and Vietnamese** — the practice's own template, unchanged,

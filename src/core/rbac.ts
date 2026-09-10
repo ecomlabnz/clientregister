@@ -31,7 +31,7 @@ export const PERMISSIONS = [
 
 export type Permission = (typeof PERMISSIONS)[number];
 
-const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
+export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   owner: [...PERMISSIONS],
   // Everything except `backup:take`, which no role but owner has. An
   // administrator manages users and settings; they do not take the register
