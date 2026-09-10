@@ -13,6 +13,43 @@ Last reviewed: 10 September 2026.
 
 ## Asked for, not yet built
 
+### 0e. A quick translation of the quotation and letter for a client with no English
+
+**Raised on 11 September 2026:** *"Think about how to help clients that do not
+understand english, may be offer them a quick translation of the LoE and
+Quotation into their language once? so it is taken from my API AI? not sure"* —
+and, immediately after, *"only a theory for now - into the pipeline"*.
+
+So this is written down, not built. The plumbing exists: `src/ai/provider.ts`,
+the model setting, and the `ai:run` permission.
+
+**The one hard line, whenever it is built.** A quotation and a letter of
+engagement are a contract. A machine translation of a contract is not the
+contract, and a client who accepts on the strength of a translation that got a
+fee or a scope clause wrong is a professional-conduct problem, not a software
+one. So: the English remains the document, the translation sits alongside it as
+a courtesy clearly marked as such with the English prevailing, and the
+acceptance record must mean the English.
+
+**The shape it should take:**
+
+- **The practice presses the button, not the client.** A translate button on a
+  public link would be unreviewed text going out under the practice's name, and
+  unauthenticated spend on their API key. It follows the standing rule: the AI
+  proposes, a person presses.
+- **Translate once and store it** against the quotation, rather than
+  regenerating on each view — for cost, and so the client is not reading a
+  slightly different translation every time they open the link.
+- **Languages come from a vocabulary**, editable by an administrator without a
+  deployment. The practice's real three appear to be English, Russian and
+  Vietnamese, judging by the relationship-document lists already in the
+  knowledge base.
+
+**The decision still open**, and it must be answered before this is built: does
+a generated translation reach the client's link immediately, or does it wait for
+the practice to approve it? For a contract the answer is probably approval, but
+it is theirs to weigh.
+
 ### 0a. Compare our document lists against INZ's own
 **Asked 10 September 2026:** *"we will also need to parse the INZ website for
 their list of documents and compare it with ours too - in the pipeline - do not
