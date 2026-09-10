@@ -134,6 +134,54 @@ export async function attachStagedTo(
 }
 
 /**
+ * The documents already on the file that a reading was taken from.
+ *
+ * **Asked for on 11 September 2026:** *"we need to make it easier for the
+ * client - so they email us docs and we extract the data with AI systems. much
+ * easier on the client."*
+ *
+ * The two halves of this file are the two states a document a reading read can
+ * be in. Everything above is a file that has **no** `documents` row yet — an
+ * upload, staged until the press that puts it on the record. This is the other
+ * one: a file that was already on the matter, emailed in by the client and
+ * filed there, which the reading does not stage, does not copy and does not
+ * attach again. All it records is that it read it, because the review screen
+ * and the append-only file note both have to be able to say so afterwards, and
+ * a list carried in a URL between the two would be a claim rather than a fact.
+ *
+ * Which documents a matter may read is decided by one SQL clause in
+ * `modules/documents` (`CASE_READING_SOURCES`) — this records the answer, it
+ * does not second-guess it.
+ */
+export interface DocumentRead {
+  document_id: string;
+  filename: string;
+  read_at: string;
+}
+
+export async function recordDocumentRead(
+  env: Env, opts: { runId: string; documentId: string },
+): Promise<void> {
+  await run(
+    env.DB,
+    // OR IGNORE because the key is (run, document): the same document ticked
+    // twice on one press is one reading of one set of bytes.
+    'INSERT OR IGNORE INTO ai_run_documents (run_id, document_id, read_at) VALUES (?,?,?)',
+    opts.runId, opts.documentId, nowIso(),
+  );
+}
+
+/** What one reading read off the file, oldest first, by name. */
+export async function documentsReadBy(env: Env, runId: string): Promise<DocumentRead[]> {
+  return all<DocumentRead>(
+    env.DB,
+    `SELECT r.document_id, r.read_at, d.filename
+       FROM ai_run_documents r JOIN documents d ON d.id = r.document_id
+      WHERE r.run_id = ? ORDER BY r.read_at, d.filename`,
+    runId);
+}
+
+/**
  * Delete the files of readings nobody acted on.
  *
  * Run nightly. A reading that was never applied leaves its uploads in R2 with

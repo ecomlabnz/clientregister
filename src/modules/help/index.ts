@@ -37,6 +37,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.44.0', date: '11 September 2026',
+    notes: [
+      'A document a client emailed you can now be read into the matter without downloading it '
+        + 'and uploading it again. The reading screen lists what is already on the file \u2014 tick '
+        + 'the ones you want and read them together.',
+      'The review screen says which document each value came from, and the file note names what '
+        + 'was read.',
+      'A document the reading cannot open \u2014 a spreadsheet, a drive link, anything over 8 MB '
+        + '\u2014 is listed with the reason rather than quietly skipped.',
+    ],
+  },
+  {
     version: '1.43.0', date: '11 September 2026',
     notes: [
       'A quotation can now actually go to more than one person. It never could: a second address '

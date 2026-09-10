@@ -2627,6 +2627,12 @@ body.site { background: var(--bg); }
 }
 .party-edit-flags { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0 0 12px; }
 
+/* The documents already on a matter, offered to a reading beside the upload
+   box. `.field-group` lays its children out in two columns on a wide screen,
+   which turns a list of file names into a table nobody asked for — a file name
+   and its size read as one line. */
+.reading-sources { display: block; }
+
 .pick-list { list-style: none; margin: 12px 0; padding: 0; }
 .pick {
   border: 1px solid var(--border); border-radius: var(--radius);
@@ -2639,7 +2645,7 @@ body.site { background: var(--bg); }
 }
 /* The global rule makes every input full-width, which turns a radio into a
    line of its own with the row's text beneath it. */
-.pick input[type="radio"] {
+.pick input[type="radio"], .pick input[type="checkbox"] {
   width: auto; margin: 0; padding: 0; flex: none; align-self: center;
   border: none; background: none;
 }

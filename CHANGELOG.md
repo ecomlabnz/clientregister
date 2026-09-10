@@ -7,6 +7,30 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.44.0 — 11 September 2026
+
+### Added
+**A document that arrived by email can be read into the matter where it sits.**
+Until now the reading only took an upload, so a passport a client emailed had to
+be downloaded and put back before it could be read. That was the one missing
+step in what the practice described: *"we need to make it easier for the client
+- so they email us docs and we extract the data with AI systems."*
+
+The reading screen now lists the documents already on the matter and on the
+client's file. Tick as many as you like and read them together. Nothing is
+copied or re-attached — they are read where they sit.
+
+The review screen says **which document each proposed value came from**, and the
+file note names what was read. Where several documents are read at once and you
+need to be certain which said what, read them one at a time; the screen says so.
+
+A document the reading cannot open — a spreadsheet, a link to a file in a drive,
+anything over 8 MB — is listed with the reason rather than silently ignored. A
+reading that found nothing says so instead of showing an empty screen.
+
+**Only this client's own documents are ever offered**, and posting another
+client's document id reads nothing.
+
 ## 1.43.0 — 11 September 2026
 
 ### Fixed
