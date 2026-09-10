@@ -46,13 +46,45 @@ import { quoteNameFrom } from '../../core/casename';
 import { practiceDetails } from '../../core/practice';
 import { shareTokenFor, shareUrl } from '../../core/quotelink';
 import { fallbackWarning, publicBase } from '../../core/publicurl';
+import { fillTemplate, tidyBlankLines, unknownPlaceholders } from '../../core/template';
 import {
   ENGAGEMENT_SETTINGS, allClauses, clauseTypes, clausesFor, engagementText, type ClauseRow,
 } from '../../core/engagement';
 import { invoiceFromQuote } from '../../core/invoices';
-import { renderEmailHtml } from '../../core/richtext';
+import { renderEmailHtml, renderRichText } from '../../core/richtext';
 import { mailConfigured } from '../../mail/provider';
 import { flushQueue, queueEmail } from '../../mail/queue';
+
+const DEFAULT_EMAIL_BODY = [
+  'Dear {client_name},',
+  '',
+  'Thank you for your enquiry and for discussing your matter with us.',
+  '',
+  'As discussed, I am pleased to provide you with our **fee quotation{and_letter}** for the',
+  'proposed work.',
+  '',
+  '{total}',
+  '',
+  '{link_block}',
+  '',
+  '{terms}',
+  '',
+  'Please note that **acceptance of the quotation does not constitute a guarantee that any',
+  'visa, immigration application or other outcome will be successful**. Immigration decisions',
+  'are made by Immigration New Zealand in accordance with the applicable legislation,',
+  'immigration instructions and its decision-making powers.',
+  '',
+  '{closing_date} {capacity}',
+  '',
+  '{how_to_accept}',
+  '',
+  'If you have any questions about the quotation, scope of work or terms of engagement,',
+  'please contact us before accepting it. We will be happy to clarify any aspect of the',
+  'proposed engagement.',
+  '',
+  'Kind regards,',
+  '{signature}',
+].join('\n');
 
 export const QUOTE_SETTINGS: SettingsGroup = {
   id: 'quotes',
@@ -60,6 +92,20 @@ export const QUOTE_SETTINGS: SettingsGroup = {
   description: 'How quotes are put together and how long they stand.',
   order: 35,
   settings: [
+    { key: 'quotes.email_subject', type: 'string', maxLength: 200,
+      label: 'Subject line of the quotation email',
+      default: 'Fee quote {quote_ref} \u2014 {matter}',
+      help: 'Placeholders in braces are filled in: {quote_ref}, {matter}, {client_name}, '
+        + '{practice_name}. Anything else in braces prints as you typed it, so a misspelling '
+        + 'shows up on the preview screen rather than reaching the client.' },
+    { key: 'quotes.email_body', type: 'text', maxLength: 20000,
+      label: 'The quotation email',
+      default: DEFAULT_EMAIL_BODY,
+      help: 'The covering letter sent with every quotation. Placeholders in braces are filled '
+        + 'in from the quotation \u2014 {client_name}, {total}, {link_block}, {terms}, '
+        + '{closing_date}, {capacity}, {how_to_accept}, {signature} and others; the Email page '
+        + 'lists them all. You still see and can edit every letter before it goes, and the '
+        + 'Preview screen shows exactly what the client will read.' },
     { key: 'quotes.validity_days', type: 'integer', label: 'A quote stands for (days)', default: '7',
       min: 1, max: 365,
       help: 'Counted inclusive of the day it is issued — issued on the 28th, seven days means it is good through the 3rd. The quote shows the date, never a number of days, so the client does not have to work it out.' },
@@ -97,6 +143,9 @@ export interface QuoteSettings {
   capacityNote: string;
   paymentTerms: string;
   defaultUnitLabel: string;
+  /** The covering letter and its subject, as the practice wrote them. */
+  emailSubject: string;
+  emailBody: string;
 }
 
 export async function quoteSettings(env: Env): Promise<QuoteSettings> {
@@ -106,6 +155,10 @@ export async function quoteSettings(env: Env): Promise<QuoteSettings> {
     capacityNote: values['quotes.capacity_note'] ?? '',
     paymentTerms: values['quotes.payment_terms'] ?? '',
     defaultUnitLabel: values['quotes.default_unit_label'] || 'item',
+    // `||` rather than `??`: a practice that empties the box wants the letter
+    // back, not an empty email. There is no way to send nothing on purpose.
+    emailSubject: values['quotes.email_subject'] || 'Fee quote {quote_ref} \u2014 {matter}',
+    emailBody: values['quotes.email_body'] || DEFAULT_EMAIL_BODY,
   };
 }
 
@@ -330,13 +383,25 @@ function totalRows(
  * bold when the email is sent formatted, and as asterisks in plain text, which
  * is how emphasis has always been written in a plain-text letter.
  */
-export function defaultQuoteEmail(
+/**
+ * The facts of one quotation, as the names a template may use.
+ *
+ * Every value is a finished piece of prose rather than a raw field, because the
+ * sentences around them differ by what is true: a quotation with a letter of
+ * engagement says "them", one without says "it", and a total is "inclusive of
+ * GST and the disbursements specified" only where both are so. Working that out
+ * in a template would need conditionals, and a letter is not a program.
+ *
+ * So the register decides what is true and hands over the words; the practice
+ * decides the letter they sit in.
+ */
+export function quoteEmailValues(
   q: QuoteRow & { client_name: string | null },
   practice: { legalName: string; termsLabel: string; termsUrl: string; contactEmail: string; contactPhone: string },
   items: QuoteItemRow[] = [],
   capacityNote = '',
   link = '',
-): string {
+): Record<string, string> {
   const totals = summariseQuote(items.map((l) => ({
     kind: l.kind, lineAmountCents: l.unit_amount_cents,
     netCents: l.net_cents, gstCents: l.gst_cents, grossCents: l.gross_cents,
@@ -353,99 +418,105 @@ export function defaultQuoteEmail(
     hasDisbursements ? 'the disbursements specified in the quotation' : '',
   ].filter(Boolean).join(' and ');
 
-  const lines = [
-    `Dear ${q.client_name ?? 'Sir or Madam'},`,
-    '',
-    'Thank you for your enquiry and for discussing your matter with us.',
-    '',
-    `As discussed, I am pleased to provide you with our **fee quotation${andLetter}** for the`,
-    'proposed work.',
-    '',
-  ];
-
-  if (items.length) {
-    lines.push(
-      inclusive
+  const total = items.length
+    ? (inclusive
         ? `The total quoted amount is **${money(totals.totalCents, q.currency)}, inclusive of ${inclusive}**.`
-        : `The total quoted amount is **${money(totals.totalCents, q.currency)}**.`,
-      '',
-    );
-  }
+        : `The total quoted amount is **${money(totals.totalCents, q.currency)}**.`)
+    : '';
 
-  if (link) {
-    lines.push(
-      `You can review and accept the quotation${andLetter} here:`,
-      '',
-      link,
-      '',
-      `Please read the **Quotation${andLetter} carefully before accepting ${them}**.`,
-      withLetter
-        ? 'Together, these documents set out the proposed scope of our work, the applicable fees,'
-        : 'It sets out the proposed scope of our work, the applicable fees,',
-      'payment arrangements, and the terms on which we would act for you.',
-      '',
-    );
-  } else {
-    // Not reachable from the compose screen, which mints a link before
-    // drafting. Said plainly rather than sending a letter that points nowhere.
-    lines.push(
-      '[This quotation has no link yet. Open it in the register and press Email again',
-      'so that one is created before sending.]',
-      '',
-    );
-  }
+  // Not reachable from the compose screen, which mints a link before drafting.
+  // Said plainly rather than sending a letter that points nowhere.
+  const linkBlock = link
+    ? [
+        `You can review and accept the quotation${andLetter} here:`,
+        '',
+        link,
+        '',
+        `Please read the **Quotation${andLetter} carefully before accepting ${them}**.`,
+        withLetter
+          ? 'Together, these documents set out the proposed scope of our work, the applicable fees,'
+          : 'It sets out the proposed scope of our work, the applicable fees,',
+        'payment arrangements, and the terms on which we would act for you.',
+      ].join('\n')
+    : '[This quotation has no link yet. Open it in the register and press Email again\n'
+      + 'so that one is created before sending.]';
 
-  if (practice.termsUrl) {
-    lines.push(
-      'The engagement is also subject to our **Standard Terms of Engagement**, which are',
-      'available here:',
-      '',
-      practice.termsUrl,
-      '',
-    );
-  }
-
-  lines.push(
-    'Please note that **acceptance of the quotation does not constitute a guarantee that any',
-    'visa, immigration application or other outcome will be successful**. Immigration decisions',
-    'are made by Immigration New Zealand in accordance with the applicable legislation,',
-    'immigration instructions and its decision-making powers.',
-    '',
-  );
+  const terms = practice.termsUrl
+    ? [
+        'The engagement is also subject to our **Standard Terms of Engagement**, which are',
+        'available here:',
+        '',
+        practice.termsUrl,
+      ].join('\n')
+    : '';
 
   // The closing date and the capacity sentence are one paragraph in the
   // practice's letter and two independent facts. A quotation with no closing
   // date still needs the capacity sentence — the first draft of this dropped it
   // with the date, so a quotation left open indefinitely was also the one that
-  // never told the client the engagement could still be declined. Caught by the
-  // test for the capacity note, on a fixture that happens to have no date.
+  // never told the client the engagement could still be declined.
   const closing = q.valid_until
     ? `The quotation is open for acceptance until **${dateLong(q.valid_until)}**.` : '';
   const capacity = capacityNote
     || 'Acceptance is also subject to our **availability and capacity to accept the engagement**'
        + ' at that time.';
-  lines.push([closing, capacity].filter(Boolean).join(' '), '');
 
-  if (link) {
-    lines.push(
-      'If you are happy to proceed, please sign electronically at the end of the quotation',
-      'page. You will be asked to provide your full name and the date of acceptance.',
-      '',
-    );
-  }
+  const howToAccept = link
+    ? 'If you are happy to proceed, please sign electronically at the end of the quotation\n'
+      + 'page. You will be asked to provide your full name and the date of acceptance.'
+    : '';
 
-  lines.push(
-    'If you have any questions about the quotation, scope of work or terms of engagement,',
-    'please contact us before accepting it. We will be happy to clarify any aspect of the',
-    'proposed engagement.',
-    '',
-    'Kind regards,',
-    practice.legalName,
-  );
-  if (practice.contactEmail) lines.push(practice.contactEmail);
-  if (practice.contactPhone) lines.push(practice.contactPhone);
+  const signature = [practice.legalName, practice.contactEmail, practice.contactPhone]
+    .filter(Boolean).join('\n');
 
-  return lines.join('\n');
+  return {
+    client_name: q.client_name ?? 'Sir or Madam',
+    quote_ref: q.ref,
+    matter: q.description ?? '',
+    and_letter: andLetter,
+    total,
+    link,
+    link_block: linkBlock,
+    terms,
+    closing_date: closing,
+    capacity,
+    how_to_accept: howToAccept,
+    practice_name: practice.legalName,
+    practice_email: practice.contactEmail,
+    practice_phone: practice.contactPhone,
+    signature,
+  };
+}
+
+/**
+ * The letter as the practice wrote it, filled with this quotation's facts.
+ *
+ * The wording is `quotes.email_body`; this only fills it. Until 11 September
+ * 2026 the wording lived in this file, which is why the practice asked *"where
+ * do i change my email template"* and the answer was nowhere.
+ */
+export function quoteEmailBody(template: string, values: Record<string, string>): string {
+  return tidyBlankLines(fillTemplate(template, values));
+}
+
+/**
+ * The built-in letter, filled for one quotation.
+ *
+ * The same words `quotes.email_body` defaults to, so this is what a practice
+ * that has never touched the setting sends. It exists as a function because the
+ * suite tests the default wording — that a quotation with no letter of
+ * engagement says "it" rather than "them", that a total is only "inclusive of
+ * GST" where there is GST — and those are properties of the letter the register
+ * ships, not of whatever a practice writes afterwards.
+ */
+export function defaultQuoteEmail(
+  q: QuoteRow & { client_name: string | null },
+  practice: { legalName: string; termsLabel: string; termsUrl: string; contactEmail: string; contactPhone: string },
+  items: QuoteItemRow[] = [],
+  capacityNote = '',
+  link = '',
+): string {
+  return quoteEmailBody(DEFAULT_EMAIL_BODY, quoteEmailValues(q, practice, items, capacityNote, link));
 }
 
 export const quotesModule: AppModule = {
@@ -1683,6 +1754,17 @@ export const quotesModule: AppModule = {
       // corrected by changing a setting afterwards.
       const addressWarning = fallbackWarning(address);
 
+      // The letter is the practice's, from Settings → Quotes; the register only
+      // supplies the facts. Drafted here rather than in the template so the
+      // sentences that depend on what is true — "them" or "it", what a total is
+      // inclusive of — are decided by the register rather than by a conditional
+      // somebody has to write in a settings box.
+      const values = quoteEmailValues(q, practice, items, qs.capacityNote, shareLink);
+      const draft = c.req.query('body');
+      const draftSubject = c.req.query('subject');
+      const body = draft ?? quoteEmailBody(qs.emailBody, values);
+      const subject = (draftSubject ?? fillTemplate(qs.emailSubject, values)).slice(0, 200);
+
       return page(c, { title: `Email ${q.ref}`, active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { href: `/quotes/${q.id}`, label: q.ref }, { label: 'Email' }])}
         ${pageHeader(`Email quote ${q.ref}`, q.client_name ?? undefined)}
@@ -1706,7 +1788,7 @@ export const quotesModule: AppModule = {
                  floated on their own away from the box they act on. The
                  practice's words: "this is just ugly — I asked for a Gmail
                  style experience". */}
-        <form method="post" action="/quotes/${q.id}/email" class="compose js-compose">
+        <form method="post" action="/quotes/${q.id}/email/preview" class="compose js-compose">
           ${csrfField(csrf)}
 
           <div class="compose-headers">
@@ -1724,7 +1806,7 @@ export const quotesModule: AppModule = {
             <div class="compose-row">
               <label for="f_subject">Subject</label>
               <input id="f_subject" name="subject" required maxlength="200"
-                     value="${`Fee quote ${q.ref} — ${q.description}`.slice(0, 200)}">
+                     value="${subject}">
             </div>
           </div>
 
@@ -1745,10 +1827,14 @@ export const quotesModule: AppModule = {
 
           <label class="visually-hidden" for="f_body">Message</label>
           <textarea id="f_body" name="body" rows="24" required maxlength="20000"
-                    class="compose-body">${defaultQuoteEmail(q, practice, items, qs.capacityNote, shareLink)}</textarea>
+                    class="compose-body">${body}</textarea>
 
+          ${'' /* Preview, never send, asked for on 11 September 2026: *"must
+                   have PREVIEW page before it goes out with an additional send
+                   button, so PREVIEW button and on the preview screen - send
+                   button or go back to edit"*. Nothing leaves this screen. */}
           <div class="compose-actions">
-            <button class="btn btn-primary" type="submit">Queue this email</button>
+            <button class="btn btn-primary" type="submit">Preview</button>
             <a class="btn btn-secondary" href="/quotes/${q.id}">Cancel</a>
             <label class="check"><input type="checkbox" name="mark_sent" checked>
               Mark this quote as sent</label>
@@ -1766,6 +1852,128 @@ export const quotesModule: AppModule = {
                is sent.</p>
           </details>
         </form>`);
+    });
+
+    /**
+     * What the client will actually read, before anybody can send it.
+     *
+     * **Asked for on 11 September 2026:** *"must have PREVIEW page before it
+     * goes out with an additional send button, so PREVIEW button and on the
+     * preview screen - send button or go back to edit"*.
+     *
+     * Three things this page has to get right:
+     *
+     *  1. **It is the only way to the send route from the compose screen.** The
+     *     compose form's button says Preview and posts here; nothing on it
+     *     sends. A preview somebody can skip is decoration.
+     *  2. **Going back must return what was written**, not the template again.
+     *     The edited subject and body travel back as query parameters and the
+     *     compose page prefers them over the draft it would otherwise make.
+     *  3. **A misspelled placeholder is named, not merely visible.** It prints
+     *     as written — the practice's choice, and the right one — and this page
+     *     says which word is wrong and lists the real ones, because "why does
+     *     my letter say {clietn_name}" is a worse way to find out.
+     *
+     * Nothing is written here. The page renders and forgets; the send route is
+     * unchanged and still does the validating.
+     */
+    r.post('/:id/email/preview', requirePermission('mail:send'), async (c) => {
+      const id = c.req.param('id')!;
+      const q = await one<QuoteRow & { client_name: string | null }>(
+        c.env.DB,
+        `SELECT q.*, cl.full_name AS client_name FROM quotes q
+           LEFT JOIN clients cl ON cl.id = q.client_id WHERE q.id = ?`, id);
+      if (!q) return c.notFound();
+
+      const f = new FormReader(await c.req.formData());
+      const to = f.text('to', { required: true, label: 'To', max: 2000 });
+      const cc = f.optional('cc', { max: 2000 }) ?? '';
+      const subject = f.text('subject', { required: true, label: 'Subject', max: 200 });
+      const body = f.text('body', { required: true, label: 'Message', max: 20000 });
+      const asHtml = f.text('format', { max: 10 }) === 'html';
+      const markSent = f.bool('mark_sent') === 1;
+      if (!f.valid) {
+        return redirectWith(c, `/quotes/${id}/email`,
+          Object.values(f.errors)[0] ?? 'Invalid message.', 'err');
+      }
+
+      const [practice, items, qs] = await Promise.all([
+        practiceDetails(c.env), quoteLines(c.env, id), quoteSettings(c.env),
+      ]);
+      const token = await shareTokenFor(c.env, id);
+      const address = await publicBase(c.env, new URL(c.req.url).origin);
+      const values = quoteEmailValues(
+        q, practice, items, qs.capacityNote, token ? shareUrl(address.base, token) : '');
+      const unknown = [
+        ...unknownPlaceholders(subject, values), ...unknownPlaceholders(body, values),
+      ].filter((v, i, all) => all.indexOf(v) === i);
+
+      const csrf = c.get('session')!.csrf;
+      const carry = { to, cc, subject, body, format: asHtml ? 'html' : 'text',
+                      ...(markSent ? { mark_sent: 'on' } : {}) };
+      const backTo = `/quotes/${id}/email?subject=${encodeURIComponent(subject)}`
+        + `&body=${encodeURIComponent(body)}`;
+
+      return page(c, { title: `Preview ${q.ref}`, active: '/quotes' }, html`
+        ${breadcrumbs([{ href: '/quotes', label: 'Quotes' },
+                       { href: `/quotes/${q.id}`, label: q.ref }, { label: 'Preview' }])}
+        ${pageHeader(`Preview \u2014 ${q.ref}`, 'Nothing has been sent yet.')}
+
+        ${unknown.length ? html`
+          <div class="alert alert-warn">
+            <strong>${unknown.length === 1 ? 'This word' : 'These words'} in braces
+              ${unknown.length === 1 ? 'is not' : 'are not'} something the register can fill:</strong>
+            ${unknown.map((name) => html`<code>{${name}}</code> `)}
+            <div class="small mt-sm">${unknown.length === 1 ? 'It' : 'They'} will be sent to the
+              client exactly as written. The ones that work are listed at the foot of this page.</div>
+          </div>` : ''}
+
+        ${'' /* The letter as the client reads it. Rendered by the same function
+                 the email uses, so the words, the emphasis and the lists are
+                 what will arrive; only the colours belong to this page. Said
+                 plainly below rather than implied. */}
+        <div class="cols">
+          <div class="col-main">
+            ${card('The message', html`
+              <dl class="kv">
+                <dt>To</dt><dd>${to}</dd>
+                ${cc ? html`<dt>Copy to</dt><dd>${cc}</dd>` : ''}
+                <dt>Subject</dt><dd><strong>${subject}</strong></dd>
+                <dt>Sent as</dt><dd>${asHtml ? 'Formatted, with a plain-text copy' : 'Plain text'}</dd>
+              </dl>
+              <div class="email-preview">
+                ${asHtml ? renderRichText(body) : html`<pre class="prewrap-pre">${body}</pre>`}
+              </div>
+              <p class="hint">${asHtml
+                ? 'Formatted exactly as it will be sent. The colours are this page\u2019s; the words, '
+                  + 'the bold and the lists are the email\u2019s.'
+                : 'Sent exactly as shown, as plain text.'}</p>`)}
+
+            <div class="compose-actions">
+              <form method="post" action="/quotes/${q.id}/email" class="inline-form">
+                ${csrfField(csrf)}
+                ${Object.entries(carry).map(([k, v]) => html`
+                  <input type="hidden" name="${k}" value="${v}">`)}
+                <button class="btn btn-primary" type="submit">Send it</button>
+              </form>
+              <a class="btn btn-secondary" href="${backTo}">Back to edit</a>
+              <a class="btn btn-link-danger" href="/quotes/${q.id}">Cancel</a>
+            </div>
+            ${markSent ? html`<p class="hint">Sending will also mark the quotation as sent.</p>` : ''}
+          </div>
+
+          <div class="col-side">
+            ${card('Words you can use in braces', html`
+              <p class="small">Set the letter itself under
+                 <a href="/settings#quotes">Settings \u2192 Quotes</a>. These are filled in from
+                 this quotation:</p>
+              <dl class="kv small">
+                ${Object.keys(values).sort().map((name) => html`
+                  <dt><code>{${name}}</code></dt>
+                  <dd class="muted">${(values[name] ?? '').split('\n')[0]?.slice(0, 60) || '\u2014'}</dd>`)}
+              </dl>`)}
+          </div>
+        </div>`);
     });
 
     r.post('/:id/email', requirePermission('mail:send'), async (c) => {

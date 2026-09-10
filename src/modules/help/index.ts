@@ -37,6 +37,20 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.38.0', date: '11 September 2026',
+    notes: [
+      'The email that goes out with a fee quote \u2014 both its subject line and its wording '
+        + '\u2014 can now be changed under Settings \u2192 Quotes, and stays changed. It used to '
+        + 'be written into the program, so a reworded letter lasted for one client only.',
+      'A word in braces, such as {client_name} or {total}, is filled in from the matter. The '
+        + 'full list is beside the compose box. A word spelled wrongly is printed as you typed '
+        + 'it rather than quietly vanishing, so a mistake is visible.',
+      'Nothing is sent unseen: the compose box now offers Preview, and the preview screen shows '
+        + 'the letter exactly as the client will receive it, with Send and Back to edit beneath '
+        + 'it.',
+    ],
+  },
+  {
     version: '1.37.0', date: '11 September 2026',
     notes: [
       'Forty-five clients held a police certificate whose expiry the register was not watching. '

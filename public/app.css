@@ -2517,3 +2517,31 @@ body.site { background: var(--bg); }
   .doc-list h2, .doc-list h3 { break-after: avoid; page-break-after: avoid; }
   .doc-list li { break-inside: avoid; page-break-inside: avoid; }
 }
+
+
+/* The letter as the client will read it, on the preview screen before anything
+   is sent. A page inside a page, so it gets a boundary and a ground of its own
+   — otherwise the eye reads it as part of the register rather than as the thing
+   about to leave the office. */
+.email-preview {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1.1rem 1.3rem;
+  margin: 0.8rem 0 0.6rem;
+  background: var(--surface-2, var(--surface));
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.email-preview p, .email-preview li { line-height: 1.55; }
+.email-preview h2, .email-preview h3 { margin: 1rem 0 0.4rem; font-size: 1rem; }
+.email-preview ul, .email-preview ol { margin: 0 0 0.8rem; padding-left: 1.2rem; }
+.email-preview > :first-child { margin-top: 0; }
+.email-preview > :last-child { margin-bottom: 0; }
+
+/* Plain text, shown as it will arrive: the line breaks are the message. */
+.prewrap-pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+  margin: 0;
+}
