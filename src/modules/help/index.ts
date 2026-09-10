@@ -37,6 +37,19 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.39.0', date: '11 September 2026',
+    notes: [
+      'What you type into a form is now kept in your own browser as you go, and offered back '
+        + 'if the page is closed or the browser crashes before you press Save. A bar at the top '
+        + 'of the form asks whether to put it back \u2014 it is never restored on its own, in '
+        + 'case somebody else has saved the record since.',
+      'Leaving a page with changes you have not saved now asks whether you are sure.',
+      'The register still does not save by itself. Nothing reaches a client\u2019s record until '
+        + 'you press Save, so every change still has a person and a moment against it. The draft '
+        + 'stays in your browser, goes when you sign out, and is discarded after twelve hours.',
+    ],
+  },
+  {
     version: '1.38.0', date: '11 September 2026',
     notes: [
       'The email that goes out with a fee quote \u2014 both its subject line and its wording '

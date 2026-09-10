@@ -122,6 +122,22 @@ plus `nosniff` and a sandboxing CSP. 25 MB limit.
 **Redirects.** `return_to` values are accepted only when they are same-site
 paths, so no form can be turned into an open redirect.
 
+**Drafts held in the browser.** Since 1.39.0 the ten substantial editing forms
+keep what has been typed in that browser's own storage, so a closed tab or a
+crash does not lose it. This puts part of a client's record on the disk of
+whatever machine it was typed on, and the design is built around limiting that:
+
+- Only a form carrying `data-draft` is watched, so a password box, a search box
+  and a one-click action form are out by construction rather than by a list
+  somebody has to keep up to date.
+- Passwords, file inputs and hidden fields are never written. A cross-site
+  token is not a draft.
+- A draft is deleted when the form is submitted, when the person signs out, and
+  in any case twelve hours after it was written.
+- It never leaves the machine. It reaches the register only when somebody
+  presses Save, which is also why the register does not autosave: the audit
+  line, the file note and the alerts all hang off that press.
+
 **Audit.** Sign-ins and failures, every record mutation, status change, fee
 change, passport reveal, document download, AI run, settings change, admin
 action and unhandled error.

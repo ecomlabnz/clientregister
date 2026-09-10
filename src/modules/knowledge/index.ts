@@ -312,7 +312,7 @@ export const knowledgeModule: AppModule = {
         ${pageHeader('New article', prefill ? 'Started from an inbound message.' : null)}
         ${'' /* multipart, because the form takes files. Everything else on it
                  is unchanged by that; a browser sends the same fields. */}
-        <form method="post" action="/knowledge" class="form-grid" enctype="multipart/form-data">
+        <form method="post" action="/knowledge" class="form-grid" enctype="multipart/form-data" data-draft>
           ${csrfField(session.csrf)}
           ${from ? html`<input type="hidden" name="from" value="${from}">` : ''}
           <div class="form-section">
@@ -604,7 +604,7 @@ export const knowledgeModule: AppModule = {
           { href: `/knowledge/${article.id}`, label: article.ref },
           { label: 'Edit' }])}
         ${pageHeader(`Edit ${article.ref}`, article.title)}
-        <form method="post" action="/knowledge/${article.id}" class="form-grid">
+        <form method="post" action="/knowledge/${article.id}" class="form-grid" data-draft>
           ${csrfField(c.get('session')!.csrf)}
           <div class="form-section">
             ${field({ label: 'Title', name: 'title', required: true, maxlength: 200, value: article.title })}

@@ -153,7 +153,7 @@ export const invoicesModule: AppModule = {
         ${pageHeader('New invoice',
           'For work you are billing without having quoted it first. Start with who it is for; '
           + 'the lines go on next, and nothing is fixed until you issue it.')}
-        <form method="post" action="/invoices" class="form-grid">
+        <form method="post" action="/invoices" class="form-grid" data-draft>
           ${csrfField(csrf)}
           <div class="form-section">
             <h3>Who and what</h3>

@@ -432,7 +432,7 @@ export const tasksModule: AppModule = {
       return page(c, { title: `Edit task`, active: '/tasks' }, html`
         ${breadcrumbs([{ href: '/tasks', label: 'Tasks' }, { label: 'Edit' }])}
         ${pageHeader('Edit task', task.title)}
-        <form method="post" action="/tasks/${task.id}" class="form-grid">
+        <form method="post" action="/tasks/${task.id}" class="form-grid" data-draft>
           ${csrfField(csrf)}
           <input type="hidden" name="return_to" value="${back}">
           <div class="form-section">
