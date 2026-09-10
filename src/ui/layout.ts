@@ -41,6 +41,19 @@ export interface PageOpts {
    * own flag rather than being read off `bare`.
    */
   paper?: boolean;
+  /**
+   * Serve the page without `/app.js`.
+   *
+   * The shared script exists for the application's forms — confirmations, live
+   * search, the quote line picker. A page with no forms on it downloads six
+   * hundred lines to do nothing, and the pages that have no forms are exactly
+   * the ones opened by somebody outside the office, on a phone, on whatever
+   * connection they have. So the document a client is sent goes without it.
+   *
+   * This is not a way to make a page work without JavaScript — every page here
+   * already does. It is a way to stop sending what will not be used.
+   */
+  noScript?: boolean;
   /** The public website: no application chrome — the page supplies its own. */
   landing?: boolean;
   /** Meta description, for the one page that has an audience outside the office. */
@@ -181,7 +194,7 @@ ${opts.landing
     <a href="/help">Help</a> · v${APP_VERSION}${c.env.APP_ENV !== 'production' ? ` · ${c.env.APP_ENV}` : ''}
   </span>
 </footer>`}
-<script src="/app.js" defer></script>
+${opts.noScript ? '' : raw('<script src="/app.js" defer></script>')}
 </body>
 </html>`;
 

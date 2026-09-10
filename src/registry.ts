@@ -16,6 +16,7 @@ import { casesModule } from './modules/cases';
 import { inquiriesModule } from './modules/inquiries';
 import { quotesModule } from './modules/quotes';
 import { clientQuoteModule } from './modules/clientquote';
+import { publicDocModule } from './modules/publicdoc';
 import { invoicesModule } from './modules/invoices';
 import { tasksModule } from './modules/tasks';
 import { calendarModule } from './modules/calendar';
@@ -44,6 +45,7 @@ export const registeredModules: AppModule[] = [
   // login screen until this line moved. Found by opening the link as a client
   // would, in a browser with no session, which is the only way it shows.
   clientQuoteModule,
+  publicDocModule,
   dashboardModule,
   alertsModule,
   inboxModule,

@@ -7,11 +7,42 @@ The rule for this file: an item leaves only when it has shipped, or when the
 practice says to drop it. If it is dropped, say so and why — do not delete the
 line.
 
-Last reviewed: 4 September 2026.
+Last reviewed: 10 September 2026.
 
 ---
 
 ## Asked for, not yet built
+
+### 0a. Compare our document lists against INZ's own
+**Asked 10 September 2026:** *"we will also need to parse the INZ website for
+their list of documents and compare it with ours too - in the pipeline - do not
+forget."*
+
+The practice's checklists now live in the knowledge base and can be sent to a
+client by link. What nobody can currently answer is whether a list has drifted
+from what INZ is asking for this month — the instructions change, the checklists
+were written on a date, and the gap is invisible until a client is asked for
+something that is no longer required, or not asked for something that is.
+
+What it would do: read the document list off the INZ page for a visa type,
+compare it against the article the practice holds for that visa type, and report
+what INZ asks for that we do not mention, and what we ask for that INZ no longer
+lists.
+
+Two things to settle before building:
+
+- **It proposes, it never edits.** The standing rule holds — the register works
+  with the AI switched off, and the practice's own words are the practice's. A
+  comparison produces a list of differences for somebody to read, not a rewritten
+  article.
+- **Not everything we ask for is on INZ's page, and that is deliberate.** The
+  practice asks for things INZ does not list because experience says the file is
+  refused without them. So a difference is a question, not a fault, and the
+  report has to be worded that way or it will train people to ignore it.
+
+Also unsettled: whether the INZ pages are stable enough to read reliably, and
+what happens when one moves. Nobody has looked yet.
+
 
 ### 0. Shrink a PDF on the way in
 **Asked 8 September 2026:** *"in the pipeline — we will need to add a PDF reducer
