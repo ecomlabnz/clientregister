@@ -7,6 +7,57 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.37.0 — 11 September 2026
+
+### Fixed
+**Forty-five clients' police certificates were invisible to the alerts.** Found
+while chasing the opposite complaint — *"an old certificate bugging me!
+especially where there is a new one already in place. no doubt it created an
+alert"*. It had not created an alert; that client's record was right. But the
+check run to prove it found **45 clients holding a police certificate whose
+expiry the register was not watching at all**. One expired fifteen months ago
+and had never once appeared on the alerts page. They were not being nagged —
+they were being ignored.
+
+The cause: the expiry dates shown on the client list and watched by the alerts
+are a copy, kept up to date by the code that adds a certificate. Every one of
+those places was correct. The certificates loaded in bulk on 1 September never
+went through any of them, and an empty copy looks exactly like a client who
+holds no certificate.
+
+**The database now keeps that copy itself** (migration 0082), so it follows the
+certificates whatever writes them — the application, a bulk load, or somebody
+typing SQL by hand. The migration also repairs every client.
+
+**Client links no longer show the register's own web address.** The public web
+address is set to `https://app.immigration.kiwi`. Every link written from now
+on — fee quotes, letters of engagement, document lists — uses it.
+
+### Changed
+**A superseded certificate no longer looks like a problem.** It kept its expiry
+in alarm red with "472 days ago" beside it, even with a current certificate in
+place. The red and the countdown are now for the certificate the register is
+actually watching. A superseded one keeps its date, quietly, because a matter
+lodged in March relied on what was held in March.
+
+### Added
+**An alert when a client is running out of time for Skilled Migrant residence.**
+*"we could probably create an alert about approaching the age of 56 — when
+Skilled Migrant RV application cannot be filed — so maybe give an alert when the
+person is 53, and 54 years old — the user will decide whether to advise the
+client or not."*
+
+It appears for a month after the 53rd birthday and again after the 54th — two
+months of visibility across three years, rather than a row that sits there every
+morning until it becomes furniture. It never rises above the quietest severity:
+nothing is late, a door is closing, and whether that is worth a telephone call
+is your decision.
+
+It stays silent for anybody who already holds residence or citizenship, for a
+company, for an archived or inactive client, and — most importantly — for anyone
+whose date of birth is not recorded. An alert built on a guessed age would be
+worse than none, because it would be believed.
+
 ## 1.36.0 — 10 September 2026
 
 ### Added

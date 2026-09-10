@@ -1430,7 +1430,25 @@ export const clientsModule: AppModule = {
                                     </form>` : ''}
                                 </div>
                                 <div>
-                                  ${cert.expires_on ? expiryCell(cert.expires_on) : ''}
+                                  ${'' /* A superseded certificate's expiry is history, not a
+                                          deadline. Reported 11 September 2026, looking at one
+                                          expired sixteen months ago sitting in alarm red beside a
+                                          current certificate good until 2028: *"this is what i do
+                                          not need - an old certificate bugging me! especially where
+                                          there is a new one already in place."*
+
+                                          It raised no alert — the alerts read the current one — but
+                                          the page said otherwise, and a page that shouts about a
+                                          solved problem is how a person stops reading the page. So
+                                          the red and the "472 days ago" are for the certificate the
+                                          register is actually watching; a superseded one keeps its
+                                          date, quietly, because a matter lodged in March relied on
+                                          what was held in March. */}
+                                  ${cert.expires_on
+                                    ? current.has(cert.id)
+                                      ? expiryCell(cert.expires_on)
+                                      : html`<span class="muted">${dateShort(cert.expires_on)}</span>`
+                                    : ''}
                                   ${writable ? actionButton(`/clients/${client.id}/certificates/${cert.id}/remove`, csrf,
                                       'Remove this certificate',
                                       { className: 'btn-remove', icon: '\u00d7',

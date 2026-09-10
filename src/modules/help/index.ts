@@ -37,6 +37,21 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.37.0', date: '11 September 2026',
+    notes: [
+      'Forty-five clients held a police certificate whose expiry the register was not watching. '
+        + 'One had expired fifteen months earlier and never appeared on the alerts page. Fixed, '
+        + 'and the database now keeps that date itself so it cannot go missing again.',
+      'A superseded certificate no longer shows in red as though it were a problem. The warning '
+        + 'is for the certificate actually in force; the old one keeps its date quietly.',
+      'Links sent to clients now use app.immigration.kiwi instead of the register\u2019s own '
+        + 'workers.dev address.',
+      'New alert: a client turning 53, and again at 54, with a note that Skilled Migrant '
+        + 'residence closes on their 56th birthday. It shows for a month after each birthday '
+        + 'rather than every day, and never for somebody who already holds residence.',
+    ],
+  },
+  {
     version: '1.36.0', date: '10 September 2026',
     notes: [
       'A client\u2019s visa now records the date it was granted, beside the expiry. Maximum '

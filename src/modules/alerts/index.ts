@@ -53,7 +53,22 @@ export type AlertKind =
    * not a deadline and does not belong in a list of them — what it asks for is
    * five minutes with the certificate, not a renewal.
    */
-  | 'unconfirmed_expiry';
+  | 'unconfirmed_expiry'
+  /**
+   * A client approaching the age at which Skilled Migrant residence closes.
+   *
+   * Asked for on 11 September 2026: *"we could probably create an alert about
+   * approaching the age of 56 - when Skilled Migrant RV application cannot be
+   * filed - so maybe give an alert when the person is 53, and 54 years old -
+   * the user will decide whether to advise the client or not."*
+   *
+   * It is an opportunity closing rather than a deadline, which is why it is
+   * never urgent and why it shows for two months after each of those two
+   * birthdays rather than every day for three years. A door that shuts in two
+   * years, mentioned every morning for two years, is not a warning — it is
+   * furniture.
+   */
+  | 'smc_age_window';
 export type AlertSeverity = 'overdue' | 'urgent' | 'soon';
 
 export interface Alert {
@@ -141,6 +156,7 @@ const KIND_LABELS: Record<AlertKind, string> = {
   expiry_unfixed: 'Expiry not yet fixed',
   no_inz_number: 'No INZ client number',
   unconfirmed_expiry: 'Worked out, never confirmed',
+  smc_age_window: 'Skilled Migrant age',
 };
 
 /** Exposed for the tests, which check that every kind is named. */
@@ -460,6 +476,56 @@ export const CHECKS_NOT_ABOUT_A_DATE = {
    * watch it; the row exists so somebody asks whether the event has
    * happened, and clears the moment the date is written down.
    */
+  /**
+   * Clients in the last stretch before Skilled Migrant residence closes to them.
+   *
+   * **Asked for on 11 September 2026.** The Skilled Migrant Category is open to
+   * a principal applicant aged 55 or under at the time the application is made,
+   * so the door shuts on the 56th birthday. Three years is about the least time
+   * in which a pathway can be built — skilled employment found, points reached,
+   * a qualification assessed — so 53 is when it is worth a conversation and 54
+   * is the last honest reminder.
+   *
+   * **Three filters, and each of them is the difference between a useful row
+   * and noise.**
+   *
+   *  - **Two windows, not a standing state.** The row appears for 30 days after
+   *    the 53rd birthday and again after the 54th — two months of visibility
+   *    across three years. A client aged 53 to 55 who appeared every day for
+   *    three years would be scrolled past within a week, and would teach the
+   *    practice to scroll past everything beside it. Thirty days is a guess at
+   *    the right length and is meant to be shortened if it nags.
+   *  - **Only somebody who might want residence.** A New Zealand or Australian
+   *    citizen, or somebody who already holds one, has nothing to gain from
+   *    this and would be pure noise.
+   *  - **Only where a birthday is actually recorded.** No date, no row: this
+   *    must never fire on an age worked out from a guess.
+   *
+   * It proposes a conversation. Whether the client is advised is the practice's
+   * decision, which is why it carries no deadline and no severity above 'soon'.
+   */
+  smcAgeWindow: () => `WITH aged AS (
+          SELECT id, ref, full_name, date_of_birth,
+                 date(date_of_birth, '+53 years') AS turns_53,
+                 date(date_of_birth, '+54 years') AS turns_54,
+                 date(date_of_birth, '+56 years') AS closes
+            FROM clients
+           WHERE kind = 'individual'
+             AND status NOT IN ('archived', 'inactive')
+             AND date_of_birth IS NOT NULL
+             AND COALESCE(current_visa_type, '') NOT IN
+                 ('rv_resident', 'rv_permanent', 'other_citizen_nz', 'other_citizen_au')
+        )
+        SELECT id, ref, full_name, closes,
+               CASE WHEN ?1 BETWEEN turns_54 AND date(turns_54, '+30 days') THEN turns_54
+                    ELSE turns_53 END AS birthday,
+               CASE WHEN ?1 BETWEEN turns_54 AND date(turns_54, '+30 days') THEN 54
+                    ELSE 53 END AS age
+          FROM aged
+         WHERE ?1 BETWEEN turns_53 AND date(turns_53, '+30 days')
+            OR ?1 BETWEEN turns_54 AND date(turns_54, '+30 days')
+         ORDER BY closes`,
+
   expiryUnfixed: () => `SELECT id, ref, full_name, current_visa_expiry_rule, updated_at
          FROM clients
         WHERE current_visa_expiry IS NULL
@@ -632,7 +698,8 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
   const lodgedPlaceholders = LODGED_CASE_STATUSES.map(() => '?').join(',');
 
   const [cases, tasks, quotes, documents, quiet, contradictions,
-         unacknowledged, noSlack, statusUnknown, expiryUnfixed, noInzNumber] = await Promise.all([
+         unacknowledged, noSlack, statusUnknown, expiryUnfixed, noInzNumber,
+         smcAgeWindow] = await Promise.all([
     all<any>(
       env.DB,
       `SELECT k.id, k.ref, k.title, k.descriptor, k.status, k.decision_due_at, cl.full_name AS client_name
@@ -674,6 +741,7 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
     all<any>(env.DB, CHECKS_NOT_ABOUT_A_DATE.expiryUnfixed()),
     all<any>(env.DB, CHECKS_NOT_ABOUT_A_DATE.noInzNumber(openPlaceholders),
       ...OPEN_CASE_STATUSES),
+    all<any>(env.DB, CHECKS_NOT_ABOUT_A_DATE.smcAgeWindow(), today),
   ]);
 
   // Fired on an absence rather than on a row, so it is assembled rather than
@@ -794,6 +862,19 @@ export async function collectAlerts(env: Env, horizonDays = 90): Promise<Alert[]
       detail: `${cl.client_ref} · ${cl.matters} open ${cl.matters === 1 ? 'matter' : 'matters'}`
         + `${cl.first_ref ? ` · ${cl.first_ref}` : ''}`,
       href: `/clients/${cl.client_id}`,
+    })),
+    ...smcAgeWindow.map((cl: any) => ({
+      kind: 'smc_age_window' as const,
+      // Never above 'soon'. Nothing is late; a door is closing, and the
+      // practice decides whether that is worth a telephone call.
+      severity: 'soon' as AlertSeverity,
+      // The birthday that opened the window, not the day the door shuts. The
+      // row is about now being the time to raise it.
+      date: String(cl.birthday).slice(0, 10),
+      title: `Turned ${cl.age} — ${cl.full_name}`,
+      detail: `${cl.ref} · Skilled Migrant residence closes on the 56th birthday, `
+        + `${dateShort(String(cl.closes))} · worth a conversation while there is time to build a case`,
+      href: `/clients/${cl.id}`,
     })),
     ...expiryUnfixed.map((cl: any) => ({
       kind: 'expiry_unfixed' as const,
