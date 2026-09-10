@@ -15,7 +15,7 @@ claim, not a fact.
 |---|---|---|
 | [`mistakes.md`](mistakes.md) | Every fault this register has actually suffered, and the rule that now prevents it | Written by hand, added to whenever something breaks |
 | [`features.md`](features.md) | 23 modules — what each is, where it is mounted, every route it owns, its settings and its place in the menu | `npm run spec`, from the registry |
-| [`invariants.md`](invariants.md) | The 107 things the database refuses to do, in its own words, and the 12 uniqueness rules | `npm run spec`, from the built schema |
+| [`invariants.md`](invariants.md) | The 109 things the database refuses to do, in its own words, and the 12 uniqueness rules | `npm run spec`, from the built schema |
 | [`data-model.md`](data-model.md) | 49 tables, every column | `npm run spec`, from the built schema |
 | [`routes.md`](routes.md) | 207 routes and the permission each runs behind, the public surface listed first | `npm run spec`, from the built router |
 | [`settings.md`](settings.md) | 82 settings — everything an administrator can change without a deployment | `npm run spec`, from the modules |
@@ -29,7 +29,7 @@ what will go wrong while you build it. A rebuild that skips it will
 rediscover a primary-passport collision, a search that only works in one word
 order, and a page that breaks at 250 rows — all of which cost real time here.
 
-**2. [`invariants.md`](invariants.md).** The 107 rules the database enforces. This is
+**2. [`invariants.md`](invariants.md).** The 109 rules the database enforces. This is
 the heart of the design: *invariants belong in the database, as triggers and
 constraints, not in the route that happens to write the row.* A guarantee in a
 handler lasts until somebody adds a second handler — and this register is written

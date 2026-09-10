@@ -308,6 +308,7 @@ later replaced still sits in the file that created it.
 | `medical_certificate_type` | TEXT | yes | — |
 | `current_visa_expiry_rule` | TEXT | yes | — |
 | `inz_client_number` | TEXT | yes | — |
+| `current_visa_start` | TEXT | yes | — |
 
 ## `counters`
 

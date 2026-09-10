@@ -94,7 +94,8 @@ export interface ClientRow {
   english_test_type: string | null;
   english_test_score: string | null;
   english_test_date: string | null;
-  current_visa_type: string | null; current_visa_expiry: string | null;
+  current_visa_type: string | null; current_visa_start: string | null;
+  current_visa_expiry: string | null;
   current_visa_expiry_rule: string | null;
   inz_client_number: string | null;
   address: string | null; status: ClientStatus; assigned_to: string | null; notes: string | null;
@@ -352,6 +353,16 @@ function clientForm(
             includeBlank: 'Not recorded',
             hint: 'What they hold now, not what is being applied for. “None — offshore” is an '
               + 'answer, and so is “None — unlawful”.' })}</div>
+          ${'' /* Reported 10 September 2026: *"I am not able to enter their
+                   NZ immigration status??? type of visa they hold, issue date
+                   and expiry date?"* The type and the expiry were here; the
+                   issue date had never been built. Almost every question about
+                   a temporary visa is about the period rather than its end —
+                   maximum continuous stay is counted from the start, and
+                   reading an interim visa needs both ends — and it was being
+                   answered from the file notes. */}
+          <div class="settings-cell">${field({ label: 'Current visa issued', name: 'current_visa_start', type: 'date', value: dateInputValue(values.current_visa_start),
+            hint: 'The date this visa was granted. Maximum continuous stay is counted from here.' })}</div>
           <div class="settings-cell">${field({ label: 'Current visa expiry', name: 'current_visa_expiry', type: 'date', value: dateInputValue(values.current_visa_expiry) })}</div>
           <div class="settings-cell">${field({ label: 'Expiry rule, if no date is fixed yet',
             name: 'current_visa_expiry_rule', maxlength: 200,
@@ -477,6 +488,7 @@ function readClientForm(f: FormReader) {
     english_test_score: f.optional('english_test_score', { max: 40 }),
     english_test_date: f.date('english_test_date'),
     current_visa_type: f.optional('current_visa_type', { max: 120 }),
+    current_visa_start: f.date('current_visa_start'),
     current_visa_expiry: f.date('current_visa_expiry'),
     current_visa_expiry_rule: f.optional('current_visa_expiry_rule', { max: 200 }),
     inz_client_number: inzClientNumber,
@@ -1084,15 +1096,15 @@ export const clientsModule: AppModule = {
             email, phone, whatsapp, telegram_username, telegram_user_id,
             date_of_birth,
             english_test_type, english_test_score, english_test_date,
-            current_visa_type, current_visa_expiry, current_visa_expiry_rule, inz_client_number,
+            current_visa_type, current_visa_start, current_visa_expiry, current_visa_expiry_rule, inz_client_number,
             address, status, assigned_to, notes,
             created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, ref, v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
         v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
-        v.current_visa_type, v.current_visa_expiry, v.current_visa_expiry_rule, v.inz_client_number,
+        v.current_visa_type, v.current_visa_start, v.current_visa_expiry, v.current_visa_expiry_rule, v.inz_client_number,
         v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), nowIso(), user.id,
       );
@@ -1544,7 +1556,16 @@ export const clientsModule: AppModule = {
                              ${passports.length > 1
                                ? html`<div class="muted small"><a href="#passports">${passports.length} passports on file</a></div>`
                                : html`<div class="muted small"><a href="#passports">Details</a></div>`}`}</dd>
-                    <dt>Current visa</dt><dd>${labelFor(visaTerms, client.current_visa_type) || '—'}</dd>
+                    ${'' /* The grant, not only its end. The period is what
+                             almost every question about a temporary visa turns
+                             on — maximum continuous stay counts from the start
+                             — and until 10 September 2026 the register held
+                             only the expiry. Drawn on one line with the expiry
+                             where both are known, because they are one fact. */}
+                    <dt>Current visa</dt><dd>${labelFor(visaTerms, client.current_visa_type) || '—'}${
+                      client.current_visa_start
+                        ? html`<div class="muted small">Granted ${dateShort(client.current_visa_start)}</div>`
+                        : ''}</dd>
                     <dt>Visa expiry</dt><dd>${!client.current_visa_expiry && client.current_visa_expiry_rule
                       ? html`${badge('not yet fixed', 'amber')}
                              <div class="muted small">${client.current_visa_expiry_rule}</div>`
@@ -2010,7 +2031,7 @@ export const clientsModule: AppModule = {
            nzbn=?, company_number=?, organisation_id=?, organisation_role=?, email=?, phone=?, whatsapp=?, telegram_username=?, telegram_user_id=?,
            date_of_birth=?,
            english_test_type=?, english_test_score=?, english_test_date=?,
-           current_visa_type=?, current_visa_expiry=?, current_visa_expiry_rule=?, inz_client_number=?,
+           current_visa_type=?, current_visa_start=?, current_visa_expiry=?, current_visa_expiry_rule=?, inz_client_number=?,
            address=?, status=?, assigned_to=?, notes=?, updated_at=?
          WHERE id=?`,
         v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
@@ -2018,7 +2039,7 @@ export const clientsModule: AppModule = {
         v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
-        v.current_visa_type, v.current_visa_expiry, v.current_visa_expiry_rule, v.inz_client_number,
+        v.current_visa_type, v.current_visa_start, v.current_visa_expiry, v.current_visa_expiry_rule, v.inz_client_number,
         v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), id,
       );
