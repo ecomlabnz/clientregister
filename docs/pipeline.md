@@ -7,11 +7,58 @@ The rule for this file: an item leaves only when it has shipped, or when the
 practice says to drop it. If it is dropped, say so and why — do not delete the
 line.
 
-Last reviewed: 10 September 2026.
+Last reviewed: 11 September 2026.
 
 ---
 
 ## Asked for, not yet built
+
+### 0f. What a reading finds and the register has nowhere to put
+
+**Written down on 11 September 2026**, when "Read a document into this matter"
+shipped. That action fills the matter's and the client's empty boxes from a
+document and keeps everything else as a file note — the practice's own idea,
+and the better half of what they asked for: *"those that re not available - save
+the datta as a file note?"*
+
+Every line that reaches that note is the register saying *I read this and had
+nowhere to put it*, which is the feedback loop `docs/intake-prompt.md` already
+describes for the bulk loads. These are the shapes that keep turning up. None is
+a decision yet; the list exists so the register can grow towards the practice
+rather than the other way round.
+
+- **An occupation on its own.** The register records what somebody does *at a
+  named company* (`clients.organisation_role`, the other half of an
+  `organisation_id` link). A document that says "boat builder" and names no
+  employer has nothing to attach it to. Common; a plain `occupation` column on
+  `clients` would hold it.
+- **A visa the practice's own list does not carry.** The reading returns the
+  visa as the document words it; `clients.current_visa_type` is vocabulary. A
+  visa that will not resolve is reported rather than written in raw — which is
+  also the register learning that its list has a gap an administrator can close
+  in Settings.
+- **A date for what happens next.** `cases.next_action_due` exists and is safe
+  to fill; the extraction returns no date to go in it. A prompt change, not a
+  schema change.
+- **The other people a document names.** A partner, an employer, an adviser. A
+  reading into an existing matter deliberately creates nobody — deciding which
+  record is meant is a person's job — so they are named in the note and added
+  by hand. Whether the review screen should *offer* to add them, the way
+  `/assistant/intake` does at creation, is an open question.
+- **Passport details.** Deliberately never extracted, and that stands. Named
+  here so nobody re-opens it by accident.
+- **Relationship history, previous marriages, children and where they live.**
+  Nothing holds these but prose. They are most of what a partnership file
+  actually contains, and item **0b** is the same finding arrived at from the
+  application form end.
+- **A character or health matter the document states.** There is a flag for
+  raising one, but no field that says what a document said.
+- **The employer's registered office and NZBN, where the employer is not the
+  client.** Both are columns on `clients`; there is no record to write them to
+  until somebody creates the company.
+- **What the letter itself is** — the INZ officer, the branch, the letter's own
+  reference and date. `/inbox` reads these for post that arrives by email;
+  a document handed over by hand carries them past unrecorded.
 
 ### 0e. A quick translation of the quotation and letter for a client with no English
 

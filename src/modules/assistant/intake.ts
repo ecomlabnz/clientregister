@@ -34,9 +34,11 @@ import { addEntry } from '../../core/timeline';
 import { caseTypes, labelFor, termOptions, visaTypes } from '../../core/vocabulary';
 import { countryCodeFor, countryOptions } from '../../core/countries';
 import {
-  MAX_NATIONALITIES, nationalitiesFor, nationalityFieldNames, normaliseCodes,
-  setNationalityStatements,
+  MAX_NATIONALITIES, nationalityFieldNames, normaliseCodes, setNationalityStatements,
 } from '../../core/nationalities';
+import {
+  fillEmptyClientFields, fillEmptyNationalities, normalisedNzbn, setInzClientNumber,
+} from '../../core/clientfill';
 import { CASE_STATUSES, CASE_STATUS_LABELS, PARTY_ROLES, PARTY_ROLE_LABELS,
          PRIORITIES, PRIORITY_LABELS, type PartyRole } from '../../domain';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
@@ -44,7 +46,6 @@ import { html, raw } from '../../ui/html';
 import { card, csrfField, emptyState, field, optionsFrom, pageHeader, select } from '../../ui/components';
 import { isAiEnabled } from '../../ai/provider';
 import { attachStagedTo, stageUpload, stagedFor } from '../../core/intakefiles';
-import { isValidNzbnFormat, normaliseNzbn } from '../../integrations/nzbn';
 import { caseNameFrom, normaliseClientName } from '../../core/casename';
 import { isAssignable } from '../../core/lookups';
 import type { IntakePerson, IntakeResult } from '../../ai/provider';
@@ -593,7 +594,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     // what the record already holds wins, and a number another client already
     // carries is left alone — that is either a duplicate person or a misread,
     // and both are for somebody to look at rather than for this to force.
-    await setInzClientNumber(c, f.optional('inz_client_number', { max: 40 }), clientId);
+    await setInzClientNumber(c.env, clientId, f.optional('inz_client_number', { max: 40 }));
 
     const caseId = newId('cas');
     const caseRef = await nextYearlyRef(c.env.DB, 'case', 'CASE');
@@ -755,33 +756,11 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
 /**
  * Put what the document said into the boxes an existing record has left empty.
  *
- * Never over the top of something already there. A document is evidence of
- * what somebody wrote on a form once; the record is what the practice knows
- * now, and a reading that quietly replaced a corrected visa expiry with an
- * older one would be worse than a reading that filled nothing in.
+ * The rule itself — what is there wins, always — lives in `core/clientfill.ts`
+ * so that this route and "Read a document into this matter" share it rather
+ * than each keeping a version. This function is only the translation from the
+ * form's prefixed boxes into the values that rule takes.
  */
-/**
- * Put an INZ client number on a client, if it is safe to.
- *
- * Never over what is recorded, and never one another client holds — the column
- * is unique, so a clash would abort the insert and lose the whole reading. A
- * number that cannot be written is not an error here: the client page shows the
- * gap and the alerts page lists it.
- */
-async function setInzClientNumber(
-  c: Parameters<typeof auditFrom>[0], typed: string | null, clientId: string,
-): Promise<void> {
-  const number = (typed ?? '').replace(/[\s-]/g, '');
-  if (!/^[0-9]{6,12}$/.test(number)) return;
-  await run(
-    c.env.DB,
-    `UPDATE clients SET inz_client_number = ?, updated_at = ?
-      WHERE id = ? AND COALESCE(TRIM(inz_client_number), '') = ''
-        AND NOT EXISTS (SELECT 1 FROM clients o WHERE o.inz_client_number = ? AND o.id <> ?)`,
-    number, nowIso(), clientId, number, clientId,
-  );
-}
-
 async function fillEmptyFields(
   c: Parameters<typeof auditFrom>[0], f: FormReader, prefix: string, clientId: string,
 ): Promise<void> {
@@ -789,38 +768,18 @@ async function fillEmptyFields(
   // visa. A document states an address, an email, a date of birth and a
   // company's NZBN as readily as it states a visa, and a record that keeps only
   // one of them is a record somebody has to retype the rest into from the same
-  // document. `COALESCE(NULLIF(…, ''), ?)` is the whole rule: what is there
-  // wins, always.
-  const filling: Array<[string, string | null]> = [
-    ['current_visa_type', f.optional(`${prefix}current_visa_type`, { max: 120 })],
-    ['current_visa_expiry', f.date(`${prefix}current_visa_expiry`)],
-    ['email', f.email(`${prefix}email`)],
-    ['phone', f.optional(`${prefix}phone`, { max: 40 })],
-    ['address', f.optional(`${prefix}address`, { max: 400 })],
-    ['date_of_birth', f.date(`${prefix}date_of_birth`)],
-    ['preferred_name', f.optional(`${prefix}preferred_name`, { max: 80 })],
-    ['nzbn', normalisedNzbn(f.optional(`${prefix}nzbn`, { max: 20 }))],
-  ];
-  const offered = filling.filter(([, value]) => value !== null && value !== '');
-  if (offered.length) {
-    await run(
-      c.env.DB,
-      `UPDATE clients SET ${offered.map(([column]) =>
-          `${column} = COALESCE(NULLIF(${column}, ''), ?)`).join(', ')}, updated_at = ?
-        WHERE id = ?`,
-      ...offered.map(([, value]) => value), nowIso(), clientId,
-    );
-  }
-  // Nationalities are all-or-nothing rather than merged: a person who holds
-  // two and is recorded as holding one is recorded wrongly, and merging a list
-  // has no obvious right answer. So they are written only when the record has
-  // none at all.
-  const proposed = nationalitiesFromForm(f, prefix);
-  if (proposed.length === 0) return;
-  const held = await nationalitiesFor(c.env as any, clientId);
-  if (held.length === 0) {
-    await c.env.DB.batch(setNationalityStatements(c.env as any, clientId, proposed));
-  }
+  // document.
+  await fillEmptyClientFields(c.env, clientId, {
+    current_visa_type: f.optional(`${prefix}current_visa_type`, { max: 120 }),
+    current_visa_expiry: f.date(`${prefix}current_visa_expiry`),
+    email: f.email(`${prefix}email`),
+    phone: f.optional(`${prefix}phone`, { max: 40 }),
+    address: f.optional(`${prefix}address`, { max: 400 }),
+    date_of_birth: f.date(`${prefix}date_of_birth`),
+    preferred_name: f.optional(`${prefix}preferred_name`, { max: 80 }),
+    nzbn: normalisedNzbn(f.optional(`${prefix}nzbn`, { max: 20 })),
+  });
+  await fillEmptyNationalities(c.env, clientId, nationalitiesFromForm(f, prefix));
 }
 
 /**
@@ -901,20 +860,6 @@ async function linkOrganisations(
     written += 1;
   }
   return written;
-}
-
-/**
- * An NZBN the register would accept, or nothing.
- *
- * A number read off a document can arrive spaced, hyphenated or simply wrong.
- * Stored as read, it is rejected the first time somebody opens the client and
- * saves — which is a worse place to find out than here, where the reading is
- * still on the screen beside it.
- */
-function normalisedNzbn(value: string | null): string | null {
-  if (!value) return null;
-  const clean = normaliseNzbn(value);
-  return isValidNzbnFormat(clean) ? clean : null;
 }
 
 /** Create one person or company from the prefixed fields, or nothing unnamed. */
