@@ -37,6 +37,20 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.39.1', date: '11 September 2026',
+    notes: [
+      'The ** marks in the quotation letter no longer reach the client. They are bold marks: '
+        + 'in a formatted email they make the words bold, but a plain-text email was sending '
+        + 'them as typed. Plain text now has them taken off; the letter you edit is unchanged.',
+      'The preview shows the plain-text letter exactly as the client will read it.',
+      'The list of brace-words beside the compose box no longer cuts a date in half.',
+      'Your email signature is now yours to set, under Settings \u2192 Practice. Paste it in as '
+        + 'plain text \u2014 name, title, phone, confidentiality notice \u2014 and it is used at '
+        + 'the foot of the quotation letter. Before this the register signed off with the '
+        + 'practice name, email and phone, which is what it still does if you leave it empty.',
+    ],
+  },
+  {
     version: '1.39.0', date: '11 September 2026',
     notes: [
       'What you type into a form is now kept in your own browser as you go, and offered back '
