@@ -18,6 +18,7 @@ import { quotesModule } from './modules/quotes';
 import { mailModule } from './modules/mail';
 import { clientQuoteModule } from './modules/clientquote';
 import { publicDocModule } from './modules/publicdoc';
+import { shortcutModule } from './modules/shortcut';
 import { invoicesModule } from './modules/invoices';
 import { tasksModule } from './modules/tasks';
 import { calendarModule } from './modules/calendar';
@@ -47,6 +48,14 @@ export const registeredModules: AppModule[] = [
   // would, in a browser with no session, which is the only way it shows.
   clientQuoteModule,
   publicDocModule,
+  // Above the dashboard for the same reason as the two lines before it, and
+  // for one more. A shortcut on the practice's Mac or phone carries a token,
+  // not a session — there is no cookie for `requireAuth` to find, so behind
+  // the dashboard's guard on '*' every upload would be answered with a
+  // redirect to a login page that a Shortcuts action cannot read. It is also
+  // in `WEBHOOK_PATHS` in `src/app.ts`: a shortcut sends no `Origin` header,
+  // so the cross-site check would otherwise refuse it. A test holds both.
+  shortcutModule,
   dashboardModule,
   alertsModule,
   inboxModule,

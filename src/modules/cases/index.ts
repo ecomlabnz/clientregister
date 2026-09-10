@@ -55,6 +55,7 @@ import {
 } from '../../core/vocabulary';
 import { caseNameFrom } from '../../core/casename';
 import { readingCard, registerReadingRoutes } from './reading';
+import { driveConfigured } from '../../integrations/gdrive';
 import { invoicesSection } from '../invoices';
 
 export interface CaseRow {
@@ -991,9 +992,13 @@ export const casesModule: AppModule = {
                      upload. What may be offered and what may be read are the
                      same query in `modules/documents`, so the two cannot drift
                      into disagreeing about whose documents these are. */}
+            ${'' /* *"could they be fetched, read, case created and they are
+                     then discarded from the system to only remain in the
+                     gdrive?"* — the same card offers the practice's Google
+                     Drive, where Drive is connected and not otherwise. */}
             ${aiAvailable && writable
               ? readingCard({ caseId: kase.id, csrf, filesKept: docsEnabled,
-                              sources: readingSources })
+                              sources: readingSources, driveOn: driveConfigured(c.env) })
               : ''}
 
             ${aiAvailable ? foldingCard('Brief me on this matter', html`

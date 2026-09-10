@@ -25,6 +25,8 @@ only in a handler is a guarantee until somebody adds a second handler. So:
 | A proposal cannot be made twice | `UNIQUE(dedupe_key)` (`0016`) |
 | A task always has a person | `assigned_to TEXT NOT NULL` (`0010`) |
 | A sent message keeps its author | `created_by … ON DELETE RESTRICT` (`0017`, `0018`) |
+| An upload token is never stored in the clear | `upload_token_secret_is_hashed_on_insert`/`_update` (`0087`) |
+| A revoked upload token stays revoked | `upload_token_revocation_is_final` (`0087`) |
 
 Each of these was verified by attacking the database directly — through the
 Cloudflare API, not through the application — rather than by reading the code

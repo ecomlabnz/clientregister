@@ -319,6 +319,142 @@ to `getMailProvider`.
 
 ---
 
+## Google Drive — reading a document out of a matter's folder
+
+The practice already keeps a folder per matter in Google Drive. This lets a file
+dropped into one of those folders be read into the matter without downloading it
+and uploading it again.
+
+**What it does with the file:** reads it, and throws it away. What stays on the
+matter is the values you approved, a file note naming what was read and when,
+and a link back to the file in Drive. Tick **Keep a copy** on a file and the
+register stores it as well — worth doing for a signed letter of engagement or an
+INZ decision, and not worth doing for anything else, because the file is already
+in the drive.
+
+Scope: `https://www.googleapis.com/auth/drive.readonly`, and nothing else. The
+register never creates, renames, moves, trashes or shares anything in the drive.
+
+**Its own OAuth client, not the mail one.** Two reasons, and both cost something
+if they are ignored: withdrawing the register's access to the practice's
+documents must not also stop every quote and letter going out, and the two
+grants carry different scopes. Nothing falls back to the `GMAIL_*` credentials —
+a half-configured Drive is treated as no Drive at all.
+
+**The account must hold the practice's client folders and nothing else.**
+Whatever holds this token can read every file that account can see, and it is a
+deployment secret rather than something a person unlocks.
+
+### Setting it up
+
+**1. A Google Cloud project.** [console.cloud.google.com](https://console.cloud.google.com)
+→ the project picker at the top → **New project**. Call it whatever you like.
+It can be the same project as the mail one; it is the *client* below that must
+be separate, not the project.
+
+**2. Switch the Drive API on.** **APIs & Services → Library** → search "Google
+Drive API" → **Enable**.
+
+**3. The consent screen.** **APIs & Services → OAuth consent screen**. Choose
+**External**, fill in the app name and your own email, and add yourself under
+**Test users**. Then **publish it** — the button says *Publish app*, and the
+status changes to *In production*. This does not mean submitting for
+verification, and the "Google hasn't verified this app" warning at step 5 is
+expected.
+
+> Publishing matters. A refresh token issued while the consent screen is still
+> in *Testing* stops working after seven days, and Drive would go quiet a week
+> after you set it up with nothing visibly wrong.
+
+**4. A new OAuth client.** **APIs & Services → Credentials → Create credentials
+→ OAuth client ID → Web application**. Name it something you will recognise —
+"Client register — Drive". Under **Authorised redirect URIs** add exactly:
+
+```
+https://developers.google.com/oauthplayground
+```
+
+Copy the **Client ID** and **Client secret**. Do not reuse the mail client.
+
+**5. A refresh token.** Open the
+[OAuth Playground](https://developers.google.com/oauthplayground/).
+
+* Press the **gear** at the top right, tick **Use your own OAuth credentials**,
+  and paste the client ID and secret from step 4.
+* In the list on the left, scroll to **Drive API v3** and tick **exactly one**
+  box:
+
+  ```
+  https://www.googleapis.com/auth/drive.readonly
+  ```
+
+  Do not tick `.../auth/drive` — that one can delete files.
+* **Authorize APIs** → sign in as the drive account → past the "not verified"
+  warning via **Advanced → Go to …** → **Allow**.
+* **Exchange authorization code for tokens**. Copy the **refresh token**. It
+  starts `1//`.
+
+**6. Give the three values to the register.**
+
+```bash
+npx wrangler secret put GDRIVE_CLIENT_ID
+npx wrangler secret put GDRIVE_CLIENT_SECRET
+npx wrangler secret put GDRIVE_REFRESH_TOKEN
+```
+
+Or, if the deploy runs from GitHub, set them under **Settings → Secrets and
+variables → Actions** with those exact names; the workflow passes them to the
+Worker on the next deploy.
+
+**7. Check it.** **Settings → Integrations** names Google Drive and says whether
+it is connected, and what is still missing if not. Then open any matter: under
+*Read a document into this matter* there is now a box for a Drive address.
+
+### Using it
+
+Paste the address of the matter's folder — the one in your browser's bar while
+you are looking at the folder — or of a single file. Both of these work, and so
+does the id on its own:
+
+```
+https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOpQrStUvWxYz
+https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/view
+```
+
+The register lists what is in the folder — name, kind, size, when it changed —
+and you tick what to read, up to five at a time. Google Docs, Sheets and Slides
+are read as their words; a Sheet gives its **first tab** only. Anything the
+reading cannot open is listed with the reason instead of being offered.
+
+Nothing is written to the matter until you press the button on the review
+screen, exactly as with an upload.
+
+Once a file has been read, its link sits on the matter with the rest of its
+documents, and it can be read **again** from there without pasting the address a
+second time — useful when a decision letter is amended in Drive. The register
+still holds no copy of it.
+
+**A link can break.** If a file is moved, renamed or deleted in Drive, the link
+on the matter stops working. The file note is the part that lasts — it is
+append-only and records what the document said at the time.
+
+### If it will not connect
+
+| What you see | What it usually is |
+|---|---|
+| *the client ID does not end ".apps.googleusercontent.com"* | The value was pasted short, or from the wrong field. |
+| *the refresh token does not start "1//"* | An access token or an authorisation code was saved in its place. Redo step 5. |
+| *was not found in the drive* | The drive account the register uses cannot see that folder. Share it with that account, with view access. |
+| *the register is not allowed to open it* | The file is visible but not shared. Same fix. |
+| *access has been withdrawn or has expired* | The grant was revoked, or the consent screen was never published (step 3). |
+
+`src/integrations/gdrive.ts` holds the whole of it, and says in its own comments
+why the scope is `drive.readonly` rather than the narrower `drive.file`: that
+one reaches only files chosen through Google's own picker, which is a JavaScript
+widget this register's content-security policy forbids.
+
+---
+
 ## Documents (R2)
 
 R2 has to be switched on once for the account (Dashboard → R2 → Enable — it asks

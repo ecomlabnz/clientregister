@@ -50,6 +50,32 @@ export function describeAccepted(): string {
 }
 
 /**
+ * What a kind of file is, in the practice's words, for one this cannot open.
+ *
+ * Here rather than beside the screen that first needed it, because there is now
+ * more than one screen that has to refuse a file: a document already on the
+ * matter, and a file in the practice's Google Drive. Two lists of what a media
+ * type is called would drift, and the second one would be the one nobody
+ * checked. This file already owns what may be read and how big it may be; what
+ * to call what may not is the same fact.
+ */
+export function plainType(type: string): string {
+  const known: Record<string, string> = {
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'a spreadsheet',
+    'application/vnd.ms-excel': 'a spreadsheet',
+    'application/vnd.oasis.opendocument.spreadsheet': 'a spreadsheet',
+    'application/msword': 'an old-style Word document (.doc)',
+    'application/zip': 'a zip folder',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'a slide deck',
+  };
+  if (known[type]) return known[type]!;
+  if (type.startsWith('video/')) return 'a video';
+  if (type.startsWith('audio/')) return 'a recording';
+  if (type.startsWith('image/')) return 'a picture in a format this cannot open';
+  return `a ${type} file`;
+}
+
+/**
  * Turn an uploaded file into something a provider can take.
  *
  * The media type is decided here rather than trusted from the browser. For a
@@ -86,8 +112,15 @@ export async function readUpload(file: File): Promise<IntakeFile | { error: stri
   return { error: `${name} is a ${mediaType || 'kind of file'} this cannot read. ${describeAccepted()}` };
 }
 
-/** What the bytes say the file is, for the formats where guessing wrong matters. */
-function sniff(bytes: Uint8Array): string | null {
+/**
+ * What the bytes say the file is, for the formats where guessing wrong matters.
+ *
+ * Exported because the shortcut endpoint has the same question and no browser
+ * to ask: a file arriving from Shortcuts is named by the phone, and a file
+ * stored under a type it is not is a file that will be served back wrongly one
+ * day. One answer, here, rather than a second copy that drifts.
+ */
+export function sniff(bytes: Uint8Array): string | null {
   const starts = (...sig: number[]): boolean => sig.every((b, i) => bytes[i] === b);
   if (starts(0x25, 0x50, 0x44, 0x46)) return 'application/pdf';               // %PDF
   if (starts(0x89, 0x50, 0x4e, 0x47)) return 'image/png';

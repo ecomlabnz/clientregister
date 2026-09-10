@@ -192,9 +192,29 @@ sender is on that channel's allow-list.**
   `INGEST_EMAIL_ALLOWED_SENDERS` are trusted. Inbound mail is never bounced or
   rejected, because a bounce tells a sender whether an address is monitored.
 
+- **Apple Shortcut** (`POST /api/ingest/shortcut`) — the practice's own people
+  pushing a file out of iCloud Drive, which no web service can read. A shortcut
+  cannot sign in, so it carries a personal **upload token** in an
+  `Authorization: Bearer` header. Assume that token leaks: it lives on a laptop
+  and a phone. What its holder can do is **create one inbox item, with files,
+  and nothing else** — no client, no matter, no quotation, no document, no
+  listing of what has been sent, and no session. One route in the register
+  consults it and a test asserts that stays true.
+
+  The token is two parts: a 12-character selector kept in the clear so one row
+  can be found, and a 32-byte secret kept only as a PBKDF2 hash, which a
+  database trigger enforces. It is shown once, at creation, and cannot be
+  re-issued in place. Every refusal — absent, malformed, unknown, wrong,
+  revoked, or belonging to a suspended person — returns the same sentence after
+  the same work, so a list of guesses cannot be sorted into real and imaginary.
+  Refusals are counted per address, uploads and bytes per token per hour.
+  Revocation is immediate and final, and a token is revoked from the owner's own
+  account page. See `docs/apple-shortcut.md` and `src/core/uploadtokens.ts`.
+
 Untrusted messages are still captured — you want to see them — but they land in
 the inbox marked *unverified* and create nothing until a person acts. An empty
-allow-list trusts nobody.
+allow-list trusts nobody. A shortcut upload is untrusted by construction,
+whoever the token belongs to.
 
 ## The AI layer
 

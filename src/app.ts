@@ -23,8 +23,16 @@ import { html } from './ui/html';
 import { pageHeader } from './ui/components';
 import { audit, clientIp } from './core/audit';
 
-/** Paths that authenticate by signature and must bypass the CSRF cookie check. */
-const WEBHOOK_PATHS = ['/api/ingest/telegram', '/api/ingest/whatsapp'];
+/**
+ * Paths that authenticate by signature and must bypass the CSRF cookie check.
+ *
+ * The shortcut endpoint joins the two webhooks for the same reason rather than
+ * a new one. A CSRF check defends a browser that carries a cookie it did not
+ * choose to send; a Shortcuts action carries no cookie at all, sends no
+ * `Origin` and no `Sec-Fetch-Site`, and proves who it is with a credential in
+ * the request itself. There is nothing here for a third-party page to forge.
+ */
+const WEBHOOK_PATHS = ['/api/ingest/telegram', '/api/ingest/whatsapp', '/api/ingest/shortcut'];
 
 export function createApp(): Hono<AppContext> {
   const app = new Hono<AppContext>();

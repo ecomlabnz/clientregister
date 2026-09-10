@@ -19,6 +19,10 @@ import {
   saveSession, sessionTokenFrom, setSessionCookie, sessionLabel,
 } from '../../core/session';
 import { authenticate, requireAuth, validatePassword } from '../../core/auth';
+import {
+  SHORTCUT_PATH, createUploadToken, revokeUploadToken, uploadTokensFor,
+} from '../../core/uploadtokens';
+import { publicBase } from '../../core/publicurl';
 import { asInteger, readSettings } from '../../core/settings';
 import {
   ALL_PREFERENCES, PREFERENCE_GROUPS, coercePreference, preferenceByKey, preferencesFor, writePreferences,
@@ -29,7 +33,7 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import {
-  card, csrfField, errorList, field, pageHeader, select, stamp, table,
+  badge, card, csrfField, errorList, field, pageHeader, select, stamp, table,
 } from '../../ui/components';
 import { dateTime } from '../../ui/format';
 import { ROLE_LABELS } from '../../core/rbac';
@@ -364,10 +368,17 @@ export const authModule: AppModule = {
       const tab = c.req.query('tab') ?? 'security';
       const tabs = [
         { id: 'security', label: 'Security' },
+        { id: 'shortcut', label: 'Sending files in' },
         { id: 'preferences', label: 'Preferences' },
         { id: 'appearance', label: 'Appearance' },
         { id: 'sessions', label: 'Devices' },
       ];
+      // Only read for the tab that shows them: this page is opened for every
+      // other reason far more often than for this one.
+      const tokens = tab === 'shortcut' ? await uploadTokensFor(c.env, user.id) : [];
+      const uploadUrl = tab === 'shortcut'
+        ? `${(await publicBase(c.env, new URL(c.req.url).origin)).base}${SHORTCUT_PATH}`
+        : '';
       const sessions = await all<{
         id: string; created_at: string; last_seen_at: string; ip: string | null; user_agent: string | null;
       }>(
@@ -455,6 +466,60 @@ export const authModule: AppModule = {
             <button class="btn btn-secondary" type="submit">Sign out everywhere else</button>
           </form>
           <p class="hint">Session ID shown to support: <code>${sessionLabel(session.sid)}</code></p>`)}` : ''}
+
+        ${'' /* Sending files in from Finder or the Files app. The whole feature
+                 is here rather than under Security because it is a thing the
+                 practice *does*, not a setting: make a token, build the
+                 shortcut once, then right-click a file for the rest of time. */}
+        ${tab === 'shortcut' ? html`
+        ${card('Sending a file in from your Mac or your phone', html`
+          <p>Your case files sit in iCloud Drive. The register cannot reach into iCloud —
+             Apple does not allow any website to — so the file goes the other way. You
+             build a small shortcut once, in Apple's <strong>Shortcuts</strong> app. After
+             that, right-clicking a file in Finder, or tapping <em>Share</em> on your phone,
+             sends it straight into the register's inbox, where you file it onto a client or
+             a matter like anything else that arrives.</p>
+          <p>An upload token is what the shortcut carries instead of your password, because
+             a shortcut cannot sign in. <strong>Treat it like a password: anyone holding it
+             can send files into the register.</strong> It cannot read anything — not a
+             client, not a matter, not a document — but it can put things in your inbox. If
+             a device is lost, revoke its token here and the shortcut on it stops working.</p>
+          <p><a class="btn btn-primary" href="/account/shortcut">How to build the shortcut,
+             step by step</a></p>
+          <p class="hint">The same steps are written out in <code>docs/apple-shortcut.md</code>.</p>`)}
+
+        ${card('Your upload tokens', html`
+          ${tokens.length
+            ? table(['Name', 'Made', 'Last used', 'Times used', ''], tokens.map((t) => html`
+                <tr>
+                  <td>${t.label}${t.revoked_at ? html` ${badge('revoked', 'grey')}` : ''}</td>
+                  <td>${stamp(t.created_at)}</td>
+                  <td>${t.last_used_at ? stamp(t.last_used_at) : html`<span class="muted">never used</span>`}</td>
+                  <td>${String(t.uses)}</td>
+                  <td>${t.revoked_at
+                    ? html`<span class="muted small">revoked ${stamp(t.revoked_at)}</span>`
+                    : html`<form method="post" action="/account/upload-tokens/revoke" class="inline-form">
+                             ${csrfField(session.csrf)}
+                             <input type="hidden" name="id" value="${t.id}">
+                             <button class="btn btn-small btn-danger" type="submit">Revoke</button>
+                           </form>`}
+                  </td>
+                </tr>`))
+            : html`<p class="muted">No upload token yet. Make one to build your first shortcut.</p>`}
+
+          <form method="post" action="/account/upload-tokens" class="mt">
+            ${csrfField(session.csrf)}
+            ${field({ label: 'What is it for', name: 'label', required: true, maxlength: 80,
+                      placeholder: 'The office Mac',
+                      hint: 'A name, so two devices can be told apart when one of them is lost.' })}
+            <button class="btn btn-primary" type="submit">Make an upload token</button>
+          </form>
+          <p class="hint">The token is shown once, on the next screen, and never again — the
+             register keeps only a hash of it. If it is lost, revoke it and make another.</p>`)}
+
+        ${card('Where the shortcut sends to', html`
+          <p class="key-block"><code>${uploadUrl}</code></p>
+          <p class="hint">Paste this into the shortcut's <em>Get Contents of URL</em> action.</p>`)}` : ''}
 
         ${'' /* Choosing is the whole action: press a palette and the next page
                  is drawn in it. There is no Save, because there was never a
@@ -689,6 +754,148 @@ export const authModule: AppModule = {
       );
       await auditFrom(c, { action: 'account.2fa_disabled', entityType: 'user', entityId: user.id });
       return redirectWith(c, '/account', 'Two-factor authentication turned off.');
+    });
+
+    /**
+     * Make an upload token, and show it once.
+     *
+     * Rendered rather than redirected to, deliberately, and for the same reason
+     * the recovery codes above are: the token must not travel in a URL, where it
+     * would land in browser history, in a proxy log and in the address bar of a
+     * screen somebody is sharing. This is the only moment it exists in readable
+     * form anywhere — the database holds a PBKDF2 hash, and migration 0087 has a
+     * trigger that refuses a row whose secret is not one.
+     */
+    r.post('/account/upload-tokens', async (c) => {
+      const user = c.get('user')!;
+      const f = new FormReader(await c.req.formData());
+      const label = f.text('label', { required: true, label: 'What it is for', max: 80 });
+
+      const made = await createUploadToken(c.env, { userId: user.id, label });
+      // The token is not in the audit row and must never be. What is recorded is
+      // that one was made, by whom, and which one — the selector is the public
+      // half and carries no authority.
+      await auditFrom(c, {
+        action: 'account.upload_token_created', entityType: 'upload_token', entityId: made.row.id,
+        meta: { label: made.row.label, selector: made.row.selector },
+      });
+
+      const base = (await publicBase(c.env, new URL(c.req.url).origin)).base;
+      return page(c, { title: 'Your upload token' }, html`
+        ${pageHeader('Your upload token', 'Copy it now — it is shown once and never again.')}
+        ${card(made.row.label, html`
+          <p class="key-block"><code>${made.token}</code></p>
+          <p class="alert alert-warn"><strong>Treat this like a password.</strong> Anyone
+             holding it can send files into the register’s inbox. It cannot read a client,
+             a matter or a document, and it cannot sign in — but do not paste it anywhere
+             but the shortcut.</p>
+          <p>Paste it into the shortcut’s <em>Authorization</em> header, after the word
+             <code>Bearer</code> and a space. The address it sends to is:</p>
+          <p class="key-block"><code>${base}${SHORTCUT_PATH}</code></p>
+          <p><a class="btn btn-primary" href="/account/shortcut">Build the shortcut</a>
+             <a class="btn btn-secondary" href="/account?tab=shortcut">I have copied it</a></p>`)}`);
+    });
+
+    r.post('/account/upload-tokens/revoke', async (c) => {
+      const user = c.get('user')!;
+      const f = new FormReader(await c.req.formData());
+      const id = f.text('id', { required: true, label: 'Token', max: 100 });
+      // Scoped to the owner inside the statement, so naming somebody else’s token
+      // changes nothing and reads the same as naming one that never existed.
+      const revoked = await revokeUploadToken(c.env, { userId: user.id, tokenId: id });
+      if (!revoked) return redirectWith(c, '/account?tab=shortcut', 'Token not found.', 'err');
+      await auditFrom(c, {
+        action: 'account.upload_token_revoked', entityType: 'upload_token', entityId: id,
+      });
+      return redirectWith(c, '/account?tab=shortcut',
+        'Revoked. Any shortcut carrying that token has stopped working.');
+    });
+
+    /**
+     * How to build the shortcut, on a page rather than in a file.
+     *
+     * These are the same steps as `docs/apple-shortcut.md`, which is where they
+     * are written down for whoever reads the repository. They are repeated here
+     * because the person who has to follow them is not going to open a
+     * repository — and a test holds the two together, so neither can quietly
+     * lose a step the other still has.
+     */
+    r.get('/account/shortcut', async (c) => {
+      const user = c.get('user')!;
+      const base = (await publicBase(c.env, new URL(c.req.url).origin)).base;
+      const url = `${base}${SHORTCUT_PATH}`;
+      const live = (await uploadTokensFor(c.env, user.id)).filter((t) => !t.revoked_at).length;
+
+      return page(c, { title: 'Building the shortcut' }, html`
+        ${pageHeader('Building the shortcut',
+          'Once, on your Mac. Then right-click any file and send it in.')}
+
+        ${card('What a shortcut is', html`
+          <p><strong>Shortcuts</strong> is an app Apple puts on every Mac and iPhone. A
+             shortcut is a short list of steps the computer does for you when you ask. It
+             is not programming: you drag steps into a list and fill in the boxes.</p>
+          <p>The one you are building has two steps. The first takes whatever file you
+             right-clicked. The second sends it to the register.</p>`)}
+
+        ${card('Before you start', live > 0
+          ? html`<p>You have ${String(live)} upload ${live === 1 ? 'token' : 'tokens'}. If you
+                    still have the token written down, use it. If you do not, make another —
+                    a token cannot be shown twice.</p>
+                 <p><a class="btn btn-secondary" href="/account?tab=shortcut">Your tokens</a></p>`
+          : html`<p>You need an upload token first. Make one, copy it, then come back.</p>
+                 <p><a class="btn btn-primary" href="/account?tab=shortcut">Make an upload token</a></p>`)}
+
+        ${card('On your Mac, step by step', html`
+          <ol class="steps">
+            <li>Open the <strong>Shortcuts</strong> app. It is in Applications.</li>
+            <li>Press <strong>+</strong> at the top to make a new shortcut. Name it
+                <em>Send to register</em>.</li>
+            <li>On the right, open the <strong>i</strong> (information) panel and tick
+                <strong>Use as Quick Action</strong>, then tick <strong>Finder</strong>.
+                That is what puts it in the right-click menu.</li>
+            <li>Still in that panel, set <em>Receive</em> to <strong>Files</strong>
+                from Quick Actions.</li>
+            <li>In the search box on the right, find <strong>Get Contents of URL</strong>
+                and drag it into the middle.</li>
+            <li>In the URL box, paste:
+                <span class="key-block"><code>${url}</code></span></li>
+            <li>Press <strong>Show More</strong> on that step. Set <strong>Method</strong>
+                to <strong>POST</strong>.</li>
+            <li>Under <strong>Headers</strong>, press <strong>+</strong>. Put
+                <code>Authorization</code> in the left box. In the right box type
+                <code>Bearer</code>, then a space, then paste your token. It should read
+                <code>Bearer ru_…</code>.</li>
+            <li>Set <strong>Request Body</strong> to <strong>Form</strong>.</li>
+            <li>Under the body, press <strong>+</strong> to add a field. Set its type to
+                <strong>File</strong>, name it <code>file</code>, and set its value to
+                <strong>Shortcut Input</strong>.</li>
+            <li>Close the shortcut. It saves itself.</li>
+          </ol>`)}
+
+        ${card('Using it', html`
+          <p><strong>On the Mac:</strong> right-click a file in Finder → <em>Quick
+             Actions</em> → <em>Send to register</em>. Nothing appears to happen, which is
+             what success looks like.</p>
+          <p><strong>On the phone:</strong> in the Files app, press and hold a file →
+             <em>Share</em> → <em>Send to register</em>. To make it appear there, open the
+             shortcut on the phone and turn on <em>Show in Share Sheet</em>.</p>
+          <p>Then open <a href="/inbox">the inbox</a>. The file is there, with your name and
+             the name you gave the token beside it. File it onto a client or a matter and
+             the document lands on that record.</p>`)}
+
+        ${card('If it does not work', html`
+          <ul class="list">
+            <li><strong>Nothing arrives.</strong> Check the header reads
+                <code>Bearer</code>, a space, then the token, with nothing else.</li>
+            <li><strong>It says the token was not accepted.</strong> The token is wrong, or
+                it has been revoked. Make a new one.</li>
+            <li><strong>It says the file is too big.</strong> Files must be 25 MB or
+                smaller.</li>
+            <li><strong>It says it cannot read that kind of file.</strong> Send a PDF, a
+                Word document, a photograph or a plain text file.</li>
+          </ul>`)}
+
+        <p><a class="btn btn-secondary" href="/account?tab=shortcut">Back to your account</a></p>`);
     });
 
     r.post('/account/sessions/revoke', async (c) => {
