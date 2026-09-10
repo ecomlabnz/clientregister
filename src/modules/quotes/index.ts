@@ -2507,7 +2507,13 @@ export const quotesModule: AppModule = {
           const position = Number.isFinite(positionRaw) ? Math.max(0, Math.trunc(positionRaw)) : line.position;
 
           // A line that cannot be read is left exactly as it was rather than
-          // being written half-changed or silently dropped.
+          // being written half-changed or silently dropped — and, unlike the
+          // payment stages before 11 September 2026, it is *said*: the message
+          // below names every line it skipped. That naming is the whole
+          // difference between this being a safe default and the trap the
+          // stages had, where the same silence collided with the budget
+          // refusal and the practice could not see why a schedule would not
+          // come down.
           if (!description || quantity === null || unitAmount === null) {
             problems.push(line.description);
             continue;
@@ -2537,7 +2543,9 @@ export const quotesModule: AppModule = {
 
         return problems.length
           ? redirectWith(c, `/quotes/${id}`,
-              `Saved, except ${problems.length} line(s) with a quantity or price that could not be read: ${problems.join('; ')}.`, 'err')
+              `Saved, except ${problems.length} line(s) with a quantity or price that could not be `
+              + `read: ${problems.join('; ')}. Those lines are unchanged. An empty box is not nil `
+              + '\u2014 type 0 to set one to nothing.', 'err')
           : redirectWith(c, `/quotes/${id}`, removed ? `Saved. ${removed} line(s) removed.` : 'Lines saved.');
       }
 
@@ -2785,8 +2793,8 @@ export const quotesModule: AppModule = {
           const amount = parseMoneyToCents(String(form.get(`amount_${stage.id}`) ?? ''));
           if (!description || amount === null) {
             problems.push(stage.label || stage.description);
-            // Unreadable: this stage is written back exactly as it was, rather
-            // than left at the nil it is about to be set to.
+            // Counted at its old figure only so the refusal below can be
+            // written; nothing is saved while `problems` has anything in it.
             return { stage, keepAsIs: true as const, gross: stage.gross_cents };
           }
           const treatment = (GST_TREATMENTS.includes(String(form.get(`gst_${stage.id}`)) as never)
@@ -2807,6 +2815,33 @@ export const quotesModule: AppModule = {
 
         const intended = planned.reduce((sum, p) => sum + p.gross, 0);
         const current = existing.reduce((sum, stage) => sum + stage.gross_cents, 0);
+
+        // **Reported on 11 September 2026:** *"i am trying to adjust the bottom
+        // to make it match but it does not let me."*
+        //
+        // Because an empty amount box quietly put the old amount back. A blank
+        // read as `null`, the stage was written back exactly as it was, and its
+        // old figure still counted towards the total — so a practice clearing
+        // three boxes to bring an $11,382.70 schedule down to $3,959.40 was
+        // told the schedule came to more than the quotation, with no hint that
+        // the boxes they had emptied had been refilled behind them. The
+        // "saved, except N stages" line that would have said so came *after*
+        // the budget refusal, and never ran.
+        //
+        // An empty box is now a refusal that names the stage, and it is checked
+        // first — because a total that includes a figure nobody typed is not a
+        // total worth arguing about.
+        if (problems.length) {
+          const names = problems.join(', ');
+          return redirectWith(c, `/quotes/${id}`,
+            problems.length === 1
+              ? `${names} has no amount the register can read, so nothing was saved. `
+                + 'An empty box is not nil \u2014 type 0 to set a stage to nothing.'
+              : `${problems.length} stages have no amount the register can read (${names}), so `
+                + 'nothing was saved. An empty box is not nil \u2014 type 0 to set a stage to '
+                + 'nothing.', 'err');
+        }
+
         if (intended > budget) {
           // Nothing is written, so the schedule on the page is still the one
           // that was there before. **Said explicitly on 9 September 2026**,
@@ -2836,15 +2871,10 @@ export const quotesModule: AppModule = {
              WHERE quote_id = ?`, id);
 
         for (const p of planned) {
-          if (p.keepAsIs) {
-            await run(
-              c.env.DB,
-              `UPDATE quote_stages SET amount_cents = ?, net_cents = ?, gst_cents = ?,
-                  gross_cents = ? WHERE id = ? AND quote_id = ?`,
-              p.stage.amount_cents, p.stage.net_cents, p.stage.gst_cents, p.stage.gross_cents,
-              p.stage.id, id);
-            continue;
-          }
+          // Unreachable: an unreadable amount refused the whole save above.
+          // Kept as an assertion rather than deleted, because the type still
+          // allows it and a silent write-back is the fault this replaced.
+          if (p.keepAsIs) throw new Error('a stage with an unreadable amount reached the write');
           await run(
             c.env.DB,
             `UPDATE quote_stages SET position = ?, label = ?, description = ?, amount_cents = ?,
@@ -2860,10 +2890,8 @@ export const quotesModule: AppModule = {
         await auditFrom(c, { action: 'quote.stages_saved', entityType: 'quote', entityId: id,
           meta: { removed, rejected: problems.length } });
 
-        return problems.length
-          ? redirectWith(c, `/quotes/${id}`,
-              `Saved, except ${problems.length} stage(s) with an amount that could not be read.`, 'err')
-          : redirectWith(c, `/quotes/${id}`, removed ? `Saved. ${removed} stage(s) removed.` : 'Stages saved.');
+        return redirectWith(c, `/quotes/${id}`,
+          removed ? `Saved. ${removed} stage(s) removed.` : 'Stages saved.');
       }
 
       const f = new FormReader(form);
