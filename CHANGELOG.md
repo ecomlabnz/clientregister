@@ -7,6 +7,28 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.36.0 — 10 September 2026
+
+### Added
+**A client's visa now records when it was granted, not only when it ends.**
+*"how did this happen that in a client under immigration I am not able to enter
+their NZ immigration status??? type of visa they hold, issue date and expiry
+date?"*
+
+Two of the three were already there — the visa type is a dropdown from your own
+list, and the expiry has its own field and its "not yet fixed" rule. **The issue
+date had never been built.** It is now beside the expiry on the Immigration tab,
+and shows under the visa on the client's page.
+
+It matters for more than tidiness: maximum continuous stay is counted from the
+start of a grant, reading an interim visa needs both ends, and "how long have
+they held this" was being answered from the file notes. The certificates on the
+same record have carried a date *and* an expiry since they were written; the
+visa was given only an expiry, and nothing had asked for the other half.
+
+Migration 0081 adds two refusals — a visa cannot expire before it was granted,
+on insert and on update.
+
 ## 1.35.0 — 10 September 2026
 
 ### Added

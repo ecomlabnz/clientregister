@@ -37,6 +37,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.36.0', date: '10 September 2026',
+    notes: [
+      'A client\u2019s visa now records the date it was granted, beside the expiry. Maximum '
+        + 'continuous stay is counted from there, so it was the missing half of the fact.',
+      'The register refuses a visa that expires before it was granted.',
+    ],
+  },
+  {
     version: '1.35.0', date: '10 September 2026',
     notes: [
       'A knowledge base article can be sent to a client. Open it, press Create a link, and send '
