@@ -263,3 +263,36 @@ describe('the sign-off is the practice’s own, not one the register invents', (
     expect(settings).toContain("emailSignature: values['practice.email_signature'] ?? '',");
   });
 });
+
+/**
+ * **Asked for on 11 September 2026:** *"make the formatted version of my email
+ * as a default when i want to email quotation and LoE, can switch to plain
+ * text whenever needed."*
+ *
+ * The letter is written with emphasis in it, so formatted is the shape it was
+ * meant to take. The plain text goes out alongside it either way — a formatted
+ * message is a multipart one carrying both — so nothing is lost for a client
+ * whose mail reader will not render HTML.
+ */
+describe('the quotation email goes out formatted unless told otherwise', () => {
+  const src = readFileSync('src/modules/quotes/index.ts', 'utf8');
+
+  it('offers Formatted first and ticks it', () => {
+    const fieldset = src.slice(src.indexOf('<fieldset class="compose-format">'));
+    const formatted = fieldset.indexOf("value=\"html\"");
+    const plain = fieldset.indexOf("value=\"text\"");
+    expect(formatted, 'Formatted should be the first choice offered').toBeLessThan(plain);
+    expect(src).toContain("const asHtml = (c.req.query('format') ?? 'html') !== 'text';");
+  });
+
+  it('keeps the choice when the practice goes back to edit', () => {
+    // It used to reset to plain text, so choosing Formatted and then correcting
+    // a word silently undid the choice.
+    expect(src).toContain("`&format=${asHtml ? 'html' : 'text'}`");
+  });
+
+  it('still sends the plain text alongside, whichever is chosen', () => {
+    expect(src).toContain('to, cc, subject, text: toPlainText(body),');
+    expect(src).toContain('html: asHtml ? renderEmailHtml(body) : null,');
+  });
+});

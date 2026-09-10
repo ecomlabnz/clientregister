@@ -7,6 +7,50 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.41.0 — 11 September 2026
+
+### Added
+**Every email the register has sent can now be read back.** Asked on 11
+September: *"files notes in quotations? why do we not have the entire email
+that was sent out in the file note, recorded as an email?"*
+
+It was always there. The register stores each outgoing email in full —
+recipients, copies, reply-to, subject, the formatted body, the plain-text body,
+attachments, when it went and what the provider said. What was missing was any
+way to look at it: the file note gave the address and the subject and stopped.
+
+Now the file note is a link. Open it and you see the letter exactly as the
+client received it, formatted, with the plain-text copy one click away. The
+quote page also carries an **Emails sent** list.
+
+**This reaches backwards.** Nothing was rewritten to make it work — file notes
+are append-only and stay that way. The link is worked out when the page is
+drawn, by matching the note to the stored email, so a quotation emailed weeks
+ago is readable now. Where two letters answer one note, the link goes to the
+record's list rather than guessing which.
+
+Reading a sent email needs the same permission as sending one. A sent email can
+carry a client's whole matter and, in a copy line, somebody else's address —
+more than a read-only account exists to see. Someone without it sees the file
+note as before, with no link, rather than a link that refuses them.
+
+### Changed
+**The quotation email goes out formatted unless you say otherwise.** *"make the
+formatted version of my email as a default when i want to email quotation and
+LoE, can switch to plain text whenever needed."* The plain text is still sent
+alongside it, so a client whose mail reader will not show formatting still gets
+a readable letter. The choice now also survives **Back to edit**, which used to
+reset it.
+
+**The accept button and its tick boxes are one green.** *"accept this quotation
+button should be the same green as the one saying Go to accept"* and *"the tick
+colours should be the same green."* They differed because of where each sat:
+the sticky bar took the practice's own theme colour, while the button sits
+inside the document, which sets its own palette. Both are now pinned to one
+fixed green — which also means a client's copy of a contract does not change
+colour when the practice changes their theme. It is the green of the ACCEPTED
+stamp the document wears afterwards.
+
 ## 1.40.0 — 11 September 2026
 
 ### Added

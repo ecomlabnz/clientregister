@@ -55,6 +55,7 @@ import { invoiceFromQuote } from '../../core/invoices';
 import { renderEmailHtml, renderRichText, toPlainText } from '../../core/richtext';
 import { mailConfigured } from '../../mail/provider';
 import { flushQueue, queueEmail } from '../../mail/queue';
+import { emailsForEntity, mailLinkFor, recordMailHref, sendState } from '../../mail/stored';
 
 /**
  * **A paragraph is one line, however long.**
@@ -1130,7 +1131,12 @@ export const quotesModule: AppModule = {
       );
       if (!q) return c.notFound();
 
-      const [entries, terms, lines, items, lineTypes, fees, qSettings, stages, parties, quoteInvoices] = await Promise.all([
+      // What has actually been emailed about this quotation, read here so the
+      // file notes below can offer the letter itself. Only for somebody who may
+      // open one — see the `mail` module for why that is `mail:send` — so the
+      // query is not run for a reader who would be shown nothing.
+      const canReadMail = can(c.get('user'), 'mail:send');
+      const [entries, terms, lines, items, lineTypes, fees, qSettings, stages, parties, quoteInvoices, sentMail] = await Promise.all([
         listEntries(c.env, 'quote', id),
         practiceDetails(c.env),
         quoteLines(c.env, id),
@@ -1142,6 +1148,7 @@ export const quotesModule: AppModule = {
         quoteParties(c.env, id),
         all<{ id: string; ref: string; status: string; gross_cents: number }>(
           c.env.DB, `SELECT id, ref, status, gross_cents FROM invoices WHERE quote_id = ? ORDER BY created_at`, id),
+        canReadMail ? emailsForEntity(c.env, 'quote', id) : Promise.resolve([]),
       ]);
       const stageTotal = stages.reduce((sum, s) => sum + s.gross_cents, 0);
       const csrf = c.get('session')!.csrf;
@@ -1673,12 +1680,48 @@ export const quotesModule: AppModule = {
                  exactly as it is. A quote can reasonably be invoiced more than once — staged fees
                  are precisely that — so nothing here consumes it.</p>`) : ''}
 
+            ${'' /* A note of an email sent offers the email.
+
+                     **The practice, 11 September 2026:** *"why do we not have
+                     the entire email that was sent out in the file note,
+                     recorded as an email?"* The whole letter was in the
+                     register the whole time and nothing showed it.
+
+                     The link is worked out here, at the moment the page is
+                     drawn, by matching the note against what the queue stored
+                     for this quotation — never written into the note. File
+                     notes are append-only: they say what was said at the time,
+                     and adding a link to one afterwards would be editing the
+                     record. Deriving it instead means every email the practice
+                     has *already* sent becomes readable, not only the next
+                     one. `mailLinkFor` decides, and refuses to guess when two
+                     letters answer to the same note. */}
             ${card('File notes', entries.length === 0 ? emptyState('Nothing recorded yet.') : html`
-              <ul class="timeline">${entries.map((e) => html`
+              <ul class="timeline">${entries.map((e) => {
+                const link = canReadMail ? mailLinkFor(e, sentMail, recordMailHref('quote', q.id)) : null;
+                return html`
                 <li class="timeline-item">
                   <div class="timeline-meta"><span class="muted small">${stamp(e.occurred_at)}${e.author_name ? ` · ${e.author_name}` : ''}</span></div>
                   <div class="timeline-body">${e.body}</div>
-                </li>`)}</ul>`)}
+                  ${link ? html`<p class="small mt"><a href="${link.href}">${link.label}</a></p>` : ''}
+                </li>`;
+              })}</ul>`)}
+
+            ${'' /* Quiet, and below the notes rather than beside them: this is
+                     a reference for when somebody asks "what exactly did we
+                     send them, and when", not the business of the page. The
+                     notes are still the running record. */}
+            ${canReadMail && sentMail.length > 0 ? card('Emails sent', html`
+              <ul class="list">${sentMail.map((m) => html`
+                <li class="list-row">
+                  <div>
+                    <a href="/mail/${m.id}">${m.subject || '(no subject)'}</a>
+                    <div class="muted small">${m.to_addr} · ${stamp(m.sent_at ?? m.created_at)}</div>
+                  </div>
+                  <div>${badge(sendState(m).words, sendState(m).tone)}</div>
+                </li>`)}</ul>
+              <p class="hint">Each one opens exactly as it left the office — the recipients, the
+                 subject and the letter itself.</p>`) : ''}
           </div>
 
           <div class="col-side">
@@ -1857,6 +1900,8 @@ export const quotesModule: AppModule = {
       const values = quoteEmailValues(q, practice, items, qs.capacityNote, shareLink);
       const draft = c.req.query('body');
       const draftSubject = c.req.query('subject');
+      // Formatted unless the practice has just chosen otherwise and come back.
+      const asHtml = (c.req.query('format') ?? 'html') !== 'text';
       const body = draft ?? quoteEmailBody(qs.emailBody, values);
       const subject = (draftSubject ?? fillTemplate(qs.emailSubject, values)).slice(0, 200);
 
@@ -1913,10 +1958,19 @@ export const quotesModule: AppModule = {
               <button type="button" class="btn btn-small btn-secondary" data-prefix="- " title="Bulleted list">&bull; List</button>
               <button type="button" class="btn btn-small btn-secondary" data-prefix="1. " title="Numbered list">1. List</button>
             </div>
+            ${'' /* **Asked for on 11 September 2026:** *"make the formatted version
+                     of my email as a default when i want to email quotation and LoE,
+                     can switch to plain text whenever needed."* Formatted is what the
+                     letter is written for — the bold marks in it mean something — and
+                     the plain text goes out alongside it either way, so a client whose
+                     mail reader will not render HTML still gets a readable letter.
+                     The choice also survives Back to edit now; it used to reset. */}
             <fieldset class="compose-format">
               <legend class="visually-hidden">Send as</legend>
-              <label><input type="radio" name="format" value="text" checked> Plain text</label>
-              <label><input type="radio" name="format" value="html"> Formatted</label>
+              <label><input type="radio" name="format" value="html"
+                            ${asHtml ? raw('checked') : ''}> Formatted</label>
+              <label><input type="radio" name="format" value="text"
+                            ${asHtml ? '' : raw('checked')}> Plain text</label>
             </fieldset>
           </div>
 
@@ -2038,7 +2092,8 @@ export const quotesModule: AppModule = {
       const carry = { to, cc, subject, body, format: asHtml ? 'html' : 'text',
                       ...(markSent ? { mark_sent: 'on' } : {}) };
       const backTo = `/quotes/${id}/email?subject=${encodeURIComponent(subject)}`
-        + `&body=${encodeURIComponent(body)}`;
+        + `&body=${encodeURIComponent(body)}`
+        + `&format=${asHtml ? 'html' : 'text'}`;
 
       return page(c, { title: `Preview ${q.ref}`, active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' },

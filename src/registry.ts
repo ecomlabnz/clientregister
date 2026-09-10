@@ -15,6 +15,7 @@ import { clientsModule } from './modules/clients';
 import { casesModule } from './modules/cases';
 import { inquiriesModule } from './modules/inquiries';
 import { quotesModule } from './modules/quotes';
+import { mailModule } from './modules/mail';
 import { clientQuoteModule } from './modules/clientquote';
 import { publicDocModule } from './modules/publicdoc';
 import { invoicesModule } from './modules/invoices';
@@ -53,6 +54,11 @@ export const registeredModules: AppModule[] = [
   clientsModule,
   casesModule,
   quotesModule,
+  // Reading back a letter that has already gone out. Mounted after the
+  // records it is reached from, because it is never the first page of
+  // anything: a link on a file note or a record's list of sent mail is the
+  // only way in.
+  mailModule,
   invoicesModule,
   tasksModule,
   calendarModule,

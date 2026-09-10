@@ -37,6 +37,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.41.0', date: '11 September 2026',
+    notes: [
+      'Every email the register has sent can now be read back in full. The file note saying a '
+        + 'quote was emailed is a link \u2014 open it and you see the letter exactly as the client '
+        + 'received it. This works for emails already sent, not just new ones.',
+      'The quote page has an "Emails sent" list beside the file notes.',
+      'The quotation email is sent formatted by default now, with plain text one click away. The '
+        + 'plain version still goes alongside it either way.',
+      'The accept button and its tick boxes are the same green as the "Go to accept" button.',
+    ],
+  },
+  {
     version: '1.40.0', date: '11 September 2026',
     notes: [
       'Any client, matter, quotation, inquiry, invoice or task can now be marked as test data, '
@@ -2451,6 +2463,18 @@ function sections(origin: string): Section[] {
            account details are what invoice-redirection fraud feeds on. When shown, the quote asks
            the client to quote its reference and warns them to telephone before acting on any email
            that appears to change the details.</p>
+        <h4>Sending it, and reading what you sent</h4>
+        <p><strong>Email to client</strong> writes the covering letter from the wording you keep
+           under <strong>Settings → Quotes</strong>, filling in the client's name, the figures, the
+           closing date and the link. <strong>Preview</strong> shows it exactly as the client will
+           receive it, with <strong>Send</strong> and <strong>Back to edit</strong> underneath —
+           nothing goes out unseen. It is sent formatted by default; switch to plain text on the
+           same screen if you would rather.</p>
+        <p>Every email the register sends is kept in full — recipients, subject, both the formatted
+           and the plain version, and any attachments. The file note saying a quote was emailed is
+           a link: open it and you see the letter as it went out. The quote page also carries an
+           <strong>Emails sent</strong> list for the same thing. Nothing is deleted, so a letter
+           sent months ago still reads back exactly as the client had it.</p>
         <h4>Turning it into fees</h4>
         <p>Once a quote is accepted and attached to a case, <strong>Add to case fees</strong>
            copies it across — one fee line per quote line, keeping the split treatment right — so
