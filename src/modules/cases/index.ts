@@ -54,6 +54,7 @@ import {
   VOCABULARY_SETTINGS, caseTypes, docCategories, isTerm, labelFor, termOptions, type Term,
 } from '../../core/vocabulary';
 import { caseNameFrom } from '../../core/casename';
+import { readingCard, registerReadingRoutes } from './reading';
 import { invoicesSection } from '../invoices';
 
 export interface CaseRow {
@@ -331,6 +332,11 @@ export const casesModule: AppModule = {
   register(app) {
     const r = new Hono<AppContext>();
     r.use('*', requireAuth);
+
+    // "Read a document into this matter", registered first for the same reason
+    // `/assistant/intake` is: a parameterised route added above it would
+    // swallow `/:id/read`.
+    registerReadingRoutes(r);
 
     // --- List ---------------------------------------------------------------
     r.get('/', requirePermission('register:read'), async (c) => {
@@ -968,6 +974,15 @@ export const casesModule: AppModule = {
                     <button class="btn btn-primary" type="submit">Add task</button>
                   </form>
                 </details>` : ''}`)}
+
+            ${'' /* Asked for on 11 September 2026: *"give AI data, point to a
+                     case and ask it to populate ll possible fields, and those
+                     that re not available - save the datta as a file note?"*
+                     Behind the same gate as everything else the model touches:
+                     with the assistant off there is no card here at all. */}
+            ${aiAvailable && writable
+              ? readingCard({ caseId: kase.id, csrf, filesKept: docsEnabled })
+              : ''}
 
             ${aiAvailable ? foldingCard('Brief me on this matter', html`
               ${brief ? html`

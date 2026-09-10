@@ -25,7 +25,7 @@ dashboard, and why a test holds them there.
 | 8 | `inbox` | Inbox | `/inbox` | 22 | — |
 | 9 | `inquiries` | Inquiries | `/inquiries` | 12 | Incoming |
 | 10 | `clients` | Clients | `/clients` | 23 | Clients |
-| 11 | `cases` | Cases | `/cases` | 15 | Cases |
+| 11 | `cases` | Cases | `/cases` | 18 | Cases |
 | 12 | `quotes` | Quotes | `/quotes` | 30 | Money → Quotes |
 | 13 | `mail` | Sent email | `/mail` | 2 | — |
 | 14 | `invoices` | Invoices | `/invoices` | 12 | Money → Invoices |
@@ -205,6 +205,9 @@ Settings: **Inbound channels** (1 keys)
 | POST | `/cases/:id/parties` |
 | POST | `/cases/:id/parties/:partyId/remove` |
 | POST | `/cases/:id/parties/new` |
+| GET | `/cases/:id/read` |
+| POST | `/cases/:id/read` |
+| POST | `/cases/:id/read/apply` |
 | POST | `/cases/:id/status` |
 | POST | `/cases/:id/tags` |
 | POST | `/cases/:id/tags/:tagId/remove` |

@@ -37,6 +37,18 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.42.0', date: '11 September 2026',
+    notes: [
+      'You can now point the reading at a matter that already exists: open it, drop in a passport, '
+        + 'a letter from INZ or anything else, and you get a list of every box it could fill.',
+      'Nothing is written until you press the button, and nothing already filled in is ever '
+        + 'overwritten. You tick what you want.',
+      'Whatever it found that the register has nowhere to keep \u2014 an occupation, a visa type '
+        + 'not in your list, other people named in the document \u2014 is written to the matter as '
+        + 'a file note, so nothing is lost just because there was no box for it.',
+    ],
+  },
+  {
     version: '1.41.0', date: '11 September 2026',
     notes: [
       'Every email the register has sent can now be read back in full. The file note saying a '

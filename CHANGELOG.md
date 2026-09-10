@@ -7,6 +7,42 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.42.0 — 11 September 2026
+
+### Added
+**Read a document into a matter that already exists.** Asked on 11 September:
+*"do we have any ways of supplementing the case data / filling in the existing
+field in a case automatically after case creation? - give AI data, point to a
+case and ask it to populate all possible fields, and those that are not
+available - save the data as a file note?"*
+
+Half of it existed. **Open a matter from what you already have** reads a
+document and fills the form — but only when a matter is being created. Now the
+same reading can be pointed at a matter already on the file: drop the documents
+in, and you get a screen listing every box it could fill.
+
+**Nothing is written until you press the button**, and **nothing that already
+has a value is ever overwritten**. Boxes that are already filled are shown, so
+you can see what the document said, but they are not offered — what is there
+wins, always. You tick what you want.
+
+**What it could not place goes into a file note**, which was the best part of
+the request. An occupation, a visa type that is not in your list, other people
+named in the document, values that disagree with what the record already holds
+— all of it is written to the matter as a note, attributed to the reading and
+worded as a record of what the document said rather than as something the
+register is asserting. Nothing found is lost merely because there was nowhere
+to put it.
+
+It fills six boxes on the matter and nine on the client. Deliberately not:
+anything the database works out for itself — the certificate dates especially,
+which the database has owned since the forty-five-clients fault — anything the
+decision screen owns, the fees, and the status. Each exclusion is written down
+with its reason.
+
+If the document turns out to be about somebody other than this matter's client,
+it says so and writes nothing to the client at all.
+
 ## 1.41.0 — 11 September 2026
 
 ### Added

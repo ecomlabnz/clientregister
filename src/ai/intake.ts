@@ -113,10 +113,25 @@ export interface IntakeRunRow {
   created_at: string;
 }
 
+/**
+ * What a reading was *for*, when it was for something the register already
+ * holds.
+ *
+ * A reading that opens a matter belongs to nothing yet — that is the point of
+ * it — so it is recorded against itself. A reading taken into an existing
+ * matter belongs to that matter, and saying so in `ai_runs` is what lets the
+ * review screen refuse a run id that came from somewhere else. Added
+ * 11 September 2026 with "Read a document into this matter".
+ */
+export interface IntakeSubject {
+  entityType: 'case';
+  entityId: string;
+}
+
 export async function runIntake(
   env: Env,
   input: { text: string; files: IntakeFile[] },
-  context: { userId: string | null },
+  context: { userId: string | null; subject?: IntakeSubject },
 ): Promise<{ ok: true; result: IntakeResult; runId: string } | { ok: false; error: string }> {
   const provider = await getProvider(env);
   if (!provider) return { ok: false, error: 'The AI layer is not configured. Set AI_PROVIDER and its key.' };
@@ -128,6 +143,10 @@ export async function runIntake(
   );
   const started = Date.now();
   const id = newId('itk');
+  // A reading for a matter is stored against that matter; a reading for nothing
+  // yet is stored against itself, as it always was.
+  const entityType = context.subject?.entityType ?? 'intake';
+  const entityId = context.subject?.entityId ?? id;
 
   try {
     const types = await caseTypes(env);
@@ -138,8 +157,8 @@ export async function runIntake(
       env.DB,
       `INSERT INTO ai_runs (id, kind, provider, model, entity_type, entity_id, input_hash, status,
           output_json, latency_ms, created_at, created_by)
-       VALUES (?, 'intake', ?,?, 'intake', ?,?, 'ok', ?,?,?,?)`,
-      id, provider.name, provider.model, id, inputHash,
+       VALUES (?, 'intake', ?,?, ?,?,?, 'ok', ?,?,?,?)`,
+      id, provider.name, provider.model, entityType, entityId, inputHash,
       JSON.stringify(result), Date.now() - started, nowIso(), context.userId,
     );
     return { ok: true, result, runId: id };
@@ -149,8 +168,8 @@ export async function runIntake(
       env.DB,
       `INSERT INTO ai_runs (id, kind, provider, model, entity_type, entity_id, input_hash, status,
           error, latency_ms, created_at, created_by)
-       VALUES (?, 'intake', ?,?, 'intake', ?,?, 'error', ?,?,?,?)`,
-      id, provider.name, provider.model, id, inputHash,
+       VALUES (?, 'intake', ?,?, ?,?,?, 'error', ?,?,?,?)`,
+      id, provider.name, provider.model, entityType, entityId, inputHash,
       message.slice(0, 500), Date.now() - started, nowIso(), context.userId,
     );
     return { ok: false, error: message };
@@ -171,6 +190,43 @@ export async function latestIntake(env: Env, runId: string): Promise<IntakeResul
   if (!row?.output_json) return null;
   try {
     return JSON.parse(row.output_json) as IntakeResult;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A reading fetched back, but only if it belongs to the record being looked at.
+ *
+ * `latestIntake` above answers "what did run X say"; this answers "what did run
+ * X say *about this matter*", which is the question a review screen has to ask.
+ * Without the second half, a run id pasted from another matter's reading would
+ * be applied to this one — the record whose fields are about to be written is
+ * not the record the reading was taken from, and nobody on the screen could
+ * tell.
+ */
+export async function intakeRunFor(
+  env: Env, runId: string, subject: IntakeSubject,
+): Promise<{ result: IntakeResult; at: string; by: string } | null> {
+  const row = await one<{ output_json: string | null; created_at: string; by_name: string | null }>(
+    env.DB,
+    `SELECT r.output_json, r.created_at, u.name AS by_name
+       FROM ai_runs r LEFT JOIN users u ON u.id = r.created_by
+      WHERE r.id = ? AND r.kind = 'intake' AND r.status = 'ok'
+        AND r.entity_type = ? AND r.entity_id = ?`,
+    runId, subject.entityType, subject.entityId,
+  );
+  if (!row?.output_json) return null;
+  try {
+    return {
+      result: JSON.parse(row.output_json) as IntakeResult,
+      at: row.created_at,
+      // Whoever handed it the document. Named in the file note rather than
+      // whoever happens to press the button, so the note says where the
+      // material came from — and so the note the review shows is the note that
+      // is written, whichever of them presses.
+      by: row.by_name ?? 'somebody no longer on the register',
+    };
   } catch {
     return null;
   }
