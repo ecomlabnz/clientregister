@@ -21,6 +21,7 @@ import { html, raw, type Raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
   actionButton, badge, csrfField, emptyState, errorList, field, flagBand, flagRaiser, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem, viewTabs,
+  testDataBand,
 } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate, dateOrDateTime, instantForDate } from '../../ui/format';
 import {
@@ -55,6 +56,12 @@ import { caseNameFrom } from '../../core/casename';
 import { invoicesSection } from '../invoices';
 
 export interface CaseRow {
+  /**
+   * 1 when this is test data — a record the practice is only trying things
+   * with, which Admin → Test data will delete. See migration 0083.
+   */
+  is_test: number;
+
   id: string; ref: string; client_id: string; title: string; descriptor: string | null;
   case_type: string;
   status: CaseStatus; priority: string; assigned_to: string | null;
@@ -526,7 +533,7 @@ export const casesModule: AppModule = {
                            twice, which is what made the column look
                            redundant in the first place. */}
                   <td>
-                    <a class="clamp-2" href="/cases/${row.id}">${row.title}</a>
+                    <a class="clamp-2" href="/cases/${row.id}">${row.title}</a>${row.is_test === 1 ? html` ${badge('Test', 'amber')}` : ''}
                     ${onAPhone}${tags}
                   </td>`
                 : html`
@@ -740,6 +747,7 @@ export const casesModule: AppModule = {
         ${breadcrumbs([{ href: '/cases', label: 'Cases' },
                        { href: `/clients/${kase.client_id}`, label: kase.client_name },
                        { label: kase.ref }])}
+        ${testDataBand({ isTest: kase.is_test === 1, table: 'cases', id: kase.id, csrf: c.get('session')!.csrf, canMark: can(c.get('user'), 'data:test'), noun: 'matter', returnTo: `/cases/${kase.id}` })}
         ${pageHeader(kase.title,
           `${kase.descriptor ? `${kase.descriptor} · ` : ''}${kase.ref} · `
             + `${labelFor(types, kase.case_type)} · ${kase.client_name}`,

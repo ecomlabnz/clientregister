@@ -796,3 +796,89 @@ export function statusTone(status: string): 'neutral' | 'green' | 'amber' | 'red
       return 'neutral';
   }
 }
+
+/**
+ * The band that says a record is test data, and the control that marks it.
+ *
+ * **Asked for on 11 September 2026:** *"i, the admins and owners, must be able
+ * to use a 'test' tick or mark to mark any data as test data - so it can be
+ * deleted later on without any further questions."*
+ *
+ * One component for every kind of record, because the mark means exactly the
+ * same thing on a client as on an invoice and a practice should not have to
+ * learn it twice — and because six separate versions of it would drift.
+ *
+ * ## It is loud on purpose
+ *
+ * A record marked test is going to be deleted, and the register holds real
+ * client files. So the band sits at the top of the record rather than in a
+ * settings corner, and it is the same amber the register uses for "this needs
+ * your attention" rather than a quiet grey label. Somebody who opens a real
+ * client and sees this should notice within a second.
+ *
+ * ## Nobody but an administrator sees the control
+ *
+ * *"no one but the admin or owner - which are the same - can mark data as
+ * test."* Everyone else sees the band on a marked record — they need to know
+ * what they are looking at — and no button.
+ */
+export function testDataBand(opts: {
+  isTest: boolean;
+  /** Which table the record is in, and its id — the mark route needs both. */
+  table: string;
+  id: string;
+  csrf: string;
+  /** May this person mark and unmark? Only an administrator or owner may. */
+  canMark: boolean;
+  /** "client", "matter", "quotation" — used in the sentences below. */
+  noun: string;
+  /** Where to come back to. The record's own page, normally. */
+  returnTo: string;
+  /**
+   * True where the mark cannot be lifted again. A quotation is the one such
+   * record: its mark releases the acceptance freeze, so letting it come off
+   * would launder an altered contract back into a real one.
+   */
+  oneWay?: boolean;
+}): Raw {
+  if (!opts.isTest && !opts.canMark) return html``;
+
+  // One route for every kind of record, in the admin module beside the screen
+  // that deletes them. Six routes would be six permission checks to keep in
+  // step, and this is the permission that authorises a delete.
+  const action = '/admin/test-data/mark';
+  const common = { table: opts.table, id: opts.id, return_to: opts.returnTo };
+
+  if (!opts.isTest) {
+    return html`
+      <details class="test-mark-offer">
+        <summary>Mark as test data</summary>
+        <p class="hint">Test data can be deleted in one go from Admin → Test data.
+           Marking this ${opts.noun} also marks everything filed under it.
+           ${opts.oneWay
+             ? html`A quotation cannot be unmarked afterwards, because the mark is
+                    what releases it from being a signed contract.`
+             : ''}</p>
+        ${actionButton(action, opts.csrf, 'Mark as test data', {
+          className: 'btn btn-secondary btn-small',
+          fields: { ...common, mark: '1' },
+          confirm: opts.oneWay
+            ? 'Mark this quotation as test data? This cannot be undone, and it stops being a contract.'
+            : `Mark this ${opts.noun} and everything filed under it as test data?`,
+        })}
+      </details>`;
+  }
+
+  return html`
+    <div class="test-band">
+      <p class="test-band-said"><strong>Test data.</strong> This ${opts.noun} is not a real
+         record and will be removed when test data is next deleted.</p>
+      ${opts.canMark && !opts.oneWay
+        ? actionButton(action, opts.csrf, 'This is real, remove the mark', {
+            className: 'btn btn-secondary btn-small',
+            fields: { ...common, mark: '0' },
+            confirm: `Treat this ${opts.noun} as a real record again?`,
+          })
+        : ''}
+    </div>`;
+}

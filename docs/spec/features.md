@@ -26,7 +26,7 @@ dashboard, and why a test holds them there.
 | 9 | `inquiries` | Inquiries | `/inquiries` | 12 | Incoming |
 | 10 | `clients` | Clients | `/clients` | 23 | Clients |
 | 11 | `cases` | Cases | `/cases` | 15 | Cases |
-| 12 | `quotes` | Quotes | `/quotes` | 29 | Money → Quotes |
+| 12 | `quotes` | Quotes | `/quotes` | 30 | Money → Quotes |
 | 13 | `invoices` | Invoices | `/invoices` | 12 | Money → Invoices |
 | 14 | `tasks` | Tasks | `/tasks` | 8 | Tasks |
 | 15 | `calendar` | Calendar | `/calendar` | 1 | Calendar |
@@ -36,7 +36,7 @@ dashboard, and why a test holds them there.
 | 19 | `knowledge` | Knowledge base | `/knowledge` | 14 | Tools → Knowledge |
 | 20 | `assistant` | Assistant | `/assistant` | 5 | Tools → Assistant |
 | 21 | `workflows` | Workflows | `/workflows` | 4 | — |
-| 22 | `admin` | Settings | `/admin` | 21 | Settings |
+| 22 | `admin` | Settings | `/admin` | 24 | Settings |
 | 23 | `help` | Help | `/help` | 1 | Help |
 
 ## What each module owns
@@ -231,6 +231,7 @@ Settings: **Lists and dropdowns** (5 keys), **Decisions and chasing INZ** (4 key
 | POST | `/quotes/:id/letter` |
 | POST | `/quotes/:id/parties` |
 | GET | `/quotes/:id/print` |
+| POST | `/quotes/:id/reopen` |
 | POST | `/quotes/:id/stages` |
 | POST | `/quotes/:id/stages/generate` |
 | POST | `/quotes/:id/status` |
@@ -367,6 +368,9 @@ Settings: **AI Assistant** (2 keys)
 | GET | `/admin/settings` |
 | POST | `/admin/settings` |
 | POST | `/admin/settings/default-shares` |
+| GET | `/admin/test-data` |
+| POST | `/admin/test-data/delete` |
+| POST | `/admin/test-data/mark` |
 | GET | `/admin/users` |
 | POST | `/admin/users` |
 | POST | `/admin/users/:id` |

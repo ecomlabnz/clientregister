@@ -19,6 +19,7 @@ import { html, raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
   actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, revealForm, select, stamp, statusTone, table,
+  testDataBand,
 } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays } from '../../ui/format';
 import { PRIORITIES, PRIORITY_LABELS, TASK_STATUS_LABELS, TASK_STATUSES } from '../../domain';
@@ -26,14 +27,11 @@ import { isAssignable, userOptions } from '../../core/lookups';
 import { addEntry } from '../../core/timeline';
 import { can } from '../../core/rbac';
 import { asPrefBoolean, preferencesFor } from '../../core/preferences';
+import { safeReturn } from '../../core/returnto';
 
 const ENTITY_TYPES: EntityType[] = ['client', 'case', 'inquiry', 'quote'];
 
-/** Only ever redirect to a path on this site. */
-export function safeReturn(value: string | null | undefined, fallback = '/tasks'): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return fallback;
-  return value;
-}
+
 
 export interface EntityLink { href: string; label: string }
 
@@ -347,6 +345,7 @@ export const tasksModule: AppModule = {
 
       return page(c, { title: task.title, active: '/tasks' }, html`
         ${breadcrumbs([{ href: '/tasks', label: 'Tasks' }, { label: 'Task' }])}
+        ${testDataBand({ isTest: task.is_test === 1, table: 'tasks', id: task.id, csrf: c.get('session')!.csrf, canMark: can(c.get('user'), 'data:test'), noun: 'task', returnTo: `/tasks/${task.id}` })}
         ${pageHeader(task.title, link ? link.label : 'Not attached to a record')}
 
         <div class="cols">

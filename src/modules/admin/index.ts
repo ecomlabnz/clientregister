@@ -23,9 +23,13 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import {
-  badge, card, csrfField, field, optionsFrom, pageHeader, revealForm, select, stamp, table,
+  badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, revealForm, select, stamp, table,
 } from '../../ui/components';
 import { dateShort, dateTime, timeShort, truncate } from '../../ui/format';
+import {
+  isTestTable, listTestData, purgeTestData, setTestMark, tallyTestData, TEST_TABLES,
+} from '../../core/testdata';
+import { safeReturn } from '../../core/returnto';
 import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../core/rbac';
 import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABELS, SPLIT_BASES } from '../../core/money';
 import { currentModel, isAiEnabled } from '../../ai/provider';
@@ -133,6 +137,7 @@ export function adminTabs(current: string): Raw {
     { id: 'users', label: 'Users', href: '/admin/users' },
     { id: 'settings', label: 'Practice settings', href: '/admin/settings' },
     { id: 'audit', label: 'Audit log', href: '/admin/audit' },
+    { id: 'testdata', label: 'Test data', href: '/admin/test-data' },
     { id: 'automations', label: 'Automations', href: '/admin/automations' },
     { id: 'export', label: 'Export', href: '/admin/export' },
     { id: 'integrations', label: 'Integrations', href: '/admin?tab=integrations' },
@@ -786,6 +791,109 @@ export const adminModule: AppModule = {
     });
 
     // --- Audit --------------------------------------------------------------
+    // --- Test data ----------------------------------------------------------
+    //
+    // **Asked for on 11 September 2026:** *"i, the admins and owners, must be
+    // able to use a 'test' tick or mark to mark any data as test data - so it
+    // can be deleted later on without any further questions."*
+    //
+    // The list comes before the button, which the practice chose: *"show a
+    // list first, then delete permanently"*. A count on its own is a number
+    // somebody presses past; a page naming three clients by name is one they
+    // read. This deletes real rows out of the register that holds the
+    // practice's client files, and it is worth the extra screen.
+    r.get('/test-data', requirePermission('data:test'), async (c) => {
+      const [tally, records] = await Promise.all([tallyTestData(c.env), listTestData(c.env)]);
+      const total = tally.reduce((sum, t) => sum + t.count, 0);
+
+      return page(c, { title: 'Test data', active: '/admin' }, html`
+        ${pageHeader('Test data',
+          'Records marked as tests, and one button to be rid of them.')}
+        ${adminTabs('testdata')}
+
+        ${total === 0
+          ? emptyState('Nothing is marked as test data. '
+              + 'Open any client, matter, quotation, inquiry, invoice or task and use '
+              + '“Mark as test data” to add it here.')
+          : html`
+            <div class="alert alert-warn">
+              <p><strong>${total} ${total === 1 ? 'record' : 'records'} will be deleted
+                 permanently</strong>, together with everything filed under them — fee lines,
+                 payment stages, passports, certificates, documents and file notes.</p>
+              <p>Two things do not go, and cannot:</p>
+              <ul>
+                <li><strong>The audit log.</strong> It is append-only in the database and stays
+                    that way. Afterwards it will still record that these records were created and
+                    deleted, naming ids that no longer lead anywhere. That is the log doing its
+                    job: it is the register’s account of what people did, not a copy of the data.</li>
+                <li><strong>Emails already sent.</strong> A quotation emailed to a real address
+                    was really emailed.</li>
+              </ul>
+            </div>
+
+            ${card('What will go', html`
+              <dl class="kv">
+                ${tally.filter((t) => t.count > 0).map((t) => html`
+                  <dt>${t.noun}${t.count === 1 ? '' : 's'}</dt>
+                  <dd>${t.count}</dd>`)}
+              </dl>
+              ${table(['Kind', 'Reference', 'What it is'],
+                records.map((rec) => html`
+                  <tr>
+                    <td>${rec.noun}</td>
+                    <td class="mono">${rec.ref || '\u2014'}</td>
+                    <td>${truncate(rec.title, 80) || '\u2014'}</td>
+                  </tr>`),
+                { compact: true })}`)}
+
+            ${card('Delete it', html`
+              <p class="hint mb">This cannot be undone. Nothing marked as test data is kept
+                 anywhere else.</p>
+              <form method="post" action="/admin/test-data/delete"
+                    data-confirm="Delete ${total} test ${total === 1 ? 'record' : 'records'} permanently? This cannot be undone.">
+                ${csrfField(c.get('session')!.csrf)}
+                <button type="submit" class="btn btn-danger">Delete all test data</button>
+              </form>`)}`}`);
+    });
+
+    // Marking one record, from wherever it is shown. One route rather than one
+    // per module: six would be six permission checks to keep in step, and this
+    // is the permission that authorises the delete.
+    r.post('/test-data/mark', requirePermission('data:test'), async (c) => {
+      const f = new FormReader(await c.req.formData());
+      const table = f.text('table', { required: true, label: 'Kind', max: 20 });
+      const id = f.text('id', { required: true, label: 'Record', max: 64 });
+      const mark = f.text('mark', { max: 1 }) === '1';
+      const back = safeReturn(f.text('return_to', { max: 300 }));
+      if (!f.valid || !isTestTable(table)) {
+        return redirectWith(c, back, 'That record could not be marked.', 'err');
+      }
+
+      const result = await setTestMark(c.env, table, id, mark, c.get('user')!.id);
+      if (!result.ok) return redirectWith(c, back, result.message, 'err');
+
+      const noun = TEST_TABLES[table];
+      return redirectWith(c, back,
+        mark
+          ? `Marked as test data. Everything filed under this ${noun} is marked too.`
+          : `This ${noun} is a real record again.`,
+        'ok');
+    });
+
+    r.post('/test-data/delete', requirePermission('data:test'), async (c) => {
+      const user = c.get('user')!;
+      const result = await purgeTestData(c.env, user.id);
+      const rows = Object.values(result.deleted).reduce((a, b) => a + b, 0);
+      await auditFrom(c, { action: 'data.test_purged_by', entityType: 'settings', entityId: 'test-data',
+        meta: { ...result.deleted, file_notes: result.notes } });
+      return redirectWith(c, '/admin/test-data',
+        rows === 0
+          ? 'There was nothing marked as test data.'
+          : `Deleted ${rows} test ${rows === 1 ? 'record' : 'records'}`
+            + `${result.notes ? ` and ${result.notes} file ${result.notes === 1 ? 'note' : 'notes'}` : ''}.`,
+        'ok');
+    });
+
     r.get('/audit', requirePermission('audit:read'), async (c) => {
       const action = c.req.query('action') ?? '';
       const actor = c.req.query('actor') ?? '';

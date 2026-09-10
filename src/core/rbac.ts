@@ -27,6 +27,17 @@ export const PERMISSIONS = [
   // owner alone and to no other role. Asked for on 9 September 2026: "one
   // button - but only available to owner".
   'backup:take',
+  // Marking a record as test data, and deleting everything so marked. Asked
+  // for on 11 September 2026: *"i, the admins and owners, must be able to use
+  // a 'test' tick or mark to mark any data as test data - so it can be deleted
+  // later on without any further questions"* — and, on who: *"no one but the
+  // admin or owner - which are the same - can mark data as test."*
+  //
+  // It is two powers in one permission because they are one decision: the mark
+  // is only meaningful because of the delete it authorises, and somebody who
+  // could mark but not delete would just be labelling. The delete screen names
+  // every record before it takes any.
+  'data:test',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -39,7 +50,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   admin: [
     'register:read', 'register:write', 'register:delete', 'quote:write', 'ingest:triage',
     'document:read', 'document:write', 'mail:send', 'ai:run', 'audit:read',
-    'admin:users', 'admin:settings',
+    'admin:users', 'admin:settings', 'data:test',
   ],
   adviser: [
     'register:read', 'register:write', 'quote:write', 'ingest:triage',

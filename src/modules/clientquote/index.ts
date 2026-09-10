@@ -31,6 +31,24 @@
  * matters here more than anywhere else in the register — this is the one page
  * opened by somebody the practice cannot help if it fails.
  *
+ * ## Two ticks, and a date nobody types
+ *
+ * **Asked for on 11 September 2026:** *"the date must be fixed - it cannot be
+ * selectable - whenever the click is happening, would be good to include the
+ * time zone as well. Also just above the line 'I have read the quotation and
+ * the letter of engagement, and I accept them.' need another line 'The above
+ * name is correct' and a tick box - so it is more deliberate action of
+ * accepting. and if not ticked - will not accept."*
+ *
+ * So the form asks for one thing — the name — and then two deliberate acts:
+ * the name is right, and the documents have been read. The date is the
+ * register's own, shown as read-only text and decided again at the moment the
+ * button is pressed.
+ *
+ * The refusals live in `acceptQuote`, not here. `required` on the boxes is
+ * what a browser does for a client who has one; the rule is what happens for
+ * everybody else, including a form posted straight at the route.
+ *
  * ## No account
  *
  * The address is the credential: 128 bits, unguessable, minted once. There is
@@ -44,7 +62,7 @@ import type { AppModule } from '../../core/module';
 import { html, raw } from '../../ui/html';
 import { page } from '../../ui/layout';
 import { csrfField } from '../../ui/components';
-import { dateShort, money, printedAt } from '../../ui/format';
+import { money, printedAt } from '../../ui/format';
 import { nowIso } from '../../core/db';
 import { audit, clientIp } from '../../core/audit';
 import { addEntry } from '../../core/timeline';
@@ -154,9 +172,24 @@ export const clientQuoteModule: AppModule = {
                 <input type="text" name="full_name" required maxlength="200" autocomplete="name"
                        value="${shared.client_name ?? ''}">
               </label>
-              <label class="field">
-                <span class="field-label">Date</span>
-                <input type="date" name="signed_on" required value="${todayNz()}">
+              ${'' /* The date, which is ours and not theirs.
+                     **Asked for on 11 September 2026:** *"the date must be
+                     fixed - it cannot be selectable - whenever the click is
+                     happening, would be good to include the time zone as
+                     well."* So it is read-only text, not a control: the moment
+                     of acceptance, in New Zealand time with the zone named, by
+                     the same helper that stamps the foot of the document. What
+                     is shown here is the clock as this page was drawn; what is
+                     recorded is the clock when the button is pressed. */}
+              <div class="field">
+                <span class="field-label">Date and time of acceptance</span>
+                <p class="accept-when">${printedAt(nowIso())}</p>
+                <p class="hint">Set by us, in New Zealand time, at the moment you
+                   accept. It is not something you type.</p>
+              </div>
+              <label class="check">
+                <input type="checkbox" name="confirm_name" value="1" required>
+                The above name is correct.
               </label>
               <label class="check">
                 <input type="checkbox" name="confirm" value="1" required>
@@ -165,7 +198,7 @@ export const clientQuoteModule: AppModule = {
                 ${letter ? 'them' : 'it'}.
               </label>
               <button class="btn btn-primary btn-accept" type="submit">Accept this quotation</button>
-              <p class="hint">Your name, the date you give and the time we receive it are
+              <p class="hint">Your name and the moment we receive your acceptance are
                  recorded with the quotation. Nothing is charged now.</p>
             </form>`}
           <p class="quote-doc-stamp">Opened ${printedAt(nowIso())}</p>
@@ -184,21 +217,26 @@ export const clientQuoteModule: AppModule = {
       if (blocked === 'already-accepted') return c.redirect(`/q/${token}#accept`, 303);
       if (blocked) return back(blocked);
 
+      // What the client sent, and nothing more. The two ticks and the name are
+      // read here; anything else in the body — a date, notably — is not looked
+      // at. **Asked for on 11 September 2026:** *"the date must be fixed - it
+      // cannot be selectable."* The refusals are `acceptQuote`'s, so that one
+      // place decides them and a form posted straight at this route meets the
+      // same answers as one filled in on the page.
       const form = await c.req.formData();
-      if (!form.get('confirm')) {
-        return back('Please tick the box to confirm you have read the documents.');
-      }
       const name = String(form.get('full_name') ?? '').trim();
-      if (!name) return back('Please type your full name.');
-      const signedOn = String(form.get('signed_on') ?? '').trim() || todayNz();
+      const ticked = (field: string) => String(form.get(field) ?? '').trim() !== '';
 
       const at = nowIso();
       const result = await acceptQuote(c.env, shared.id, {
-        name, signedOn, from: clientIp(c.req.raw) ?? 'an unrecorded address',
+        name,
+        from: clientIp(c.req.raw) ?? 'an unrecorded address',
+        nameIsCorrect: ticked('confirm_name'),
+        hasRead: ticked('confirm'),
       }, at);
       if (!result.ok) return back(result.message);
 
-      await recordAcceptance(c.env, shared, name, signedOn, at, clientIp(c.req.raw));
+      await recordAcceptance(c.env, shared, name, at, clientIp(c.req.raw));
 
       // Two letters: one to the client saying what they agreed to and where to
       // find it, one to the practice saying it arrived. Asked for on
@@ -209,14 +247,14 @@ export const clientQuoteModule: AppModule = {
       const url = new URL(c.req.url);
       const detail = await acceptedQuoteFor(c.env, shared.id, `${url.origin}/q/${token}`);
       const mailed = detail
-        ? await queueAcceptanceEmails(c.env, detail, { name, signedOn, at })
+        ? await queueAcceptanceEmails(c.env, detail, { name, at })
         : { toClient: false, toPractice: false };
 
       await audit(c.env, {
         action: 'quote.accepted_by_client', entityType: 'quote', entityId: shared.id,
         actorLabel: `client: ${name}`, ip: clientIp(c.req.raw),
         userAgent: c.req.header('user-agent') ?? null,
-        meta: { ref: shared.ref, signedOn, ...mailed },
+        meta: { ref: shared.ref, acceptedAt: at, ...mailed },
       });
       return c.redirect(`/q/${token}#accept`, 303);
     });
@@ -237,7 +275,7 @@ export const clientQuoteModule: AppModule = {
  * the same rule the rest of the register files by.
  */
 async function recordAcceptance(
-  env: Env, shared: SharedQuote, name: string, signedOn: string,
+  env: Env, shared: SharedQuote, name: string,
   at: string, from: string | null,
 ): Promise<void> {
   const q = await one<{ client_id: string | null; case_id: string | null }>(
@@ -248,7 +286,7 @@ async function recordAcceptance(
     : q.client_id ? { entityType: 'client' as const, entityId: q.client_id } : null;
   if (!entity) return;
 
-  const detail = `Quotation ${shared.ref} accepted online by ${name}, dated ${dateShort(signedOn)}. `
+  const detail = `Quotation ${shared.ref} accepted online by ${name}. `
     + `Received ${printedAt(at)}${from ? ` from ${from}` : ''}.`;
 
   await addEntry(env, {
@@ -283,15 +321,15 @@ async function recordAcceptance(
     body: [
       `Accepted online by ${name}.`,
       '',
-      `Signed as at: ${dateShort(signedOn)} (the date the client gave)`,
-      `Received: ${printedAt(at)}`,
+      `Accepted: ${printedAt(at)}`,
       from ? `From: ${from}` : '',
       total ? `Total accepted: ${total}` : '',
       totals?.with_letter === 1
         ? 'Accepted with the letter of engagement, which was on the same page.'
         : 'The quotation was sent without a letter of engagement.',
       '',
-      'The client confirmed they had read the documents before accepting. This quotation '
+      'The client confirmed that the name above is correct and that they had read the '
+        + 'documents, by two separate ticks, before accepting. This quotation '
         + 'is now fixed and cannot be edited — issue a new one if anything needs to change.',
     ].filter((line, i, all) => line !== '' || (all[i - 1] ?? '') !== '').join('\n'),
     occurredAt: at,

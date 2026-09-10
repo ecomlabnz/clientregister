@@ -19,6 +19,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { emphasise, html, join, raw, type Raw } from '../../ui/html';
 import {
   actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, stamp, statusTone, table,
+  testDataBand,
 } from '../../ui/components';
 import { dateInputValue, dateLong, dateShort, money, printedAt } from '../../ui/format';
 import {
@@ -55,13 +56,38 @@ import { renderEmailHtml, renderRichText, toPlainText } from '../../core/richtex
 import { mailConfigured } from '../../mail/provider';
 import { flushQueue, queueEmail } from '../../mail/queue';
 
+/**
+ * **A paragraph is one line, however long.**
+ *
+ * This letter was wrapped at about seventy-six characters, the way a plain-text
+ * letter is typed. Two things went wrong with that, both reported on
+ * 11 September 2026 with the formatted email in front of the practice:
+ * *"the HTML format - this is how it is breaking down - incorrectly"*.
+ *
+ * 1. A newline inside a paragraph becomes a line break in the formatted email,
+ *    so the client read "for the / proposed work." — the plain-text wrapping,
+ *    baked into a medium that does its own wrapping at the reader's own window
+ *    width.
+ * 2. Emphasis cannot span a line break, by the deliberate design of
+ *    `core/richtext.ts` (a marker that could run away over several lines would
+ *    swallow half a letter when somebody forgot to close it). So
+ *    `**acceptance ... successful**`, wrapped across two lines, printed its own
+ *    asterisks.
+ *
+ * Both go away by not wrapping. A plain-text mail client wraps a long line to
+ * the reader's window, which is better than wrapping it here to a width nobody
+ * chose; and the blank lines between paragraphs are what carry the shape.
+ *
+ * So: **never hard-wrap a paragraph in this letter, or in anything filling a
+ * placeholder in it.** Blank lines between paragraphs, and a line break only
+ * where one is meant — an address, a signature.
+ */
 const DEFAULT_EMAIL_BODY = [
   'Dear {client_name},',
   '',
   'Thank you for your enquiry and for discussing your matter with us.',
   '',
-  'As discussed, I am pleased to provide you with our **fee quotation{and_letter}** for the',
-  'proposed work.',
+  'As discussed, I am pleased to provide you with our **fee quotation{and_letter}** for the proposed work.',
   '',
   '{total}',
   '',
@@ -69,18 +95,13 @@ const DEFAULT_EMAIL_BODY = [
   '',
   '{terms}',
   '',
-  'Please note that **acceptance of the quotation does not constitute a guarantee that any',
-  'visa, immigration application or other outcome will be successful**. Immigration decisions',
-  'are made by Immigration New Zealand in accordance with the applicable legislation,',
-  'immigration instructions and its decision-making powers.',
+  'Please note that **acceptance of the quotation does not constitute a guarantee that any visa, immigration application or other outcome will be successful**. Immigration decisions are made by Immigration New Zealand in accordance with the applicable legislation, immigration instructions and its decision-making powers.',
   '',
   '{closing_date} {capacity}',
   '',
   '{how_to_accept}',
   '',
-  'If you have any questions about the quotation, scope of work or terms of engagement,',
-  'please contact us before accepting it. We will be happy to clarify any aspect of the',
-  'proposed engagement.',
+  'If you have any questions about the quotation, scope of work or terms of engagement, please contact us before accepting it. We will be happy to clarify any aspect of the proposed engagement.',
   '',
   'Kind regards,',
   '{signature}',
@@ -277,6 +298,12 @@ export async function refreshQuoteTotals(env: Env, quoteId: string): Promise<Quo
 }
 
 export interface QuoteRow {
+  /**
+   * 1 when this is test data — a record the practice is only trying things
+   * with, which Admin → Test data will delete. See migration 0083.
+   */
+  is_test: number;
+
   id: string; ref: string; client_id: string | null; case_id: string | null; inquiry_id: string | null;
   /** The kind of work, since 0075. What the letter chooses its clauses from. */
   case_type: string | null;
@@ -335,6 +362,9 @@ const ITEM_WIDTHS: Record<string, string | undefined> = {
 };
 
 /** Where the figures live, and how far the label beside them may reach. */
+/** The columns whose figures are right-aligned, and whose headings must be too. */
+const ITEM_NUMERIC = new Set<string>(['Qty', 'Unit', 'GST', 'Amount']);
+
 const AMOUNT_COLUMN = ITEM_COLUMNS.indexOf('Amount');
 const COLUMNS_AFTER_AMOUNT = ITEM_COLUMNS.length - AMOUNT_COLUMN - 1;
 
@@ -426,25 +456,31 @@ export function quoteEmailValues(
 
   // Not reachable from the compose screen, which mints a link before drafting.
   // Said plainly rather than sending a letter that points nowhere.
+  // **Reworded by the practice on 11 September 2026**, who supplied the
+  // replacement sentences: the documents are no longer named a second time
+  // (the paragraph above has just named them), and the paragraph runs on rather
+  // than restating the title in bold.
   const linkBlock = link
     ? [
         `You can review and accept the quotation${andLetter} here:`,
         '',
         link,
         '',
-        `Please read the **Quotation${andLetter} carefully before accepting ${them}**.`,
         withLetter
-          ? 'Together, these documents set out the proposed scope of our work, the applicable fees,'
-          : 'It sets out the proposed scope of our work, the applicable fees,',
-        'payment arrangements, and the terms on which we would act for you.',
+          ? 'Please read the documents carefully before accepting them. Together, these documents'
+            + ' set out the proposed scope of our work, the applicable fees, payment arrangements,'
+            + ' and the terms on which we would act for you.'
+          : `Please read the quotation carefully before accepting ${them}. It sets out the`
+            + ' proposed scope of our work, the applicable fees, payment arrangements, and the'
+            + ' terms on which we would act for you.',
       ].join('\n')
-    : '[This quotation has no link yet. Open it in the register and press Email again\n'
+    : '[This quotation has no link yet. Open it in the register and press Email again '
       + 'so that one is created before sending.]';
 
   const terms = practice.termsUrl
     ? [
-        'The engagement is also subject to our **Standard Terms of Engagement**, which are',
-        'available here:',
+        'This engagement is also subject to our **Standard Terms of Engagement**, which are'
+          + ' available here:',
         '',
         practice.termsUrl,
       ].join('\n')
@@ -462,8 +498,8 @@ export function quoteEmailValues(
        + ' at that time.';
 
   const howToAccept = link
-    ? 'If you are happy to proceed, please sign electronically at the end of the quotation\n'
-      + 'page. You will be asked to provide your full name and the date of acceptance.'
+    ? 'If you are happy to proceed, please sign electronically at the end of the quotation page.'
+      + ' You will be asked to provide your full name and the date of acceptance.'
     : '';
 
   // **Asked on 11 September 2026**, seeing the letter for the first time on the
@@ -637,6 +673,7 @@ export const quotesModule: AppModule = {
             <td class="col-sm-hide"><a href="/quotes/${row.id}"><code>${row.ref}</code></a></td>
             <td class="small col-sm-hide">${row.client_id ? html`<a href="/clients/${row.client_id}">${row.client_name}</a>` : '—'}</td>
             <td><a class="clamp-2" href="/quotes/${row.id}">${row.description}</a>
+                ${row.is_test === 1 ? html` ${badge('Test', 'amber')}` : ''}
                 ${row.case_ref ? html`<div class="muted small">${row.case_ref}</div>` : ''}
                 <div class="row-meta show-sm">
                   <code>${row.ref}</code>
@@ -1126,6 +1163,24 @@ export const quotesModule: AppModule = {
 
       return page(c, { title: q.ref, active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { label: q.ref }])}
+        ${testDataBand({ isTest: q.is_test === 1, table: 'quotes', id: q.id,
+                         csrf: c.get('session')!.csrf, canMark: can(c.get('user'), 'data:test'),
+                         noun: 'quotation', returnTo: `/quotes/${q.id}`, oneWay: true })}
+        ${'' /* **Asked for on 11 September 2026:** *"can you mark them so that I can
+                 reinstate them to unaccepted state to test? so i can send them and
+                 accept them many times - because i need to test the system."* Only on
+                 a quotation marked test data, because on a real one this would be
+                 un-forming a contract. */}
+        ${q.is_test === 1 && q.accepted_at && can(c.get('user'), 'data:test')
+          ? html`<div class="test-band">
+              <p class="test-band-said">Accepted ${dateShort(q.accepted_at)} by
+                 ${q.accepted_name}. Wind it back to a draft to send and accept it again.</p>
+              ${actionButton(`/quotes/${q.id}/reopen`, csrf, 'Unaccept and start again', {
+                className: 'btn btn-secondary btn-small',
+                confirm: 'Clear the acceptance and put this test quotation back to draft?',
+              })}
+            </div>`
+          : ''}
         ${pageHeader(q.description, `${q.ref} · ${QUOTE_STATUS_LABELS[q.status]}`, html`
           <a class="btn btn-secondary" href="/quotes/${q.id}/print" target="_blank" rel="noopener">Print</a>
           ${q.with_letter === 1
@@ -1168,7 +1223,17 @@ export const quotesModule: AppModule = {
                 // Amount last, to the right of GST, at the practice's
                 // instruction of 9 September 2026: the eye runs along a fee line
                 // to the figure that matters, and that is what the line comes to.
-                : table(ITEM_COLUMNS.map((label) => ({ label, width: ITEM_WIDTHS[label] })), [
+                // **Reported on 11 September 2026:** *"the column heading
+                // shifted"*. The figures in these columns are right-aligned and
+                // the headings were not, so Qty, Unit, GST and Amount each sat
+                // to the left of the column they name — by more, the wider the
+                // window. The alignment is stated once here, beside the widths,
+                // and the heading now sits over its own figures.
+                : table(ITEM_COLUMNS.map((label) => ({
+                    label,
+                    width: ITEM_WIDTHS[label],
+                    align: ITEM_NUMERIC.has(label) ? ('right' as const) : undefined,
+                  })), [
                     ...lines.map((l) => html`
                       <tr>
                         <td>
@@ -1197,11 +1262,15 @@ export const quotesModule: AppModule = {
                     // the columns but left the totals under gst". Both are now
                     // derived from ITEM_COLUMNS, so moving a column moves the
                     // totals with it.
+                    // **Asked on 11 September 2026:** "are these lines superfluous?
+                    // the body of the quotation already says what is what - why do we
+                    // duplicate it? clients can calculate subtotals themselves - lets
+                    // save some space." They were. Every line above already says
+                    // whether it is a professional fee or a disbursement, so the two
+                    // subtotals restated the column beside them, and Subtotal restated
+                    // Total payable minus the GST directly under it. Five rows, two
+                    // of them load-bearing.
                     ...totalRows([
-                      ['Professional fees', totals.feesNetCents, true],
-                      ['Disbursements', totals.disbursementsNetCents,
-                        totals.disbursementsNetCents !== 0],
-                      ['Subtotal', totals.subtotalNetCents, true],
                       ['GST', totals.gstCents, totals.hasGst],
                       ['Total payable', totals.totalCents, true],
                     ], q.currency),
@@ -1903,6 +1972,37 @@ export const quotesModule: AppModule = {
      * Nothing is written here. The page renders and forgets; the send route is
      * unchanged and still does the validating.
      */
+    /**
+     * Wind a test quotation back to a draft.
+     *
+     * Only ever a quotation marked test data. On a real one this would be
+     * un-forming a contract, and the database refuses it outright — migrations
+     * 0078 and 0079 freeze an accepted quotation, and 0083 exempts test data
+     * alone. The check here is so the button is honest, not so the rule holds.
+     */
+    r.post('/:id/reopen', requirePermission('data:test'), async (c) => {
+      const id = c.req.param('id')!;
+      const q = await one<QuoteRow>(c.env.DB, 'SELECT * FROM quotes WHERE id = ?', id);
+      if (!q) return c.notFound();
+      if (q.is_test !== 1) {
+        return redirectWith(c, `/quotes/${id}`,
+          'Only a quotation marked as test data can be unaccepted. A real one is answered '
+          + 'with a new quotation.', 'err');
+      }
+
+      await run(
+        c.env.DB,
+        `UPDATE quotes
+            SET accepted_at = NULL, accepted_name = NULL, accepted_from = NULL,
+                status = 'draft', responded_at = NULL, sent_at = NULL, updated_at = ?
+          WHERE id = ?`,
+        nowIso(), id);
+      await auditFrom(c, { action: 'quote.test_reopened', entityType: 'quote', entityId: id,
+        meta: { ref: q.ref } });
+      return redirectWith(c, `/quotes/${id}`,
+        'Back to a draft. Send it and accept it as many times as you need.', 'ok');
+    });
+
     r.post('/:id/email/preview', requirePermission('mail:send'), async (c) => {
       const id = c.req.param('id')!;
       const q = await one<QuoteRow & { client_name: string | null }>(
@@ -3122,7 +3222,13 @@ export function quotationArticle(
     applicants, associated, contacts, representative, partyDetail, lineRows,
   } = d;
   return html`
-        <article class="quote-doc">
+        ${'' /* `quote-doc-quotation` is what the fee quote's own headings hang
+                off in `app.css`: the practice asked on 11 September 2026 for
+                more room above the section headings of *this* document and a
+                larger size on them, and `.quote-doc h3` is shared with the
+                letter of engagement and the invoice, which were not in front of
+                them. */}
+        <article class="quote-doc quote-doc-quotation">
           ${'' /* Accepted, said at the top of the document itself.
 
                  **Asked for on 9 September 2026:** *"once it is accepted —
@@ -3270,14 +3376,13 @@ export function quotationArticle(
                 <tr class="quote-doc-group"><td colspan="4">Disbursements — paid on your behalf</td></tr>
                 ${lineRows(disbursements)}` : ''}
             </tbody>
+            ${'' /* The same tidying as the quotation page, for the same reason:
+                     the lines above are already grouped under "Professional
+                     fees" and "Disbursements — paid on your behalf", so a
+                     footer repeating those two figures said it a second time,
+                     and the subtotal said the total minus the GST beneath
+                     it. */}
             <tfoot>
-              ${fees.length && disbursements.length ? html`
-                <tr><td colspan="3">Professional fees</td>
-                    <td class="num">${money(totals.feesNetCents, q.currency)}</td></tr>
-                <tr><td colspan="3">Disbursements</td>
-                    <td class="num">${money(totals.disbursementsNetCents, q.currency)}</td></tr>` : ''}
-              <tr><td colspan="3">Subtotal</td>
-                  <td class="num">${money(totals.subtotalNetCents, q.currency)}</td></tr>
               ${totals.hasGst
                 ? html`<tr><td colspan="3">GST</td>
                            <td class="num">${money(totals.gstCents, q.currency)}</td></tr>`

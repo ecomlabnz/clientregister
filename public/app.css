@@ -1505,6 +1505,23 @@ details[open] > summary { margin-bottom: 12px; }
 .letter-doc .hint {
   text-align: left;
 }
+/* The clause headings of the Short Form Terms of Engagement, in bold.
+ *
+ * **Asked for on 11 September 2026:** *"slightly increase the font of headings
+ * in the Short Form Terms of Engagement, or make them bold without increasing,
+ * so they are better visible."* Of the two, bold.
+ *
+ * Size is already carrying meaning in this document: the 1.05rem of
+ * "SHORT FORM TERMS OF ENGAGEMENT" and of the addendum's title is what says
+ * "a new document starts here", and a clause heading grown towards it blurs
+ * that. Weight is unused, so it is free to say "a new clause starts here".
+ * It also moves nothing: the terms run to several printed pages and a heading
+ * that got taller would push clauses over page breaks — which is a change to
+ * a contract's pagination bought for nothing.
+ *
+ * 600 → 700 against the same accent and capitals, so the headings darken
+ * where they stand. Two class names, to beat `.quote-doc h3` on weight. */
+.quote-doc.letter-doc h3 { font-weight: 700; }
 .letter-acknowledgements li { margin-bottom: 8px; }
 .letter-signature { margin-top: 32px; }
 .letter-signature p { margin: 0 0 2px; }
@@ -1565,6 +1582,47 @@ details[open] > summary { margin-bottom: 12px; }
   font-size: 0.72rem; margin: 14px 0 5px; text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--accent);
   padding-bottom: 3px; border-bottom: 1px solid var(--accent);
+}
+/* The quotation's own section headings, larger and with more air above them.
+ *
+ * **Asked for on 11 September 2026**, written four times in red on a printed
+ * fee quote — above THE PARTIES, above the items table's column headings,
+ * above PAYMENT STAGES and above PAYMENT: *"More space here, say x2 of what it
+ * is"*, and *"Payment Stages - Larger Font, by 2, say if it was 10, make it 12,
+ * and the same applied to The Parties, Description, Payment and to other
+ * headings in this quotations to be printed."* Alongside it: *"I like how all
+ * looks now - do not break it, just need some surgical changes so it is
+ * better."* So the existing figures are doubled and stepped, not replaced: the
+ * top margin 14px → 28px, the size 0.72rem (11.5px) → 0.845rem (13.5px), which
+ * is the +2px they asked for. Everything else about these headings — the
+ * capitals, the letter-spacing, the accent, the rule under them, the 5px
+ * beneath — is left exactly as it was.
+ *
+ * Scoped to the quotation, and to the quotation in every medium.
+ *
+ * By document, because `.quote-doc h3` also sets the clause headings of the
+ * letter of engagement and the invoice, and neither was in front of them.
+ * In every medium, because `/quotes/:id/print` is a page on a screen before it
+ * is a sheet of paper — it is what they were looking at when they wrote this —
+ * and because the client reads this same document through their link. One
+ * document, one appearance, which is what the paper palette on `.quote-doc`
+ * already decided.
+ *
+ * Two class names, so this beats `.quote-doc h3` on weight rather than on where
+ * it happens to sit in the file. */
+.quote-doc.quote-doc-quotation h3 {
+  margin-top: 28px;
+  font-size: 0.845rem;
+}
+/* The items table's column headings — DESCRIPTION / QUANTITY / UNIT PRICE /
+   AMOUNT — are a section heading too, and were named as one ("Description").
+   Same two changes: the padding above the heading row doubled, 5px → 10px, and
+   the size up 2px from the 0.7rem the stylesheet sets on every `th`, to
+   0.825rem. The payment-stages table carries the same headings and takes the
+   same treatment, so the two tables of one document still match. */
+.quote-doc.quote-doc-quotation .quote-doc-table th {
+  padding-top: 10px;
+  font-size: 0.825rem;
 }
 .quote-doc-head {
   display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap;
@@ -1771,6 +1829,19 @@ details[open] > summary { margin-bottom: 12px; }
 .accept-panel h2 { margin: 0 0 10px; font-size: 1.15rem; }
 .accept-form { display: grid; gap: 14px; max-width: 26rem; margin-top: 14px; }
 .accept-form .field { margin: 0; }
+
+/* The date of acceptance, which is read rather than entered.
+ *
+ * **Asked for on 11 September 2026:** *"the date must be fixed - it cannot be
+ * selectable - whenever the click is happening, would be good to include the
+ * time zone as well."* It sits where the date control used to sit, so it must
+ * read as a stated fact and not as a box somebody has failed to fill in: the
+ * document's own type, a little heavier than the prose around it, and no
+ * border. */
+.accept-when {
+  margin: 2px 0 0; font-weight: 600; line-height: 1.35; word-break: normal;
+}
+.accept-form .hint { margin: 4px 0 0; }
 /* Bigger than an ordinary button. It is the only thing on the page a client is
    asked to do, and it is a contract. */
 .btn-accept { padding: 11px 20px; font-size: 1rem; }
@@ -1877,6 +1948,10 @@ details[open] > summary { margin-bottom: 12px; }
    * page. `.quote-doc h3` and `.quote-doc-group` are deliberately absent. */
   .quote-doc-table td { padding: 3px 0; }
   .quote-doc-table th { padding: 4px 0; }
+  /* The same doubling as on screen, against the tighter figure paper uses:
+     4px → 8px. Written with the same two class names as the screen rule above,
+     or that rule's 10px would simply carry through to the print box. */
+  .quote-doc.quote-doc-quotation .quote-doc-table th { padding-top: 8px; }
   .quote-doc-table tfoot td { padding: 3px 0; }
   .quote-doc-table tfoot tr:first-child td { padding-top: 7px; }
   .quote-doc-table tfoot .totals-row td { padding-top: 7px; }
@@ -2566,3 +2641,23 @@ body.site { background: var(--bg); }
   flex-wrap: wrap;
   margin: 0.55rem 0 0;
 }
+
+/* A record marked as test data. Amber rather than red — nothing is wrong, but
+   this will be deleted, and the register holds real client files, so it is the
+   first thing on the record rather than a quiet label in a corner. */
+.test-band {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  border: 1px solid var(--amber);
+  background: var(--amber-bg);
+  border-radius: 6px;
+  padding: 0.6rem 0.85rem;
+  margin: 0 0 0.9rem;
+}
+.test-band-said { margin: 0; font-size: 0.85rem; line-height: 1.45; flex: 1 1 20rem; }
+.test-mark-offer { margin: 0 0 0.9rem; font-size: 0.8rem; }
+.test-mark-offer > summary { cursor: pointer; color: var(--muted); }
+.test-mark-offer > summary:hover { color: var(--text); }
+.test-mark-offer .hint { margin-bottom: 8px; }

@@ -35,6 +35,12 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 };
 
 export interface InvoiceRow {
+  /**
+   * 1 when this is test data — a record the practice is only trying things
+   * with, which Admin → Test data will delete. See migration 0083.
+   */
+  is_test: number;
+
   id: string;
   ref: string;
   quote_id: string | null;

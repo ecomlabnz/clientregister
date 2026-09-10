@@ -18,6 +18,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import {
   actionButton, badge, card, csrfField, filingPicker, emptyState, errorList, field, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
+  testDataBand,
 } from '../../ui/components';
 import { dateInputValue, dateOrDateTime, dateShort, dateTime, truncate } from '../../ui/format';
 import {
@@ -39,6 +40,12 @@ import { caseTypes, isTerm, labelFor, termOptions } from '../../core/vocabulary'
 import { fileOntoRecord, filingSearch, filingTargetLabel, markLinkedFiled, parseFilingChoice, unfile } from '../../core/filing';
 
 export interface InquiryRow {
+  /**
+   * 1 when this is test data — a record the practice is only trying things
+   * with, which Admin → Test data will delete. See migration 0083.
+   */
+  is_test: number;
+
   id: string; ref: string; source: InquirySource; source_ref: string | null; received_at: string;
   contact_name: string | null; contact_email: string | null; contact_phone: string | null;
   subject: string | null; body: string | null; status: InquiryStatus;
@@ -368,6 +375,7 @@ export const inquiriesModule: AppModule = {
 
       return page(c, { title: inq.ref, active: '/inbox' }, html`
         ${breadcrumbs([{ href: '/inquiries', label: 'Inquiries' }, { label: inq.ref }])}
+        ${testDataBand({ isTest: inq.is_test === 1, table: 'inquiries', id: inq.id, csrf: c.get('session')!.csrf, canMark: can(c.get('user'), 'data:test'), noun: 'inquiry', returnTo: `/inquiries/${inq.id}` })}
         ${pageHeader(inq.subject || `Inquiry ${inq.ref}`,
           html`${inq.ref} · ${INQUIRY_SOURCE_LABELS[inq.source]} · received ${stamp(inq.received_at)}`,
           writable

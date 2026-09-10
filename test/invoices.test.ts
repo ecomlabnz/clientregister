@@ -12,6 +12,7 @@ const invoice = (over: Partial<InvoiceRow>): InvoiceRow => ({
   description: 'x', issued_on: '2026-08-01', due_on: '2026-08-08', payment_terms_days: 7,
   status: 'issued', currency: 'NZD', net_cents: 10000, gst_cents: 1500, gross_cents: 11500,
   paid_cents: 0, notes: null, xero_invoice_id: null, xero_pushed_at: null, xero_error: null,
+  is_test: 0,
   created_at: '', updated_at: '', created_by: null, issued_by: null,
   voided_at: null, void_reason: null, ...over,
 });

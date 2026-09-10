@@ -34,7 +34,7 @@
 
 import type { Env } from '../types';
 import { getSetting, one } from './db';
-import { money, dateShort, printedAt } from '../ui/format';
+import { money, printedAt } from '../ui/format';
 import { practiceDetails } from './practice';
 import { queueEmail } from '../mail/queue';
 
@@ -59,7 +59,7 @@ export interface AcceptedQuote {
 export async function queueAcceptanceEmails(
   env: Env,
   q: AcceptedQuote,
-  accepted: { name: string; signedOn: string; at: string },
+  accepted: { name: string; at: string },
 ): Promise<{ toClient: boolean; toPractice: boolean }> {
   const practice = await practiceDetails(env);
   const total = money(q.totalCents, q.currency);
@@ -75,7 +75,6 @@ export async function queueAcceptanceEmails(
       `Thank you. We have received your acceptance of quotation ${q.ref}.`,
       '',
       `Accepted by: ${accepted.name}`,
-      `Date given: ${dateShort(accepted.signedOn)}`,
       `Received: ${printedAt(accepted.at)}`,
       `Total: ${total}`,
       '',
@@ -123,7 +122,6 @@ export async function queueAcceptanceEmails(
       '',
       `Client: ${q.clientName ?? 'not named'}`,
       `Accepted by: ${accepted.name}`,
-      `Date given: ${dateShort(accepted.signedOn)}`,
       `Received: ${printedAt(accepted.at)}`,
       `Total: ${total}`,
       q.withLetter ? 'Sent with the letter of engagement.' : 'Sent without a letter of engagement.',

@@ -22,6 +22,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { defaultQuoteEmail, type QuoteItemRow, type QuoteRow } from '../src/modules/quotes';
+import { renderRichText } from '../src/core/richtext';
 import { PRACTICE_SETTINGS } from '../src/core/practice';
 
 const quote = {
@@ -217,5 +218,59 @@ describe('the address the register ships with', () => {
     const setting = PRACTICE_SETTINGS.settings.find((s) => s.key === 'practice.terms_url');
     expect(setting, 'the setting has gone').toBeDefined();
     expect(setting!.default).toBe('https://www.immigration.kiwi/terms');
+  });
+});
+
+/**
+ * **Reported on 11 September 2026**, with the formatted email on screen:
+ * *"the HTML format - this is how it is breaking down - incorrectly"*.
+ *
+ * The letter was wrapped at about seventy-six characters, the way a plain-text
+ * letter is typed. In the formatted email every one of those newlines became a
+ * line break, so the client read "for the / proposed work." — and emphasis,
+ * which by design cannot span a line break, printed its own asterisks wherever
+ * a bold phrase happened to wrap.
+ */
+describe('a paragraph of the letter is one line, however long', () => {
+  // With a letter of engagement, which is the longer of the two shapes and the
+  // one the practice was looking at.
+  const body = defaultQuoteEmail({ ...quote, with_letter: 1 } as never, practice, [
+    { kind: 'professional', unit_amount_cents: 100000, net_cents: 100000,
+      gst_cents: 15000, gross_cents: 115000 } as never,
+  ], '', 'https://app.immigration.kiwi/q/abc');
+
+  it('leaves no emphasis marker spanning a line break', () => {
+    // This is the rule that broke. A `**` that opens on one line and closes on
+    // the next matches nothing and is printed as typed.
+    for (const line of body.split('\n')) {
+      expect((line.match(/\*\*/g) ?? []).length % 2, `unclosed emphasis on: ${line}`).toBe(0);
+    }
+  });
+
+  it('renders with no asterisks left in the formatted email', () => {
+    expect(String(renderRichText(body))).not.toContain('**');
+  });
+
+  it('breaks the line only where a break is meant', () => {
+    // Three, and all of them in the sign-off: a name, an address, a number.
+    // Everything above it is paragraphs separated by blank lines.
+    expect((String(renderRichText(body)).match(/<br>/g) ?? []).length).toBe(3);
+  });
+
+  it('carries the practice’s reworded paragraph', () => {
+    expect(body).toContain(
+      'Please read the documents carefully before accepting them. Together, these documents'
+      + ' set out the proposed scope of our work, the applicable fees, payment arrangements,'
+      + ' and the terms on which we would act for you.');
+    expect(body).toContain(
+      'This engagement is also subject to our **Standard Terms of Engagement**, which are'
+      + ' available here:');
+  });
+
+  it('names one document rather than several when no letter goes with it', () => {
+    const alone = defaultQuoteEmail(quote, practice, [], '',
+      'https://app.immigration.kiwi/q/abc');
+    expect(alone).toContain('Please read the quotation carefully before accepting it.');
+    expect(alone).not.toContain('these documents');
   });
 });

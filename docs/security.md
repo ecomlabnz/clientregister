@@ -122,6 +122,29 @@ plus `nosniff` and a sandboxing CSP. 25 MB limit.
 **Redirects.** `return_to` values are accepted only when they are same-site
 paths, so no form can be turned into an open redirect.
 
+**Test data.** Since 1.40.0 a record can be marked test data by an
+administrator or owner (`data:test`, held by no other role), and everything so
+marked can be deleted in one action from Admin → Test data. Three things make
+this safe to have in a register holding real client files:
+
+- The mark travels **down** a file and never up. Marking a client marks their
+  matters, quotations, inquiries and invoices; marking one quotation says
+  nothing about the client it belongs to.
+- On a quotation the mark is **one-way**. It is what releases the acceptance
+  freeze of migrations 0078/0079, so if it could be lifted again the sequence
+  "mark as test, un-accept, change the fee, accept, un-mark" would launder an
+  altered contract. Marking a quotation destroys it as a contract permanently
+  and visibly, which is a worse outcome for anyone tempted to misuse it than
+  leaving it alone.
+- The delete **names every record first** and takes them only on a second
+  press.
+
+The audit log is not touched by the purge — it is append-only and remains the
+register's account of what people did, including the purge itself. File notes
+are the one exemption, and a narrow one: a note may be deleted only while the
+record it is filed against is still present and still marked test. See
+migration 0083.
+
 **Drafts held in the browser.** Since 1.39.0 the ten substantial editing forms
 keep what has been typed in that browser's own storage, so a closed tab or a
 crash does not lose it. This puts part of a client's record on the disk of

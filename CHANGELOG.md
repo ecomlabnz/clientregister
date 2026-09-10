@@ -7,6 +7,78 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.40.0 — 11 September 2026
+
+### Added
+**Test data can be marked, and deleted in one go.** Asked for on 11 September:
+*"i, the admins and owners, must be able to use a 'test' tick or mark to mark
+any data as test data - so it can be deleted later on without any further
+questions."*
+
+The register has held the practice's real client files since 30 August. There
+is nowhere else to try things, so things get tried here, and until now nothing
+told a rehearsal apart from a real file.
+
+Open any client, matter, quotation, inquiry, invoice or task and there is now
+**Mark as test data**. A marked record wears an amber band saying so, and shows
+a **Test** badge in the lists. **Admin → Test data** lists everything marked,
+by name, and deletes the lot on one confirmation.
+
+**Only an administrator or owner can mark or delete** — nobody else sees the
+control.
+
+**The mark travels down a file and never up.** Marking a client marks their
+matters, quotations, inquiries and invoices, and anything filed under them
+afterwards is born marked. Marking one quotation says nothing about the client
+it belongs to, which is what makes it usable on a real client's file.
+
+**A quotation cannot be unmarked**, and this is deliberate. The mark is what
+releases a quotation from the freeze that makes an accepted one a contract. If
+it could be lifted again, somebody could mark a signed quotation as a test,
+un-accept it, change the fee, accept it again and remove the mark — which is
+the exact thing that freeze exists to prevent. So marking a quotation destroys
+it as a contract, permanently and visibly. Everything else unmarks freely.
+
+**A test quotation can be sent and accepted as many times as you like.** The
+original request: *"can you mark them so that I can reinstate them to
+unaccepted state to test? so i can send them and accept them many times."* An
+accepted test quotation now offers **Unaccept and start again**.
+
+**What the delete cannot take:** the audit log, which is append-only in the
+database and remains the register's account of what people did — afterwards it
+still records that these records existed. And emails already sent: a quotation
+emailed to a real address was really emailed. File notes are the one narrow
+exemption, and go only with the test record they are filed against.
+
+### Changed
+**Accepting a quotation is now a more deliberate act.** *"the date must be
+fixed - it cannot be selectable... need another line 'The above name is
+correct' and a tick box - so it is more deliberate action of accepting. and if
+not ticked - will not accept."*
+
+- **The date is no longer a box the client can change.** It was an editable
+  date field defaulting to today, so a client could put any date they liked on
+  a contract. It now shows the moment of acceptance as the register sees it,
+  with the time and the time zone, and that is what is recorded. A date posted
+  in the form body is ignored.
+- **Two ticks, not one.** "The above name is correct." sits above "I have read
+  the quotation and the letter of engagement, and I accept them." Both must be
+  ticked, and this is checked on the server — an unticked box comes back as a
+  plain sentence asking for it, not an error.
+
+**A money column heading now sits over its own figures.** *"the column heading
+shifted."* The figures were right-aligned and the headings were not, so Qty,
+Unit, GST and Amount each drifted left of their column — further, the wider the
+window.
+
+**The quotation totals lost three rows.** *"are these lines superfluous? the
+body of the quotation already says what is what - why do we duplicate it?
+clients can calculate subtotals themselves - lets save some space."* They were.
+Every line already says whether it is a professional fee or a disbursement, so
+the two subtotals restated the column beside them, and Subtotal restated Total
+payable minus the GST directly under it. **GST** and **Total payable** remain,
+on the quotation page and on the printed document alike.
+
 ## 1.39.1 — 11 September 2026
 
 ### Fixed
