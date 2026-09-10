@@ -18,7 +18,7 @@ claim, not a fact.
 | [`invariants.md`](invariants.md) | The 109 things the database refuses to do, in its own words, and the 12 uniqueness rules | `npm run spec`, from the built schema |
 | [`data-model.md`](data-model.md) | 49 tables, every column | `npm run spec`, from the built schema |
 | [`routes.md`](routes.md) | 208 routes and the permission each runs behind, the public surface listed first | `npm run spec`, from the built router |
-| [`settings.md`](settings.md) | 84 settings — everything an administrator can change without a deployment | `npm run spec`, from the modules |
+| [`settings.md`](settings.md) | 85 settings — everything an administrator can change without a deployment | `npm run spec`, from the modules |
 | [`permissions.md`](permissions.md) | 13 permissions across 5 roles, as a matrix | `npm run spec`, from `core/rbac.ts` |
 
 ## Read them in this order

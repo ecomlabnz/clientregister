@@ -51,7 +51,7 @@ import {
   ENGAGEMENT_SETTINGS, allClauses, clauseTypes, clausesFor, engagementText, type ClauseRow,
 } from '../../core/engagement';
 import { invoiceFromQuote } from '../../core/invoices';
-import { renderEmailHtml, renderRichText } from '../../core/richtext';
+import { renderEmailHtml, renderRichText, toPlainText } from '../../core/richtext';
 import { mailConfigured } from '../../mail/provider';
 import { flushQueue, queueEmail } from '../../mail/queue';
 
@@ -397,7 +397,7 @@ function totalRows(
  */
 export function quoteEmailValues(
   q: QuoteRow & { client_name: string | null },
-  practice: { legalName: string; termsLabel: string; termsUrl: string; contactEmail: string; contactPhone: string },
+  practice: { legalName: string; termsLabel: string; termsUrl: string; contactEmail: string; contactPhone: string; emailSignature: string },
   items: QuoteItemRow[] = [],
   capacityNote = '',
   link = '',
@@ -466,8 +466,18 @@ export function quoteEmailValues(
       + 'page. You will be asked to provide your full name and the date of acceptance.'
     : '';
 
-  const signature = [practice.legalName, practice.contactEmail, practice.contactPhone]
-    .filter(Boolean).join('\n');
+  // **Asked on 11 September 2026**, seeing the letter for the first time on the
+  // preview screen: *"signature should look something like this, in plain text
+  // ... where did you take this signature from?"* From here — it was three
+  // settings glued together, which is a placeholder, not a signature. A
+  // practice's sign-off is a title, a mobile, and usually a confidentiality
+  // notice, and none of that can be derived.
+  //
+  // So it is now Settings → Practice → Email signature, and the three-line
+  // version below is only what a practice that has not written one yet gets.
+  const signature = practice.emailSignature.trim()
+    || [practice.legalName, practice.contactEmail, practice.contactPhone]
+         .filter(Boolean).join('\n');
 
   return {
     client_name: q.client_name ?? 'Sir or Madam',
@@ -495,6 +505,22 @@ export function quoteEmailValues(
  * 2026 the wording lived in this file, which is why the practice asked *"where
  * do i change my email template"* and the answer was nowhere.
  */
+/**
+ * One line of a placeholder's value, for the list beside the compose box.
+ *
+ * Cut at a word rather than mid-date, and said to be cut. It was ending
+ * "open for acceptance until **16 September 20", which reads as a wrong date
+ * rather than a shortened one.
+ */
+function shorten(value: string, max = 60): string {
+  const plain = toPlainText(value).trim();
+  if (plain === '') return '\u2014';
+  if (plain.length <= max) return plain;
+  const cut = plain.slice(0, max);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > max / 2 ? cut.slice(0, space) : cut).trimEnd()}\u2026`;
+}
+
 export function quoteEmailBody(template: string, values: Record<string, string>): string {
   return tidyBlankLines(fillTemplate(template, values));
 }
@@ -511,7 +537,7 @@ export function quoteEmailBody(template: string, values: Record<string, string>)
  */
 export function defaultQuoteEmail(
   q: QuoteRow & { client_name: string | null },
-  practice: { legalName: string; termsLabel: string; termsUrl: string; contactEmail: string; contactPhone: string },
+  practice: { legalName: string; termsLabel: string; termsUrl: string; contactEmail: string; contactPhone: string; emailSignature: string },
   items: QuoteItemRow[] = [],
   capacityNote = '',
   link = '',
@@ -1942,7 +1968,10 @@ export const quotesModule: AppModule = {
                 <dt>Sent as</dt><dd>${asHtml ? 'Formatted, with a plain-text copy' : 'Plain text'}</dd>
               </dl>
               <div class="email-preview">
-                ${asHtml ? renderRichText(body) : html`<pre class="prewrap-pre">${body}</pre>`}
+                ${'' /* Plain text is previewed with the emphasis marks off, because
+                         that is what the client will receive. Reported 11 September
+                         2026: "what are the ** characters in the body?" */}
+                ${asHtml ? renderRichText(body) : html`<pre class="prewrap-pre">${toPlainText(body)}</pre>`}
               </div>
               <p class="hint">${asHtml
                 ? 'Formatted exactly as it will be sent. The colours are this page\u2019s; the words, '
@@ -1970,7 +1999,7 @@ export const quotesModule: AppModule = {
               <dl class="kv small">
                 ${Object.keys(values).sort().map((name) => html`
                   <dt><code>{${name}}</code></dt>
-                  <dd class="muted">${(values[name] ?? '').split('\n')[0]?.slice(0, 60) || '\u2014'}</dd>`)}
+                  <dd class="muted">${shorten((values[name] ?? '').split('\n')[0] ?? '')}</dd>`)}
               </dl>`)}
           </div>
         </div>`);
@@ -2002,7 +2031,7 @@ export const quotesModule: AppModule = {
       // one carrying both, so a client that cannot or will not render HTML
       // still gets a readable letter rather than a wall of markup.
       const outboundId = await queueEmail(c.env, {
-        to, cc, subject, text: body,
+        to, cc, subject, text: toPlainText(body),
         html: asHtml ? renderEmailHtml(body) : null,
         entityType: 'quote', entityId: id, createdBy: user.id,
       });

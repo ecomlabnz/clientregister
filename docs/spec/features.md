@@ -372,7 +372,7 @@ Settings: **AI Assistant** (2 keys)
 | POST | `/admin/users/:id` |
 | POST | `/admin/users/:id/reset-password` |
 
-Settings: **Practice** (14 keys)
+Settings: **Practice** (15 keys)
 
 ### `help` — Help
 

@@ -39,6 +39,36 @@ function inline(text: string): Raw {
   return join(parts);
 }
 
+/**
+ * The same letter, with the emphasis marks taken out rather than rendered.
+ *
+ * **Reported on 11 September 2026**, looking at a fee quote about to go to a
+ * client: *"what are the ** characters in the body?"* They are the bold marks
+ * from the practice's own letter, and in a formatted email they become bold —
+ * but a plain-text email was being sent the source exactly as written, so the
+ * client received `**fee quotation**` with the asterisks in it.
+ *
+ * The letter is written once and rendered twice. Formatted, the marks become
+ * `<strong>`; plain, they come off. What is stored is still the source, so the
+ * audit log and the compose box show what a person actually wrote.
+ *
+ * Bullets, numbers and bare links are left exactly as typed: that is already
+ * how a list and an address are written in a plain-text letter, and rewriting
+ * them would be changing the practice's words rather than un-marking them.
+ */
+export function toPlainText(body: string): string {
+  return (body ?? '')
+    .replace(/\r\n/g, '\n')
+    // The same markers, in the same order, as `inline` above — longest first,
+    // so `**bold**` is not read as two italics.
+    .replace(/\*\*([^*\n]+)\*\*/g, '$1')
+    .replace(/\*([^*\n]+)\*/g, '$1')
+    .replace(/_([^_\n]+)_/g, '$1')
+    // A heading in a plain-text letter is a line on its own, not a line
+    // beginning with a hash.
+    .replace(/^#{1,3}[ \t]+/gm, '');
+}
+
 export function renderRichText(body: string): Raw {
   const blocks: Raw[] = [];
 

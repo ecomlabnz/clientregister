@@ -7,6 +7,48 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.39.1 — 11 September 2026
+
+### Fixed
+**A plain-text fee quote was reaching the client with `**` in it.** Spotted on
+the new preview screen: *"what are the ** characters in the body?"*
+
+They are the bold marks from the practice's own letter of 9 September. Sent as
+a formatted email they become bold, which is what they were for. Sent as plain
+text — which is the register's default — the letter was going out as written,
+so the client read `**fee quotation and Letter of Engagement**`, asterisks and
+all.
+
+The letter is now written once and rendered twice: formatted, the marks become
+bold; plain, they come off. Bullets and web addresses are left exactly as
+typed, because that is already how a list and a link are written in a
+plain-text letter. What is stored is still what a person wrote, so the compose
+box and the audit log are unchanged.
+
+**The preview shows the plain-text letter with the marks off**, because a
+preview that does not match what is sent is not a preview.
+
+**The list of brace-words beside the compose box stopped cutting mid-date.** It
+was ending "open for acceptance until **16 September 20", which reads as a
+wrong date rather than a shortened one. It now cuts at a word and says so with
+an ellipsis.
+
+### Added
+**The email signature is now yours.** *"where did you take this signature
+from?"* From three settings glued together with newlines — the practice name,
+the email and the phone. That is a placeholder, not a signature: a sign-off is
+a name, a title, a mobile and usually a confidentiality notice, and none of
+that can be worked out from what the register happens to know.
+
+**Settings → Practice → Email signature** now holds it. Paste it in as plain
+text, exactly as a client should read it; blank lines are kept. Left empty, the
+register signs off with the practice name, email and phone as before, so
+nothing changes until it is set.
+
+Anything the letter already says is better left out of the signature than said
+twice — the link to the terms of engagement, for instance, is already a
+paragraph of the letter.
+
 ## 1.39.0 — 11 September 2026
 
 ### Added

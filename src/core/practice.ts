@@ -46,6 +46,14 @@ export const PRACTICE_SETTINGS: SettingsGroup = {
     { key: 'practice.adviser_details', type: 'text', label: 'Adviser or barrister details',
       default: '', maxLength: 500,
       help: 'Licence or admission details, as they should appear on a quote.' },
+    { key: 'practice.email_signature', type: 'text', label: 'Email signature',
+      default: '', maxLength: 4000,
+      help: 'How you sign off an email that leaves the register \u2014 name, title, phone, and '
+        + 'any confidentiality notice. Paste it in as plain text, exactly as you want a client '
+        + 'to read it; blank lines are kept. Left empty, the register signs off with the '
+        + 'practice name, email and phone above. Anything the letter already says \u2014 a link '
+        + 'to the terms of engagement, for instance \u2014 is better left out here than said '
+        + 'twice.' },
     { key: 'practice.bank_account_holder', type: 'string', label: 'Bank account holder',
       default: '', maxLength: 120,
       help: 'Printed on quotes so a client knows exactly who to pay.' },
@@ -89,6 +97,7 @@ export interface PracticeDetails {
   bankAccountNumber: string;
   showBankOnQuote: boolean;
   adviserDetails: string;
+  emailSignature: string;
   termsUrl: string;
   termsLabel: string;
 }
@@ -107,6 +116,7 @@ export async function practiceDetails(env: Env): Promise<PracticeDetails> {
     bankAccountNumber: values['practice.bank_account_number'] ?? '',
     showBankOnQuote: asBoolean(values['practice.show_bank_on_quote'], false),
     adviserDetails: values['practice.adviser_details'] ?? '',
+    emailSignature: values['practice.email_signature'] ?? '',
     termsUrl: values['practice.terms_url'] ?? '',
     termsLabel: values['practice.terms_label'] || 'Terms of Engagement',
   };

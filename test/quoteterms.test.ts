@@ -40,6 +40,9 @@ const practice = {
   termsUrl: 'https://www.immigration.kiwi/terms',
   contactEmail: 'consult@thelawfirm.nz',
   contactPhone: '+64 27 967 5984',
+  // Not set, so these tests exercise the fallback sign-off. The signature the
+  // practice actually writes is tested in quoteemailtemplate.test.ts.
+  emailSignature: '',
 };
 
 describe('the covering email a quote drafts', () => {
