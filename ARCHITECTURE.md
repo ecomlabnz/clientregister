@@ -185,9 +185,12 @@ src/
   modules/        one folder per feature
   ui/             html escaping, layout, components, formatting
 migrations/       numbered, forward-only, applied by CI before deploy
-test/             1,373 tests: pure logic, schema guarantees, browser rules,
+test/             2,320 tests: pure logic, schema guarantees, browser rules,
                   and every route exercised through the real handler
 ```
+
+The stack itself — what it runs on, what stores what, and every outside service
+it can do without — is one page in [docs/stack.md](docs/stack.md).
 
 **Nightly** (`scheduled`): flush the mail queue, expire stale quotes, reconcile
 knowledge-base follow-ups, reconcile INZ chases, run the automation rules — in
