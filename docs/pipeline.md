@@ -228,6 +228,68 @@ authority — it is an answer the client gave, on a date, on a form. If it is he
 at all it belongs to the application, not to the client, and the register does
 not yet have a place that means "an application" as distinct from a matter.
 
+#### The plan for the histories, as decided
+
+**Written down on 11 September 2026** at the practice's request, so the next
+session does not re-open a settled question. Nothing below is built.
+
+**A table each, not one table with a kind column.** The three options were
+weighed above; this is the answer and why. An employment period wants an
+employer, a role and an industry. A travel period wants a port of entry and a
+purpose. An education period wants an institution and a qualification. Those do
+not share a row shape, and forcing them into one buys a single migration at the
+cost of either columns that are usually null or a JSON blob — and the register
+has kept structured data out of JSON everywhere else, deliberately.
+
+So:
+
+| Table | One row is | Carries |
+|---|---|---|
+| `client_residence` | a period living in one country | country, from, to, address (optional) |
+| `client_employment` | a period in one job | employer, role, country, from, to, industry, whether it is claimed as skilled work |
+| `client_education` | a period at one institution | institution, country, qualification, level, from, to |
+| `client_travel` | one trip | country, from, to, purpose |
+
+**The gapless rule belongs to `client_residence` alone.** It is the one INZ
+actually enforces — the form says *"Do not leave any gaps in the timeline"* —
+and it is what drives which police certificates are needed. Putting the rule in
+one table where it is true beats putting it in a shared table where it is true
+of one kind out of four. It is a database rule, as always: a trigger refusing a
+period that ends before it starts, and a **view** — not a trigger — reporting
+gaps and overlaps, because a gap is a thing to show somebody, not a write to
+refuse. A client part-way through data entry legitimately has gaps.
+
+**Held per person, not per application.** The third option above — per
+application, because answers are given as at a date — is the one the forms
+themselves use, and it is still wrong for the register. Where somebody lived
+from 2015 to 2019 is a fact about them, and it does not become a different fact
+because a second form asks again. When the register grows a thing that means
+*an application*, that application can record which periods it declared and
+what it said about them; until then, the person holds them once.
+
+**The 12-months-in-10-years question is derived, never typed.** *"Countries
+lived in for 12 months or more in the last 10 years since age 17"* is the
+police-certificate driver, and it is a query over `client_residence` — not a
+field somebody fills in and then forgets to update when a period is added. One
+fact, one owner. This is also the point at which the register could tell the
+practice which police certificates a client needs before anybody asks, which is
+the standing instruction of 10 September about partners and police certificates,
+generalised.
+
+**The order to build them in**, by what earns its keep soonest:
+
+1. `client_residence` — it drives police certificates, which is the thing that
+   most often holds a file up.
+2. `client_employment` — an AEWV turns on the work history, and the register
+   currently holds none of it.
+3. `client_education` and `client_travel` — asked for by the forms, but neither
+   drives a deadline.
+
+**What is still not decided, and does not need to be yet:** the declarations —
+convictions, removals, refusals, health. Those are answers a client gave on a
+date, not facts the register should assert on its own authority, and they belong
+to an application. They wait for that.
+
 #### Before any of this is built
 
 - **Read two or three more forms** against the register — an AEWV, a student
