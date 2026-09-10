@@ -7,6 +7,49 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.45.0 — 11 September 2026
+
+### Added
+**Two ways to get a client's documents into a matter without typing anything.**
+
+**1. Send a file straight from your Mac or your phone.** Set up under **My
+account → Sending files in**. You build a small button once in Apple's own
+Shortcuts app; after that, select files in Finder, right-click, and send them.
+Same from the share sheet on a phone. They land in **Incoming**, exactly where
+emails land, and you file them to a matter as usual.
+
+This works from *any* folder — iCloud, Proton Drive, Google Drive, a memory
+stick — because you are pushing the file out rather than the register reaching
+in. Apple offers no way for a website to read iCloud, and this is the way
+around that.
+
+The button carries a **token**, because a shortcut cannot sign in. It is shown
+once, stored scrambled, and you can revoke it. If it ever leaked, the holder
+could **only drop a file into your inbox** — no client records, no quotations,
+no reading anything. Step-by-step instructions are in the register and in
+`docs/apple-shortcut.md`.
+
+**2. Read documents straight out of Google Drive.** On a matter, paste a Drive
+folder or file address. The register lists what is there and you tick what to
+read. It reads them, proposes the details, and you approve as before.
+
+**The file is not kept.** What stays is the details you approved, a file note
+naming what was read and when, and a link back to the Drive copy. That was the
+practice's own design: *"could they be fetched, read, case created and they are
+then discarded from the system to only remain in the gdrive?"* Storage stays
+near nothing.
+
+**A "keep a copy" tick, per file, off by default** — for a signed letter of
+engagement or an INZ decision, where the file disappearing from Drive would
+matter.
+
+Google Docs, Sheets and Slides are exported before reading; a Sheet gives its
+first tab and says so. A link that stops working is a real risk and the page
+says so: the file note is the part that lasts.
+
+Setting Drive up is a one-time job in your Google account — the steps are in
+`docs/integrations.md`. Until then the feature simply does not appear.
+
 ## 1.44.1 — 11 September 2026
 
 ### Fixed

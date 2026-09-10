@@ -56,14 +56,19 @@ import {
   type ClientFillColumn, type ClientFillValues,
 } from '../../core/clientfill';
 import {
-  attachStagedTo, documentsReadBy, recordDocumentRead, stageUpload, stagedFor,
+  attachStagedTo, documentsReadBy, driveReadsBy, markDriveReadLinked, recordDocumentRead,
+  recordDriveRead, stageUpload, stagedFor, type DriveRead,
 } from '../../core/intakefiles';
+import {
+  driveConfigured, driveCredentials, driveEntry, driveFileIdIn, listDriveFolder, openDriveFile,
+  parseDriveTarget, describeDriveType, isExported, MAX_LISTED, type DriveEntry,
+} from '../../integrations/gdrive';
 import { isAiEnabled } from '../../ai/provider';
 import {
-  ACCEPTED_UPLOADS, MAX_UPLOAD_BYTES, MAX_UPLOADS, describeAccepted, intakeRunFor, readUpload,
-  runIntake,
+  ACCEPTED_UPLOADS, MAX_UPLOAD_BYTES, MAX_UPLOADS, describeAccepted, intakeRunFor, plainType,
+  readUpload, runIntake,
 } from '../../ai/intake';
-import { readingSourceForCase, type ReadingSourceDoc } from '../documents';
+import { addExternalDocument, readingSourceForCase, type ReadingSourceDoc } from '../documents';
 import {
   planReading, readingNote,
   type CaseFacts, type ClientFacts, type Placement, type ReadingPlan,
@@ -71,6 +76,7 @@ import {
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, type Raw } from '../../ui/html';
 import { card, csrfField, field, foldingCard, pageHeader, table } from '../../ui/components';
+import { dateShort } from '../../ui/format';
 
 const CASE_COLUMNS = `id, ref, descriptor, inz_application_number, lodged_at,
                       decision_due_at, next_action, summary, client_id`;
@@ -119,23 +125,6 @@ export interface OfferedSource extends ReadableSource {
   why: string | null;
 }
 
-/** What a type is in the practice's words, for a file the reading cannot open. */
-function plainType(type: string): string {
-  const known: Record<string, string> = {
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'a spreadsheet',
-    'application/vnd.ms-excel': 'a spreadsheet',
-    'application/vnd.oasis.opendocument.spreadsheet': 'a spreadsheet',
-    'application/msword': 'an old-style Word document (.doc)',
-    'application/zip': 'a zip folder',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'a slide deck',
-  };
-  if (known[type]) return known[type]!;
-  if (type.startsWith('video/')) return 'a video';
-  if (type.startsWith('audio/')) return 'a recording';
-  if (type.startsWith('image/')) return 'a picture in a format this cannot open';
-  return `a ${type} file`;
-}
-
 /**
  * The matter's documents, in the order the file already lists them, each
  * marked with whether the reading can open it.
@@ -144,19 +133,35 @@ function plainType(type: string): string {
  * there is one list of a matter's files and this is a second use of it, not a
  * second answer to what is on the file.
  */
-export function offerSources(files: ReadableSource[]): OfferedSource[] {
+export function offerSources(files: ReadableSource[], driveOn = false): OfferedSource[] {
   const seen = new Set<string>();
   const offered: OfferedSource[] = [];
   for (const d of files) {
     if (seen.has(d.id)) continue;
     seen.add(d.id);
-    offered.push({ ...d, why: whyNotReadable(d) });
+    offered.push({ ...d, why: whyNotReadable(d, driveOn) });
   }
   return offered;
 }
 
-function whyNotReadable(d: ReadableSource): string | null {
+function whyNotReadable(d: ReadableSource, driveOn: boolean): string | null {
   if (d.external_url) {
+    // **The refusal this replaces.** Until Drive was connected, a linked file
+    // was refused flatly: the register held the address and nothing else. With
+    // Drive connected, a link *into Drive* is now readable — the bytes are
+    // fetched, read and thrown away exactly as they are when the address is
+    // pasted, and this is the second way to reach the same reading rather than
+    // a second reading. A link to anywhere else is still refused, because there
+    // is still nothing behind it the register may open.
+    //
+    // The size cannot be checked here: a linked row records no size, and Drive
+    // is the only thing that knows. `openDriveFile` refuses an oversized one in
+    // the reader's own words, before the bytes are read.
+    if (driveFileIdIn(d.external_url)) {
+      return driveOn ? null
+        : 'a link into Google Drive, which is not connected — an administrator can '
+          + 'connect it under Settings → Integrations';
+    }
     return 'a link to a file in a drive — the register holds the address, not the document';
   }
   if (d.size_bytes <= 0) return 'empty';
@@ -184,8 +189,16 @@ export function readingCard(opts: {
   caseId: string; csrf: string; filesKept: boolean;
   /** This matter's files and its client's, as the page already listed them. */
   sources: ReadableSource[];
+  /**
+   * Whether the practice's Google Drive is connected.
+   *
+   * With it unconnected there is no box, no button and no mention of one — the
+   * same rule the AI itself is held to. A feature that needs three secrets
+   * nobody has set is worse than absent when it is visible: it looks broken.
+   */
+  driveOn: boolean;
 }): Raw {
-  const offered = offerSources(opts.sources);
+  const offered = offerSources(opts.sources, opts.driveOn);
   const readable = offered.filter((d) => d.why === null);
   const skipped = offered.filter((d) => d.why !== null);
 
@@ -253,8 +266,102 @@ export function readingCard(opts: {
              the button on the next screen. A document already on the file stays where it is.</p>`
         : html`<p class="hint">File storage is not switched on, so an upload is read and dropped.
              Attach it to the matter afterwards if you need it on the file.</p>`}
-    </form>`);
+    </form>
+
+    ${'' /* A second form rather than another box in the one above: a form
+             cannot be nested inside a form, and this one goes to a different
+             place — it lists a folder before anything is read. */}
+    ${opts.driveOn ? html`
+      <hr>
+      <h4>Or read it out of Google Drive</h4>
+      <p class="small">Paste the address of this matter’s folder in Drive, or of one file in it.
+         The next screen lists what is there and you tick what to read.
+         <strong>Nothing is stored</strong> unless you tick to keep a copy — the file stays where
+         it is, in the drive.</p>
+      <form method="post" action="/cases/${opts.caseId}/drive" class="entry-form">
+        ${csrfField(opts.csrf)}
+        ${field({ label: 'Drive folder or file address', name: 'link', maxlength: 500,
+                  placeholder: 'https://drive.google.com/drive/folders/…' })}
+        <button class="btn btn-secondary" type="submit">See what is in it</button>
+      </form>` : ''}`);
 }
+
+/**
+ * What is in the drive folder, to tick.
+ *
+ * Drawn straight from the POST that listed it rather than after a redirect,
+ * which is deliberate: the alternative is putting the folder id in a URL, and a
+ * folder id names a client's folder. It belongs in a form body, not in a
+ * browser history, a bookmark or a proxy log.
+ */
+function drivePicker(opts: {
+  caseId: string; caseRef: string; csrf: string; filesKept: boolean;
+  entries: DriveEntry[]; truncated: boolean; folderName: string | null;
+}): Raw {
+  const readable = opts.entries.filter((e) => e.why === null);
+  const skipped = opts.entries.filter((e) => e.why !== null);
+
+  return html`
+    <form method="post" action="/cases/${opts.caseId}/drive/read" class="entry-form">
+      ${csrfField(opts.csrf)}
+      ${readable.length ? html`
+        ${table([{ label: 'Read', width: '6' }, { label: 'Keep a copy', width: '10' },
+                 'Name', 'Kind', 'Size', 'Changed'],
+          readable.map((e) => html`
+            <tr>
+              <td><input type="checkbox" name="drive" value="${e.id}"
+                         aria-label="Read ${e.name}"></td>
+              <td>${opts.filesKept
+                ? html`<input type="checkbox" name="keep" value="${e.id}"
+                              aria-label="Keep a copy of ${e.name}">`
+                : html`<span class="muted small">—</span>`}</td>
+              <td>${e.name}</td>
+              <td class="small">${describeDriveType(e.mimeType)}${isExported(e.mimeType)
+                ? html` <span class="muted">· read as text</span>` : ''}</td>
+              <td class="small">${e.size > 0
+                ? `${Math.ceil(e.size / 1024)} KB`
+                : html`<span class="muted">—</span>`}</td>
+              <td class="small">${dateShort(e.modified)}</td>
+            </tr>`))}
+        <p class="hint">Up to ${MAX_UPLOADS} at a time. A Google Doc, Sheet or Slides file is read
+           as its words — a Sheet gives its <strong>first tab</strong> only.</p>` : html`
+        <p class="muted">Nothing in ${opts.folderName ? opts.folderName : 'that folder'} can be
+           read as it stands.</p>`}
+
+      ${skipped.length ? html`
+        <p class="hint">Not offered, because the reading cannot open
+           ${skipped.length === 1 ? 'it' : 'them'}:</p>
+        <ul class="list">
+          ${skipped.map((e) => html`<li class="muted small">${e.name} — ${e.why}</li>`)}
+        </ul>` : ''}
+
+      ${opts.truncated ? html`
+        <p class="hint">Only the first ${MAX_LISTED} things in this folder are listed. If what you
+           want is not here, open the file in Drive and paste its own address instead.</p>` : ''}
+
+      ${opts.filesKept ? html`
+        <p class="hint"><strong>Keep a copy</strong> stores the file in the register as well as
+           reading it. Tick it for something whose disappearance from the drive would matter —
+           a signed letter of engagement, an INZ decision. Leave it for everything else: the
+           file stays in the drive, which is where the practice keeps it anyway.</p>`
+        : html`<p class="hint">File storage is not switched on, so nothing can be kept — every
+           file here is read and dropped.</p>`}
+
+      ${readable.length ? html`
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Read the ticked files</button>
+          <a class="btn btn-secondary" href="/cases/${opts.caseId}">Cancel</a>
+        </div>
+        <p class="hint">This reads them and shows you what it could fill in.
+           <strong>Nothing is written to the matter until you press the button on the next
+           screen.</strong></p>` : html`
+        <p><a class="btn btn-secondary" href="/cases/${opts.caseId}">Back to ${opts.caseRef}</a></p>`}
+    </form>`;
+}
+
+/** The one-line caution wherever a Drive address is shown. */
+const LINK_MAY_BREAK = 'If the file is moved, renamed or deleted in Drive the link stops '
+  + 'working. The file note is the part that lasts.';
 
 /**
  * One row of the review: the box, what is in it, what the document said — and
@@ -297,6 +404,162 @@ function reviewTable(rows: Placement[], offer: boolean, from: string): Raw {
 }
 
 export function registerReadingRoutes(r: Hono<AppContext>): void {
+  // --- Read it out of the practice's Google Drive --------------------------
+  //
+  // **Asked for on 11 September 2026:** the practice keeps a folder per matter
+  // in Drive — *"i can easily store the file in the appropriate folders"* — and
+  // said what should happen after a file had been read: *"could they be
+  // fetched, read, case created and they are then discarded from the system to
+  // only remain in the gdrive?"*, refined to *"throw away by default, tick to
+  // keep"*.
+  //
+  // **The permission is `ai:run`, and it is the same one `/:id/read` runs
+  // behind.** Chosen rather than invented: a drive read *is* a reading, and a
+  // second, different gate on the same act is how two rules drift apart until
+  // one of them is wrong. What that permission means here is worth writing
+  // down, because the sharp question is who may pull a client's document out of
+  // the practice's drive. `ai:run` is held by owner, administrator, specialist
+  // and assistant — every one of which also holds `register:read` and
+  // `register:write`, so anybody who can reach this route can already open this
+  // matter and type into it. `readonly` holds none of the three and gets a 403
+  // before the handler runs. Nobody gains sight of anything through Drive that
+  // they could not already see on the matter.
+  //
+  // Two more things are refused before anything is fetched: the AI being
+  // switched off (this is a reading, and a reading with no reader is nothing),
+  // and Drive not being connected — in which case there is no card, no route
+  // that does anything, and no mention of the feature anywhere.
+  r.post('/:id/drive', requirePermission('ai:run'), async (c) => {
+    const id = c.req.param('id')!;
+    const kase = await one<{ id: string; ref: string }>(
+      c.env.DB, 'SELECT id, ref FROM cases WHERE id = ?', id);
+    if (!kase) return c.notFound();
+    const ready = driveReady(c.env);
+    if ('error' in ready) return redirectWith(c, `/cases/${id}`, ready.error, 'err');
+
+    const form = await c.req.formData();
+    // Parsed, never fetched. What comes out is a Google file id checked against
+    // `[A-Za-z0-9_-]`; every request made from here is built out of that id
+    // against `www.googleapis.com`, so a pasted address cannot cause a request
+    // to the host it names. See `integrations/gdrive.ts`.
+    const target = parseDriveTarget(String(form.get('link') ?? '').slice(0, 500));
+    if ('error' in target) return redirectWith(c, `/cases/${id}`, target.error, 'err');
+
+    // What the link *said* it was is a hint. What it is comes from Google — a
+    // bare id says nothing, and a folder link can point at a file.
+    const entry = await driveEntry(c.env, ready.creds, target.id);
+    if ('error' in entry) return redirectWith(c, `/cases/${id}`, entry.error, 'err');
+
+    let entries: DriveEntry[] = [entry];
+    let truncated = false;
+    if (entry.isFolder) {
+      const listed = await listDriveFolder(c.env, ready.creds, entry.id);
+      if ('error' in listed) return redirectWith(c, `/cases/${id}`, listed.error, 'err');
+      entries = listed.entries;
+      truncated = listed.truncated;
+    }
+
+    return page(c, { title: `${kase.ref} — what is in the drive`, active: '/cases' }, html`
+      ${breadcrumbs([{ href: '/cases', label: 'Cases' },
+                     { href: `/cases/${kase.id}`, label: kase.ref },
+                     { label: 'Google Drive' }])}
+      ${pageHeader(entry.isFolder ? entry.name : 'One file in the drive',
+        'Tick what to read. Nothing has been read yet and nothing has been written.')}
+      ${card('What is here', drivePicker({
+        caseId: kase.id, caseRef: kase.ref, csrf: c.get('session')!.csrf,
+        filesKept: Boolean(c.env.DOCS), entries, truncated,
+        folderName: entry.isFolder ? entry.name : null,
+      }))}
+      <p class="hint">These files stay in Google Drive. The register reads them and, unless you
+         tick to keep a copy, holds only the address afterwards. ${LINK_MAY_BREAK}</p>`);
+  });
+
+  // --- Fetch the ticked files and hand them to the reading that exists ------
+  //
+  // The whole of the difference between this and an upload is the loop below:
+  // fetch the bytes, wrap them in a `File`. Everything after it is the path
+  // that already existed — the same `readUpload`, so the same size limit and
+  // the same words when a file is too big or is a kind nothing can read; the
+  // same `runIntake`, so the same recorded run against this matter; the same
+  // review screen and the same press. A second extraction path would be a
+  // second set of rules about what may be written to a client's file.
+  r.post('/:id/drive/read', requirePermission('ai:run'), async (c) => {
+    const id = c.req.param('id')!;
+    const user = c.get('user')!;
+    const kase = await one<{ id: string; ref: string }>(
+      c.env.DB, 'SELECT id, ref FROM cases WHERE id = ?', id);
+    if (!kase) return c.notFound();
+    const ready = driveReady(c.env);
+    if ('error' in ready) return redirectWith(c, `/cases/${id}`, ready.error, 'err');
+
+    const form = await c.req.formData();
+    const wanted = [...new Set(form.getAll('drive').map(String).filter(Boolean))];
+    const keep = new Set(form.getAll('keep').map(String));
+    if (wanted.length === 0) {
+      return redirectWith(c, `/cases/${id}`, 'Nothing was ticked, so nothing was read.', 'err');
+    }
+    if (wanted.length > MAX_UPLOADS) {
+      return redirectWith(c, `/cases/${id}`, `That is more than ${MAX_UPLOADS} files.`, 'err');
+    }
+
+    const files = [];
+    const taken: Array<{ entry: DriveEntry; file: File; mediaType: string; keep: boolean }> = [];
+    for (const fileId of wanted) {
+      // Asked of Google again rather than read off the form. The name, the kind
+      // and the size decide whether a file may be read at all, and a posted
+      // value is what the browser was told to send, not what the file is.
+      const entry = await driveEntry(c.env, ready.creds, fileId);
+      if ('error' in entry) return redirectWith(c, `/cases/${id}`, entry.error, 'err');
+      const opened = await openDriveFile(c.env, ready.creds, entry);
+      if ('error' in opened) return redirectWith(c, `/cases/${id}`, opened.error, 'err');
+      const read = await readUpload(opened.file);
+      if ('error' in read) return redirectWith(c, `/cases/${id}`, read.error, 'err');
+      files.push(read);
+      taken.push({ entry, file: opened.file, mediaType: read.mediaType,
+                   keep: keep.has(entry.id) });
+    }
+
+    const outcome = await runIntake(c.env, { text: '', files },
+      { userId: user.id, subject: { entityType: 'case', entityId: id } });
+
+    let kept = 0;
+    if (outcome.ok) {
+      for (const item of taken) {
+        // *"throw away by default, tick to keep"*. Ticked, the bytes are staged
+        // exactly as an upload's are and land on the matter with the same press
+        // — one way for bytes to reach a matter, not two. Unticked, nothing is
+        // stored anywhere and this is the last moment the bytes exist.
+        const staged = item.keep
+          ? await stageUpload(c.env, { runId: outcome.runId, file: item.file,
+                                       contentType: item.mediaType, userId: user.id })
+          : null;
+        if (staged) kept += 1;
+        // Recorded whichever way, because the review screen and the append-only
+        // file note both have to be able to name what was read. `keep` is what
+        // actually happened rather than what was ticked: with file storage off
+        // there is nowhere to put a copy, and promising one that is not coming
+        // is worse than saying so.
+        await recordDriveRead(c.env, {
+          runId: outcome.runId, fileId: item.entry.id, filename: item.file.name,
+          contentType: item.mediaType, sizeBytes: item.file.size,
+          webUrl: item.entry.webUrl, keep: Boolean(staged),
+        });
+      }
+    }
+
+    await auditFrom(c, {
+      action: 'case.read_from_drive', entityType: 'case', entityId: id,
+      // The Google file ids, which are handles rather than content, and counts.
+      // Nothing about the credentials, and nothing the documents said.
+      meta: { ok: outcome.ok, files: files.length, kept,
+              drive_files: taken.map((t) => t.entry.id),
+              run: outcome.ok ? outcome.runId : null },
+    });
+    return outcome.ok
+      ? c.redirect(`/cases/${id}/read?run=${outcome.runId}`, 303)
+      : redirectWith(c, `/cases/${id}`, outcome.error, 'err');
+  });
+
   // --- Give it something to read -------------------------------------------
   r.post('/:id/read', requirePermission('ai:run'), async (c) => {
     const id = c.req.param('id')!;
@@ -408,9 +671,13 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     if ('error' in loaded) {
       return redirectWith(c, `/cases/${id}`, loaded.error, 'err');
     }
-    const { kase, client, plan, note, sources } = loaded;
+    const { kase, client, plan, note, sources, drive } = loaded;
     const staged = await stagedFor(c.env, runId);
     const onFile = await documentsReadBy(c.env, runId);
+    // A drive file the practice ticked to keep is staged like an upload, so it
+    // would otherwise be listed twice on this screen. The drive list owns it.
+    const keptFromDrive = new Set(drive.filter((d) => d.kept).map((d) => d.filename));
+    const uploaded = staged.filter((f) => !keptFromDrive.has(f.filename));
     const session = c.get('session')!;
     const offered = plan.caseFill.length + plan.clientFill.length
       + (plan.nationalities?.offer ? 1 : 0);
@@ -497,7 +764,25 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
           <pre class="prewrap-pre">${note}</pre>` : html`
           <p class="muted">There is nothing left over to record.</p>`)}
 
-        ${staged.length || onFile.length ? card('What this was read from', html`
+        ${uploaded.length || onFile.length || drive.length ? card('What this was read from', html`
+            ${drive.length ? html`
+              <h4>Read out of Google Drive</h4>
+              <p class="hint">${drive.some((d) => d.kept)
+                ? 'The ones marked “copy kept” are stored here when you press the button. The '
+                  + 'rest are read and gone — what stays is the address and the file note.'
+                : 'Read and gone. What stays on this matter is the address and the file note — '
+                  + 'the files themselves are still in the drive, where the practice keeps '
+                  + 'them.'}</p>
+              <ul class="list">
+                ${drive.map((d) => html`
+                  <li><strong>${d.filename}</strong>
+                    <span class="muted small">${d.size_bytes > 0
+                      ? `${Math.round(d.size_bytes / 1024)} KB · ` : ''}${d.content_type}</span>
+                    ${d.kept ? html` <span class="badge badge-blue">copy kept</span>` : ''}
+                    <br><a href="${d.web_url}" target="_blank" rel="noopener">Open it in
+                      Drive</a></li>`)}
+              </ul>
+              <p class="hint">${LINK_MAY_BREAK}</p>` : ''}
             ${onFile.length ? html`
               <h4>Already on the file</h4>
               <ul class="list">
@@ -505,12 +790,12 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
                   <li><a href="/documents/${doc.document_id}">${doc.filename}</a>
                     <span class="muted small">— read where it sits; nothing is copied</span></li>`)}
               </ul>` : ''}
-            ${staged.length ? html`
+            ${uploaded.length ? html`
               <h4>Uploaded to this reading</h4>
-              <p class="hint">${staged.length === 1 ? 'It goes' : 'They go'} onto this matter when
-                 you press the button.</p>
+              <p class="hint">${uploaded.length === 1 ? 'It goes' : 'They go'} onto this matter
+                 when you press the button.</p>
               <ul class="list">
-                ${staged.map((file) => html`
+                ${uploaded.map((file) => html`
                   <li><strong>${file.filename}</strong>
                     <span class="muted small">${String(Math.round(file.size_bytes / 1024))} KB ·
                       ${file.content_type}</span></li>`)}
@@ -553,7 +838,7 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
 
     const loaded = await load(c.env, id, runId);
     if ('error' in loaded) return redirectWith(c, `/cases/${id}`, loaded.error, 'err');
-    const { kase, client, plan, note, sources } = loaded;
+    const { kase, client, plan, note, sources, drive } = loaded;
     const stamp = nowIso();
     // What was read, for the timeline entry and the audit line. The file note
     // names them too — `readingNote` puts them in its first sentence — so the
@@ -632,11 +917,41 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
       : null;
 
     // The documents the reading was taken from, onto the matter — the same R2
-    // objects, not copies.
+    // objects, not copies. For a drive reading these are the files the practice
+    // ticked to keep, and nothing else: *"throw away by default, tick to
+    // keep"*.
     const attached = await attachStagedTo(c.env, {
       runId, entityType: 'case', entityId: kase.id, userId: user.id,
-      description: `Read into this matter by the assistant on ${stamp.slice(0, 10)}.`,
+      description: drive.length
+        ? `Copy kept from Google Drive on ${stamp.slice(0, 10)}, read into this matter.`
+        : `Read into this matter by the assistant on ${stamp.slice(0, 10)}.`,
     });
+
+    // --- what stays of a drive file ------------------------------------------
+    //
+    // The practice's own design: *"could they be fetched, read, case created
+    // and they are then discarded from the system to only remain in the
+    // gdrive?"* So what lands on the matter is a **link** — `external_url` set,
+    // no stored object — and it lands here, on the press, rather than when the
+    // file was read. A reading nobody acted on leaves nothing on the file.
+    //
+    // The address is composed by the register from a Google file id it checked,
+    // not from anything posted; `addExternalDocument` is the one place a linked
+    // document is written, and the database triggers from migration 0044 hold
+    // the shape either way.
+    let linked = 0;
+    for (const file of drive) {
+      if (file.document_id) continue;
+      const made = await addExternalDocument(c.env, {
+        entityType: 'case', entityId: kase.id, url: file.web_url, title: file.filename,
+        uploadedBy: user.id,
+        description: `Read into this matter from Google Drive on ${stamp.slice(0, 10)}. `
+          + 'The register holds the address, not the document.',
+      });
+      if ('error' in made) continue;
+      await markDriveReadLinked(c.env, file.id, made.id);
+      linked += 1;
+    }
 
     // What the register did, in its own voice, on the matter's timeline. Kept
     // apart from the note above: one is a record of what a document said, the
@@ -671,7 +986,7 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
         inz_client_number: inzWritten,
         national_id: nationalIdWritten,
         nationalities: nationalitiesWritten,
-        note: Boolean(noteId), files: attached, read_from: sources,
+        note: Boolean(noteId), files: attached, linked, read_from: sources,
         matched: plan.match?.how ?? 'none',
         // What it read that the register could not place. The count, never the
         // content: the audit log is read by people who are not looking at this
@@ -685,7 +1000,11 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
         ? `Filled ${changed.length} empty ${changed.length === 1 ? 'box' : 'boxes'}.`
         : 'Nothing was empty to fill.')
       + (noteId ? ' What it found besides is on the file as a note.' : '')
-      + (attached ? ` ${attached} ${attached === 1 ? 'file is' : 'files are'} on the file.` : ''),
+      + (attached ? ` ${attached} ${attached === 1 ? 'file is' : 'files are'} on the file.` : '')
+      + (linked
+        ? ` ${linked} Drive ${linked === 1 ? 'file is' : 'files are'} linked on the file; `
+          + 'the documents stay in the drive.'
+        : ''),
       // Reading a document and finding nothing to fill is a perfectly ordinary
       // outcome, not a failure: the note is still on the file.
       'ok');
@@ -704,7 +1023,7 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
 async function load(
   env: AppContext['Bindings'], caseId: string, runId: string,
 ): Promise<{ kase: CaseFacts; client: ClientFacts; plan: ReadingPlan; note: string | null;
-             sources: string[] }
+             sources: string[]; drive: DriveRead[] }
           | { error: string }> {
   if (!runId) return { error: 'There is no reading to act on.' };
   const kase = await one<CaseFacts & { client_id: string }>(
@@ -734,14 +1053,44 @@ async function load(
   // about the run rather than a claim carried in the URL that drew the page.
   // The file note is written from it, and a file note cannot be corrected
   // afterwards.
-  const sources = [
+  //
+  // A file read out of Google Drive is the third source, and it is here for the
+  // same reason as the other two: the file note has to name what was read, and
+  // a drive file that was not kept leaves no other trace of having existed.
+  // Deduplicated by name, because a drive file the practice ticked to keep is
+  // recorded twice — once as a drive read, once as the staged copy — and it is
+  // one file either way.
+  const drive = await driveReadsBy(env, runId);
+  const sources = [...new Set([
     ...(await stagedFor(env, runId)).map((f) => f.filename),
     ...(await documentsReadBy(env, runId)).map((d) => d.filename),
-  ];
+    ...drive.map((d) => d.filename),
+  ])];
   return {
-    kase, client, plan, sources,
+    kase, client, plan, sources, drive,
     note: readingNote(plan, found.result, { sources, at: found.at, by: found.by }),
   };
+}
+
+/**
+ * Whether a drive reading may happen at all, and with whose credentials.
+ *
+ * Two gates, in the order they matter. The AI first, because a reading with
+ * nothing to read it is nothing — the same refusal `/:id/read` gives. Then
+ * Drive itself: unconnected, the card on the matter is not drawn, so reaching
+ * either route means a form somebody kept from before it was switched off or
+ * built by hand, and the answer is the plain one an administrator can act on.
+ */
+function driveReady(
+  env: AppContext['Bindings'],
+): { creds: NonNullable<ReturnType<typeof driveCredentials>> } | { error: string } {
+  if (!isAiEnabled(env)) return { error: 'The AI layer is not switched on.' };
+  const creds = driveCredentials(env);
+  if (!creds) {
+    return { error: 'Google Drive is not connected, so nothing can be read from it. An '
+                    + 'administrator can set it up — Settings → Integrations.' };
+  }
+  return { creds };
 }
 
 /**
@@ -755,15 +1104,30 @@ async function load(
  * recorded run, the review, the press — is then one path, and the practice's
  * *"much easier on the client"* costs the register no second set of rules.
  *
- * A linked drive file is refused by name rather than fetched: the register
- * holds the address, not the document, and the drive decides who may open it.
+ * A link into the practice's Google Drive is the third way in, added the same
+ * day Drive was connected. It is not a fourth path: the bytes come back from
+ * Drive, get wrapped in the same `File`, and go through the same reader. The
+ * link row is left exactly as it was — the document stays in the drive, and
+ * what the register holds is still the address.
+ *
+ * A link to anywhere else is still refused by name rather than fetched. The
+ * register holds the address, not the document, and it has no business
+ * following an address into somebody's server on a button press.
  */
 async function openStored(
   env: AppContext['Bindings'], doc: ReadingSourceDoc,
 ): Promise<{ file: File } | { error: string }> {
   if (doc.external_url) {
-    return { error: `${doc.filename} is a link to a file in a drive, so there is nothing here `
-                    + 'to read. Open it there and upload it, or paste the text.' };
+    const fileId = driveFileIdIn(doc.external_url);
+    if (!fileId) {
+      return { error: `${doc.filename} is a link to a file in a drive, so there is nothing here `
+                      + 'to read. Open it there and upload it, or paste the text.' };
+    }
+    const ready = driveReady(env);
+    if ('error' in ready) return ready;
+    const entry = await driveEntry(env, ready.creds, fileId);
+    if ('error' in entry) return entry;
+    return openDriveFile(env, ready.creds, entry);
   }
   if (!env.DOCS) {
     return { error: 'File storage is not switched on, so a document already on the file '

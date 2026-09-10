@@ -66,6 +66,20 @@ export interface Env {
   /** Only for display on the integrations page; nothing is authorised by it. */
   GMAIL_INBOX_ADDRESS?: string;
 
+  /**
+   * Google Drive, read-only, as a source of client documents.
+   *
+   * Its own client and its own refresh token, never the mail account's. Two
+   * reasons, both of which cost something if they are ignored: revoking the
+   * register's access to the practice's documents must not stop its outgoing
+   * mail, and the two grants carry different scopes — `drive.readonly` here
+   * against `gmail.send` and `gmail.readonly` there. Nothing falls back to the
+   * `GMAIL_*` pair; see `integrations/gdrive.ts` for why not.
+   */
+  GDRIVE_CLIENT_ID?: string;
+  GDRIVE_CLIENT_SECRET?: string;
+  GDRIVE_REFRESH_TOKEN?: string;
+
   AI_PROVIDER?: string;
   ANTHROPIC_API_KEY?: string;
 }

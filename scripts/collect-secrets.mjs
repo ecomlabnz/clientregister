@@ -30,6 +30,12 @@ const SECRET_NAMES = [
   'GMAIL_INBOX_CLIENT_ID',
   'GMAIL_INBOX_CLIENT_SECRET',
   'GMAIL_INBOX_ADDRESS',
+  // Google Drive, read-only. Its own client and its own refresh token, never
+  // the mail account's: revoking the register's access to the practice's
+  // documents must not stop its outgoing mail.
+  'GDRIVE_CLIENT_ID',
+  'GDRIVE_CLIENT_SECRET',
+  'GDRIVE_REFRESH_TOKEN',
   'AI_PROVIDER',
   // AI_MODEL is deliberately absent: which model runs is a setting, chosen
   // under Settings → AI Assistant, so there is one place that answers it.

@@ -34,6 +34,8 @@ import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
 import { FormReader } from '../../core/validate';
 import { sanitiseHtml } from '../../core/sanitise';
 import { fileOntoRecord, filingSearch, filingTargetLabel, markIngestFiled, markLinkedFiled, parseFilingChoice, unfile } from '../../core/filing';
+import { attachInboxUploadsTo, dropInboxUploads, inboxUploadsFor } from '../../core/inboxfiles';
+import { fileResponse } from '../../core/files';
 import {
   CHANNEL_LABELS, type ThreadEntry, type ThreadRow,
   forwardQuote, linkThread, postReply, threadFor, threadHistory,
@@ -571,6 +573,12 @@ export const inboxModule: AppModule = {
           meta: { sender: m.sender, subject: m.subject, channel: m.channel, bulk: true },
         });
       }
+      // The bytes of anything that arrived with these and never reached a
+      // record. Deleting a captured message is the practice saying it should
+      // not hold what arrived, and a file left in the bucket would contradict
+      // that. Files already put on a client or a matter are left alone — that
+      // document is not this message. See `core/inboxfiles.ts`.
+      await dropInboxUploads(c.env, going.map((m) => m.id));
       const changed = await runByIds(c.env.DB, going.map((m) => m.id),
         (placeholders) => `DELETE FROM ingest_messages WHERE id IN (${placeholders})`);
 
@@ -689,6 +697,7 @@ export const inboxModule: AppModule = {
 
       const user = c.get('user')!;
       let filed = 0;
+      let landed = 0;
       for (const row of going) {
         // Read one at a time: the note carries the whole message, and two
         // hundred of those held in memory at once is a different kind of
@@ -707,6 +716,14 @@ export const inboxModule: AppModule = {
         }, markIngestFiled(c.env, msg.id, target, targetId, user.id));
         if (!done) continue;
         filed += 1;
+        // Whatever arrived with it goes onto the same record, as the same
+        // bytes. See `core/inboxfiles.ts`: a file sent in by a shortcut has
+        // been waiting for somebody to say which client it is for, and this is
+        // that press.
+        landed += await attachInboxUploadsTo(c.env, {
+          messageId: msg.id, entityType: target, entityId: targetId, userId: user.id,
+          description: `Sent in from ${msg.sender_display ?? msg.channel}.`,
+        });
         // One audit row per message, as the single filing writes, so the log
         // says which messages went where rather than that six of them did.
         await auditFrom(c, {
@@ -721,6 +738,7 @@ export const inboxModule: AppModule = {
       const skipped = found.length - filed;
       return redirectWith(c, `/${target === 'case' ? 'cases' : 'clients'}/${targetId}`,
         `Filed ${String(filed)} ${filed === 1 ? 'message' : 'messages'} on ${label}.`
+        + (landed ? ` ${String(landed)} ${landed === 1 ? 'file is' : 'files are'} on the record.` : '')
         + (skipped
           ? ` ${String(skipped)} left alone, because ${skipped === 1 ? 'it was' : 'they were'} already filed.`
           : ''));
@@ -1353,6 +1371,11 @@ ${quote}</textarea>
       const attachments = msg.attachments_json
         ? (JSON.parse(msg.attachments_json) as Array<{ filename: string; contentType: string; size: number }>)
         : [];
+      // What actually arrived with bytes attached, as opposed to what the
+      // message merely names. Today that is a shortcut upload from the
+      // practice's own Mac or phone; an email attachment is still only named,
+      // because nothing keeps those yet.
+      const kept = await inboxUploadsFor(c.env, id);
       const aiAvailable = isAiEnabled(c.env) && can(c.get('user'), 'ai:run');
       const suggestion = await latestTriage(c.env, 'ingest_message', id);
       // A circular can be filed in the knowledge base as well as — or instead
@@ -1428,7 +1451,15 @@ ${quote}</textarea>
                     ? html`<p class="small muted"><a href="?">Show it as it was sent</a></p>`
                     : ''}`)}
 
-            ${attachments.length > 0 ? card('Attachments', html`
+            ${kept.length > 0 ? card('Files that came with it', html`
+              <ul class="list">${kept.map((f) => html`
+                <li><a href="/inbox/${id}/files/${f.id}">${f.filename}</a>
+                    <span class="muted small">${f.content_type} · ${Math.ceil(f.size_bytes / 1024)} KB${
+                      f.attached_at ? ' · already on the record' : ''}</span></li>`)}</ul>
+              <p class="hint">These are kept. Filing this onto a matter or a client puts them on
+                 that record as documents, ready for a reading.</p>`) : ''}
+
+            ${attachments.length > 0 && kept.length === 0 ? card('Attachments', html`
               <ul class="list">${attachments.map((a) => html`
                 <li>${a.filename} <span class="muted small">${a.contentType}${a.size ? ` · ${Math.ceil(a.size / 1024)} KB` : ''}</span></li>`)}</ul>
               <p class="hint">Attachment contents are not stored: enable R2 to keep documents.</p>`) : ''}
@@ -1558,10 +1589,18 @@ ${quote}</textarea>
       // item filed onto nothing is gone from the list and present on no record.
       if (!filed) return redirectWith(c, `/inbox/${id}`, 'That matter or client no longer exists.', 'err');
 
+      // And whatever arrived with it goes onto the same record, as the same
+      // bytes rather than a copy. See `core/inboxfiles.ts`.
+      const landed = await attachInboxUploadsTo(c.env, {
+        messageId: id, entityType: target, entityId: targetId, userId: user.id,
+        description: `Sent in from ${msg.sender_display ?? msg.channel}.`,
+      });
+
       await auditFrom(c, { action: 'inbox.filed', entityType: 'ingest_message', entityId: id,
-        meta: { target, targetId, entryId: filed.entryId } });
+        meta: { target, targetId, entryId: filed.entryId, files: landed } });
       return redirectWith(c, `/${target === 'case' ? 'cases' : 'clients'}/${targetId}`,
-        `Filed on ${filed.label}.`);
+        `Filed on ${filed.label}.`
+        + (landed ? ` ${String(landed)} ${landed === 1 ? 'file is' : 'files are'} on the record.` : ''));
     });
 
     /** Put it back in the working list. The note it wrote stays on the file. */
@@ -1615,8 +1654,35 @@ ${quote}</textarea>
         action: 'inbox.deleted', entityType: 'ingest_message', entityId: id,
         meta: { sender: msg.sender, subject: msg.subject, channel: msg.channel },
       });
+      // As in the bulk delete: the bytes of anything that arrived with it and
+      // never reached a record go too. See `core/inboxfiles.ts`.
+      await dropInboxUploads(c.env, [id]);
       await run(c.env.DB, 'DELETE FROM ingest_messages WHERE id = ?', id);
       return redirectWith(c, '/inbox', 'Deleted. The audit log keeps the record that it arrived.');
+    });
+
+    /**
+     * One of the files that arrived with a message, handed back.
+     *
+     * Streamed through the Worker rather than by a public or signed URL, like
+     * every other file the register holds, so the read stays inside the session
+     * and behind the same permission as the message it came with. The headers
+     * are `core/files.ts`'s, which is what stops something user-supplied being
+     * handed back with a content type a browser would execute.
+     */
+    r.get('/:id/files/:fileId', requirePermission('ingest:triage'), async (c) => {
+      const id = c.req.param('id')!;
+      const fileId = c.req.param('fileId')!;
+      // Matched on both ids, so a file id from one message cannot be read
+      // through another.
+      const file = (await inboxUploadsFor(c.env, id)).find((f) => f.id === fileId);
+      if (!file) return c.notFound();
+      if (!c.env.DOCS) return c.notFound();
+      const object = await c.env.DOCS.get(file.r2_key);
+      if (!object) return c.notFound();
+      return fileResponse(object.body, {
+        filename: file.filename, content_type: file.content_type, size_bytes: file.size_bytes,
+      });
     });
 
     r.post('/:id/triage', requirePermission('ai:run'), async (c) => {

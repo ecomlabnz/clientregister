@@ -39,6 +39,15 @@ MAIL_PROVIDER=none
 MAIL_FROM=
 RESEND_API_KEY=
 
+# --- Google Drive, read-only (optional) ---
+# Its own OAuth client, never the mail one: revoking Drive must not stop
+# outgoing mail, and the two grants carry different scopes. Scope to grant:
+#   https://www.googleapis.com/auth/drive.readonly
+# Steps in docs/integrations.md. Without all three there is no Drive card.
+GDRIVE_CLIENT_ID=
+GDRIVE_CLIENT_SECRET=
+GDRIVE_REFRESH_TOKEN=
+
 # --- AI layer (optional) ---
 # Provider: "workers-ai" (uses the bound AI binding), "anthropic", or "none".
 AI_PROVIDER=none

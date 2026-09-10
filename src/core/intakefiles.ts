@@ -182,6 +182,73 @@ export async function documentsReadBy(env: Env, runId: string): Promise<Document
 }
 
 /**
+ * The third state a file a reading read can be in: read, and thrown away.
+ *
+ * **Asked for on 11 September 2026:** *"could they be fetched, read, case
+ * created and they are then discarded from the system to only remain in the
+ * gdrive?"* — with the refinement *"throw away by default, tick to keep"*.
+ *
+ * The two halves above are the two states a file with bytes in the register can
+ * be in. A file in the practice's Google Drive is in neither: the bytes are
+ * fetched, read and dropped, and what is left on the matter is an address. So a
+ * drive read records what the reading needs to be able to say afterwards — the
+ * name, the kind, the address, and whether the practice ticked to keep a copy —
+ * and nothing else. See migration 0086 for why this is a table rather than a
+ * hidden field on the review screen.
+ *
+ * A ticked "keep a copy" is *not* handled here. That file is staged exactly as
+ * an upload is, by `stageUpload` above, and lands on the matter by
+ * `attachStagedTo` with the same press. One way for bytes to reach a matter,
+ * not two.
+ */
+export interface DriveRead {
+  id: string;
+  run_id: string;
+  file_id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  web_url: string;
+  kept: number;
+  read_at: string;
+  document_id: string | null;
+  linked_at: string | null;
+}
+
+export async function recordDriveRead(
+  env: Env,
+  opts: {
+    runId: string; fileId: string; filename: string; contentType: string;
+    sizeBytes: number; webUrl: string; keep: boolean;
+  },
+): Promise<void> {
+  await run(
+    env.DB,
+    // OR IGNORE on the (run, file) uniqueness: the same drive file ticked twice
+    // on one press is one reading of one set of bytes.
+    `INSERT OR IGNORE INTO drive_reads (id, run_id, file_id, filename, content_type,
+        size_bytes, web_url, kept, read_at)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    newId('dvr'), opts.runId, opts.fileId, safeFilename(opts.filename), opts.contentType,
+    opts.sizeBytes, opts.webUrl, opts.keep ? 1 : 0, nowIso(),
+  );
+}
+
+/** What one reading took out of the drive, oldest first. */
+export async function driveReadsBy(env: Env, runId: string): Promise<DriveRead[]> {
+  return all<DriveRead>(
+    env.DB, 'SELECT * FROM drive_reads WHERE run_id = ? ORDER BY read_at, filename', runId);
+}
+
+/** Mark a drive read as having become a document on the matter. */
+export async function markDriveReadLinked(
+  env: Env, id: string, documentId: string,
+): Promise<void> {
+  await run(env.DB, 'UPDATE drive_reads SET document_id = ?, linked_at = ? WHERE id = ?',
+            documentId, nowIso(), id);
+}
+
+/**
  * Delete the files of readings nobody acted on.
  *
  * Run nightly. A reading that was never applied leaves its uploads in R2 with

@@ -59,8 +59,15 @@ describe('the manual keeps up with the application', () => {
       // so it is described under Quotes, where the practice meets it, rather
       // than as a thing of its own. If it ever gains a menu entry, take this
       // out and write it a section.
+      //
+      // `shortcut` is the same case again, and more so: it owns one address
+      // that an Apple Shortcut posts to and not one page a person opens. Where
+      // the practice meets it is their own account page — make a token, follow
+      // the steps — so it is described there and in `docs/apple-shortcut.md`,
+      // under "account", rather than as a section about a screen that does not
+      // exist.
       && !['landing', 'auth', 'dashboard', 'help', 'documents', 'workflows', 'inbox',
-           'mail'].includes(name));
+           'mail', 'shortcut'].includes(name));
     expect(undocumented, `no manual section: ${undocumented.join(', ')}`).toEqual([]);
   });
 });

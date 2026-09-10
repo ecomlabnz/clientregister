@@ -70,6 +70,7 @@ missing from the workflow.
 | `GMAIL_INBOX_REFRESH_TOKEN` | reading a mailbox | Scope `gmail.readonly`. **Never the sending account's token** — it is what names the mailbox. |
 | `GMAIL_INBOX_CLIENT_ID` · `GMAIL_INBOX_CLIENT_SECRET` | reading a mailbox | Fall back to the sending pair only when both accounts are in the same Google project. A refresh token is bound to the client that issued it, so a token from a different project needs its own pair. |
 | `GMAIL_INBOX_ADDRESS` | display only | Lets the integrations page name the mailbox being read. Authorises nothing. |
+| `GDRIVE_CLIENT_ID` · `GDRIVE_CLIENT_SECRET` · `GDRIVE_REFRESH_TOKEN` | reading the practice's Google Drive | Scope `drive.readonly`. **Its own OAuth client, never the mail one** — revoking Drive must not stop outgoing mail, and the two grants carry different scopes. Nothing falls back to `GMAIL_*`. Without all three there is no Drive card on a matter at all. |
 
 ### Setting or changing one
 

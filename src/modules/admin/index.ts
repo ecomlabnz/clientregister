@@ -34,6 +34,9 @@ import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../c
 import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABELS, SPLIT_BASES } from '../../core/money';
 import { currentModel, isAiEnabled } from '../../ai/provider';
 import { nzbnConfigured } from '../../integrations/nzbn';
+import {
+  driveConfigured, driveCredentialProblem, driveSetupGaps,
+} from '../../integrations/gdrive';
 import { mailConfigured, mailSetupGaps, mailTransportDetail } from '../../mail/provider';
 import { inboxCredentials, inboxSetupGaps, pollInbox } from '../../ingest/gmail';
 import { flushQueue, queueEmail } from '../../mail/queue';
@@ -231,6 +234,18 @@ export const adminModule: AppModule = {
           statusRow('Outbound email', mailConfigured(env), mailTransportDetail(env)),
           statusRow('Document storage', Boolean(env.DOCS),
             'R2 bucket binding DOCS. Enable R2 in the dashboard, then uncomment the binding.'),
+          statusRow('Google Drive — read a document from a folder', driveConfigured(env),
+            driveConfigured(env)
+              ? (driveCredentialProblem(env)
+                  ? `Set up, but ${driveCredentialProblem(env)}.`
+                  : 'Read-only (drive.readonly). Paste a folder or file address on a matter and '
+                    + 'the register lists what is there. A file is read and thrown away unless '
+                    + 'you tick to keep a copy; what stays is the address and the file note. '
+                    + 'Its own credentials, so revoking this does not stop outgoing mail.')
+              : 'Not set up. Connect it and a file dropped into a matter’s Drive folder can be '
+                + 'read into the matter without downloading it. Its own credentials, separate '
+                + `from mail. Still needed: ${driveSetupGaps(env).join(', ')}. `
+                + 'Steps in docs/integrations.md.'),
         ])}`) : ''}
 
         ${tab === 'modules' ? card('Modules', html`

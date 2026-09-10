@@ -37,6 +37,22 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.45.0', date: '11 September 2026',
+    notes: [
+      'You can now send a file straight from Finder or your phone into the register\u2019s inbox. '
+        + 'Set it up under My account \u2192 Sending files in. It works from any folder \u2014 '
+        + 'iCloud, Proton, Drive \u2014 because you are sending the file out rather than the '
+        + 'register reaching in.',
+      'The button carries a token, shown once and revocable. If it ever leaked, the holder could '
+        + 'only drop a file into your inbox \u2014 nothing can be read with it.',
+      'On a matter you can also paste a Google Drive folder or file address. The register lists '
+        + 'what is there, you tick what to read, and it fills in what it can.',
+      'A file read from Drive is not kept. What stays is the details you approved, a file note '
+        + 'saying what was read, and a link back to Drive. Tick "keep a copy" for the few you want '
+        + 'held here \u2014 a signed letter of engagement, an INZ decision.',
+    ],
+  },
+  {
     version: '1.44.1', date: '11 September 2026',
     notes: [
       'Clearing a payment stage\u2019s amount box used to put the old amount back without saying '
