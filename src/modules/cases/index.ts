@@ -123,7 +123,7 @@ function caseForm(
   const action = values.id ? `/cases/${values.id}` : '/cases';
   return html`
     ${errorList(errors)}
-    <form method="post" action="${action}" class="form-grid">
+    <form method="post" action="${action}" class="form-grid" data-draft>
       ${csrfField(csrf)}
       <div class="form-section">
         <h3>Matter</h3>

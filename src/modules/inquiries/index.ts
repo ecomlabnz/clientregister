@@ -283,7 +283,7 @@ export const inquiriesModule: AppModule = {
           ? html`<div class="alert alert-ok">Filled in from what the assistant read. Check it before
                    saving — it is a reading, not a fact.</div>`
           : ''}
-        <form method="post" action="/inquiries" class="form-grid">
+        <form method="post" action="/inquiries" class="form-grid" data-draft>
           ${csrfField(csrf)}
           <div class="form-section">
             <h3>Where it came from</h3>
@@ -543,7 +543,7 @@ export const inquiriesModule: AppModule = {
       return page(c, { title: `Edit ${inq.ref}`, active: '/inbox' }, html`
         ${breadcrumbs([{ href: '/inquiries', label: 'Inquiries' }, { href: `/inquiries/${inq.id}`, label: inq.ref }, { label: 'Edit' }])}
         ${pageHeader(`Edit ${inq.ref}`)}
-        <form method="post" action="/inquiries/${inq.id}" class="form-grid">
+        <form method="post" action="/inquiries/${inq.id}" class="form-grid" data-draft>
           ${csrfField(csrf)}
           <div class="form-section">
             <h3>Where it came from</h3>

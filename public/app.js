@@ -618,4 +618,245 @@
       search.focus();
     }
   });
+
+
+  /* ------------------------------------------------------------------ *
+     Nothing typed is lost to a closed tab, a stray click, or a crash.
+
+     Asked for on 10 September 2026: "i also want to add automatic saving of
+     details entered - say every 1.5 minute after the change - possible?" Two
+     of the three answers were chosen — "build both, 1 and 2, do not build 3."
+
+       1. A draft kept in this browser, offered back when the page reopens.
+       2. A warning before leaving a form with changes not yet saved.
+
+     What was deliberately NOT built is the third: writing to the register
+     every ninety seconds by itself. A register that saves without being told
+     to has no moment where a person decided the record was right, and the file
+     note, the audit line and the alerts all hang off that moment. It would
+     also record half-typed values as facts. The draft below is the opposite:
+     it is private to the browser and reaches the register only when somebody
+     presses Save.
+
+     ## What is kept, and where
+
+     A form opts in with `data-draft`. Only those are watched, so a password
+     box, a search box and a one-click action form are out by construction
+     rather than by a list somebody has to maintain.
+
+     The draft lives in this browser's own storage, under the form's own
+     address, and never leaves the machine. Passwords, files and hidden fields
+     — a cross-site token is not a draft — are never written. It is dropped
+     when the form is submitted, when the person signs out, and in any case
+     twelve hours after it was written.
+
+     That last part matters and is worth saying plainly: while a draft exists,
+     part of a client's record is on the disk of whatever machine it was typed
+     on. That is the price of surviving a closed tab, and it is why the drafts
+     are short-lived and go at sign-out.
+   * ------------------------------------------------------------------ */
+  (function () {
+    var SAVE_EVERY = 90 * 1000;              // "say every 1.5 minute"
+    var KEEP_FOR = 12 * 60 * 60 * 1000;      // and no longer
+    var PREFIX = 'draft:';
+
+    // Private browsing, a browser with storage switched off, or a quota
+    // already full. The forms carry on working exactly as they do with this
+    // whole file blocked.
+    var store = (function () {
+      try {
+        window.localStorage.setItem(PREFIX + 'probe', '1');
+        window.localStorage.removeItem(PREFIX + 'probe');
+        return window.localStorage;
+      } catch (e) { return null; }
+    })();
+    if (!store) return;
+
+    function forget(key) { try { store.removeItem(key); } catch (e) { /* full or gone */ } }
+
+    function forgetEverything() {
+      var keys = [];
+      try {
+        for (var i = 0; i < store.length; i += 1) {
+          var k = store.key(i);
+          if (k && k.indexOf(PREFIX) === 0) keys.push(k);
+        }
+      } catch (e) { return; }
+      keys.forEach(forget);
+    }
+
+    /* The fields worth keeping. Passwords and files cannot be restored and
+       must not be written down; hidden fields are the server's business. */
+    function fields(form) {
+      return Array.prototype.filter.call(form.elements, function (el) {
+        if (!el.name || el.disabled) return false;
+        var type = (el.type || '').toLowerCase();
+        return type !== 'password' && type !== 'file' && type !== 'hidden'
+            && type !== 'submit' && type !== 'button' && type !== 'reset';
+      });
+    }
+
+    /* Position and name together, so a repeated name (a row of checkboxes) is
+       kept exactly and a form whose shape has changed since the draft was
+       written restores only the boxes that still line up. */
+    function readForm(form) {
+      return fields(form).map(function (el) {
+        var type = (el.type || '').toLowerCase();
+        if (type === 'checkbox' || type === 'radio') return [el.name, el.checked];
+        if (el.multiple && el.options) {
+          return [el.name, Array.prototype.filter.call(el.options, function (o) {
+            return o.selected;
+          }).map(function (o) { return o.value; })];
+        }
+        return [el.name, el.value];
+      });
+    }
+
+    function writeForm(form, saved) {
+      fields(form).forEach(function (el, i) {
+        var entry = saved[i];
+        if (!entry || entry[0] !== el.name) return;   // the form has moved on
+        var value = entry[1];
+        var type = (el.type || '').toLowerCase();
+        if (type === 'checkbox' || type === 'radio') { el.checked = Boolean(value); return; }
+        if (el.multiple && el.options) {
+          Array.prototype.forEach.call(el.options, function (o) {
+            o.selected = value.indexOf(o.value) !== -1;
+          });
+          return;
+        }
+        el.value = value;
+      });
+    }
+
+    function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+    /* When the draft was written, said the way a person says it. */
+    function when(at) {
+      var then = new Date(at);
+      var today = new Date();
+      var sameDay = then.getFullYear() === today.getFullYear()
+                 && then.getMonth() === today.getMonth()
+                 && then.getDate() === today.getDate();
+      return sameDay
+        ? then.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+        : then.toLocaleString([], {
+            day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit',
+          });
+    }
+
+    var watched = [];
+    var submitting = null;
+
+    Array.prototype.forEach.call(document.querySelectorAll('form[data-draft]'), function (form) {
+      // The form's own address is its identity: the edit page for one client
+      // and the edit page for another are different addresses, and the new
+      // form is a third. Nothing has to be kept in step by hand.
+      var key = PREFIX + form.method.toUpperCase() + ' ' + form.action;
+      var asLoaded = readForm(form);
+      var timer = null;
+      var mine = { form: form, dirty: function () { return !same(readForm(form), asLoaded); } };
+      watched.push(mine);
+
+      function save() {
+        if (!mine.dirty()) { forget(key); return; }
+        try {
+          store.setItem(key, JSON.stringify({ at: Date.now(), fields: readForm(form) }));
+        } catch (e) { /* quota: the form still works, there is just no draft */ }
+      }
+
+      function stopSaving() {
+        if (timer) { window.clearInterval(timer); timer = null; }
+      }
+
+      function startSaving() {
+        if (timer) return;
+        timer = window.setInterval(save, SAVE_EVERY);
+      }
+
+      form.addEventListener('input', startSaving);
+      form.addEventListener('change', startSaving);
+
+      form.addEventListener('submit', function () {
+        // It is on its way to the register now, and if the server rejects it
+        // the server sends the values back in the page.
+        submitting = form;
+        stopSaving();
+        forget(key);
+        asLoaded = readForm(form);
+      });
+
+      // Ninety seconds is a long time to lose to a closed tab, so the last
+      // moment the browser gives us is used as well.
+      window.addEventListener('pagehide', function () { if (submitting !== form) save(); });
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'hidden' && submitting !== form) save();
+      });
+
+      // Offer back whatever is already there.
+      var raw = null;
+      try { raw = store.getItem(key); } catch (e) { raw = null; }
+      if (!raw) return;
+      var draft = null;
+      try { draft = JSON.parse(raw); } catch (e) { draft = null; }
+      if (!draft || !draft.fields || typeof draft.at !== 'number') { forget(key); return; }
+      if (Date.now() - draft.at > KEEP_FOR) { forget(key); return; }
+      // Nothing to offer: the page already says what the draft says.
+      if (same(draft.fields, asLoaded)) { forget(key); return; }
+
+      // Offered, never applied on its own. Someone else may have saved this
+      // record since, and quietly overwriting their work with an old draft is
+      // the sort of thing nobody notices until it matters.
+      var offer = document.createElement('div');
+      offer.className = 'draft-offer';
+      var said = document.createElement('p');
+      said.className = 'draft-offer-said';
+      said.textContent = 'You have changes to this page from ' + when(draft.at)
+        + ' that were never saved. They were kept in this browser only.';
+      var acts = document.createElement('p');
+      acts.className = 'draft-offer-acts';
+      var restore = document.createElement('button');
+      restore.type = 'button';
+      restore.className = 'btn btn-secondary btn-small';
+      restore.textContent = 'Put them back';
+      var discard = document.createElement('button');
+      discard.type = 'button';
+      discard.className = 'btn btn-link';
+      discard.textContent = 'Discard them';
+      restore.addEventListener('click', function () {
+        writeForm(form, draft.fields);
+        forget(key);
+        offer.remove();
+        startSaving();
+      });
+      discard.addEventListener('click', function () { forget(key); offer.remove(); });
+      acts.appendChild(restore);
+      acts.appendChild(discard);
+      offer.appendChild(said);
+      offer.appendChild(acts);
+      form.insertBefore(offer, form.firstChild);
+    });
+
+    /* Leaving with changes not yet saved.
+
+       The browser writes the wording, not us — every browser refuses a custom
+       message, because a page that could write its own would be used to
+       frighten people into staying. Returning anything at all is the whole of
+       the API. */
+    window.addEventListener('beforeunload', function (event) {
+      var unsaved = watched.some(function (w) { return w.form !== submitting && w.dirty(); });
+      if (!unsaved) return;
+      event.preventDefault();
+      event.returnValue = '';
+      return '';
+    });
+
+    /* Signing out clears the lot. A draft is part of a client's record sitting
+       on this machine, and the point of signing out is that it is not there
+       for the next person. */
+    document.addEventListener('submit', function (event) {
+      var form = event.target;
+      if (form instanceof HTMLFormElement && /\/logout$/.test(form.action)) forgetEverything();
+    });
+  })();
 })();

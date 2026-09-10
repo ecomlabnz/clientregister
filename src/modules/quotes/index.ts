@@ -637,7 +637,7 @@ export const quotesModule: AppModule = {
       return page(c, { title: 'New quote', active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { label: 'New' }])}
         ${pageHeader('New quote', 'Start with who it is for and what it covers. The items go on next.')}
-        <form method="post" action="/quotes" class="form-grid">
+        <form method="post" action="/quotes" class="form-grid" data-draft>
           ${csrfField(csrf)}
           <input type="hidden" name="inquiry_id" value="${presetInquiry}">
           ${'' /* The quotation is named rather than described. The practice, on
@@ -2047,7 +2047,7 @@ export const quotesModule: AppModule = {
       return page(c, { title: `Edit ${q.ref}`, active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { href: `/quotes/${q.id}`, label: q.ref }, { label: 'Edit' }])}
         ${pageHeader(`Edit ${q.ref}`)}
-        <form method="post" action="/quotes/${q.id}" class="form-grid">
+        <form method="post" action="/quotes/${q.id}" class="form-grid" data-draft>
           ${csrfField(csrf)}
           <div class="form-section">
             <h3>Who and what</h3>

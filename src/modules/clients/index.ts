@@ -181,7 +181,7 @@ function clientForm(
       <button type="button" class="tab" data-tab="immigration">Immigration</button>
       <button type="button" class="tab" data-tab="file">File</button>
     </nav>
-    <form method="post" action="${action}" class="form-grid js-client-form js-tabbed" data-tabs="client">
+    <form method="post" action="${action}" class="form-grid js-client-form js-tabbed" data-tabs="client" data-draft>
       ${csrfField(csrf)}
       <div class="form-section" data-panel="who">
         <h3>Who this is</h3>

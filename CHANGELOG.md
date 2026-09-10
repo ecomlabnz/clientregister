@@ -7,6 +7,49 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.39.0 — 11 September 2026
+
+### Added
+**Nothing typed is lost to a closed tab.** Asked for on 10 September: *"i also
+want to add automatic saving of details entered - say every 1.5 minute after
+the change - possible?"* — and narrowed the same day to the two answers that do
+not write to the register on their own: *"build both, 1 and 2, do not build
+3."*
+
+**A draft, kept in the browser.** Ninety seconds after a change, and again
+whenever the tab is hidden or the page is about to go away, whatever has been
+typed is written to that browser's own storage. Reopen the page and a bar at
+the top of the form says so, with **Put them back** and **Discard them**. It is
+offered, never applied by itself — somebody else may have saved the record
+since, and quietly overwriting their work with an old draft is the sort of
+thing nobody notices until it matters. If the draft matches what is already on
+the page, nothing is said.
+
+**A warning before leaving with changes not yet saved.** The browser writes the
+wording, not us; every browser refuses a custom message, because a page that
+could write its own would be used to frighten people into staying.
+
+On ten forms: the client, the case, both inquiry forms, the invoice, both
+knowledge-base forms, both quote forms, and the task. Not on search boxes,
+sign-in, or one-click actions.
+
+**What was deliberately not built** is the third option — writing to the
+register every ninety seconds by itself. A register that saves without being
+told to has no moment where a person decided the record was right, and the file
+note, the audit line and the alerts all hang off that moment. It would also
+record half-typed values as facts.
+
+**The cost, said plainly.** While a draft exists, part of a client's record is
+on the disk of whatever machine it was typed on. So: passwords, files and
+hidden fields are never written; a draft goes when the form is submitted, when
+the person signs out, and in any case after twelve hours; and it never leaves
+the machine. Written up under *Data* in `docs/security.md`.
+
+Tested by running `public/app.js` itself against a small stand-in for a
+browser, rather than by reading the file and asserting a line is in it — the
+drafts are a state machine, and a text assertion would pass while every one of
+its states was wrong.
+
 ## 1.38.0 — 11 September 2026
 
 ### Added
