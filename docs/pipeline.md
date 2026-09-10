@@ -285,10 +285,56 @@ generalised.
 3. `client_education` and `client_travel` — asked for by the forms, but neither
    drives a deadline.
 
-**What is still not decided, and does not need to be yet:** the declarations —
-convictions, removals, refusals, health. Those are answers a client gave on a
-date, not facts the register should assert on its own authority, and they belong
-to an application. They wait for that.
+**The declarations are not being built. Decided 11 September 2026** by the
+practice: *"disregard the declarations - they declare accurate info on their
+visa applications anyway."*
+
+That is the right call and it settles a question this document spent a page on.
+A conviction declaration is not a fact the register would be holding — it is an
+answer the client gives INZ, on INZ's own form, under INZ's own penalty for
+getting it wrong. Copying it into the register would create a second version of
+an answer that already has an authoritative home, and a second version that can
+drift from the first is worse than no version. **Do not build these.** If a
+future session finds a reason to, the reason has to be better than "the form
+asks for it", because that reason was already weighed and rejected here.
+
+**The histories remain undecided** — the practice is still weighing them
+(11 September 2026: *"Re the histories - i am thinking."*). The plan above is
+what to build **if** they are built; nothing starts until they say so.
+
+#### The direction the practice actually wants: the client sends documents, not data
+
+**Said on 11 September 2026**, and it reframes everything above:
+
+> *"there should be an option for the client to enter their details... no
+> scratch that... we need to make it easier for the client - so they email us
+> docs and we extract the data with AI systems. much easier on the client."*
+
+A client portal was considered and dropped in the same breath, rightly. A person
+applying for a visa has a folder of documents, not a spreadsheet of facts. Asking
+them to retype a passport into a web form is asking them to do the register's
+work badly — and every field they mistype is a field the practice then has to
+check against the document anyway.
+
+**Most of this already exists**, and it is worth writing down how little is left:
+
+- Email arrives with attachments → the inbox holds it, and its attachments
+  become documents (`ingest_messages`, `reply_attachments`, `documents`).
+- A message is filed to a matter (`filed_to_type` / `filed_to_id`).
+- A document can be read into a matter that already exists, proposing values a
+  person then approves — `/cases/:id/read`, built 11 September 2026.
+
+**The one missing join:** the reading takes an *upload*. A document that arrived
+by email is already on the matter, and cannot be read without downloading and
+re-uploading it. Connecting those two is a small piece of work and it is what
+turns the practice's sentence into a working routine: the client emails their
+passport, it lands on the matter, one press reads it in.
+
+This also changes what the histories are for. If a document can be read into a
+matter, a residence or employment history is something the register could
+*propose* from what it read — a passport's stamps, an employment letter's dates —
+rather than something anybody types. That is an argument for building them, and
+it belongs in the practice's thinking while they weigh it.
 
 #### Before any of this is built
 
