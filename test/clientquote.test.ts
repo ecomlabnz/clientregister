@@ -54,7 +54,8 @@ function seeded(status = 'sent', token: string | null = LINK) {
 }
 
 const accept = (h: ReturnType<typeof seeded>, form: Record<string, string> = {}) =>
-  h.post(`/q/${LINK}/accept`, { full_name: 'A Person', signed_on: '2026-09-09', confirm: '1', ...form });
+  h.post(`/q/${LINK}/accept`,
+    { full_name: 'A Person', confirm_name: '1', confirm: '1', ...form });
 
 describe('the client opens the link', () => {
   it('shows the quotation without an account', async () => {
@@ -66,11 +67,11 @@ describe('the client opens the link', () => {
     expect(body).toContain('$8,050.00');
   });
 
-  it('carries the acceptance form, the reminder, and the tick', async () => {
+  it('carries the acceptance form, the reminder, and both ticks', async () => {
     const body = await (await seeded().request(`/q/${LINK}`)).text();
     expect(body).toContain('accept-form');
     expect(body).toContain('name="full_name"');
-    expect(body).toContain('name="signed_on"');
+    expect(body).toContain('name="confirm_name"');
     expect(body).toContain('name="confirm"');
     // The bar that follows the reader. It is a reminder and a link, never the
     // button itself — see the note at the head of the module.
@@ -106,13 +107,16 @@ describe('accepting', () => {
     expect(q.accepted_name).toBe('A Person');
     expect(q.accepted_at).not.toBeNull();
     expect(q.status).toBe('accepted');
-    // The client's own date is kept beside the moment we received it, and
-    // neither is corrected against the other.
-    expect(q.accepted_from).toContain('signed 2026-09-09');
+    // The moment is the register's, written out with the zone said aloud —
+    // *"whenever the click is happening, would be good to include the time
+    // zone as well."*
+    expect(q.accepted_from).toMatch(/signed .*NZ(ST|DT)/);
   });
 
-  it('refuses without the tick, and without a name', async () => {
-    const cases: Array<Record<string, string>> = [{ confirm: '' }, { full_name: '   ' }];
+  it('refuses without either tick, and without a name', async () => {
+    const cases: Array<Record<string, string>> = [
+      { confirm: '' }, { confirm_name: '' }, { full_name: '   ' },
+    ];
     for (const missing of cases) {
       const h = seeded();
       await accept(h, missing);
@@ -120,6 +124,87 @@ describe('accepting', () => {
         'SELECT accepted_at FROM quotes WHERE id = ?', 'q1')!.accepted_at,
         JSON.stringify(missing)).toBeNull();
     }
+  });
+
+  /**
+   * **Asked for on 11 September 2026:** *"the date must be fixed - it cannot be
+   * selectable - whenever the click is happening, would be good to include the
+   * time zone as well ... need another line 'The above name is correct' and a
+   * tick box - so it is more deliberate action of accepting. and if not ticked
+   * - will not accept."*
+   *
+   * Two boxes and a date nobody types. What is pinned here is the server's
+   * side of it: `required` in the markup is a courtesy to a browser, and this
+   * is what happens without one.
+   */
+  describe('two ticks, and a date the client does not get to choose', () => {
+    /** What a refused client is actually shown, off the redirect. */
+    const refusal = (res: Response) => {
+      const location = res.headers.get('location') ?? '';
+      const err = new URL(location, 'https://example.test').searchParams.get('err');
+      return err ?? '';
+    };
+
+    it('refuses when the name box is not ticked, in words a client can act on', async () => {
+      const h = seeded();
+      const res = await accept(h, { confirm_name: '' });
+      expect(refusal(res)).toBe('Please tick the box to confirm the name above is correct.');
+      expect(h.get<{ accepted_at: string | null }>(
+        'SELECT accepted_at FROM quotes WHERE id = ?', 'q1')!.accepted_at).toBeNull();
+    });
+
+    it('refuses when the reading box is not ticked', async () => {
+      const h = seeded();
+      const res = await accept(h, { confirm: '' });
+      expect(refusal(res)).toBe('Please tick the box to confirm you have read the documents.');
+      expect(h.get<{ accepted_at: string | null }>(
+        'SELECT accepted_at FROM quotes WHERE id = ?', 'q1')!.accepted_at).toBeNull();
+    });
+
+    it('refuses a bare post that carries neither box', async () => {
+      // Not through the form at all: the boxes are simply absent, which is what
+      // a posted form without a browser looks like.
+      const h = seeded();
+      const res = await h.post(`/q/${LINK}/accept`, { full_name: 'A Person' });
+      expect(refusal(res)).toMatch(/tick the box/);
+      expect(h.get<{ accepted_at: string | null }>(
+        'SELECT accepted_at FROM quotes WHERE id = ?', 'q1')!.accepted_at).toBeNull();
+    });
+
+    it('accepts when both are ticked', async () => {
+      const h = seeded();
+      const res = await accept(h);
+      expect(refusal(res), 'nothing should have been refused').toBe('');
+      const q = h.get<{ accepted_at: string | null; status: string }>(
+        'SELECT accepted_at, status FROM quotes WHERE id = ?', 'q1')!;
+      expect(q.accepted_at).not.toBeNull();
+      expect(q.status).toBe('accepted');
+    });
+
+    it('offers no date control at all', async () => {
+      const body = await (await seeded().request(`/q/${LINK}`)).text();
+      expect(body).not.toContain('type="date"');
+      expect(body).not.toContain('name="signed_on"');
+      // Shown instead as read-only text, with the zone said aloud.
+      expect(body).toMatch(/class="accept-when">[^<]*NZ(ST|DT)/);
+    });
+
+    it('ignores a date posted in the body', async () => {
+      // The one that matters: somebody who writes their own form cannot put a
+      // date of their choosing onto a contract.
+      const h = seeded();
+      await accept(h, { signed_on: '1999-01-01', accepted_at: '1999-01-01T00:00:00Z' });
+      const q = h.get<{ accepted_at: string; accepted_from: string }>(
+        'SELECT accepted_at, accepted_from FROM quotes WHERE id = ?', 'q1')!;
+      expect(q.accepted_at.startsWith('1999')).toBe(false);
+      expect(q.accepted_from).not.toContain('1999');
+      // It is now, to the day, in the register's own clock.
+      expect(q.accepted_at.slice(0, 10)).toBe(new Date().toISOString().slice(0, 10));
+
+      const note = h.get<{ body: string }>(
+        `SELECT body FROM entries WHERE entity_type = 'quote' AND entity_id = 'q1'`)!;
+      expect(note.body).not.toContain('1999');
+    });
   });
 
   it('writes a file note on the client, pinned', async () => {
@@ -148,10 +233,10 @@ describe('accepting', () => {
     expect(note, 'nothing written on the quotation').not.toBeNull();
     expect(note.pinned).toBe(1);
     expect(note.body).toContain('A Person');
-    // The two dates are different things and both are recorded: what the client
-    // said they signed on, and when it actually arrived.
-    expect(note.body).toMatch(/Signed as at/);
-    expect(note.body).toMatch(/Received/);
+    // One moment, ours, with the zone named. There is no longer a second date
+    // for the client to give — see 11 September 2026.
+    expect(note.body).toMatch(/Accepted: .*NZ(ST|DT)/);
+    expect(note.body).not.toMatch(/Signed as at/);
     // What was accepted, in money.
     expect(note.body).toContain('$8,050.00');
     // And that it is now fixed, which is the thing somebody needs to know

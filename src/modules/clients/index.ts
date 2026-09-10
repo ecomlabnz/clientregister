@@ -30,6 +30,7 @@ import { html, raw, type Raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
   actionButton, badge, card, csrfField, emptyState, errorList, field, flagBand, flagHistory, flagRaiser, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
+  testDataBand,
 } from '../../ui/components';
 import {
   ageYears, dateInputValue, dateOrDateTime, dateShort, dateTime, isOverdue, money, relativeDays,
@@ -78,6 +79,12 @@ import {
 } from '../../integrations/nzbn';
 
 export interface ClientRow {
+  /**
+   * 1 when this is test data — a record the practice is only trying things
+   * with, which Admin → Test data will delete. See migration 0083.
+   */
+  is_test: number;
+
   id: string; ref: string; kind: ClientKind; full_name: string; preferred_name: string | null;
   given_names: string | null; family_name: string | null;
   nzbn: string | null; company_number: string | null;
@@ -799,7 +806,7 @@ export const clientsModule: AppModule = {
         ], shown.map((row) => html`
           <tr>
             <td class="col-sm-hide"><a href="/clients/${row.id}"><code>${row.ref}</code></a></td>
-            <td><a href="/clients/${row.id}">${row.full_name}</a>
+            <td><a href="/clients/${row.id}">${row.full_name}</a>${row.is_test === 1 ? html` ${badge('Test', 'amber')}` : ''}
                 <div class="muted small">
                   ${row.kind === 'organisation'
                     ? html`Organisation${row.nzbn ? html` · NZBN ${row.nzbn}` : ''}`
@@ -1213,6 +1220,7 @@ export const clientsModule: AppModule = {
 
       return page(c, { title: client.full_name, active: '/clients' }, html`
         ${breadcrumbs([{ href: '/clients', label: 'Clients' }, { label: client.ref }])}
+        ${testDataBand({ isTest: client.is_test === 1, table: 'clients', id: client.id, csrf: c.get('session')!.csrf, canMark: can(c.get('user'), 'data:test'), noun: 'client', returnTo: `/clients/${client.id}` })}
         ${pageHeader(client.full_name,
           `${client.ref} · ${isOrg ? 'Organisation' : 'Individual'} · ${CLIENT_STATUS_LABELS[client.status]}`
             + `${client.assignee_name ? ` · ${client.assignee_name}` : ''}`,

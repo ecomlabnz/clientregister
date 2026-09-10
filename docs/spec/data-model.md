@@ -174,6 +174,7 @@ later replaced still sits in the file that created it.
 | `closed_at` | TEXT | yes | — |
 | `chase_inz` | INTEGER | no | `1` |
 | `descriptor` | TEXT | yes | — |
+| `is_test` | INTEGER | no | `0` |
 
 ## `channel_replies`
 
@@ -309,6 +310,7 @@ later replaced still sits in the file that created it.
 | `current_visa_expiry_rule` | TEXT | yes | — |
 | `inz_client_number` | TEXT | yes | — |
 | `current_visa_start` | TEXT | yes | — |
+| `is_test` | INTEGER | no | `0` |
 
 ## `counters`
 
@@ -445,6 +447,7 @@ later replaced still sits in the file that created it.
 | `filed_at` | TEXT | yes | — |
 | `filed_by` | TEXT | yes | — |
 | `filed_entry_id` | TEXT | yes | — |
+| `is_test` | INTEGER | no | `0` |
 
 ## `intake_uploads`
 
@@ -539,6 +542,7 @@ later replaced still sits in the file that created it.
 | `issued_by` | TEXT | yes | — |
 | `voided_at` | TEXT | yes | — |
 | `void_reason` | TEXT | yes | — |
+| `is_test` | INTEGER | no | `0` |
 
 ## `kb_article_tags`
 
@@ -736,6 +740,7 @@ later replaced still sits in the file that created it.
 | `accepted_at` | TEXT | yes | — |
 | `accepted_name` | TEXT | yes | — |
 | `accepted_from` | TEXT | yes | — |
+| `is_test` | INTEGER | no | `0` |
 
 ## `reply_attachments`
 
@@ -815,6 +820,7 @@ later replaced still sits in the file that created it.
 | `completion_note` | TEXT | yes | — |
 | `completion_note_at` | TEXT | yes | — |
 | `completion_note_by` | TEXT | yes | — |
+| `is_test` | INTEGER | no | `0` |
 
 ## `user_preferences`
 

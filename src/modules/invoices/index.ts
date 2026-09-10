@@ -30,6 +30,7 @@ import { html, raw, type Raw } from '../../ui/html';
 import {
   actionButton, badge, card, collapsibleCard, csrfField, emptyState, field, optionsFrom, pageHeader,
   select, stamp, statusTone, table,
+  testDataBand,
 } from '../../ui/components';
 import { dateShort, money, printedAt } from '../../ui/format';
 import {
@@ -358,6 +359,7 @@ export const invoicesModule: AppModule = {
       return page(c, { title: `Invoice ${invoice.ref}`, active: '/invoices' }, html`
         ${breadcrumbs([{ label: 'Quotes', href: '/quotes' },
                        { label: 'Invoices', href: '/invoices' }, { label: invoice.ref }])}
+        ${testDataBand({ isTest: invoice.is_test === 1, table: 'invoices', id: invoice.id, csrf: c.get('session')!.csrf, canMark: can(c.get('user'), 'data:test'), noun: 'invoice', returnTo: `/invoices/${invoice.id}` })}
         ${pageHeader(`Invoice ${invoice.ref}`, invoice.description, html`
           <a class="btn btn-secondary" href="${`/invoices/${invoice.id}/print`}">Print view</a>`)}
 

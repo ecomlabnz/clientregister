@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { allowList, digitsOnly, isAllowed } from '../src/ingest/pipeline';
 import { parseInboundEmail, stripHtml } from '../src/ingest/email';
-import { safeReturn } from '../src/modules/tasks';
+import { safeReturn } from '../src/core/returnto';
 import { safeFilename } from '../src/modules/documents';
 import { normaliseTriage, parseTriageJson } from '../src/ai/provider';
 

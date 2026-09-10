@@ -291,8 +291,7 @@ Owned by `quotes`.
 
 Thank you for your enquiry and for discussing your matter with us.
 
-As discussed, I am pleased to provide you with our **fee quotation{and_letter}** for the
-proposed work.
+As discussed, I am pleased to provide you with our **fee quotation{and_letter}** for the proposed work.
 
 {total}
 
@@ -300,18 +299,13 @@ proposed work.
 
 {terms}
 
-Please note that **acceptance of the quotation does not constitute a guarantee that any
-visa, immigration application or other outcome will be successful**. Immigration decisions
-are made by Immigration New Zealand in accordance with the applicable legislation,
-immigration instructions and its decision-making powers.
+Please note that **acceptance of the quotation does not constitute a guarantee that any visa, immigration application or other outcome will be successful**. Immigration decisions are made by Immigration New Zealand in accordance with the applicable legislation, immigration instructions and its decision-making powers.
 
 {closing_date} {capacity}
 
 {how_to_accept}
 
-If you have any questions about the quotation, scope of work or terms of engagement,
-please contact us before accepting it. We will be happy to clarify any aspect of the
-proposed engagement.
+If you have any questions about the quotation, scope of work or terms of engagement, please contact us before accepting it. We will be happy to clarify any aspect of the proposed engagement.
 
 Kind regards,
 {signature}` | The covering letter sent with every quotation. Placeholders in braces are filled in from the quotation — {client_name}, {total}, {link_block}, {terms}, {closing_date}, {capacity}, {how_to_accept}, {signature} and others; the Email page lists them all. You still see and can edit every letter before it goes, and the Preview screen shows exactly what the client will read. |

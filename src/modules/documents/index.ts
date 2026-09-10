@@ -27,7 +27,7 @@ import {
 } from '../../ui/components';
 import { dateShort, dateTime } from '../../ui/format';
 import { addEntry } from '../../core/timeline';
-import { safeReturn } from '../tasks';
+import { safeReturn } from '../../core/returnto';
 import { docCategories, isTerm, labelFor, type Term } from '../../core/vocabulary';
 
 const ENTITY_TYPES: EntityType[] = ['client', 'case', 'inquiry', 'quote'];

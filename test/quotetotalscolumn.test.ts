@@ -15,12 +15,29 @@
  * This suite does not check that derivation, which would be checking the code
  * against itself. It renders the page and counts the cells, which is what a
  * person looking at the screen does — the only reading that could have caught
- * the fault, and the reason it reached the practice instead.
+ * the fault, and the reason it reached the practice instead. Where the tests
+ * need to know which column Amount is, they read it off the rendered heading
+ * row, which the page builds from `ITEM_COLUMNS`: move the column and the
+ * expectation moves with it, so nothing here is a number typed in by hand.
+ *
+ * **Trimmed on 11 September 2026**, at the practice's request: *"are these
+ * lines superfluous? the body of the quotation already says what is what - why
+ * do we duplicate it? clients can calculate subtotals themselves - lets save
+ * some space."* The "Professional fees", "Disbursements" and "Subtotal" rows
+ * came out of both the register's own quotation page and the printed document
+ * — every line above already says which of the two it is, and Subtotal was the
+ * Total payable minus the GST printed directly beneath it. GST (when it
+ * applies) and Total payable are what remain, and they are the two rows that
+ * were never a restatement of something else.
+ *
+ * The fault this suite exists for is untouched by that: fewer rows still have
+ * to sit under the column they total.
  */
 
 import { describe, expect, it } from 'vitest';
 import { mountModule, fakeUser } from './support/d1';
 import { quotesModule } from '../src/modules/quotes';
+import { readFileSync } from 'node:fs';
 
 const AT = '2026-09-09T00:00:00Z';
 const USER = fakeUser({ id: 'u_q', email: 'q@example.test' });
@@ -40,7 +57,10 @@ function seeded() {
   return h;
 }
 
-/** One fee line and one disbursement, so every totals row is present. */
+/**
+ * One fee line and one disbursement, both carrying GST — so both kinds of line
+ * are on the page and both of the remaining totals rows apply.
+ */
 function withLines(h: ReturnType<typeof seeded>) {
   const line = (id: string, kind: string, net: number, gst: number, pos: number) =>
     h.db.prepare(`INSERT INTO quote_items (id, quote_id, position, description, kind, unit_label,
@@ -74,6 +94,14 @@ function columnOf(row: Array<{ text: string; span: number }>, index: number): nu
   return row.slice(0, index).reduce((n, c) => n + c.span, 0);
 }
 
+/** A printed figure back to cents, so the page can be added up on its own terms. */
+function cents(text: string): number {
+  return Math.round(Number(text.replace(/[$,]/g, '')) * 100);
+}
+
+/** The labels of the totals rows the practice still wants to see, in order. */
+const TOTALS_ROWS = ['GST', 'Total payable'] as const;
+
 describe('the totals under a quotation line up with the figures above them', () => {
   it('puts every total in the Amount column', async () => {
     const h = withLines(seeded());
@@ -86,10 +114,12 @@ describe('the totals under a quotation line up with the figures above them', () 
     expect(columnOf(rows[0]!, amount)).toBe(amount);
 
     const totals = rows.filter((r) => r.length > 1
-      && ['Professional fees', 'Disbursements', 'Subtotal', 'GST', 'Total payable']
-        .includes(r[0]!.text));
-    // Every one of them, or the test is passing on an empty list.
-    expect(totals.length).toBe(5);
+      && (TOTALS_ROWS as readonly string[]).includes(r[0]!.text));
+    // Every one of them, or the test is passing on an empty list. Two since
+    // 11 September 2026, where it was five: see the note at the head of this
+    // file. A row quietly disappearing is a change to the quotation the
+    // practice sends out, so the count is asserted rather than inferred.
+    expect(totals.map((r) => r[0]!.text)).toEqual([...TOTALS_ROWS]);
 
     for (const row of totals) {
       const figure = row.findIndex((c) => /^\$[\d,]+\.\d\d$/.test(c.text));
@@ -100,14 +130,49 @@ describe('the totals under a quotation line up with the figures above them', () 
 
   it('adds up to the same figures it shows on the lines', async () => {
     // The alignment is only worth pinning if the numbers under it are right.
+    //
+    // The fee lines themselves are the figures to check against, not a pair of
+    // constants: the page is read down its own GST and Amount columns and the
+    // two totals have to agree with what is above them. Until 11 September 2026
+    // this also checked the Professional fees, Disbursements and Subtotal rows;
+    // those rows are gone, and with them the only arithmetic they carried, so
+    // those assertions are deleted rather than left to pass on nothing.
     const h = withLines(seeded());
     const rows = rowsOf(await (await h.request('/quotes/q1')).text());
-    const total = (label: string) =>
-      rows.find((r) => r[0]?.text === label)?.find((c) => /^\$/.test(c.text))?.text;
-    expect(total('Professional fees')).toBe('$7,000.00');
-    expect(total('Disbursements')).toBe('$4,660.87');
-    expect(total('Subtotal')).toBe('$11,660.87');
-    expect(total('Total payable')).toBe('$13,410.00');
+
+    const heading = rows[0]!.map((c) => c.text);
+    const gstColumn = heading.indexOf('GST');
+    const amountColumn = heading.indexOf('Amount');
+    expect(gstColumn, 'no GST column on the page').toBeGreaterThan(-1);
+    expect(amountColumn, 'no Amount column on the page').toBeGreaterThan(-1);
+
+    // A fee line is a row with a cell in every column and no label spanning
+    // several — which is what tells it apart from the totals beneath it.
+    const lines = rows.slice(1).filter((r) => r.length === heading.length
+      && r.every((c) => c.span === 1));
+    expect(lines.length, 'no fee lines on the page').toBe(2);
+
+    const sum = (column: number) =>
+      lines.reduce((n, r) => n + cents(r[column]!.text), 0);
+    const total = (label: string) => {
+      const row = rows.find((r) => r[0]?.text === label);
+      expect(row, `no ${label} row on the page`).toBeDefined();
+      const figure = row!.find((c) => /^\$[\d,]+\.\d\d$/.test(c.text));
+      expect(figure, `${label} carries no figure`).toBeDefined();
+      return cents(figure!.text);
+    };
+
+    // The GST row is the GST column added up.
+    expect(total('GST')).toBe(sum(gstColumn));
+    // And Total payable is the Amount column plus that GST — the whole of what
+    // the client is being asked to pay, which is the one figure on the page
+    // nobody should have to work out for themselves.
+    expect(total('Total payable')).toBe(sum(amountColumn) + sum(gstColumn));
+
+    // Pinned against the seeded figures too, so a page that added up two wrong
+    // numbers consistently would still fail here.
+    expect(total('GST')).toBe(cents('$1,749.13'));
+    expect(total('Total payable')).toBe(cents('$13,410.00'));
   });
 
   it('takes a line off with a labelled cross rather than the word', async () => {
@@ -197,5 +262,39 @@ describe('a payment stage shows the figure the client pays', () => {
     const page = await (await staged().request('/quotes/q1')).text();
     expect(page).toMatch(/class="[^"]*\bnowrap\b[^"]*"[^>]*>\s*Stage 1/);
     expect(page).toMatch(/<span class="nowrap">\$2,300\.00<\/span>/);
+  });
+});
+
+/**
+ * **Reported on 11 September 2026:** *"the column heading shifted"* — a
+ * screenshot of the items table with QTY, UNIT, GST and AMOUNT each sitting to
+ * the left of the figures beneath them.
+ *
+ * The figures carry `class="num"`, which right-aligns them. The headings
+ * carried nothing, so they stayed left-aligned in cells that grew with the
+ * window: the wider the screen, the further each heading drifted from its own
+ * column. It had nothing to do with the trailing remove-button column, which
+ * was the obvious suspect and was innocent.
+ */
+describe('a money heading sits over its own figures', () => {
+  it('right-aligns every numeric heading and no other', () => {
+    const src = readFileSync('src/modules/quotes/index.ts', 'utf8');
+    expect(src).toContain("const ITEM_NUMERIC = new Set<string>(['Qty', 'Unit', 'GST', 'Amount']);");
+    expect(src).toContain("align: ITEM_NUMERIC.has(label) ? ('right' as const) : undefined,");
+  });
+
+  it('marks the heading with the same class the figures use', () => {
+    // `align: 'right'` becomes `class="num"` in the table helper — the very
+    // class the cells below already carry. One rule, not two that can drift.
+    const components = readFileSync('src/ui/components.ts', 'utf8');
+    expect(components).toContain("c.align === 'right' ? 'num' : ''");
+  });
+
+  it('leaves Description alone', () => {
+    // The one column whose content is words. Right-aligning it would be the
+    // same fault in the other direction.
+    const src = readFileSync('src/modules/quotes/index.ts', 'utf8');
+    const numeric = src.slice(src.indexOf('const ITEM_NUMERIC'));
+    expect(numeric.slice(0, 120)).not.toContain('Description');
   });
 });

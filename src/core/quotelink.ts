@@ -20,18 +20,32 @@
  *
  * ## The acceptance
  *
- * The client types their full name and the date, and ticks to say they have
- * read the documents. What is recorded is that, plus the moment the register
- * received it and where from — because the typed date is the client's word and
- * the received moment is the register's, and a document that recorded only one
- * of them would be less use in the one argument it exists for. They are stored
- * side by side and neither is corrected against the other.
+ * The client types their full name and ticks two boxes: that the name above is
+ * correct, and that they have read the documents. There is no date to type.
+ *
+ * **Asked for on 11 September 2026:** *"the date must be fixed - it cannot be
+ * selectable - whenever the click is happening, would be good to include the
+ * time zone as well ... need another line 'The above name is correct' and a
+ * tick box - so it is more deliberate action of accepting. and if not ticked -
+ * will not accept."*
+ *
+ * So the date is the register's, not the client's: the moment this handler
+ * ran, in New Zealand time with the zone said out loud. An earlier version
+ * kept the client's typed date beside it, on the reasoning that the two are
+ * different facts. They are not, once the date is no longer typed — there is
+ * one moment of acceptance and one place that decides it, and a date arriving
+ * in the form body is now ignored rather than recorded.
+ *
+ * Both ticks are refused here rather than only in the HTML. `required` is what
+ * a browser does for a client who has one; this is what happens for everybody
+ * else, including a form posted straight at the route.
  *
  * It is written once and never again, by anybody. See migration 0078.
  */
 
 import type { Env } from '../types';
 import { one, run } from './db';
+import { printedAt } from '../ui/format';
 
 /** 128 bits, hex, matching the shape the database insists on. */
 export function newShareToken(): string {
@@ -132,11 +146,26 @@ export type AcceptResult =
 export async function acceptQuote(
   env: Env,
   quoteId: string,
-  typed: { name: string; signedOn: string; from: string },
+  typed: { name: string; from: string; nameIsCorrect: boolean; hasRead: boolean },
   at: string,
 ): Promise<AcceptResult> {
   const name = typed.name.trim().slice(0, 200);
   if (!name) return { ok: false, message: 'Please type your full name.' };
+
+  // Both ticks, in the order they are read on the page, each answered in the
+  // words of the thing that was not done. *"if not ticked - will not accept."*
+  if (!typed.nameIsCorrect) {
+    return {
+      ok: false,
+      message: 'Please tick the box to confirm the name above is correct.',
+    };
+  }
+  if (!typed.hasRead) {
+    return {
+      ok: false,
+      message: 'Please tick the box to confirm you have read the documents.',
+    };
+  }
 
   try {
     await run(
@@ -145,7 +174,7 @@ export async function acceptQuote(
           SET accepted_at = ?, accepted_name = ?, accepted_from = ?,
               status = 'accepted', responded_at = ?, updated_at = ?
         WHERE id = ? AND accepted_at IS NULL`,
-      at, name, `${typed.from} · signed ${typed.signedOn}`.slice(0, 200), at, at, quoteId);
+      at, name, `${typed.from} · signed ${printedAt(at)}`.slice(0, 200), at, at, quoteId);
   } catch {
     // The refusals are written for the practice, not for a client — see
     // migration 0078. A client gets the one sentence that is true whichever of

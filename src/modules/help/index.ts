@@ -37,6 +37,31 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.40.0', date: '11 September 2026',
+    notes: [
+      'Any client, matter, quotation, inquiry, invoice or task can now be marked as test data, '
+        + 'and everything so marked is deleted in one go from Settings \u2192 Test data. Only you '
+        + 'and an administrator can do either.',
+      'Marking a client marks everything filed under them \u2014 their matters, quotations, '
+        + 'inquiries and invoices \u2014 so nothing real-looking is left behind when they go. '
+        + 'Marking one quotation says nothing about the client it belongs to.',
+      'A test quotation can be sent and accepted as many times as you need: an accepted one '
+        + 'offers "Unaccept and start again". A quotation cannot be unmarked afterwards, because '
+        + 'the mark is what stops it being a contract.',
+      'The audit log is never deleted. After a purge it still records that those records existed '
+        + 'and were removed \u2014 that is the log doing its job.',
+      'Accepting a quotation asks for two ticks now, not one: "The above name is correct" and '
+        + '"I have read the quotation and the letter of engagement". Neither can be skipped.',
+      'The acceptance date is no longer a box the client can change. It is the moment they '
+        + 'accept, with the time and time zone, as the register sees it.',
+      'On the quote page, the Qty, Unit, GST and Amount headings now sit over their own figures '
+        + 'instead of drifting to the left of them.',
+      'The quotation totals lost the Professional fees, Disbursements and Subtotal rows. Every '
+        + 'line already says which it is, and the subtotal was the total less the GST underneath '
+        + 'it. GST and Total payable remain.',
+    ],
+  },
+  {
     version: '1.39.1', date: '11 September 2026',
     notes: [
       'The ** marks in the quotation letter no longer reach the client. They are bold marks: '
