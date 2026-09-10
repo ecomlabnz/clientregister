@@ -42,7 +42,7 @@ import { FLAG_LIVES, flagKinds, flagsForCase, isShowing } from '../../core/flags
 import { can } from '../../core/rbac';
 import { caseDeleteCard, deleteRefusal } from '../../core/deletes';
 import { asPrefBoolean, preferencesFor } from '../../core/preferences';
-import { filesPanel, listCaseFiles, storeDocument } from '../documents';
+import { filesPanel, listCaseFiles, readingSourcesForCase, storeDocument } from '../documents';
 import {
   DECISION_SETTINGS, caseForSync, decisionPolicy, expectedDecisionDate, syncCaseFollowUps,
 } from '../../core/decisions';
@@ -696,7 +696,7 @@ export const casesModule: AppModule = {
       const canReadMail = can(c.get('user'), 'mail:send');
       const [entries, sentMail, history, tasks, quotes, users, invoicesPanel, caseFlags, flagKindTerms,
              parties, caseTags, allTags, clients,
-             threads, caseFiles, docCats, linkableDocs] = await Promise.all([
+             threads, caseFiles, docCats, linkableDocs, readingSources] = await Promise.all([
         listEntries(c.env, 'case', id),
         canReadMail ? emailsForEntity(c.env, 'case', id) : Promise.resolve([]),
         all<any>(c.env.DB, `SELECT h.*, u.name AS by_name FROM case_status_history h
@@ -728,6 +728,11 @@ export const casesModule: AppModule = {
               AND NOT EXISTS (SELECT 1 FROM case_documents cd
                                WHERE cd.case_id = ?1 AND cd.document_id = d.id)
             ORDER BY d.uploaded_at DESC`, id, kase.client_id),
+        // What the reading may be pointed at: this matter's documents and this
+        // client's, from the one query that also decides whether a document
+        // posted back may be read. Asked for only where the card is drawn.
+        aiAvailable && writable
+          ? readingSourcesForCase(c.env, id) : Promise.resolve([]),
       ]);
 
       // The first person on a matter is the principal applicant far more often
@@ -980,8 +985,15 @@ export const casesModule: AppModule = {
                      that re not available - save the datta as a file note?"*
                      Behind the same gate as everything else the model touches:
                      with the assistant off there is no card here at all. */}
+            ${'' /* *"we need to make it easier for the client - so they email
+                     us docs and we extract the data with AI systems"* — so the
+                     card offers what is already on the file as well as an
+                     upload. What may be offered and what may be read are the
+                     same query in `modules/documents`, so the two cannot drift
+                     into disagreeing about whose documents these are. */}
             ${aiAvailable && writable
-              ? readingCard({ caseId: kase.id, csrf, filesKept: docsEnabled })
+              ? readingCard({ caseId: kase.id, csrf, filesKept: docsEnabled,
+                              sources: readingSources })
               : ''}
 
             ${aiAvailable ? foldingCard('Brief me on this matter', html`

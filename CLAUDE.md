@@ -83,6 +83,22 @@ is "it depends", say what it depends on in one sentence. "Do not understand —
 clarify" means shorter and more concrete, not more detail. Standing
 instruction (31 August 2026): be brief and to the point, no fluff.
 
+**Write plainly (standing instruction, 11 September 2026).** Shown five styles
+of the same explanation and asked to choose, the practice picked the plainest:
+*"mostly use #1. simple."* That style was short sentences, ordinary words, no
+jargon, and the point first — *"Until today, a fee quote could only go to one
+person. If you put two addresses in the To box, the email silently failed. I
+found it while building the address picker, and fixed it."*
+
+What that rules out: the shape of an explanation that names functions, files and
+mechanisms. That version is accurate and nearly useless here. Say what changed,
+whether it affects them, and what they need to do. The mechanism belongs in the
+code comment and the commit message, where it is already written down.
+
+When they say they do not follow, the fix is **shorter and more concrete**, not
+more detail — walk through what actually happens, step by step, with real
+things.
+
 **End the day with a digest** (standing instruction, 9 September 2026): *"i do
 not always have time to read your writing but i want to - so at the end of the
 day produce easily readable digest of what has been accomplished."* Plain words,

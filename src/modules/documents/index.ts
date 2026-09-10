@@ -167,6 +167,70 @@ export async function listCaseFiles(env: Env, caseId: string): Promise<DocumentR
   );
 }
 
+/**
+ * The documents a reading on one matter may be taken from — and nothing else.
+ *
+ * **Asked for on 11 September 2026:** *"we need to make it easier for the
+ * client - so they email us docs and we extract the data with AI systems. much
+ * easier on the client."* The client emails the documents; they arrive as
+ * attachments, are filed to a matter and become rows here. Reading one into the
+ * matter meant downloading it and uploading it again until this existed.
+ *
+ * **The privacy boundary is this WHERE clause and nothing above it.** A matter
+ * may read its own documents and its client's, and the client is read from the
+ * joined `cases` row — never from the request — so no id a person can type
+ * widens the set. The same SQL answers both questions the reading asks: *what
+ * may I offer* and *may I read this one*, because two queries that had to agree
+ * would one day not.
+ *
+ * A document linked onto the matter from the client's file (`case_documents`)
+ * needs no branch of its own: only that client's own documents can be linked
+ * (see `/documents/case-link`), so the second clause already covers it.
+ */
+const CASE_READING_SOURCES = `
+    SELECT d.id, d.filename, d.content_type, d.size_bytes, d.r2_key, d.external_url,
+           d.entity_type, d.description, d.uploaded_at
+      FROM documents d
+      JOIN cases k ON k.id = ?1
+     WHERE ( (d.entity_type = 'case'   AND d.entity_id = k.id)
+          OR (d.entity_type = 'client' AND d.entity_id = k.client_id) )`;
+
+/** One document, as a reading needs to see it. */
+export interface ReadingSourceDoc {
+  id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  r2_key: string | null;
+  external_url: string | null;
+  /** `case` or `client` — the file it is on, which the screen says out loud. */
+  entity_type: string;
+  description: string | null;
+  uploaded_at: string;
+}
+
+/** Everything this matter may read from, newest first. */
+export async function readingSourcesForCase(
+  env: Env, caseId: string,
+): Promise<ReadingSourceDoc[]> {
+  return all<ReadingSourceDoc>(
+    env.DB, `${CASE_READING_SOURCES} ORDER BY d.uploaded_at DESC`, caseId);
+}
+
+/**
+ * One document, but only if this matter may read it.
+ *
+ * Null covers both "no such document" and "somebody else's document", and the
+ * caller says the same thing for either: a request that names another client's
+ * file learns nothing from the answer.
+ */
+export async function readingSourceForCase(
+  env: Env, caseId: string, documentId: string,
+): Promise<ReadingSourceDoc | null> {
+  return one<ReadingSourceDoc>(
+    env.DB, `${CASE_READING_SOURCES} AND d.id = ?2`, caseId, documentId);
+}
+
 export const documentsModule: AppModule = {
   name: 'documents',
   title: 'Documents',
