@@ -7,6 +7,30 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.44.1 — 11 September 2026
+
+### Fixed
+**An empty amount box on a payment schedule quietly put the old amount back.**
+Reported: *"i am trying to adjust the bottom to make it match but it does not
+let me."* A schedule stood at $11,382.70 against a quotation of $3,959.40 — the
+fee lines had been lowered underneath it — and every attempt to bring it down
+was refused.
+
+Clearing a stage's amount box did not set it to nothing. The register could not
+read an empty box, so it wrote that stage back exactly as it was, and the old
+figure still counted. The practice was told the schedule came to more than the
+quotation, with no hint that the boxes they had emptied had been refilled behind
+them. The message that would have said so came after the total check and never
+ran.
+
+Now an empty box refuses the save, names the stage, and says what to type: **an
+empty box is not nil — type 0 to set a stage to nothing.** It is checked before
+the total, because a total containing a figure nobody typed is not worth
+arguing about.
+
+The fee lines have always named the lines they could not read, so the same trap
+was visible there. Their message now says the same thing about typing 0.
+
 ## 1.44.0 — 11 September 2026
 
 ### Added

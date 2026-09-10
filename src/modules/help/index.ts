@@ -37,6 +37,14 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.44.1', date: '11 September 2026',
+    notes: [
+      'Clearing a payment stage\u2019s amount box used to put the old amount back without saying '
+        + 'so, which is why a schedule could not be brought down to match the quotation. An empty '
+        + 'box now refuses the save and names the stage: type 0 to set one to nothing.',
+    ],
+  },
+  {
     version: '1.44.0', date: '11 September 2026',
     notes: [
       'A document a client emailed you can now be read into the matter without downloading it '
