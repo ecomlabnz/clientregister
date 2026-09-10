@@ -115,6 +115,28 @@ export function relativeDays(value: string | null | undefined, now = Date.now())
   return days > 0 ? `in ${days} days` : `${Math.abs(days)} days ago`;
 }
 
+/**
+ * Age in completed years on a given day, or null when there is no date of birth.
+ *
+ * Counted by calendar rather than by dividing days, because the answers the
+ * practice needs are calendar answers: a dependent child is under 25 on the day
+ * the application is lodged, not 24.97 years old. Leap years take care of
+ * themselves — 29 February becomes 1 March in a year that has no 29th, which is
+ * the reading every New Zealand age threshold uses.
+ */
+export function ageYears(dateOfBirth: string | null | undefined,
+                         on: string | Date = new Date()): number | null {
+  if (!dateOfBirth) return null;
+  const born = new Date(`${dateOfBirth.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(born.getTime())) return null;
+  const day = typeof on === 'string' ? new Date(`${on.slice(0, 10)}T00:00:00Z`) : on;
+  if (Number.isNaN(day.getTime())) return null;
+  let years = day.getUTCFullYear() - born.getUTCFullYear();
+  const monthsIn = day.getUTCMonth() - born.getUTCMonth();
+  if (monthsIn < 0 || (monthsIn === 0 && day.getUTCDate() < born.getUTCDate())) years -= 1;
+  return years < 0 ? null : years;
+}
+
 export function isOverdue(value: string | null | undefined, now = Date.now()): boolean {
   if (!value) return false;
   const t = Date.parse(value);

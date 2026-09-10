@@ -32,7 +32,8 @@ import {
   actionButton, badge, card, csrfField, emptyState, errorList, field, flagBand, flagHistory, flagRaiser, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
 } from '../../ui/components';
 import {
-  dateInputValue, dateOrDateTime, dateShort, dateTime, isOverdue, money, relativeDays, truncate,
+  ageYears, dateInputValue, dateOrDateTime, dateShort, dateTime, isOverdue, money, relativeDays,
+  truncate,
 } from '../../ui/format';
 import {
   CASE_STATUS_LABELS, CLIENT_STATUSES, CLIENT_STATUS_LABELS,
@@ -1471,42 +1472,6 @@ export const clientsModule: AppModule = {
           </div>
 
           <div class="col-side">
-            ${'' /* Fees are recorded per matter, which is right, but "what does
-                     this person owe us" is a question about the person. This
-                     answers it without opening every file, and each line leads
-                     back to the matter it came from. */}
-            ${feesByCase.length > 0 && can(c.get('user'), 'register:read') ? card('Fees', html`
-              <dl class="kv">
-                <dt>Recorded</dt><dd>${money(feeTotals.gross)}</dd>
-                <dt>Invoiced</dt><dd>${money(feeTotals.billed)}</dd>
-                <dt>Paid</dt><dd>${money(feeTotals.paid)}</dd>
-                <dt>Outstanding</dt>
-                <dd class="${feeTotals.owing ? 'warn strong' : ''}">${money(feeTotals.owing)}</dd>
-              </dl>
-              <ul class="list small mt">
-                ${feesByCase.map((row) => html`
-                  <li class="list-row">
-                    <div><a href="/cases/${row.case_id}"><code>${row.case_ref}</code></a>
-                      <div class="muted clamp-1">${row.case_title}</div></div>
-                    <div class="num">${money(row.gross)}
-                      ${row.gross - row.paid > 0
-                        ? html`<div class="muted">${money(row.gross - row.paid)} owing</div>` : ''}</div>
-                  </li>`)}
-              </ul>`) : ''}
-
-            ${card('Contact', html`
-              <dl class="kv">
-                ${isOrg ? '' : html`
-                  <dt>Given names</dt><dd>${client.given_names ?? '—'}</dd>
-                  <dt>Family name</dt><dd>${client.family_name ?? '—'}</dd>
-                  <dt>Preferred</dt><dd>${client.preferred_name ?? '—'}</dd>`}
-                <dt>Email</dt><dd>${client.email ? html`<a href="mailto:${client.email}">${client.email}</a>` : '—'}</dd>
-                <dt>Phone</dt><dd>${client.phone ?? '—'}</dd>
-                <dt>WhatsApp</dt><dd>${client.whatsapp ?? '—'}</dd>
-                <dt>Telegram</dt><dd>${client.telegram_username ?? client.telegram_user_id ?? '—'}</dd>
-                <dt>Address</dt><dd>${client.address ?? '—'}</dd>
-              </dl>`)}
-
             ${isOrg
               ? html`
                 ${card('Registration', html`
@@ -1549,12 +1514,29 @@ export const clientsModule: AppModule = {
                       <dt>Works for</dt><dd><a href="/clients/${employer.id}">${employer.full_name}</a>
                         ${client.organisation_role ? html`<div class="muted small">${client.organisation_role}</div>` : ''}
                         ${employer.primary_contact_id === client.id ? badge('Primary contact', 'green') : ''}</dd>` : ''}
+                    ${'' /* The number quoted on everything sent to INZ about
+                             this person, so it leads — which is what the note
+                             below it always claimed and the order never was.
+                             Shown even when empty: a blank here is the
+                             practice's own standing instruction unmet. */}
+                    <dt>INZ client no.</dt><dd>${client.inz_client_number
+                      ? html`<code>${client.inz_client_number}</code>`
+                      : html`${badge('not recorded', 'amber')}`}</dd>
                     ${'' /* Plural, because a person may be. Listed in the
                              order the practice entered them: the first is the
                              passport an application is likely to be made on. */}
                     <dt>${clientNationalities.length > 1 ? 'Nationalities' : 'Nationality'}</dt>
                     <dd>${clientNationalities.map(countryName).join(' · ') || '—'}</dd>
-                    <dt>Date of birth</dt><dd>${dateShort(client.date_of_birth)}</dd>
+                    ${'' /* The age, not just the birthday. Half the thresholds
+                             in the instructions are ages — a dependent child
+                             under 25, a parent for the Parent Category — and
+                             working one out from a date in the head, on a page
+                             being read for something else, is where a mistake
+                             gets made. */}
+                    <dt>Date of birth</dt><dd>${dateShort(client.date_of_birth)}${
+                      ageYears(client.date_of_birth) === null
+                        ? ''
+                        : html` <span class="muted">· ${ageYears(client.date_of_birth)}</span>`}</dd>
                     <dt>Passport</dt><dd>${passports.length === 0
                       ? html`<span class="muted">—</span>`
                       : html`${countryName(client.passport_country) || 'Primary'}${
@@ -1562,11 +1544,6 @@ export const clientsModule: AppModule = {
                              ${passports.length > 1
                                ? html`<div class="muted small"><a href="#passports">${passports.length} passports on file</a></div>`
                                : html`<div class="muted small"><a href="#passports">Details</a></div>`}`}</dd>
-                    ${'' /* First, and shown even when empty: a blank here is
-                             the practice's own standing instruction unmet. */}
-                    <dt>INZ client no.</dt><dd>${client.inz_client_number
-                      ? html`<code>${client.inz_client_number}</code>`
-                      : html`${badge('not recorded', 'amber')}`}</dd>
                     <dt>Current visa</dt><dd>${labelFor(visaTerms, client.current_visa_type) || '—'}</dd>
                     <dt>Visa expiry</dt><dd>${!client.current_visa_expiry && client.current_visa_expiry_rule
                       ? html`${badge('not yet fixed', 'amber')}
@@ -1592,6 +1569,52 @@ export const clientsModule: AppModule = {
             ${'' /* Correspondence, read from where it lives rather than copied
                      onto a timeline. A message with two owners disagrees with
                      itself the first time one of them is edited. */}
+            ${card('Contact', html`
+              <dl class="kv">
+                <dt>Phone</dt><dd>${client.phone
+                  ? html`<a href="tel:${client.phone}">${client.phone}</a>` : '—'}</dd>
+                <dt>Email</dt><dd>${client.email ? html`<a href="mailto:${client.email}">${client.email}</a>` : '—'}</dd>
+                <dt>WhatsApp</dt><dd>${client.whatsapp
+                  ? html`<a href="tel:${client.whatsapp}">${client.whatsapp}</a>` : '—'}</dd>
+                <dt>Telegram</dt><dd>${client.telegram_username ?? client.telegram_user_id ?? '—'}</dd>
+                <dt>Address</dt><dd>${client.address ?? '—'}</dd>
+                ${isOrg ? '' : html`
+                  <dt>Given names</dt><dd>${client.given_names ?? '—'}</dd>
+                  <dt>Family name</dt><dd>${client.family_name ?? '—'}</dd>
+                  <dt>Preferred</dt><dd>${client.preferred_name ?? '—'}</dd>`}
+              </dl>`)}
+
+            ${'' /* Fees are recorded per matter, which is right, but "what does
+                     this person owe us" is a question about the person. This
+                     answers it without opening every file, and each line leads
+                     back to the matter it came from. */}
+            ${feesByCase.length > 0 && can(c.get('user'), 'register:read') ? card('Fees', html`
+              <dl class="kv">
+                <dt>Recorded</dt><dd>${money(feeTotals.gross)}</dd>
+                <dt>Invoiced</dt><dd>${money(feeTotals.billed)}</dd>
+                <dt>Paid</dt><dd>${money(feeTotals.paid)}</dd>
+                <dt>Outstanding</dt>
+                <dd class="${feeTotals.owing ? 'warn strong' : ''}">${money(feeTotals.owing)}</dd>
+              </dl>
+              <ul class="list small mt">
+                ${feesByCase.map((row) => html`
+                  <li class="list-row">
+                    <div><a href="/cases/${row.case_id}"><code>${row.case_ref}</code></a>
+                      <div class="muted clamp-1">${row.case_title}</div></div>
+                    <div class="num">${money(row.gross)}
+                      ${row.gross - row.paid > 0
+                        ? html`<div class="muted">${money(row.gross - row.paid)} owing</div>` : ''}</div>
+                  </li>`)}
+              </ul>`) : ''}
+
+            ${'' /* Reaching them comes first. The card used to open with
+                     three rows of name parts — given, family, preferred — above
+                     the email address, on a page whose heading already says
+                     their name in full. The parts still matter, because an
+                     INZ form asks for them separately, so they stay; they
+                     simply stop standing between the reader and the phone
+                     number. Both the phone and the email are links, so the row
+                     is the action rather than something to copy out of. */}
             ${threads.length > 0
               ? card('Correspondence', html`
                   <ul class="list">${threads.map((t) => html`
@@ -1632,6 +1655,18 @@ export const clientsModule: AppModule = {
                      never did, for no reason anybody recorded. Asked for
                      8 September 2026. The same tag list serves both, so a tag
                      invented on a matter is the same tag here. */}
+            ${card('Open tasks', tasks.length === 0
+              ? emptyState('Nothing outstanding.')
+              : html`<ul class="list">${tasks.map((t: any) => html`
+                  <li><a href="/tasks#${t.id}">${t.title}</a> <span class="muted small">${dateShort(t.due_at)}</span></li>`)}</ul>`)}
+
+            ${card('Recent inquiries', inquiries.length === 0
+              ? emptyState('None recorded.')
+              : html`<ul class="list">${inquiries.map((i: any) => html`
+                  <li><a href="/inquiries/${i.id}">${i.subject || i.ref}</a>
+                      <span class="muted small">${stamp(i.received_at)}</span></li>`)}</ul>`)}
+
+            ${card('Notes', html`<p class="prewrap">${client.notes || '—'}</p>`)}
             ${foldingCard('Tags', html`
               ${clientTags.length === 0
                 ? html`<p class="muted small">No tags yet.</p>`
@@ -1663,18 +1698,6 @@ export const clientsModule: AppModule = {
                   </form>
                 </details>` : ''}`)}
 
-            ${card('Open tasks', tasks.length === 0
-              ? emptyState('Nothing outstanding.')
-              : html`<ul class="list">${tasks.map((t: any) => html`
-                  <li><a href="/tasks#${t.id}">${t.title}</a> <span class="muted small">${dateShort(t.due_at)}</span></li>`)}</ul>`)}
-
-            ${card('Recent inquiries', inquiries.length === 0
-              ? emptyState('None recorded.')
-              : html`<ul class="list">${inquiries.map((i: any) => html`
-                  <li><a href="/inquiries/${i.id}">${i.subject || i.ref}</a>
-                      <span class="muted small">${stamp(i.received_at)}</span></li>`)}</ul>`)}
-
-            ${card('Notes', html`<p class="prewrap">${client.notes || '—'}</p>`)}
           </div>
         </div>`);
     });

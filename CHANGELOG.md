@@ -7,6 +7,35 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.34.0 — 10 September 2026
+
+### Added
+**The age now sits beside the date of birth.** Half the thresholds in the
+instructions are ages — a dependent child under 25, a parent for the Parent
+Category — and working one out from a date in your head, on a page you opened
+for something else, is where a mistake gets made. Counted by calendar, so a
+29 February birthday turns over on 1 March.
+
+### Changed
+**The right-hand column of a client's page, reordered.** *"see what details you
+can add or rearrange on the actual client page — on the right side panels — to
+make it more efficient."*
+
+- **Identity and compliance leads**, above Contact and Fees. The dates that
+  expire — visa, passport, police certificate, medical — are why the file is
+  open.
+- **The INZ client number leads that card**, above nationality and date of
+  birth. It is quoted on everything sent to INZ about the person, and the note
+  beside it already claimed it came first.
+- **Contact reaches them first.** Phone, then email, then WhatsApp, Telegram and
+  address; the name parts follow. Three rows of given, family and preferred
+  names used to stand between the reader and the phone number, on a page whose
+  heading says the name in full. They stay, because an INZ form asks for them
+  separately — they simply stop leading.
+- **The phone number and WhatsApp number are now links**, as the email address
+  already was.
+- **Tags move to the bottom**, matching matters.
+
 ## 1.33.0 — 9 September 2026
 
 ### Added

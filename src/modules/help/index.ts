@@ -37,6 +37,19 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.34.0', date: '10 September 2026',
+    notes: [
+      'A client\u2019s page now leads with Identity and compliance \u2014 visa, passport, police '
+        + 'certificate, medical \u2014 because those are the dates that expire. Contact and Fees '
+        + 'follow, and Tags sit at the bottom as they now do on a matter.',
+      'The age is shown beside the date of birth, so you are not working it out in your head.',
+      'Contact opens with the phone number and email rather than three rows of name parts, and '
+        + 'the phone and WhatsApp numbers are now tappable.',
+      'The INZ client number leads Identity and compliance, where the note beside it always said '
+        + 'it would.',
+    ],
+  },
+  {
     version: '1.33.0', date: '9 September 2026',
     notes: [
       'The client\u2019s phone number and email address now show on the matter itself, under Key '
