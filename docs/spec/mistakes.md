@@ -499,6 +499,150 @@ contain, the empty column that is empty in real life. Where the shape of the rea
 data can be measured, measure it and seed to that shape. A test whose input is
 cleaner than reality is testing the code against itself.
 
+### 29. A module mounted after a guard on `/` is behind a sign-in it never asked for
+
+**What happened.** The page a client opens to read their fee quote redirected
+them to a login screen. Its own routes required nothing; the fault was position.
+The dashboard mounts at `/` and puts `requireAuth` on `*`, which in Hono means
+every path in the application — so anything registered after it is behind a
+sign-in whatever it says about itself. Every unit test passed, because a unit
+test mounts one module alone. It showed up only by opening the link in a browser
+with no session, which is a thing nobody does by accident.
+
+**The rule.** Mounting order is part of the access-control design, not a detail
+of the registry. A page reachable without a session is mounted above anything
+that guards `*` from the root, and a test asserts that ordering by name — because
+the next module added at `/` breaks it again in exactly the same silent way. When
+a route's behaviour depends on what else is mounted, no test that mounts it alone
+can see the fault: open it the way the person opens it.
+
+### 30. A permission answers "may you edit these at all", never "is this one still yours to edit"
+
+**What happened.** A client accepted a fee quotation, and the practice then
+deleted a line off it. The only guard anywhere was `quote:write`. That permission
+is about the user; it says nothing about the state of the document, and there is
+no state a permission can express. So an accepted quotation — a contract, with a
+recorded acceptance — could have its fees, its schedule, its parties and its
+status changed by anybody entitled to edit a draft.
+
+**The rule.** Where a record becomes a fact about the world — accepted, lodged,
+issued, paid — the freeze belongs in the database as refusals on every table that
+composes it, not in the handler that happened to be looked at. Ten refusals were
+needed here, because a quotation is four tables and a permission check was
+guarding one screen. The test for such a rule attacks the tables directly: the
+whole point is that it holds when a second screen forgets.
+
+### 31. A branch of rewritten history goes stale the moment work continues
+
+**What happened.** A branch carrying the repository's history with nine client
+names removed was prepared, then left while four releases landed on `main`.
+Force-pushing it days later would have been a fast-forward in appearance and a
+deletion in fact: it was cut before those releases and did not contain them. The
+whole client-acceptance system would have gone.
+
+**The rule.** A rewritten history is a snapshot, and a snapshot of a moving branch
+is out of date immediately. Before any force-push that replaces history, compare
+the **tree** of the replacement against the tree of what it replaces — not the
+commit count, not the dates. Identical trees mean the same code with different
+history, which is the only safe case. Anything else is a deletion, whatever it is
+called.
+
+### 32. A print rule on `body` cannot reach an element that sets its own size
+
+**What happened.** The practice asked for a more compact fee quote, the print
+stylesheet was set to 8.5pt on `body`, and the PDF came out at 10.3pt. The
+document element sets its own `font-size`, which is more specific than the
+inherited one, so the rule never applied. Nothing in the code looked wrong.
+
+**The rule.** A visual change is not made until it has been measured on the
+artefact that matters — here, generating the PDF and reading the type size out of
+it. "I set the value" and "the value took effect" are different claims, and CSS
+specificity is exactly the kind of thing that separates them silently. The same
+applies to the print canvas colour, which is painted by the root element and
+cannot be reached by a rule on `body` at all.
+
+### 33. A release shipped without the page ever being rendered
+
+**What happened.** A header change went out that left an invoice showing
+"Invoice" as a small heading with the contact lines unlabelled. Tests passed; the
+change was correct in the sense that it did what the diff said. Nobody had looked
+at the resulting page.
+
+**The rule.** A change to how something looks is not finished until that thing has
+been rendered and looked at. Tests hold rules; they do not hold appearance, and
+they are not meant to. If the change is visual, produce the artefact — page, PDF,
+screenshot — before shipping it.
+
+### 34. A generated document that nobody regenerates is a written one
+
+**What happened.** Three specification documents carried the sentence *"generated
+from the code and cannot drift from it"*. The front page said 195 routes; the
+routes document said 178. Both had been produced from the code once, and edited
+by hand since.
+
+**The rule.** "Generated" is a property of a command that exists and is run, not
+of how a file was first produced. Either there is one command that rewrites the
+file — `npm run spec` — and a test that fails when what is on disk is not what the
+command would write, or the document is hand-written and should say so. A file
+that claims to be derived and is not is worse than one that never claimed it,
+because it is trusted.
+
+### 35. A fallback that says nothing is a leak
+
+**What happened.** Every link sent to a client — fee quotes, letters of
+engagement, document lists — is built on the practice's public web address. That
+setting was blank, so the register fell back to the address the request arrived
+on, which in production is its own `workers.dev` name. Clients had been receiving
+it for weeks. The fallback is correct behaviour and is what makes a fresh
+deployment work; the fault was that it happened in silence.
+
+**The rule.** A fallback that changes what an outsider sees announces itself at
+the point of use, not in a settings page nobody has open. The screen that is
+about to send the link says which address the client will see. Note also what
+could *not* be fixed here: a link only works at an address that routes to the
+application, so writing a domain into the setting without pointing that domain at
+the register would replace an ugly link with a dead one. Half a fix that breaks
+the working half is not a fix.
+
+### 36. A pattern that matches a tag also matches a longer tag
+
+**What happened.** Reading the practice's own checklists out of Word files,
+`<w:t[^>]*>` was used to find text runs. It also matches `<w:tab w:val="num"/>`,
+so everything between a tab and the next closing tag was captured as text —
+producing checklist items containing raw XML. Caught by reading the output; three
+documents extracted earlier had to be re-checked to prove they were unaffected.
+
+**The rule.** When matching a named thing in a structured format, anchor the end
+of the name: `<w:t(?:\s[^>]*)?>`, not `<w:t[^>]*>`. And when a parser is found to
+be wrong, re-run everything it has already produced and prove the earlier output
+is clean, rather than assuming the bug is new.
+
+### 37. Moving a function can take its neighbour with it
+
+**What happened.** A helper was moved out of a module into a core file by slicing
+from its doc comment to the end of its body. The slice began at the previous
+function's doc comment and removed that function too. The typechecker caught it
+immediately.
+
+**The rule.** This one is in the ledger not because it was costly but because it
+was free — the typechecker made a silent structural mistake loud. Run the
+typechecker after any edit that moves code between files, before running anything
+else. And prefer an edit that names what it is replacing over one that computes a
+range.
+
+### 38. An identifier typed from memory is not an identifier
+
+**What happened.** A merge was attempted with an expected-head SHA whose first
+seven characters were right and whose remainder was invented. The API refused it
+as "head branch was modified", which reads as somebody else having pushed. Time
+was spent looking for a push that had not happened.
+
+**The rule.** Identifiers are copied from the tool that produced them, never
+recalled. When a call is refused on the basis of one, check the identifier before
+checking the world.
+
+---
+
 ---
 
 ## Working practices that caught things

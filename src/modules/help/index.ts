@@ -47,6 +47,7 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
       'Nothing in the knowledge base is readable from outside until you press that button on that '
         + 'article, and the register records who pressed it.',
       'Links sent to clients were showing the register\u2019s own web address. Until a domain of yours is pointed at the register there is no other address to use, so the quote email page and the share panel now tell you which address the client will see before you send it, and where to change it.',
+      'The register\u2019s own specification is now produced by one command and checked by the build, so it cannot quietly go out of date \u2014 including new documents listing every setting you can change and who may do what.',
       'Six document lists are now filed: relationship documents in English, Russian and '
         + 'Vietnamese \u2014 your own template, unchanged \u2014 and first drafts for AEWV, '
         + 'RV Partner and VV General, marked as drafts until you have checked them.',
