@@ -7,6 +7,61 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.35.0 — 10 September 2026
+
+### Added
+**A document list can now be sent to a client by link.** *"ideally I should be
+able to share those lists with clients if necessary — and it is often
+necessary."* Open a knowledge base article and press **Create a link**. The
+address goes in an email or a message; the client opens a clean page with the
+list under its own headings, made to be read on a phone and printed on paper.
+No sign-in, nothing to install.
+
+Two things worth knowing:
+
+- **Whatever you edit afterwards is what they see.** Correct a list and the
+  correction reaches everybody holding the address. That is the reason for
+  doing it this way instead of pasting the text into an email, where every
+  client ends up holding a different version frozen on the day it was sent.
+- **The link can be stopped.** Press **Stop sharing** and it dies immediately,
+  including for clients already holding it. Sharing again makes a fresh
+  address; the old one stays dead. Nothing is readable from outside until
+  somebody presses the button on that particular article, and the register
+  records who pressed it.
+
+The client's page is served without the application's JavaScript — it has no
+forms on it, so there was nothing for six hundred lines of script to do on
+somebody's phone.
+
+Four new database refusals (migration 0080) hold the rules: a link is at least
+32 hexadecimal characters, no two articles answer to one address, and a shared
+article always records who shared it and when.
+
+### Fixed
+**Client links were carrying the register's own address.** *"the links we are
+sending to clients — quotes, invoices, anything — should not be exposing our
+internal worker domain."* They were. Every client link is built on the **Public
+web address** in Settings → Website, and that box is empty, so the register fell
+back to whatever address it was opened on — its own `workers.dev` name.
+
+This cannot be fully fixed from inside the register: a link only works at an
+address that actually points here, so setting the box to a domain that has not
+been pointed at the register would replace an ugly link with a dead one. What
+has changed is that the fallback is no longer silent. The quote email page and
+the article share panel now say, before anything is sent, which address the
+client will see and where to change it. The setting's own help says what it
+does to client links.
+
+**To finish it:** point a domain at the register in Cloudflare, then put that
+address in the box. Every link written afterwards uses it.
+
+### The lists themselves
+Six document lists are now in the knowledge base. **Relationship documents** in
+**English, Russian and Vietnamese** — the practice's own template, unchanged,
+so the right one can be picked for the client. And first drafts of **AEWV**,
+**RV Partner** and **VV General**, which are marked as drafts and say on their
+face that they have not been checked.
+
 ## 1.34.0 — 10 September 2026
 
 ### Added

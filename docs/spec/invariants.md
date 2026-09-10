@@ -11,7 +11,7 @@ guarantee in a handler lasts until somebody adds a second handler — and this
 register is written to by the application, by bulk loads, and occasionally by
 hand at a console. Everything below holds in all three cases.
 
-**103 refusals** across 25 tables, plus
+**107 refusals** across 26 tables, plus
 **10 uniqueness rules**. Each is quoted in the words the
 database itself uses, because that is what somebody will see.
 
@@ -127,6 +127,15 @@ whether or not the rule exists is not a test.
 | insert | a flag must say what it is warning about |
 | update | a flag cannot be cleared before it was raised |
 | update | a flag must say what it is warning about |
+
+### `kb_articles`
+
+| On | The database refuses |
+|---|---|
+| insert | a share link must be at least 32 hexadecimal characters: the address is the only thing protecting it |
+| insert | a shared article records the link and when it was shared, or neither |
+| update | a share link must be at least 32 hexadecimal characters: the address is the only thing protecting it |
+| update | a shared article records the link and when it was shared, or neither |
 
 ### `ingest_messages`
 

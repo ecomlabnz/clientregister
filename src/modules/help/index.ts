@@ -37,6 +37,22 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.35.0', date: '10 September 2026',
+    notes: [
+      'A knowledge base article can be sent to a client. Open it, press Create a link, and send '
+        + 'the address \u2014 they get a clean page with the list under its headings, no sign-in, '
+        + 'and it prints properly.',
+      'Correcting the article corrects what every client holding the link sees. Press Stop sharing '
+        + 'and the address dies at once, including for anybody already holding it.',
+      'Nothing in the knowledge base is readable from outside until you press that button on that '
+        + 'article, and the register records who pressed it.',
+      'Links sent to clients were showing the register\u2019s own web address. Until a domain of yours is pointed at the register there is no other address to use, so the quote email page and the share panel now tell you which address the client will see before you send it, and where to change it.',
+      'Six document lists are now filed: relationship documents in English, Russian and '
+        + 'Vietnamese \u2014 your own template, unchanged \u2014 and first drafts for AEWV, '
+        + 'RV Partner and VV General, marked as drafts until you have checked them.',
+    ],
+  },
+  {
     version: '1.34.0', date: '10 September 2026',
     notes: [
       'A client\u2019s page now leads with Identity and compliance \u2014 visa, passport, police '

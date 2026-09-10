@@ -26,6 +26,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from '../../types';
+import { canonicalBaseFrom } from '../../core/publicurl';
 import type { AppModule } from '../../core/module';
 import type { SettingsGroup } from '../../core/settings';
 import { nextRef, nowIso, run } from '../../core/db';
@@ -98,7 +99,7 @@ export const WEBSITE_SETTINGS: SettingsGroup = {
     { key: 'website.seo_title', type: 'string', label: 'Page title for search results', default: '', maxLength: 120,
       help: 'What appears as the heading in a search result and on the browser tab. Leave blank to use the practice name and the line above the headline. Around 60 characters reads best.' },
     { key: 'website.canonical_url', type: 'string', label: 'Public web address', default: '', maxLength: 300,
-      help: 'The address the public should reach this page on, e.g. https://immigration.kiwi. Used for the canonical link, the sitemap and the structured data. Leave blank to use whatever address the page was opened on.' },
+      help: 'The address the public should reach this page on, e.g. https://immigration.kiwi. **Every link sent to a client is built on this** \u2014 fee quotes, letters of engagement, document lists \u2014 as well as the canonical link, the sitemap and the structured data. Left blank, those links carry whatever address the register was opened on, which in production is its own workers.dev name. Set it only once a domain actually points at the register: an address that does not reach it produces links that do not work.' },
     { key: 'website.service_area', type: 'string', label: 'Where you act', default: 'New Zealand', maxLength: 200,
       help: 'Named in the structured data search engines and AI assistants read.' },
     { key: 'website.practice_type', type: 'enum', label: 'How to describe the practice', default: 'LegalService',
@@ -121,14 +122,12 @@ export const WEBSITE_SETTINGS: SettingsGroup = {
  * page. The configured address wins, so every canonical link, sitemap entry and
  * piece of structured data names one address rather than whichever one the
  * request happened to arrive on.
+ *
+ * The same reasoning applies to a link emailed to a client, which is why the
+ * rule itself now lives in `core/publicurl.ts` and this is one caller of it.
  */
 function canonicalBase(c: Context<AppContext>, values: Record<string, string>): string {
   return canonicalBaseFrom(values['website.canonical_url'] ?? '', new URL(c.req.url).origin);
-}
-
-export function canonicalBaseFrom(configured: string, requestOrigin: string): string {
-  const trimmed = configured.trim().replace(/\/+$/, '');
-  return /^https?:\/\/[^\s/]+$/i.test(trimmed) ? trimmed : requestOrigin;
 }
 
 function escapeXml(value: string): string {

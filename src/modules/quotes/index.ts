@@ -45,7 +45,7 @@ import { caseTypes, labelFor, type Term } from '../../core/vocabulary';
 import { quoteNameFrom } from '../../core/casename';
 import { practiceDetails } from '../../core/practice';
 import { shareTokenFor, shareUrl } from '../../core/quotelink';
-import { canonicalBaseFrom } from '../landing';
+import { fallbackWarning, publicBase } from '../../core/publicurl';
 import {
   ENGAGEMENT_SETTINGS, allClauses, clauseTypes, clausesFor, engagementText, type ClauseRow,
 } from '../../core/engagement';
@@ -1676,13 +1676,18 @@ export const quotesModule: AppModule = {
       // reads their fee quote at the firm's address rather than at
       // workers.dev — the same rule the reminder emails follow.
       const token = await shareTokenFor(c.env, id);
-      const base = canonicalBaseFrom(
-        await getSetting(c.env, 'website.canonical_url', ''), new URL(c.req.url).origin);
-      const shareLink = token ? shareUrl(base, token) : '';
+      const address = await publicBase(c.env, new URL(c.req.url).origin);
+      const shareLink = token ? shareUrl(address.base, token) : '';
+      // Said before the email goes, not after: the link is minted here and the
+      // client keeps it for good, so an address sent by mistake cannot be
+      // corrected by changing a setting afterwards.
+      const addressWarning = fallbackWarning(address);
 
       return page(c, { title: `Email ${q.ref}`, active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { href: `/quotes/${q.id}`, label: q.ref }, { label: 'Email' }])}
         ${pageHeader(`Email quote ${q.ref}`, q.client_name ?? undefined)}
+
+        ${addressWarning ? html`<div class="alert alert-warn">${addressWarning}</div>` : ''}
 
         ${configured
           ? ''

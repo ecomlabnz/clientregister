@@ -21,9 +21,10 @@ import { Hono } from 'hono';
 import type { AppContext, Env } from '../../types';
 import type { AppModule } from '../../core/module';
 import { everyTermClausePlain } from '../../core/search';
-import { all, count, nextYearlyRef, nowIso, one, run } from '../../core/db';
+import { all, count, getSetting, nextYearlyRef, nowIso, one, run } from '../../core/db';
 import { newId } from '../../core/ids';
 import { requireAuth, requirePermission } from '../../core/auth';
+import { can } from '../../core/rbac';
 import { MAX_UPLOAD_BYTES, fileResponse, putFile, safeFilename } from '../../core/files';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
@@ -39,6 +40,8 @@ import {
   actionButton, badge, card, csrfField, emptyState, field, pageHeader, select, stamp, table, viewTabs,
 } from '../../ui/components';
 import { dateShort, dateTime, relativeDays, truncate } from '../../ui/format';
+import { documentUrl, revokeArticleLink, shareArticle } from '../../core/kblink';
+import { fallbackWarning, publicBase } from '../../core/publicurl';
 
 const PAGE_SIZE = 25;
 
@@ -147,6 +150,7 @@ interface ArticleRow {
   status: KbStatus; published_at: string | null; effective_at: string | null;
   expires_at: string | null; review_at: string | null; source: string; source_ref: string | null;
   ingest_message_id: string | null; version: number;
+  share_token: string | null; shared_at: string | null; shared_by: string | null;
   created_at: string; updated_at: string; created_by: string | null; updated_by: string | null;
 }
 
@@ -428,6 +432,14 @@ export const knowledgeModule: AppModule = {
         listArticleFiles(c.env, id),
       ]);
 
+      const writable = can(c.get('user'), 'register:write');
+      const address = await publicBase(c.env, new URL(c.req.url).origin);
+      const shareLink = article.share_token ? documentUrl(address.base, article.share_token) : '';
+      const addressWarning = fallbackWarning(address);
+      const sharer = article.shared_by
+        ? await one<{ name: string }>(c.env.DB, 'SELECT name FROM users WHERE id = ?', article.shared_by)
+        : null;
+
       return page(c, { title: article.title, active: '/knowledge' }, html`
         ${breadcrumbs([{ href: '/knowledge', label: 'Knowledge base' }, { label: article.ref }])}
         ${pageHeader(article.title,
@@ -478,6 +490,43 @@ export const knowledgeModule: AppModule = {
           </div>
 
           <div class="col-side">
+            ${'' /* Asked for on 10 September 2026, with the document lists:
+                     *"ideally I should be able to share those lists with
+                     clients if necessary - and it is often necessary."*
+
+                     First in the column, because on a client-facing list it is
+                     the thing you came to the page to do.
+
+                     Two things this card says out loud, because the knowledge
+                     base holds the practice's internal notes beside the lists
+                     meant for clients: that a live link is readable by anybody
+                     who has the address, and who opened that door. Revoking is
+                     immediate and mints nothing — sharing again produces a new
+                     address, and the old one stays dead. */}
+            ${card('Share with a client', article.share_token
+              ? html`
+                <p class="small">Anybody with this address can read the article. No sign-in.</p>
+                ${'' /* Selectable in one gesture on a phone, which is where it
+                         is copied from. `readonly`, not `disabled`: a disabled
+                         input cannot be selected at all. */}
+                <label class="sr-only" for="share_link">Link</label>
+                <input id="share_link" class="share-link" type="text" readonly
+                       value="${shareLink}" onfocus="this.select()">
+                <p class="muted small">Shared ${dateTime(article.shared_at)}${
+                  sharer ? ` by ${sharer.name}` : ''}.</p>
+                ${addressWarning ? html`<p class="warn small">${addressWarning}</p>` : ''}
+                ${writable ? actionButton(`/knowledge/${article.id}/unshare`, session.csrf,
+                    'Stop sharing',
+                    { className: 'btn btn-small btn-link-danger',
+                      confirm: 'Stop sharing? The link stops working immediately, including for '
+                             + 'clients already holding it.' }) : ''}`
+              : html`
+                <p class="small">Not shared. Nobody outside the practice can read it.</p>
+                ${writable ? actionButton(`/knowledge/${article.id}/share`, session.csrf,
+                    'Create a link', { className: 'btn btn-secondary btn-small' }) : ''}
+                <p class="hint">Creates an address you can send. Whatever you edit afterwards is
+                   what the client sees, so a correction reaches everybody holding it.</p>`)}
+
             ${card('Dates', html`
               <dl class="kv">
                 <dt>State</dt><dd>${badge(state.label, state.tone)}</dd>
@@ -734,6 +783,41 @@ export const knowledgeModule: AppModule = {
                   <div class="kb-body">${renderBody(v.body)}</div>
                 </details>
               </li>`)}</ul>`}`);
+    });
+
+    // --- Sharing ----------------------------------------------------------
+    //
+    // Both audited, because the thing being recorded is a decision about who
+    // outside the practice may read something, and that is exactly the kind of
+    // decision somebody asks about six months later.
+
+    r.post('/:id/share', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const article = await one<ArticleRow>(c.env.DB, 'SELECT * FROM kb_articles WHERE id = ?', id);
+      if (!article) return c.notFound();
+
+      const token = await shareArticle(c.env, id, c.get('user')?.id ?? null);
+      if (!token) return redirectWith(c, `/knowledge/${id}`, 'Could not create a link.', 'err');
+
+      await auditFrom(c, {
+        action: 'kb.shared', entityType: 'kb_article', entityId: id, meta: { ref: article.ref },
+      });
+      return redirectWith(c, `/knowledge/${id}`,
+        'Link created. Anybody with the address can read this article.');
+    });
+
+    r.post('/:id/unshare', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const article = await one<ArticleRow>(c.env.DB, 'SELECT * FROM kb_articles WHERE id = ?', id);
+      if (!article) return c.notFound();
+
+      await revokeArticleLink(c.env, id);
+      await auditFrom(c, {
+        action: 'kb.unshared', entityType: 'kb_article', entityId: id, meta: { ref: article.ref },
+      });
+      // Said plainly rather than softly: somebody may be holding that address.
+      return redirectWith(c, `/knowledge/${id}`,
+        'Link stopped. It no longer works for anybody, including clients already holding it.');
     });
 
     // --- Tags -------------------------------------------------------------
