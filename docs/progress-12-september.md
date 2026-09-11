@@ -159,6 +159,38 @@ properly and then checks where it actually landed.
 Used for the trial today: created from a machine in the United States, landed in
 Oceania.
 
+## 7. See the quote and the letter before you send one
+
+*"in the settings quotes and Letter of engagement - there should be a button to
+preview these two documents or how they appear?"*
+
+You edit the wording of both as boxes of text under Settings. A box of text is
+not a document, so the only way to see what a change looked like was to go and
+find a real quotation and open it.
+
+There is now a **Preview** button on each of those two settings pages. It draws
+the finished document — the same page a client is sent — with your wording as it
+stands now.
+
+**It draws on your most recently issued quotation.** That was a deliberate
+choice over inventing a specimen client: an invented one shows invented figures
+and invented names, and the thing you are checking is how *your* words sit in a
+real document. The cost of that choice is that a real client's name is on the
+page, so a band across the top says which quotation it is and that this is a
+preview. That band prints, unlike the note on the client's own page — a printout
+without it would be indistinguishable from the document itself.
+
+Looking writes nothing: no record of a document being printed, no change to the
+quotation, no client link minted. Only somebody who can already open Settings
+can open a preview, because it shows a client file.
+
+If nothing has been issued yet it uses the newest quotation on the register and
+says it is not issued. With no quotations at all it says so in a sentence and
+tells you to create one — which is what a trial register will see on its first
+day.
+
+---
+
 ---
 
 ## Four things I got wrong, and what changed because of them
@@ -204,8 +236,6 @@ that now prevents it.
 
 1. **The seeded caseload for the trial** — 20 matters, 5 simple, 10 complicated,
    5 unusual, people from different countries. Asked for; not built yet.
-2. **A preview button** for the quotation and the letter of engagement in
-   settings, so you can see how they look. Asked for; not built yet.
-3. **The demonstration-data workflow** from August, which can still load
+2. **The demonstration-data workflow** from August, which can still load
    invented clients into your live register with one click. It should go; the
    Test Data page inside the register replaced it.

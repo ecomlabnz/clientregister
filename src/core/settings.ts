@@ -58,6 +58,16 @@ export interface SettingsGroup {
   settings: SettingDef[];
   /** Rendered under the generic fields, for anything that needs its own form. */
   note?: string;
+  /**
+   * Places to go and *see* what this wording does, shown beside the heading.
+   *
+   * Some settings are the words of a document, and a box of text on a settings
+   * page is not the document. Asked for on 12 September 2026: *"in the settings
+   * quotes and Letter of engagement - there should be a button to preview these
+   * two documents or how they appear?"* A group declares its own, so the
+   * settings page stays generic.
+   */
+  links?: Array<{ href: string; label: string }>;
 }
 
 export class SettingValueError extends Error {

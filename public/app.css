@@ -1913,6 +1913,11 @@ details[open] > summary { margin-bottom: 12px; }
 /* A note to the reader rather than part of the document, so it is not set as
    the document is and does not print with it. */
 .client-note { max-width: 210mm; margin: 10px auto; }
+/* The same, on the preview of a quotation or a letter of engagement — but this
+   one prints. It is the only thing saying the page is a preview drawn on a real
+   client's quotation, and a printout of it without that line is a document
+   somebody could file. */
+.preview-note { max-width: 210mm; margin: 10px auto; }
 /* Air between the documents.
  *
  * **Asked for the same day:** *"can we put space in between these two?"* They
@@ -2034,6 +2039,9 @@ details[open] > summary { margin-bottom: 12px; }
     max-width: none; margin: 0; padding: 0 20mm; border: none; border-radius: 0;
     background: #fff; color: #000;
   }
+  /* Lines up with the document beneath it rather than sitting centred in its
+     own narrower column. See `.preview-note` for why it prints at all. */
+  .preview-note { max-width: none; margin: 0 20mm 8mm; }
 
   /* Sized for paper rather than for a screen.
    *

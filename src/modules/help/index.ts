@@ -94,6 +94,19 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.60.0', date: '12 September 2026',
+    notes: [
+      'A Preview button on Settings \u2192 Quotes and on Settings \u2192 Letter of engagement. '
+        + 'It shows the finished document with your wording in it, so you can see a change '
+        + 'before a client does.',
+      'It draws on your most recently issued quotation, so nothing on it is made up \u2014 which '
+        + 'also means a client\u2019s name is on it. A band at the top of the page says so, and '
+        + 'that band prints too.',
+      'Nothing is sent, changed or recorded by looking. If you have no quotations yet, the '
+        + 'preview says so instead of showing an error.',
+    ],
+  },
+  {
     version: '1.59.0', date: '12 September 2026',
     notes: [
       'Quotations expiring no longer appear on the calendar. Every other date there is one you '

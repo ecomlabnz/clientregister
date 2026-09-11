@@ -43,6 +43,7 @@ export const ENGAGEMENT_SETTINGS: SettingsGroup = {
     + 'Quotes → Letter clauses, because there can be any number of them and some belong only on '
     + 'certain kinds of matter.',
   order: 36,
+  links: [{ href: '/quotes/preview/letter', label: 'Preview the letter' }],
   settings: [
     { key: 'engagement.subject', type: 'string', label: 'Subject line', maxLength: 200,
       default: 'Letter of Engagement for Legal Services',
