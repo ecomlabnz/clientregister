@@ -100,14 +100,21 @@ because the fault was always intermittent.
 
 | Deploy | Probes | Refusals | Note |
 | --- | --- | --- | --- |
-| Run 240, 1.59.0, 12 Sep | 20 over 2 min | none | Straight through the practice's deploy and the trial's. Every answer served from the same Cloudflare edge (`-DFW`). |
+| Run 240, 1.59.0, 12 Sep | 20 over 2 min | none | Straight through the practice's deploy and the trial's. Every answer from one Cloudflare edge (`-DFW`). |
+| Run 241, 1.60.1, 12 Sep | 20 over 2 min | none | Again through both deploys. Answers came from **four** edges this time — `EWR`, `IAD`, `CDG`, and others. |
 
-One thing the instrument cannot see from where it stands: the runner probes
-from a GitHub data centre, so it reaches whichever Cloudflare edge is nearest
-*it*. The practice reaches a different one. If the refusal is edge-local, a
-clean reading here does not mean a clean minute in Auckland. Probing from
-somewhere in New Zealand is what would settle that, and nothing in the
-pipeline can do it — it needs a machine there.
+**A correction to the line written after the first reading.** That note said the
+runner reaches "whichever Cloudflare edge is nearest it", singular, on the
+evidence of twenty answers that all carried `-DFW`. The second reading disproves
+it: the same job, twenty minutes later, was answered from at least four edges
+including one in Paris. So the probe is not pinned to one edge, and twenty
+probes sample several.
+
+What still stands, and is the part that matters: **none of them is the edge the
+practice reaches.** Auckland is served from Australasia, and nothing in the
+pipeline runs there. If the refusal is local to that edge, every clean reading
+here is consistent with a bad minute in Auckland. Settling it needs a machine in
+New Zealand doing the probing.
 
 A separate trap, found the same day: run the probe from inside a sandboxed
 environment and the *sandbox's* egress proxy answers 403 with
