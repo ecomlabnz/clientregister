@@ -7,6 +7,28 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.51.2 — 12 September 2026
+
+### Fixed
+**A decision on the calendar says which way it went.** It now reads
+**Approved — …** or **Declined — …** rather than *Decided — …*.
+
+*"On its own 'Decided' is useless. It should be either approved or declined or
+something else."*
+
+The word comes from the matter's status, not from the outcome box. The outcome
+box holds a record of the grant — *"Approved. AEWV granted 17 August 2026;
+multiple entry; must arrive before 17 January 2027 …"* — and a calendar row
+carrying a paragraph would be a worse version of the same complaint.
+
+Where a matter was decided and later closed, the status no longer says which way
+it went; the first few words of the outcome are used if they are short enough to
+be a label.
+
+**Lodged and Decided are back on the calendar.** 1.51.1 took them off it. That
+was a misreading of the complaint — the objection was to the word, not to the
+rows — and it lasted about twenty minutes.
+
 ## 1.51.1 — 12 September 2026
 
 ### Fixed

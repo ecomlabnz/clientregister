@@ -24,7 +24,7 @@ import { html, raw } from '../../ui/html';
 import { badge, card, emptyState, pageHeader } from '../../ui/components';
 import { dateShort, relativeDays } from '../../ui/format';
 import {
-  byDay, calendarEvents, CALENDAR_SOURCES, defaultSources, type CalendarEvent,
+  byDay, calendarEvents, CALENDAR_SOURCES, type CalendarEvent,
 } from '../../core/calendar';
 import {
   firstDay, lastDay, monthGrid, monthKeyOf, monthName, shiftDate, shiftMonth,
@@ -71,25 +71,21 @@ export const calendarModule: AppModule = {
           ? { from: `${year}-01-01`, to: `${year}-12-31` }
           : { from: firstDay(month), to: lastDay(month) };
 
-      // Which kinds are switched on. Absent means everything still ahead —
-      // not everything there is.
+      // Which sources are switched on. Absent means all of them — a calendar
+      // that opens empty because a previous visit unticked something is a
+      // calendar nobody trusts.
       //
-      // Reported 12 September 2026, looking at a September full of decisions
-      // that had already arrived: *"why do i see in calendar a useless status
-      // 'Decided'??? how does that help?"* It did not. Lodged and Decided are
-      // the only two kinds that are in the past by nature; they can never
-      // appear in a future month, so they crowded this one and left the next
-      // one empty. `historic` had said so since the calendar was built and
-      // nothing read it.
-      //
-      // Still nothing is remembered between visits: a calendar that opens
-      // empty because of something you unticked last week is one nobody
-      // trusts. The default is a fixed set, not your last set.
+      // Lodged and Decided were briefly defaulted off, on 12 September 2026, on
+      // a misreading of *"why do i see in calendar a useless status
+      // 'Decided'??? how does that help?"* That was a complaint about the word,
+      // not about the rows — corrected the same day: *"i meant that the case
+      // must actually say what the decision is, not just remove it."* So they
+      // are back on, and a decision now says whether it was approved or
+      // declined. See `decisionLabel` in core/calendar.
       const asked = (c.req.query('s') ?? '').split(',').filter(Boolean);
       const known = new Set(CALENDAR_SOURCES.map((s) => s.id));
       const chosen = asked.filter((id) => known.has(id));
-      const byDefault = defaultSources();
-      const showing = chosen.length ? chosen : byDefault;
+      const showing = chosen.length ? chosen : CALENDAR_SOURCES.map((s) => s.id);
 
       // "Mine" is the seed of the per-user calendars the practice asked to keep
       // possible: it is a filter value, not a second page.
@@ -120,12 +116,12 @@ export const calendarModule: AppModule = {
       const toggle = (id: string): string => {
         const on = new Set(showing);
         if (on.has(id)) on.delete(id); else on.add(id);
-        // The default set is the same as none specified, and the shorter
-        // address is the one worth sharing.
-        const next = [...on].sort();
-        const isDefault = next.length === byDefault.length
-          && next.every((id) => byDefault.includes(id));
-        return isDefault ? href({ s: '' }) : href({ s: next.join(',') });
+        // All of them on is the same as none specified, and the shorter address
+        // is the one worth sharing.
+        const next = [...on];
+        return next.length === CALENDAR_SOURCES.length
+          ? href({ s: '' })
+          : href({ s: next.join(',') });
       };
 
       const counts = new Map<string, number>();
@@ -197,9 +193,7 @@ export const calendarModule: AppModule = {
                 ${on ? html`<span class="muted">${String(n)}</span>` : ''}
               </a>`;
           })}
-          ${chosen.length
-            ? html`<a class="btn btn-link" href="${href({ s: '' })}">Back to what\u2019s coming</a>`
-            : ''}
+          ${chosen.length ? html`<a class="btn btn-link" href="${href({ s: '' })}">Show all kinds</a>` : ''}
         </div>
 
         ${'' /* Client dates — visas, passports, certificates — belong to a client

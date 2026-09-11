@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
-import { byDay, calendarEvents, CALENDAR_SOURCES, defaultSources } from '../src/core/calendar';
+import { byDay, calendarEvents, CALENDAR_SOURCES, decisionLabel } from '../src/core/calendar';
 import { mountModule, fakeUser } from './support/d1';
 import { calendarModule } from '../src/modules/calendar';
 const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
@@ -329,20 +329,21 @@ describe('three views of the same events', () => {
 });
 
 /**
- * What the calendar opens with.
+ * A decision on the calendar says which way it went.
  *
- * **Reported 12 September 2026**, looking at a September full of decisions that
- * had already arrived: *"why do i see in calendar a useless status 'Decided'???
- * how does that help?"*
+ * **Reported 12 September 2026:** *"why do i see in calendar a useless status
+ * 'Decided'??? how does that help?"* — and, when the first fix removed the rows
+ * instead of the word: *"i meant that the case must actually say what the
+ * decision is, not just remove it or the word 'Decided'. On its own 'Decided'
+ * is useless. It should be either approved or declined or something else."*
  *
- * It did not help. A calendar is what is coming. Lodged and Decided are the
- * only two kinds that are in the past by nature — a decision cannot be entered
- * before it arrives, so those rows can never appear in a future month. They
- * filled the month in front of the practice and left the next one empty.
- *
- * The `historic` flag had said exactly that since the calendar was built, and
- * nothing read it. These tests are what make it mean something.
+ * So the row stays and the word changes. The label is read from the **status**
+ * and not from `outcome`, because outcome is free text and in the practice's
+ * own register it runs to a full paragraph recording the grant — a record, not
+ * a label. A calendar row that was a paragraph would be a worse version of the
+ * same complaint.
  */
+
 /** A matter decided in September, and one still waiting on a decision. */
 function mounted() {
   const h = mountModule(calendarModule, { user: fakeUser({ id: 'u1' }) });
@@ -353,8 +354,13 @@ function mounted() {
   h.db.prepare(
     `INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
         lodged_at, decided_at, outcome, created_at, updated_at)
-     VALUES ('k1','CASE-26-901','c1','A decided matter','wv_aewv','approved','u1',
+     VALUES ('k1','CASE-26-901','c1','An approved matter','wv_aewv','approved','u1',
              '2026-09-01','2026-09-08','approved',?,?)`).run(AT, AT);
+  h.db.prepare(
+    `INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
+        lodged_at, decided_at, outcome, created_at, updated_at)
+     VALUES ('k3','CASE-26-903','c1','A declined matter','wv_aewv','declined','u1',
+             '2026-09-02','2026-09-09','declined',?,?)`).run(AT, AT);
   h.db.prepare(
     `INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
         decision_due_at, next_action, next_action_due, created_at, updated_at)
@@ -363,43 +369,53 @@ function mounted() {
   return h;
 }
 
-describe('the calendar opens on what is coming', () => {
-  it('leaves the two backward-looking kinds out by default', () => {
-    expect(defaultSources()).not.toContain('decided');
-    expect(defaultSources()).not.toContain('lodged');
+describe('a decision says which way it went', () => {
+  it('says Approved and Declined rather than Decided', () => {
+    expect(decisionLabel('approved', 'approved')).toBe('Approved');
+    expect(decisionLabel('declined', 'declined')).toBe('Declined');
+    expect(decisionLabel('withdrawn', null)).toBe('Withdrawn');
   });
 
-  it('keeps every kind that is still ahead', () => {
-    const ahead = CALENDAR_SOURCES.filter((s) => !s.historic).map((s) => s.id);
-    expect(defaultSources().sort()).toEqual(ahead.sort());
-    // The ones that matter most: a deadline, a task, an expiry.
-    for (const id of ['decision_due', 'task', 'visa_expiry']) {
-      expect(defaultSources(), id).toContain(id);
-    }
+  it('never renders the outcome paragraph as a label', () => {
+    // Real shape from the practice's own register: the outcome column holds the
+    // record of the grant, not a word.
+    const paragraph = 'Approved. AEWV granted 17 August 2026; multiple entry; must arrive '
+      + 'before 17 January 2027; expires 36 months after first arrival.';
+    expect(decisionLabel('approved', paragraph)).toBe('Approved');
+    expect(decisionLabel('closed', paragraph)).not.toContain('August');
+    expect(decisionLabel('closed', paragraph).length).toBeLessThan(25);
   });
 
-  it('marks exactly the two kinds that are in the past by nature', () => {
-    expect(CALENDAR_SOURCES.filter((s) => s.historic).map((s) => s.id).sort())
-      .toEqual(['decided', 'lodged']);
+  it('uses a short outcome where the status no longer says which way it went', () => {
+    // A matter decided and later closed: "Closed" is not the decision.
+    expect(decisionLabel('closed', 'information released')).toBe('Information released');
   });
 
-  it('does not draw a decision that has already arrived', async () => {
+  it('falls back to the status where there is nothing better', () => {
+    expect(decisionLabel('closed', null)).toBe('Closed');
+    expect(decisionLabel('closed', '')).toBe('Closed');
+  });
+
+  it('draws the outcome on the calendar itself', async () => {
     const h = mounted();
     const body = await (await h.request('/calendar?m=2026-09')).text();
-    expect(body).not.toContain('Decided — ');
-    expect(body).not.toContain('Lodged — ');
+    expect(body).toContain('Approved \u2014 An approved matter');
+    expect(body).toContain('Declined \u2014 A declined matter');
+    expect(body).not.toContain('Decided \u2014');
   });
+});
 
-  it('draws it when the reader ticks it on', async () => {
-    // Kept rather than deleted, because there is one real use: looking back at
-    // a month to see what was lodged and what came back.
+describe('the calendar still opens on everything', () => {
+  it('shows a decision without anybody ticking it on', async () => {
+    // It was briefly defaulted off, on a misreading. The complaint was about
+    // the word, not the row.
     const h = mounted();
-    const body = await (await h.request('/calendar?m=2026-09&s=decided')).text();
-    expect(body).toContain('Decided');
+    const body = await (await h.request('/calendar?m=2026-09')).text();
+    expect(body).toContain('An approved matter');
+    expect(body).toContain('Lodged \u2014');
   });
 
-  it('still shows a deadline that has not been reached', async () => {
-    // The point of the change is that what is ahead survives it.
+  it('and still shows a deadline that has not been reached', async () => {
     const h = mounted();
     const body = await (await h.request('/calendar?m=2026-09')).text();
     expect(body).toContain('A waiting matter');

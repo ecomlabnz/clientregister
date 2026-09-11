@@ -30,6 +30,7 @@
 
 import type { Env } from '../types';
 import { all } from './db';
+import { CASE_STATUS_LABELS, type CaseStatus } from '../domain';
 
 export type CalendarTone = 'red' | 'amber' | 'green' | 'blue' | 'grey';
 
@@ -63,20 +64,17 @@ export interface CalendarSource {
   /**
    * Whether these events are in the past by nature — a lodgement, a decision.
    *
-   * **These are off unless you tick them on**, since 12 September 2026. The
-   * practice, looking at a September full of them: *"why do i see in calendar a
-   * useless status 'Decided'??? how does that help?"*
+   * Documentation, not behaviour: nothing filters on it, and that is deliberate
+   * as of 12 September 2026. These were briefly defaulted off, on a misreading
+   * of *"why do i see in calendar a useless status 'Decided'??? how does that
+   * help?"* — which was a complaint about the **word**, not about the rows.
+   * The practice, correcting it the same day: *"i meant that the case must
+   * actually say what the decision is, not just remove it or the word
+   * 'Decided'. On its own 'Decided' is useless. It should be either approved or
+   * declined or something else."*
    *
-   * The answer is that it did not. A calendar is what is coming; a decision
-   * that has already arrived is not a date anybody plans around, and it can
-   * never appear in a future month at all — so it filled today's screen and
-   * left tomorrow's empty.
-   *
-   * They are kept rather than deleted because there is one real use: looking
-   * back at a month to see what was lodged and what came back. That is a thing
-   * you go and ask for, not a thing that should be in the way meanwhile.
-   *
-   * This flag existed before that complaint and nothing read it. It reads now.
+   * So a decision is on the calendar and says what it was. See
+   * `decisionLabel`.
    */
   historic?: boolean;
   /**
@@ -89,14 +87,30 @@ export interface CalendarSource {
 }
 
 /**
- * The kinds a calendar opens with: everything that is still ahead.
+ * What a decision was, in one word, for a calendar row.
  *
- * Used where no kinds are named in the address. Naming them explicitly in the
- * address still works for any kind, historic ones included — that is how the
- * tick turns one back on.
+ * **Asked for on 12 September 2026:** *"the case must actually say what the
+ * decision is ... on its own 'Decided' is useless. It should be either approved
+ * or declined or something else."*
+ *
+ * Read from the **status**, not from `outcome`. Outcome is free text and is
+ * often a whole paragraph — in the practice's own register it runs to
+ * *"Approved. AEWV granted 17 August 2026; multiple entry; must arrive before
+ * 17 January 2027 ..."* — which is a record of the grant, not a label.
+ *
+ * A matter that was decided and later closed has a status that no longer says
+ * which way it went. For those the first words of `outcome` are used when they
+ * are short enough to be a label, and only then does it fall back to the bare
+ * word the practice objected to.
  */
-export function defaultSources(): string[] {
-  return CALENDAR_SOURCES.filter((s) => !s.historic).map((s) => s.id);
+export function decisionLabel(status: string, outcome: string | null): string {
+  const known = CASE_STATUS_LABELS[status as CaseStatus];
+  if (status === 'approved' || status === 'declined' || status === 'withdrawn') return known;
+  const short = (outcome ?? '').trim();
+  if (short && short.length <= 24 && !short.includes('.')) {
+    return short.charAt(0).toUpperCase() + short.slice(1);
+  }
+  return known ?? 'Decided';
 }
 
 /** A cap per source, so one busy source cannot fill a month on its own. */
@@ -185,7 +199,7 @@ export const CALENDAR_SOURCES: CalendarSource[] = [
         .map((r) => ({
           date: String(r.date).slice(0, 10), source: 'decided',
           tone: (r.status === 'declined' ? 'red' : 'green') as CalendarTone,
-          title: `${r.status === 'declined' ? 'Declined' : 'Decided'} — ${r.title}`,
+          title: `${decisionLabel(r.status, r.outcome)} — ${r.title}`,
           detail: `${r.client_name} · ${r.ref}`,
           href: `/cases/${r.id}`, ownerId: r.owner_id, ownerName: r.owner_name,
         }));
