@@ -60,7 +60,24 @@ export interface CalendarSource {
   /** Plain words. This is what the reader ticks. */
   label: string;
   tone: CalendarTone;
-  /** Whether these events are in the past by nature — a lodgement, a decision. */
+  /**
+   * Whether these events are in the past by nature — a lodgement, a decision.
+   *
+   * **These are off unless you tick them on**, since 12 September 2026. The
+   * practice, looking at a September full of them: *"why do i see in calendar a
+   * useless status 'Decided'??? how does that help?"*
+   *
+   * The answer is that it did not. A calendar is what is coming; a decision
+   * that has already arrived is not a date anybody plans around, and it can
+   * never appear in a future month at all — so it filled today's screen and
+   * left tomorrow's empty.
+   *
+   * They are kept rather than deleted because there is one real use: looking
+   * back at a month to see what was lodged and what came back. That is a thing
+   * you go and ask for, not a thing that should be in the way meanwhile.
+   *
+   * This flag existed before that complaint and nothing read it. It reads now.
+   */
   historic?: boolean;
   /**
    * Whether this source can be narrowed to one person. A passport expiry
@@ -69,6 +86,17 @@ export interface CalendarSource {
    */
   ownable?: boolean;
   load(env: Env, from: string, to: string, filter: CalendarFilter): Promise<CalendarEvent[]>;
+}
+
+/**
+ * The kinds a calendar opens with: everything that is still ahead.
+ *
+ * Used where no kinds are named in the address. Naming them explicitly in the
+ * address still works for any kind, historic ones included — that is how the
+ * tick turns one back on.
+ */
+export function defaultSources(): string[] {
+  return CALENDAR_SOURCES.filter((s) => !s.historic).map((s) => s.id);
 }
 
 /** A cap per source, so one busy source cannot fill a month on its own. */

@@ -7,6 +7,27 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.51.1 — 12 September 2026
+
+### Fixed
+**The calendar opens on what is coming.** Reported the same day: *"why do i see
+in calendar a useless status 'Decided'??? how does that help?"*
+
+It did not help. **Lodged** and **Decided** are the only two kinds on the
+calendar that are in the past by nature — a decision cannot be entered before it
+arrives. So they filled the month in front of you and could never appear in the
+month ahead.
+
+Both are now off unless you tick them on. Everything still ahead — decisions
+due, tasks, expiries, quotes, invoices, warnings — is unchanged.
+
+They are still there to tick, because there is one real use: looking back at a
+month to see what went in and what came back. That is something to go and ask
+for, not something to have in the way meanwhile.
+
+Nothing is remembered between visits. The calendar opens the same way every
+time, rather than however you last left it.
+
 ## 1.51.0 — 12 September 2026
 
 ### Added
