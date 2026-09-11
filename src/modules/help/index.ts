@@ -37,6 +37,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.51.2', date: '12 September 2026',
+    notes: [
+      'A decision on the calendar now says which way it went \u2014 \u201cApproved \u2014 \u2026\u201d '
+        + 'or \u201cDeclined \u2014 \u2026\u201d rather than \u201cDecided\u201d.',
+      'Lodged and Decided are back on the calendar. Taking them off in 1.51.1 was a misreading: '
+        + 'the objection was to the word, not to the rows.',
+    ],
+  },
+  {
     version: '1.51.1', date: '12 September 2026',
     notes: [
       'The calendar opens on what is coming. Lodged and Decided are off unless you tick them on '
