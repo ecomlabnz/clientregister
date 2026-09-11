@@ -81,6 +81,14 @@ describe.each(environments)('the %s environment', (name, env) => {
   it('says which register it is, so a screen cannot be mistaken for the other', () => {
     expect(env.vars.APP_ENV).not.toBe(top.vars.APP_ENV);
   });
+
+  it('links to itself, never to the practice’s register', () => {
+    // `APP_ORIGIN` builds the links in the nightly automation summary. One
+    // practice's summary linking into another's register is the single mistake
+    // this whole arrangement exists to prevent, and it would arrive by e-mail
+    // rather than on a screen anybody was looking at.
+    expect(env.vars.APP_ORIGIN ?? '').not.toBe(top.vars.APP_ORIGIN);
+  });
 });
 
 describe('every configured database is migrated by the deploy', () => {

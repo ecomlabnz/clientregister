@@ -22,7 +22,7 @@ A second register, from the same code. Architecture and the order of work:
 | D1 database | `clientregister-trial-db` | `a2bdf373-974a-47b6-a7a3-72f7bf7b4730` |
 | KV namespace | `clientregister-trial-sessions` | `8e6c31e521fc4226b541003bf27bb466` |
 | R2 bucket | — | **not created; see below** |
-| Worker | `clientregister-trial` | created on its first deploy |
+| Worker | `clientregister-trial` | `https://clientregister-trial.ecomlabnz.workers.dev` |
 
 Both were created on 12 September 2026; the database carries the same `oc`
 location hint as the practice's, so a trial that becomes a practice is already
@@ -48,9 +48,11 @@ secret. That is the switch: no secret, no job, no Worker.
    top-level configuration, does not find that practice's database, and fails
    before doing anything. Checking that by hand takes a second and needs no
    token: `npx wrangler d1 migrations list <database> --local --env <name>`.
-3. **Put that address into `wrangler.jsonc`** as the trial's `APP_ORIGIN`. It
-   is deliberately empty until then: it builds links in the nightly automation
-   output, and a wrong address there is worse than none.
+3. **Put that address into `wrangler.jsonc`** as that practice's `APP_ORIGIN`.
+   It builds links in the nightly automation output, so it must be that
+   practice's own address — a summary linking into somebody else's register is
+   the one mistake this arrangement exists to prevent. Done for the trial on
+   12 September 2026.
 4. **Open `/setup`** on that address, give it the token, and create the first
    user.
 5. **Fill in Settings → Practice** as that practice — name, address, bank, GST.
