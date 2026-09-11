@@ -37,6 +37,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.47.0', date: '12 September 2026',
+    notes: [
+      'The Kind list on a file note is now yours to edit, under Settings \u2192 Lists and '
+        + 'dropdowns. Rename Consult, add Site visit, drop Message \u2014 no deployment.',
+      'System notes and email in and out stay out of the list. Those are what the register writes '
+        + 'about itself, so a note claiming an email was sent cannot be written by hand.',
+      'Taking a kind off the list does not change notes already filed under it \u2014 file notes '
+        + 'can never be rewritten. The note keeps its kind and shows the stored word.',
+    ],
+  },
+  {
     version: '1.46.0', date: '12 September 2026',
     notes: [
       'You can now change the response or decision date without moving the status. Leave "Move '

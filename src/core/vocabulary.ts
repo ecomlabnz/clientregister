@@ -362,10 +362,53 @@ money | Money
 other | Other`,
 };
 
+/**
+ * What a file note is called.
+ *
+ * **Asked for on 11 September 2026**, looking at the Kind dropdown on a file
+ * note and asking whether it could be editable like the others. Yes — and
+ * migration 0064 had already argued the case and done the hard half.
+ *
+ * That migration removed the database CHECK on `entries.kind`, and its own
+ * words are the reason this list belongs here: *"A CHECK is the right tool for
+ * a rule about the shape of the world... It is the wrong tool for a list of
+ * words a practice uses to describe its own work, because that list is
+ * configuration."* The list had changed three times in eight days, and one of
+ * those changes offered a value the database refused — so for a week anybody
+ * who picked "Preliminary consultation" got an error instead of a note, and
+ * nobody found out.
+ *
+ * **Three kinds are deliberately not here**: `system`, `email_in` and
+ * `email_out`. Those are not words the practice chooses — they are what the
+ * register writes when it records something itself, and the sent-email viewer
+ * finds a letter by looking for `email_out`. They stay in `domain.ts`.
+ *
+ * **Removing a kind does not rewrite the notes filed under it.** File notes are
+ * append-only; a note filed as a Consult stays a Consult. What it loses is its
+ * label, and the register shows the stored key rather than pretending the note
+ * has no kind at all.
+ */
+export const NOTE_KIND_VOCAB: VocabularyDef = {
+  key: 'vocab.note_kinds',
+  label: 'File note kinds',
+  help: 'One per line, written as “key | Label”. Offered when writing a file note on a client, '
+    + 'a matter or an inquiry. Relabelling is free; removing a key leaves notes already filed '
+    + 'under it showing the raw key, because a file note cannot be rewritten. The register’s own '
+    + 'entries — system notes and email in and out — are not in this list and cannot be changed. '
+    + 'Blank lines and lines starting with # are ignored.',
+  defaults: `note | Note
+status_query | Status query
+consult | Consult
+call | Phone call
+meeting | Meeting
+message | Message
+file | Document`,
+};
+
 export const VOCABULARIES: VocabularyDef[] = [
   CASE_TYPE_VOCAB, VISA_TYPE_VOCAB,
   TITLE_VOCAB, GENDER_VOCAB, RELATIONSHIP_STATUS_VOCAB,
-  ENGLISH_TEST_VOCAB, DOC_CATEGORY_VOCAB, FLAG_KIND_VOCAB,
+  ENGLISH_TEST_VOCAB, DOC_CATEGORY_VOCAB, FLAG_KIND_VOCAB, NOTE_KIND_VOCAB,
 ];
 
 export const VOCABULARY_SETTINGS: SettingsGroup = {
@@ -434,6 +477,29 @@ export function suggestCaseTitle(typeLabel: string, clientFormalName: string): s
 
 export async function caseTypes(env: Env): Promise<Term[]> {
   return vocabulary(env, CASE_TYPE_VOCAB);
+}
+
+export async function noteKinds(env: Env): Promise<Term[]> {
+  return vocabulary(env, NOTE_KIND_VOCAB);
+}
+
+/**
+ * What to call a note that is already filed.
+ *
+ * Three answers, in order, and the order is the point:
+ *
+ * 1. The practice's own list, if the kind is still on it.
+ * 2. The register's own kinds — `system`, `email_in`, `email_out` — which are
+ *    not the practice's to name and never appear in the list.
+ * 3. The stored key itself, when a kind has been taken off the list since the
+ *    note was filed. File notes are append-only: the note stays exactly as it
+ *    was written, and showing the raw key is more honest than showing nothing
+ *    or, worse, quietly calling it something else.
+ */
+export function noteKindLabel(
+  kinds: Term[], kind: string, fixed: Record<string, string>,
+): string {
+  return kinds.find((t) => t.key === kind)?.label ?? fixed[kind] ?? kind;
 }
 
 export async function englishTests(env: Env): Promise<Term[]> {

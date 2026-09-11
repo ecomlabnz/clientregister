@@ -38,7 +38,7 @@ import {
 } from '../../ui/format';
 import {
   CASE_STATUS_LABELS, CLIENT_STATUSES, CLIENT_STATUS_LABELS,
-  CHOOSABLE_ENTRY_KINDS, ENTRY_KINDS, ENTRY_KIND_LABELS, PARTY_ROLE_LABELS,
+  ENTRY_KIND_LABELS, type EntryKind, PARTY_ROLE_LABELS,
   QUOTE_STATUS_LABELS, type ClientStatus,
 } from '../../domain';
 import { organisationOptions, userOptions } from '../../core/lookups';
@@ -51,8 +51,8 @@ import { can } from '../../core/rbac';
 import { clientDeleteCard, deleteRefusal } from '../../core/deletes';
 import { preferencesFor } from '../../core/preferences';
 import {
-  caseTypes, docCategories, englishTests, genders, isTerm, labelFor, relationshipStatuses,
-  termOptions, titles, visaTypes, type Term,
+  caseTypes, docCategories, englishTests, genders, isTerm, labelFor, noteKindLabel, noteKinds,
+  relationshipStatuses, termOptions, titles, visaTypes, type Term,
 } from '../../core/vocabulary';
 import { renameMattersFor } from '../../core/casename';
 import { detachTag, attachTag, findOrCreateTag, listTags, tagsForClient, tagsForClients } from '../../core/tags';
@@ -1318,6 +1318,8 @@ export const clientsModule: AppModule = {
 
     // --- Detail -------------------------------------------------------------
     r.get('/:id', requirePermission('register:read'), async (c) => {
+      // What this practice calls its own file notes. See NOTE_KIND_VOCAB.
+      const noteKindList = await noteKinds(c.env);
       const types = await caseTypes(c.env);
       const id = c.req.param('id')!;
       const client = await one<ClientRow & { assignee_name: string | null }>(
@@ -1464,7 +1466,7 @@ export const clientsModule: AppModule = {
               <form method="post" action="/clients/${client.id}/entries" class="entry-form">
                 ${csrfField(csrf)}
                 ${select({ label: 'Kind', name: 'kind', value: 'note', includeBlank: false,
-                           options: optionsFrom(CHOOSABLE_ENTRY_KINDS as any, ENTRY_KIND_LABELS as any) })}
+                           options: termOptions(noteKindList) })}
                 ${field({ label: 'Note', name: 'body', type: 'textarea', rows: 3, required: true, maxlength: 5000,
                           placeholder: 'What happened, what was advised, what was agreed.' })}
                 <button class="btn btn-primary" type="submit">Add a note</button>
@@ -1473,15 +1475,13 @@ export const clientsModule: AppModule = {
                 <ul class="timeline">
                   ${entries.map((e) => timelineItem({
                     entry: e,
-                    kindLabel: ENTRY_KIND_LABELS[e.kind] ?? e.kind,
+                    kindLabel: noteKindLabel(noteKindList, e.kind, ENTRY_KIND_LABELS),
                     mail: canReadMail ? mailLinkFor(e, sentMail, recordMailHref('client', client.id)) : null,
                     happened: stamp(e.occurred_at),
                     written: stamp(e.created_at),
                     correction: writable && correctable(e, c.get('user')?.id ?? null)
                       ? { csrf, minutes: CORRECTION_WINDOW_MINUTES,
-                          kindOptions: optionsFrom(
-                            CHOOSABLE_ENTRY_KINDS as any,
-                            ENTRY_KIND_LABELS as any) }
+                          kindOptions: termOptions(noteKindList) }
                       : null,
                   }))}
                 </ul>`}`)}
@@ -2470,7 +2470,12 @@ export const clientsModule: AppModule = {
       if (!exists) return c.notFound();
 
       const f = new FormReader(await c.req.formData());
-      const kind = f.enum('kind', ENTRY_KINDS, { fallback: 'note' })!;
+      // Checked against the practice's own list rather than a list in the
+      // code — see NOTE_KIND_VOCAB. A kind that is not on it falls back to
+      // a plain note rather than being refused: the words are the note.
+      const writable_kinds = await noteKinds(c.env);
+      const submitted = f.optional('kind', { max: 40 });
+      const kind = (isTerm(writable_kinds, submitted) ? submitted : 'note') as EntryKind;
       const body = f.text('body', { required: true, label: 'Entry', max: 5000 });
       if (!f.valid) return redirectWith(c, `/clients/${id}`, Object.values(f.errors)[0]!, 'err');
 

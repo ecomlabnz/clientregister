@@ -19,7 +19,8 @@ import { auditFrom } from '../../core/audit';
 import { one } from '../../core/db';
 import { FormReader } from '../../core/validate';
 import { correctEntry } from '../../core/timeline';
-import { ENTRY_KINDS } from '../../domain';
+import { isTerm, noteKinds } from '../../core/vocabulary';
+import type { EntryKind } from '../../domain';
 import { instantForDate } from '../../ui/format';
 import { redirectWith } from '../../ui/layout';
 
@@ -50,7 +51,12 @@ export const notesModule: AppModule = {
 
       const f = new FormReader(await c.req.formData());
       const body = f.text('body', { required: true, label: 'Note', max: 20000 });
-      const kind = f.enum('kind', ENTRY_KINDS, { fallback: 'note' })!;
+      // Checked against the practice's own list rather than a list in the
+      // code — see NOTE_KIND_VOCAB. A kind that is not on it falls back to
+      // a plain note rather than being refused: the words are the note.
+      const writable_kinds = await noteKinds(c.env);
+      const submitted = f.optional('kind', { max: 40 });
+      const kind = (isTerm(writable_kinds, submitted) ? submitted : 'note') as EntryKind;
       const occurredOn = f.date('occurred_at');
       if (!f.valid) return redirectWith(c, back, Object.values(f.errors)[0]!, 'err');
 
