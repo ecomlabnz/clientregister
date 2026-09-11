@@ -15,3 +15,8 @@ coverage/
 clients.jsonl
 cases.jsonl
 *.jsonl
+
+# A git worktree is a second checkout of this repository, not content of it.
+# Claude Code puts one here when work runs in isolation; committing it would
+# commit a copy of the tree into the tree.
+.claude/worktrees/
