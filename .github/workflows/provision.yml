@@ -1,0 +1,94 @@
+# Create a practice's storage, in the right place, on purpose.
+#
+# **Asked for on 12 September 2026:** *"lets to the bucket now"* — the trial has
+# no R2 bucket, so it has no document storage and no nightly backup.
+#
+# ## Why this is a button rather than a line in the deploy
+#
+# Creating a bucket is not a deployment. It happens once per practice, it costs
+# money from that moment, and **the name can never be moved afterwards** (see
+# below). A step that ran on every push would be a step nobody reads, doing
+# something irreversible.
+#
+# So: run it by hand, from the Actions tab, once per practice. It is also the
+# shape the automation in `docs/second-practice.md` stage 3 takes — a script
+# that provisions a practice's resources — with one resource in it so far.
+#
+# ## The location, which is the whole point
+#
+# **R2 pins a name to a location the first time that name is created**, for
+# good. Delete the bucket and recreate the same name and it comes back where it
+# was. The practice's first bucket was created through an API call with no
+# location parameter, so "automatic" placed it near whoever called it — eastern
+# North America — and every attempt to move it failed. The bucket had to be
+# given a different name to get to Oceania.
+#
+# That note has said since then that a bucket must be created *from a browser
+# in New Zealand*. It need not: `wrangler r2 bucket create --location oc` says
+# where it goes explicitly, so it lands in Oceania wherever it is run from,
+# including a GitHub runner in the United States. That is what this uses.
+name: Create a practice's storage
+
+on:
+  workflow_dispatch:
+    inputs:
+      bucket:
+        description: 'Bucket name — new, and never used before on this account'
+        required: true
+        type: string
+      location:
+        description: 'Where it lives. Permanent for this name.'
+        required: true
+        default: oc
+        type: choice
+        options: [oc, apac, weur, eeur, wnam, enam]
+
+permissions:
+  contents: read
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Named back at whoever pressed the button, because the one thing that
+      # cannot be undone here is a typo in the name.
+      - name: Say what is about to happen
+        run: |
+          echo "Creating R2 bucket '${{ inputs.bucket }}' in '${{ inputs.location }}'."
+          echo "This location is permanent for this name, even if the bucket is deleted."
+
+      - name: Create the bucket
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: r2 bucket create ${{ inputs.bucket }} --location ${{ inputs.location }}
+
+      # Read it back. A create that returned without error and made nothing is
+      # the same class of fault the nightly backup reads its own bytes back for.
+      - name: Confirm it is there, and where
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: r2 bucket info ${{ inputs.bucket }}
+
+      - name: What to do next
+        run: |
+          echo "Now add it to wrangler.jsonc, under the practice that owns it:"
+          echo ''
+          echo '  "r2_buckets": [{ "binding": "DOCS", "bucket_name": "${{ inputs.bucket }}" }]'
+          echo ''
+          echo "Until it is bound there, the practice still reports document storage"
+          echo "as not enabled and still has no nightly backup."

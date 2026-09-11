@@ -63,18 +63,37 @@ secret. That is the switch: no secret, no job, no Worker.
    Nothing about the practice's identity is in the code.
 6. **Seed it** from the Test Data page, so the trial has a caseload to look at.
 
-#### The R2 bucket, by hand and from New Zealand
+#### The R2 bucket
 
-Deliberately not created from here. **R2 honours a location hint only on the
-first creation of a name**, and the practice's own bucket had to be renamed to
-`files` because the original name was permanently pinned to eastern North
-America — see the note in `wrangler.jsonc`. A bucket created through the API
-from a container outside New Zealand would land in the wrong place for good.
+Every practice needs one. Without it there is no document storage **and no
+nightly backup** — the backup is written to R2 — so this is part of setting a
+practice up rather than an optional extra.
 
-So: create it in the dashboard, from a browser in New Zealand, under a name
-that has never been used before, then add an `r2_buckets` block to the trial
-environment. Until then the register reports document storage as not enabled,
-which every page that uses it already handles.
+**R2 pins a name to a location the first time that name is created**, for good:
+delete the bucket and recreate the same name and it comes back where it was.
+The practice's own bucket had to be renamed to `files` because the original
+name was stuck in eastern North America.
+
+**Use the button, not the dashboard.** Actions → *Create a practice's storage* →
+Run workflow, with a name that has never been used on this account and the
+location left at `oc`. It runs `wrangler r2 bucket create --location oc`, which
+says where the bucket goes explicitly, then reads it back to confirm where it
+landed.
+
+(An earlier version of this note said the bucket had to be created from a
+browser in New Zealand. That was the workaround, not the rule — it was needed
+because the *API* call has no location parameter, so "automatic" placed the
+bucket near whoever called it. Wrangler's `--location` removes the problem.)
+
+Then add it to that practice's environment in `wrangler.jsonc`:
+
+```jsonc
+"r2_buckets": [{ "binding": "DOCS", "bucket_name": "clientregister-trial-files" }]
+```
+
+Until it is bound there, the register reports document storage as not enabled —
+which every page that uses it already handles — and its Exports page says it has
+no automatic backup.
 
 #### Checking the two are actually separate
 
