@@ -67,9 +67,9 @@ import { threadsFor } from '../../core/channels';
 import {
   CERTIFICATE_KINDS, CERTIFICATE_LABELS, MEDICAL_TYPES, type CertificateKind,
   CERTIFICATE_VALIDITY, PROVENANCE_OPTIONS, type CertificateRow, type IssueDateProvenance,
-  addCertificate, certificatesFor, confirmIssueDate, currentOf, expiryIsDerived,
+  addCertificate, certificateChanges, certificatesFor, confirmIssueDate, currentOf, expiryIsDerived,
   issueDateUnverified, medicalTypeLabel,
-  refreshClientCache, removeCertificate, setCertificateSubmitted, validityRule,
+  refreshClientCache, removeCertificate, setCertificateSubmitted, updateCertificate, validityRule,
 } from '../../core/certificates';
 import {
   PASSPORT_STATUSES, type PassportStatus,
@@ -525,13 +525,12 @@ function clientForm(
             ${values.id
               ? html`<p><a class="btn btn-secondary" href="/clients/${values.id}#certificates">Add
                        a police certificate, medical or x-ray</a></p>
-                     <p class="hint">Each one is recorded with its own country and dates, and a new
-                        one never overwrites the old: a matter lodged in March relied on what was
-                        held in March.</p>`
-              : html`<p class="hint">Police certificates, medicals and x-rays are added on the
-                       client's own page once this record exists — each with its own country and
-                       dates, because a client may hold several at once and a new one must never
-                       overwrite the one an application relied on.</p>`}
+                     ${'' /* Both branches used to explain why certificates are records
+                             rather than boxes — a client may hold several at once, and a
+                             new one must never overwrite the one an application relied on.
+                             Still true, still the reason; no longer on the screen. */}
+                     <p class="hint">A new one never replaces the old.</p>`
+              : html`<p class="hint">Added on the client's own page, once this record exists.</p>`}
           </div>
 
           <p class="settings-head subhead">English</p>
@@ -762,8 +761,7 @@ function renderDormant(c: Context<AppContext>, rows: DormantClient[], q: string)
 
   return page(c, { title: 'Clients — finished with?', active: '/clients' }, html`
     ${pageHeader('Finished with?',
-      'Every matter closed, and everything on file expired. Until somebody says otherwise these '
-      + 'go on raising expiry alerts for ever.')}
+      'Every matter closed, everything on file expired \u2014 and still raising alerts.')}
 
     <nav class="tabs">
       <a class="tab" href="/clients">← Back to clients</a>
@@ -774,9 +772,8 @@ function renderDormant(c: Context<AppContext>, rows: DormantClient[], q: string)
       ? emptyState('Nobody looks finished with. Every client either has a matter running or '
           + 'something still in date.')
       : html`
-        <p class="hint">Archiving stops the alerts. <strong>Nothing is deleted</strong> — the
-           file, the matters and the notes all stay, and changing the status back brings them
-           with it. Anyone who has a matter running again is left out automatically.</p>
+        <p class="hint">Archiving stops the alerts. <strong>Nothing is deleted</strong>, and
+           changing the status back undoes it.</p>
 
         <form method="get" action="/clients" class="filters" data-live-search>
           <input type="hidden" name="view" value="dormant">
@@ -1063,8 +1060,7 @@ export const clientsModule: AppModule = {
       const skipped = ids.length - rows.length;
       return page(c, { title: 'Archive these clients?', active: '/clients' }, html`
         ${pageHeader('Archive these clients?',
-          'Nothing is deleted. Their files, matters and notes stay exactly as they are — they '
-          + 'stop raising expiry alerts, and they come back if you change the status again.')}
+          'Nothing is deleted. They stop raising expiry alerts.')}
 
         ${card(`${rows.length} ${rows.length === 1 ? 'client' : 'clients'}`, html`
           <ul class="list">${rows.map((r) => html`
@@ -1539,7 +1535,13 @@ export const clientsModule: AppModule = {
                                 ${pp.number
                                   ? html`<code>${pp.number}</code>` : 'No number recorded'}
                                 ${pp.issued_on ? html` \u00b7 issued ${dateShort(pp.issued_on)}` : ''}
-                                ${pp.expires_on ? html` \u00b7 expires ${dateShort(pp.expires_on)}` : ''}
+                                ${/* Not the expiry of a passport still held: it is in the column
+                                      at the right, with its colour and its "in 4 months".
+                                      Reported 11 September 2026, about "02 Dec 2031" printed twice
+                                      on one row. A passport no longer held has no cell there, so
+                                      it keeps its date here. */ ''}
+                                ${pp.expires_on && pp.status !== 'held'
+                                  ? html` \u00b7 expired ${dateShort(pp.expires_on)}` : ''}
                               </div>
                               ${pp.notes ? html`<div class="small muted">${pp.notes}</div>` : ''}
                             </div>
@@ -1576,10 +1578,12 @@ export const clientsModule: AppModule = {
                         ${field({ label: 'Note', name: 'notes', maxlength: 300 })}
                         <button class="btn btn-primary" type="submit">Add it</button>
                       </form>
-                      <p class="hint">The primary passport is edited on the client\u2019s own form.
-                         Every passport still marked held is watched for expiry, so a dual national
-                         is chased about both. One that has been replaced stays on the file as a
-                         record \u2014 a visa may still be stuck in it \u2014 but is not chased.</p>
+                      ${'' /* Was four sentences: where the primary is edited, that every
+                              held passport is watched so a dual national is chased about
+                              both, and that a replaced one stays on the file as a record
+                              because a visa may still be stuck in it. All true; the Status
+                              dropdown above already offers the choice. */}
+                      <p class="hint">Only a passport marked held is watched for expiry.</p>
                     </details>` : ''}
                 </div>
               </section>`}
@@ -1604,7 +1608,6 @@ export const clientsModule: AppModule = {
                                   ${current.has(cert.id) ? badge('current', 'green') : badge('superseded', 'grey')}
                                   <div class="small muted">
                                     ${cert.issued_on ? html`Issued ${dateShort(cert.issued_on)}` : 'Issue date not recorded'}
-                                    ${cert.expires_on ? html` · expires ${dateShort(cert.expires_on)}` : ''}
                                     ${cert.reference ? html` · ${cert.reference}` : ''}
                                   </div>
                                   ${/* Why it expires when it does. The date is worked out by the
@@ -1614,10 +1617,10 @@ export const clientsModule: AppModule = {
                                   ${expiryIsDerived(kind) ? html`
                                     <div class="small muted">
                                       ${cert.submitted_on
-                                        ? html`Submitted with an application ${dateShort(cert.submitted_on)} —
-                                               ${CERTIFICATE_VALIDITY[kind]!.submitted} months from issue.`
-                                        : html`Not submitted with an application —
-                                               ${CERTIFICATE_VALIDITY[kind]!.held} months from issue.`}
+                                        ? html`Submitted ${dateShort(cert.submitted_on)} ·
+                                               ${CERTIFICATE_VALIDITY[kind]!.submitted} months from issue`
+                                        : html`Not submitted ·
+                                               ${CERTIFICATE_VALIDITY[kind]!.held} months from issue`}
                                     </div>` : ''}
                                   ${/* A date nobody read off the paper must never look like one
                                         somebody did — the expiry above is computed from it. */ ''}
@@ -1625,29 +1628,75 @@ export const clientsModule: AppModule = {
                                     <div class="small">
                                       ${badge('issue date unverified', 'amber')}
                                       ${cert.issued_on_provenance === 'from_filename'
-                                        ? 'Taken from a document’s filename, never confirmed against the certificate.'
+                                        ? 'From a filename.'
                                         : cert.issued_on_provenance === 'from_ocr'
-                                        ? 'Read off the scanned certificate by a machine, never confirmed by a person.'
-                                        : 'Never confirmed against the certificate itself.'}
-                                      ${expiryIsDerived(kind) ? 'The expiry shown is worked out from it.' : ''}
+                                        ? 'Read by machine.'
+                                        : 'Source unknown.'}
                                       ${writable ? html`
                                         <form method="post" class="inline-form mt-sm"
                                               action="/clients/${client.id}/certificates/${cert.id}/confirm-issue-date">
                                           ${csrfField(csrf)}
                                           <button class="btn btn-small btn-secondary" type="submit">
-                                            I have checked it against the certificate</button>
+                                            Confirm against the certificate</button>
                                         </form>` : ''}
                                     </div>` : ''}
                                   ${cert.notes ? html`<div class="small muted">${cert.notes}</div>` : ''}
-                                  ${writable && expiryIsDerived(kind) ? html`
+                                  ${/* The quick way to record the day it went in, and it goes
+                                        away once it has been. Reported 11 September 2026: *"the
+                                        'Submitted with an application on' box must disappear once
+                                        its function is fulfilled."* Changing the date afterwards
+                                        is a correction, and corrections are made under Edit, where
+                                        they are written to the file. */ ''}
+                                  ${writable && expiryIsDerived(kind) && !cert.submitted_on ? html`
                                     <form method="post" class="inline-form mt-sm"
                                           action="/clients/${client.id}/certificates/${cert.id}/submitted">
                                       ${csrfField(csrf)}
                                       <label class="small muted" for="sub-${cert.id}">Submitted with an application on</label>
-                                      <input type="date" id="sub-${cert.id}" name="submitted_on"
-                                             value="${cert.submitted_on ?? ''}">
+                                      <input type="date" id="sub-${cert.id}" name="submitted_on">
                                       <button class="btn btn-small btn-secondary" type="submit">Save</button>
                                     </form>` : ''}
+                                  ${/* Correcting the record rather than deleting it. Asked for on
+                                        11 September 2026: *"need an option to edit PC and Medical
+                                        Cert details when needed, with appropriate log entries."*
+                                        Every change lands in a file note and the audit log, which
+                                        is what makes it safe on a certificate an application has
+                                        already relied on. */ ''}
+                                  ${writable ? html`
+                                    <details class="reveal mt-sm">
+                                      <summary class="btn btn-small btn-secondary reveal-open">Edit</summary>
+                                      <form method="post" class="row-form"
+                                            action="/clients/${client.id}/certificates/${cert.id}">
+                                        ${csrfField(csrf)}
+                                        ${kind === 'police'
+                                          ? select({ label: 'Country', name: 'country',
+                                                     value: cert.country ?? '',
+                                                     options: countryOptions(), includeBlank: 'Not recorded' })
+                                          : ''}
+                                        ${kind === 'medical'
+                                          ? select({ label: 'Medical type', name: 'subtype',
+                                                     value: cert.subtype ?? '',
+                                                     includeBlank: 'Not recorded', options: MEDICAL_TYPES })
+                                          : ''}
+                                        ${field({ label: 'Issued', name: 'issued_on', type: 'date',
+                                                  value: cert.issued_on ?? '' })}
+                                        ${select({ label: 'The issue date was', name: 'issued_on_provenance',
+                                                   value: cert.issued_on_provenance ?? 'unverified',
+                                                   includeBlank: false, options: PROVENANCE_OPTIONS })}
+                                        ${expiryIsDerived(kind)
+                                          ? field({ label: 'Submitted with an application on',
+                                                    name: 'submitted_on', type: 'date',
+                                                    value: cert.submitted_on ?? '',
+                                                    hint: 'Clear it to undo.' })
+                                          : field({ label: 'Expires', name: 'expires_on', type: 'date',
+                                                    value: cert.expires_on ?? '' })}
+                                        ${field({ label: 'Reference', name: 'reference', maxlength: 80,
+                                                  value: cert.reference ?? '' })}
+                                        ${field({ label: 'Note', name: 'notes', maxlength: 300,
+                                                  value: cert.notes ?? '' })}
+                                        <button class="btn btn-primary btn-small" type="submit">Save changes</button>
+                                      </form>
+                                      <p class="hint">Every change is written to the file.</p>
+                                    </details>` : ''}
                                 </div>
                                 <div>
                                   ${'' /* A superseded certificate's expiry is history, not a
@@ -1947,8 +1996,9 @@ export const clientsModule: AppModule = {
                     <li><a href="/clients/${rel.id}">${rel.full_name}</a>
                         <div class="muted small">${PARTY_ROLE_LABELS[rel.role] ?? rel.role}
                           on <a href="/cases/${rel.via_case_id}">${rel.via_case_ref}</a></div></li>`)}</ul>
-                  <p class="hint">Everyone who appears on a matter together — which is how a family
-                     group shows itself, without anyone having to maintain a second list.</p>`)
+                  ${'' /* Was a sentence saying this is how a family group shows itself
+                          without a second list being maintained. The list above already
+                          shows it. */}`)
               : ''}
 
             ${'' /* Matters have had these since migration 0007 and clients
@@ -2265,6 +2315,81 @@ export const clientsModule: AppModule = {
       return redirectWith(c, `/clients/${id}#certificates`,
         ok ? 'Confirmed — the date now counts as read from the certificate.'
            : 'Nothing to confirm on that certificate.', ok ? 'ok' : 'err');
+    });
+
+    // Correcting what a certificate says.
+    //
+    // Asked for on 11 September 2026: *"need an option to edit PC and Medical
+    // Cert details when needed, with appropriate log entries."* The log entries
+    // are the reason this is a route and not a delete-and-retype: a file note
+    // naming the date that moved is a record, and a removed certificate is not.
+    //
+    // The kind is not editable. A police certificate that turns out to be a
+    // medical is a different document, not a corrected one.
+    r.post('/:id/certificates/:certId', requirePermission('register:write'), async (c) => {
+      const id = c.req.param('id')!;
+      const certId = c.req.param('certId')!;
+      const f = new FormReader(await c.req.formData());
+
+      const existing = await one<CertificateRow>(
+        c.env.DB, 'SELECT * FROM client_certificates WHERE id = ? AND client_id = ?', certId, id);
+      if (!existing) return c.notFound();
+      const derived = expiryIsDerived(existing.kind);
+
+      const issuedOn = f.date('issued_on');
+      const submittedOn = f.date('submitted_on');
+      const expiresOn = f.date('expires_on');
+
+      // The same three refusals the add form makes, in the same words, because
+      // they are the same three facts.
+      if (derived && !issuedOn) {
+        return redirectWith(c, `/clients/${id}#certificates`,
+          `A ${CERTIFICATE_LABELS[existing.kind].toLowerCase()} needs its issue date — `
+          + 'the expiry is worked out from it.', 'err');
+      }
+      if (!derived && !issuedOn && !expiresOn) {
+        return redirectWith(c, `/clients/${id}#certificates`,
+          'Give at least one date — otherwise there is nothing to watch.', 'err');
+      }
+      if (submittedOn && issuedOn && submittedOn < issuedOn) {
+        return redirectWith(c, `/clients/${id}#certificates`,
+          'A certificate cannot have been submitted before it was issued.', 'err');
+      }
+      if (!derived && issuedOn && expiresOn && expiresOn < issuedOn) {
+        return redirectWith(c, `/clients/${id}#certificates`,
+          'A certificate cannot expire before it was issued.', 'err');
+      }
+
+      const before = await updateCertificate(c.env, id, certId, {
+        subtype: f.optional('subtype', { max: 40 }),
+        country: f.optional('country', { max: 100 }),
+        reference: f.optional('reference', { max: 80 }),
+        issuedOn,
+        issuedOnProvenance: (f.enum('issued_on_provenance',
+          PROVENANCE_OPTIONS.map((o) => o.value), { fallback: 'unverified' })
+          ?? 'unverified') as IssueDateProvenance,
+        submittedOn, expiresOn,
+        notes: f.optional('notes', { max: 300 }),
+      });
+      if (!before) return c.notFound();
+
+      // Read back rather than assumed: the expiry is the database's to set, and
+      // the whole reason to note the change is that moving the issue date moves
+      // the deadline by itself.
+      const after = await one<CertificateRow>(
+        c.env.DB, 'SELECT * FROM client_certificates WHERE id = ?', certId);
+      const changes = after ? certificateChanges(before, after, dateShort) : [];
+      if (changes.length > 0) {
+        await addEntry(c.env, {
+          entityType: 'client', entityId: id, kind: 'system',
+          body: `${CERTIFICATE_LABELS[existing.kind]} corrected: ${changes.join('; ')}.`,
+          createdBy: c.get('user')!.id,
+        });
+        await auditFrom(c, { action: 'client.certificate_edited', entityType: 'client', entityId: id,
+          meta: { certId, changes } });
+      }
+      return redirectWith(c, `/clients/${id}#certificates`,
+        changes.length > 0 ? 'Certificate updated.' : 'Nothing changed.');
     });
 
     r.post('/:id/certificates/:certId/remove', requirePermission('register:write'), async (c) => {

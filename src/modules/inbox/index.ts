@@ -263,7 +263,7 @@ export const inboxModule: AppModule = {
         new URLSearchParams({ status, channel, q, ...extra }).toString();
 
       return page(c, { title: 'Inbox', active: '/inbox' }, html`
-        ${pageHeader('Inbox', 'Everything that arrived from a channel, before anybody has decided about it.')}
+        ${pageHeader('Inbox')}
         ${incomingTabs(c.get('user'), 'inbox', family)}
 
         ${raw('<!-- Buttons, not a second bar of tabs: the bar above moves between the'
@@ -279,9 +279,8 @@ export const inboxModule: AppModule = {
             ${csrfField(csrf)}
             <input type="hidden" name="back" value="${keep({})}">
             <button class="btn btn-secondary" type="submit">Read the post</button>
-            <span class="hint">Reads what is waiting and says what each piece looks like — a PPI
-               letter, a decision, a request for documents — and which matter it belongs to.
-               It changes nothing; you decide what to do with each one.</span>
+            <span class="hint">Says what each piece looks like and which matter it belongs to —
+               it changes nothing.</span>
           </form>` : ''}
 
         <form method="get" action="/inbox" class="filters" data-live-search>
@@ -525,15 +524,16 @@ export const inboxModule: AppModule = {
       const csrf = c.get('session')!.csrf;
 
       return page(c, { title: 'Delete these messages?', active: '/inbox' }, html`
-        ${pageHeader('Delete these messages?',
-          'They go for good. The audit log keeps the record that each one arrived.')}
+        ${'' /* The audit log keeps the record that each message arrived, so deleting the
+              message does not erase the fact of it. Not worth saying on screen. */}
+        ${pageHeader('Delete these messages?', 'They go for good.')}
 
         ${card(`${going.length} ${going.length === 1 ? 'message' : 'messages'} will be deleted`,
           html`<ul class="list">${going.map(describeSelected)}</ul>`)}
 
+        ${'' /* Kept because each one became an inquiry or was filed, and that record points
+              back at the message. */}
         ${kept.length ? card(`${kept.length} will be kept`, html`
-          <p class="small">Each of these became an inquiry or has been filed onto a record, and
-             that record points back at the message. They are left alone.</p>
           <ul class="list">${kept.map(describeSelected)}</ul>`) : ''}
 
         <form method="post" action="/inbox/delete/confirm" class="filters">
@@ -641,14 +641,14 @@ export const inboxModule: AppModule = {
 
       return page(c, { title: 'File these messages', active: '/inbox' }, html`
         ${pageHeader(`File ${String(going.length)} ${many ? 'messages' : 'message'}`,
-          'They all go on the same matter or client. Each one is written as its own note.')}
+          'They all go on the same matter or client.')}
 
         ${card(`What is about to be filed`,
           html`<ul class="list">${going.map(describeSelected)}</ul>`)}
 
+        ${'' /* Left alone because filing them again would write a second note that could
+              never be taken off — file notes are append-only. */}
         ${kept.length ? card(`${String(kept.length)} already filed`, html`
-          <p class="small">These are already on a record, and filing them again would write a
-             second note that could never be taken off. They are left alone.</p>
           <ul class="list">${kept.map(describeSelected)}</ul>`) : ''}
 
         ${card('Where do they go?', filingPicker({
@@ -657,9 +657,9 @@ export const inboxModule: AppModule = {
           csrf, query, hits,
           carry: [{ name: 'back', value: back }, ...going.map((m) => ({ name: 'id', value: m.id }))],
           submitLabel: `File ${String(going.length)} ${many ? 'messages' : 'message'}`,
-          hint: html`<p class="hint">A note is written on that record for each message, saying
-             where it came from and what it said. Nothing is deleted and nothing moves — the
-             messages stay in the inbox under Filed, and each one can be put back.</p>`,
+          /* Nothing is deleted and nothing moves: the messages stay in the inbox under
+             Filed, and each one can be put back. */
+          hint: html`<p class="hint">A note is written on that record for each message.</p>`,
         }))}
 
         <p><a class="btn btn-secondary" href="${backHref}">Cancel</a></p>`);
@@ -771,8 +771,7 @@ export const inboxModule: AppModule = {
       ]);
 
       return page(c, { title: 'Conversations', active: '/inbox' }, html`
-        ${pageHeader('Conversations',
-          'Each channel as a two-way thread: what they sent, and what the practice sent back.')}
+        ${pageHeader('Conversations')}
         ${incomingTabs(c.get('user'), 'threads', family)}
         <nav class="tabs">
           <a class="${view === 'open' ? 'tab current' : 'tab'}" href="/inbox/threads">To deal with</a>
@@ -786,8 +785,7 @@ export const inboxModule: AppModule = {
         <div data-live-results>
         ${rows.length === 0
           ? card('No conversations yet', emptyState(
-              'A conversation starts the first time somebody writes in on a channel that can be '
-              + 'replied to — Telegram or WhatsApp.'))
+              'Conversations start when somebody writes in on Telegram or WhatsApp.'))
           : table([
               { label: 'Who', width: '34' },
               { label: 'Channel', width: '16', hideOn: 'sm' },
@@ -896,7 +894,8 @@ export const inboxModule: AppModule = {
 
         ${(thread as any).filed_at
           ? html`<div class="alert alert-ok">
-                   Filed ${dateShort((thread as any).filed_at)}. The conversation is kept here in full.
+                   Filed ${dateShort((thread as any).filed_at)}.
+                   ${'' /* The conversation itself is kept here in full either way. */}
                    ${canFileThread ? html`
                      <form method="post" action="/inbox/threads/${thread.id}/unfile" class="inline-form">
                        ${csrfField(session.csrf)}
@@ -908,10 +907,11 @@ export const inboxModule: AppModule = {
                 action: `/inbox/threads/${thread.id}/file`,
                 findAction: `/inbox/threads/${thread.id}`,
                 csrf: session.csrf, query: threadFind, hits: threadTargets,
-                hint: html`<p class="hint">Search by name, reference, or an INZ application number.
-                   A note is written on that record pointing at this conversation, and the
-                   conversation moves to the Filed tab. Nothing is deleted — the messages stay here
-                   in full, and you can put it back.</p>`,
+                /* A note is written on that record pointing at this conversation, and the
+                   conversation moves to the Filed tab. Nothing is deleted and it can be put
+                   back. */
+                hint: html`<p class="hint">Search by name, reference, or an INZ application
+                   number.</p>`,
               }))
             : ''}
 
@@ -998,24 +998,26 @@ export const inboxModule: AppModule = {
                           <span class="muted small">${Math.max(1, Math.round(d.size_bytes / 1024))} KB ·
                             ${stamp(d.uploaded_at)}</span></label>
                       </div>`)}
-                    <p class="hint">Documents already on this client or matter. Sending one records
-                       that it went, and to whom — so which version they were sent, and when, stays
-                       answerable from the document itself.</p>
+                    <p class="hint">Documents already on this client or matter; sending one is
+                       recorded on the document.</p>
                   </fieldset>` : ''}
                 ${thread.channel === 'email' ? html`
                   <div class="field checkbox-field">
                     <label><input type="checkbox" name="format" value="html" checked> Send it formatted</label>
-                    <p class="hint">Blank lines start paragraphs. <code>**bold**</code>,
-                       <code>*italic*</code>, <code># heading</code>, and lines starting
-                       <code>-</code> or <code>1.</code> become lists. Links are made from
-                       addresses you paste. The plain text is sent as well, so a client whose
-                       mail reader will not show formatting still gets a readable letter.</p>
+                    ${'' /* Links are made from addresses pasted in, and the plain text is sent
+                             alongside, so a mail reader that will not show formatting still
+                             gets a readable letter. */}
+                    <p class="hint">Blank lines start paragraphs; <code>**bold**</code>,
+                       <code>*italic*</code>, <code># heading</code> and lines starting
+                       <code>-</code> or <code>1.</code> become lists.</p>
                   </div>` : ''}
                 <button class="btn btn-primary" type="submit">Send</button>
-                <p class="hint">Sent as the practice, and recorded here with your name against it.
-                   ${thread.channel === 'whatsapp'
-                     ? 'WhatsApp only accepts free text within 24 hours of their last message; '
-                       + 'outside that Meta refuses it, and the reason is shown on the message.' : ''}</p>
+                ${'' /* Sent as the practice, recorded here with the sender's name against it.
+                         Outside WhatsApp's 24-hour window Meta refuses the message, and the
+                         reason is shown on the message itself. */}
+                ${thread.channel === 'whatsapp'
+                  ? html`<p class="hint">WhatsApp only accepts free text within 24 hours of their
+                           last message.</p>` : ''}
               </form>` : html`<p class="small muted">Your role can read this conversation but not reply on it.</p>`)}
           </div>
 
@@ -1040,11 +1042,10 @@ export const inboxModule: AppModule = {
                   </select>
                 </div>
                 <button class="btn btn-secondary" type="submit">Save</button>
-                <p class="hint">A conversation is usually about a person <em>and</em> a matter, and
-                   most correspondence is about one particular matter. Linking it to both puts it
-                   on both files.</p>
-                <p class="hint">Neither changes who is trusted — that is the channel's allow-list,
-                   and it is a secret rather than a setting.</p>
+                ${'' /* Linking to both a client and a matter puts the conversation on both
+                         files. Trust is the channel's allow-list, a secret rather than a
+                         setting, and linking does not touch it. */}
+                <p class="hint">Linking does not change who is trusted.</p>
               </form>`)}
           </div>
         </div>`);
@@ -1168,8 +1169,9 @@ export const inboxModule: AppModule = {
             <div class="field">
               <label for="f_to">To<span class="req"> *</span></label>
               <input id="f_to" name="to" list="known-addresses" maxlength="500" required autofocus>
-              <p class="hint">Separate several with commas. The conversation this starts is filed
-                 against the same client and matter as the one it came from.</p>
+              ${'' /* The conversation this starts is filed against the same client and matter
+                       as the one it came from. */}
+              <p class="hint">Separate several with commas.</p>
             </div>
             <div class="cols-2">
               <div class="field">
@@ -1205,8 +1207,7 @@ ${quote}</textarea>
                       <span class="muted small">${Math.max(1, Math.round(d.size_bytes / 1024))} KB ·
                         ${stamp(d.uploaded_at)}</span></label>
                   </div>`)}
-                <p class="hint">What arrived on the original is named in the quote above, but a file
-                   is only sent on if it is on this client or matter and picked here.</p>
+                <p class="hint">A file is only sent on if it is picked here.</p>
               </fieldset>` : ''}
             <div class="field checkbox-field">
               <label><input type="checkbox" name="format" value="html" checked> Send it formatted</label>
@@ -1400,15 +1401,16 @@ ${quote}</textarea>
 
         ${msg.trusted
           ? ''
-          : html`<div class="alert alert-warn">This sender is not on the channel allow-list. The message was
-                   captured but nothing was created from it. Check who it is before acting.</div>`}
+          : html`<div class="alert alert-warn">This sender is not on the channel allow-list —
+                   check who it is before acting.</div>`}
 
         ${msg.filed_at
           ? html`<div class="alert alert-ok">
                    Filed on ${filedOn
                      ? html`<a href="/${msg.filed_to_type === 'case' ? 'cases' : 'clients'}/${msg.filed_to_id}">${filedOn}</a>`
                      : 'a record that has since gone'}
-                   — ${dateShort(msg.filed_at)}. The message itself is kept here, unchanged.
+                   — ${dateShort(msg.filed_at)}.
+                   ${'' /* The message itself is kept here, unchanged. */}
                    ${canFile ? html`
                      <form method="post" action="/inbox/${id}/unfile" class="inline-form">
                        ${csrfField(csrf)}
@@ -1419,11 +1421,11 @@ ${quote}</textarea>
             ? card('File it on a matter or client', filingPicker({
                 action: `/inbox/${id}/file`, findAction: `/inbox/${id}`, csrf,
                 query: find, hits: fileTargets,
-                hint: html`<p class="hint">Search by name, reference, or the INZ application number
-                   from the letter. A note is written on that record with this message's date, sender
-                   and text, and the message moves out of the inbox to the Filed tab. Nothing is
-                   deleted: the message stays here exactly as it arrived, and you can put it
-                   back.</p>`,
+                /* A note is written on that record with this message's date, sender and text,
+                   and the message moves to the Filed tab. Nothing is deleted: it stays here
+                   exactly as it arrived and can be put back. */
+                hint: html`<p class="hint">Search by name, reference, or the INZ application
+                   number from the letter.</p>`,
               }))
             : ''}
 
@@ -1456,8 +1458,8 @@ ${quote}</textarea>
                 <li><a href="/inbox/${id}/files/${f.id}">${f.filename}</a>
                     <span class="muted small">${f.content_type} · ${Math.ceil(f.size_bytes / 1024)} KB${
                       f.attached_at ? ' · already on the record' : ''}</span></li>`)}</ul>
-              <p class="hint">These are kept. Filing this onto a matter or a client puts them on
-                 that record as documents, ready for a reading.</p>`) : ''}
+              <p class="hint">Filing this onto a matter or client puts them on that record as
+                 documents.</p>`) : ''}
 
             ${attachments.length > 0 && kept.length === 0 ? card('Attachments', html`
               <ul class="list">${attachments.map((a) => html`
@@ -1481,7 +1483,7 @@ ${quote}</textarea>
                   <dt>Dates mentioned</dt><dd>${suggestion.key_dates.length ? suggestion.key_dates.join(', ') : '—'}</dd>
                   <dt>Spam?</dt><dd>${suggestion.is_spam ? 'Flagged as likely spam' : 'No'}</dd>
                 </dl>
-                <p class="hint">A suggestion only. Nothing here has been written to the register.</p>` : ''}
+                <p class="hint">A suggestion only — nothing has been written.</p>` : ''}
               <form method="post" action="/inbox/${msg.id}/triage">
                 ${csrfField(csrf)}
                 <button class="btn btn-secondary" type="submit">${suggestion ? 'Re-run triage' : 'Run AI triage'}</button>

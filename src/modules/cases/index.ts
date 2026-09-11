@@ -165,10 +165,8 @@ function caseForm(
         ${field({ label: 'What this matter is about', name: 'descriptor', value: values.descriptor,
                   required: true, maxlength: 160,
                   placeholder: 'e.g. Fresh application, chef’s role with her current employer',
-                  hint: 'How this matter reads in every list. The reference, the client and the '
-                    + 'type are already columns of their own — this is the thing they cannot say. '
-                    + 'What distinguishes it from the next matter of the same kind for the same '
-                    + 'person: the role and the employer, the ground of the request.' })}
+                  hint: 'What distinguishes it from the next matter of the same kind for the '
+                    + 'same person \u2014 the role and the employer, the ground of the request.' })}
         <div class="field">
           <label for="f_case_type">Case type<span class="req"> *</span></label>
           <select id="f_case_type" name="case_type" required>
@@ -816,11 +814,8 @@ export const casesModule: AppModule = {
                   ${nextStatuses.some(isAwaitingStatus)
                     ? field({ label: 'Response / decision due', name: 'decision_due_at', type: 'date',
                               value: dateInputValue(kase.decision_due_at),
-                              hint: 'A date still being waited for \u2014 an RFI or PPI response, or '
-                                  + 'when INZ is expected to decide. Change it on its own, leaving the '
-                                  + 'status alone, to record an extension. Not the date a decision '
-                                  + 'arrived: the register records that itself when you move to '
-                                  + 'Approved or Declined.' })
+                              hint: 'A date still being waited for. Change it on its own, '
+                                  + 'leaving the status alone, to record an extension.' })
                     : ''}
                   <button class="btn btn-primary" type="submit">Save</button>
                 </form>` : ''}
@@ -896,8 +891,9 @@ export const casesModule: AppModule = {
                               placeholder: 'e.g. accredited employer, NZ citizen partner' })}
                     <button class="btn btn-primary" type="submit">Add party</button>
                   </form>
-                  <p class="hint">Everyone on a matter is a client in their own right — a partner, a
-                     child, an employer — so each has their own documents and expiry dates.</p>
+                  ${'' /* Was a sentence explaining that everyone on a matter is a client
+                          in their own right, so each carries their own documents and expiry
+                          dates. That is what the list above is. */}
 
                   ${'' /* Somebody who is not on file yet is the ordinary case
                            for a party, not the exception: a partner, a child, an
@@ -922,9 +918,8 @@ export const casesModule: AppModule = {
                     ${field({ label: 'Email', name: 'email', type: 'email', maxlength: 320 })}
                     <button class="btn btn-secondary" type="submit">Create and add</button>
                   </form>
-                  <p class="hint">Creates a client record and puts them on this matter in one step.
-                     Everything else about them — passport, nationality, dates — is filled in on
-                     their own page afterwards, which is where it belongs.</p>
+                  <p class="hint">Creates the client and adds them here. The rest goes on their
+                     own page.</p>
                 </details>` : ''}`)}
 
             ${'' /* Quotes above Invoices, and both in the main column. They
@@ -1051,9 +1046,8 @@ export const casesModule: AppModule = {
                             box. */ ''}
                       ${field({ label: 'The note as it will be written', name: 'brief_body',
                                 type: 'textarea', rows: 14, value: briefNoteBody(brief.result),
-                                hint: 'Change anything you like. A note you have edited is '
-                                  + 'recorded as edited by you rather than as the model\u2019s '
-                                  + 'words. Once saved it cannot be changed, like any file note.' })}
+                                hint: 'Edit it freely \u2014 an edited note is recorded as '
+                                  + 'yours, not the model\u2019s.' })}
                       <button class="btn btn-primary" type="submit" name="save" value="1">
                         Save as a file note
                       </button>
@@ -1114,10 +1108,10 @@ export const casesModule: AppModule = {
                              </div>`}
                   </div>
                   <button class="btn btn-primary" type="submit">Add the note</button>
-                  <p class="hint">A note can be corrected for five minutes after it is saved, and
-                     only once. After that the database refuses it — not just this screen — and a
-                     correction goes in as a new note, both standing in order. That is what makes
-                     the file worth something later.</p>
+                  ${'' /* The full rule — five minutes, once, enforced by the database
+                          rather than the screen — is on the correction form itself, where
+                          somebody is about to use it. */}
+                  <p class="hint">Correctable once, for five minutes.</p>
                 </form>` : ''}
 
               ${entries.length === 0 ? emptyState('Nothing recorded yet.') : html`

@@ -77,8 +77,10 @@ export function deleteCard(opts: {
     ${blocking.length > 0 ? html`
       <p class="small"><strong>This one cannot be deleted yet.</strong></p>
       <ul class="small">${blocking.map((o) => html`<li>${o.says}</li>`)}</ul>` : html`
-      <p class="small">${opts.toll} <strong>This cannot be undone.</strong> It is recorded in
-         the audit log, and the reference is retired rather than reissued.</p>
+      ${'' /* The deletion is recorded in the audit log and the reference is retired
+              rather than reissued. Both true; neither changes the decision being made
+              here, and the box below already asks for the reference to be typed. */}
+      <p class="small">${opts.toll} <strong>This cannot be undone.</strong></p>
       <form method="post" action="${opts.action}"
             data-confirm="${`Delete ${opts.ref}? This cannot be undone.`}">
         ${csrfField(opts.csrf)}

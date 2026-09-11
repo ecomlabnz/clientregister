@@ -7,6 +7,46 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.49.0 — 12 September 2026
+
+### Changed
+**Less writing on the screen, everywhere.** Asked for on 11 September: *"too
+much of explanatory text — must be deleted, and not just here, but everywhere.
+It can get too busy on the screen … the app should look like an app and not an
+annotated form."*
+
+About seventy paragraphs of explanation are gone or cut to a line, across
+clients, matters, quotations, invoices, the inbox, the assistant, tasks, the
+calendar, the knowledge base and Settings. Field names and the small notes under
+a box are untouched — those tell you what to type. What went was the writing
+that explained why the register works the way it does. The reasoning is all
+still written down, in the code, where it was always meant to live.
+
+Two paragraphs that show on every file note and every warning went with it.
+Those were the most-repeated writing in the register.
+
+### Added
+**Certificates can be corrected.** A police certificate, medical or x-ray now
+has an **Edit** button. Change the issue date, the country, the reference, the
+note — anything but which kind of certificate it is.
+
+Every change is written to the client's file as a note saying what moved, and to
+the audit log. That is what makes it safe on a certificate an application has
+already relied on: nothing is quietly different, and nothing has to be deleted
+and retyped.
+
+The expiry still looks after itself. Move the issue date and the deadline moves
+with it.
+
+**The "Submitted with an application on" box goes away once it has been used.**
+Asked for the same day. It did its job; changing the date afterwards is a
+correction, and corrections go through Edit, where they are written down.
+
+**A date is printed once.** The expiry appeared twice on every certificate and
+every passport — in the small line underneath and again in the column at the
+right. The column keeps it, because that is where it carries its colour and its
+"in 4 months".
+
 ## 1.48.0 — 12 September 2026
 
 ### Added

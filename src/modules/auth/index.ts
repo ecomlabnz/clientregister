@@ -477,21 +477,16 @@ export const authModule: AppModule = {
                  practice *does*, not a setting: make a token, build the
                  shortcut once, then right-click a file for the rest of time. */}
         ${tab === 'shortcut' ? html`
+        ${'' /* The explanation that was here: the register cannot reach into iCloud (Apple
+                 allows no website to), so the file goes the other way — a shortcut built once
+                 posts it into the inbox. The token stands in for a password because a
+                 shortcut cannot sign in; it can only put things in the inbox, and revoking it
+                 stops the shortcut on a lost device. The security line below stays on screen. */}
         ${card('Sending a file in from your Mac or your phone', html`
-          <p>Your case files sit in iCloud Drive. The register cannot reach into iCloud —
-             Apple does not allow any website to — so the file goes the other way. You
-             build a small shortcut once, in Apple's <strong>Shortcuts</strong> app. After
-             that, right-clicking a file in Finder, or tapping <em>Share</em> on your phone,
-             sends it straight into the register's inbox, where you file it onto a client or
-             a matter like anything else that arrives.</p>
-          <p>An upload token is what the shortcut carries instead of your password, because
-             a shortcut cannot sign in. <strong>Treat it like a password: anyone holding it
-             can send files into the register.</strong> It cannot read anything — not a
-             client, not a matter, not a document — but it can put things in your inbox. If
-             a device is lost, revoke its token here and the shortcut on it stops working.</p>
+          <p><strong>Treat an upload token like a password: anyone holding it can send files
+             into the register.</strong></p>
           <p><a class="btn btn-primary" href="/account/shortcut">How to build the shortcut,
-             step by step</a></p>
-          <p class="hint">The same steps are written out in <code>docs/apple-shortcut.md</code>.</p>`)}
+             step by step</a></p>`)}
 
         ${card('Your upload tokens', html`
           ${tokens.length
@@ -519,8 +514,9 @@ export const authModule: AppModule = {
                       hint: 'A name, so two devices can be told apart when one of them is lost.' })}
             <button class="btn btn-primary" type="submit">Make an upload token</button>
           </form>
-          <p class="hint">The token is shown once, on the next screen, and never again — the
-             register keeps only a hash of it. If it is lost, revoke it and make another.</p>`)}
+          ${'' /* The register keeps only a hash of the token, so a lost one cannot be shown
+                   again — it has to be revoked and replaced. */}
+          <p class="hint">The token is shown once, on the next screen, and never again.</p>`)}
 
         ${card('Where the shortcut sends to', html`
           <p class="key-block"><code>${uploadUrl}</code></p>
@@ -570,8 +566,7 @@ export const authModule: AppModule = {
                   </span>
                 </button>`)}
             </fieldset>
-            <p class="hint">Press one and it is on. Saved against your account, so it follows you to
-               any device you sign in from.</p>
+            <p class="hint">Press one and it is on.</p>
           </form>`)}` : ''}
       `);
     });
@@ -790,10 +785,10 @@ export const authModule: AppModule = {
         ${pageHeader('Your upload token', 'Copy it now — it is shown once and never again.')}
         ${card(made.row.label, html`
           <p class="key-block"><code>${made.token}</code></p>
+          ${'' /* The token cannot read a client, a matter or a document and cannot sign in;
+                   it can only put files in the inbox. */}
           <p class="alert alert-warn"><strong>Treat this like a password.</strong> Anyone
-             holding it can send files into the register’s inbox. It cannot read a client,
-             a matter or a document, and it cannot sign in — but do not paste it anywhere
-             but the shortcut.</p>
+             holding it can send files into the register’s inbox.</p>
           <p>Paste it into the shortcut’s <em>Authorization</em> header, after the word
              <code>Bearer</code> and a space. The address it sends to is:</p>
           <p class="key-block"><code>${base}${SHORTCUT_PATH}</code></p>
@@ -835,13 +830,9 @@ export const authModule: AppModule = {
         ${pageHeader('Building the shortcut',
           'Once, on your Mac. Then right-click any file and send it in.')}
 
-        ${card('What a shortcut is', html`
-          <p><strong>Shortcuts</strong> is an app Apple puts on every Mac and iPhone. A
-             shortcut is a short list of steps the computer does for you when you ask. It
-             is not programming: you drag steps into a list and fill in the boxes.</p>
-          <p>The one you are building has two steps. The first takes whatever file you
-             right-clicked. The second sends it to the register.</p>`)}
-
+        ${'' /* A "What a shortcut is" card explained that Shortcuts is an Apple app, that a
+                 shortcut is a list of steps rather than programming, and that this one has
+                 two: take the file, send it to the register. The steps below say it. */}
         ${card('Before you start', live > 0
           ? html`<p>You have ${String(live)} upload ${live === 1 ? 'token' : 'tokens'}. If you
                     still have the token written down, use it. If you do not, make another —

@@ -32,8 +32,12 @@ describe('one box for the whole register', () => {
 
   it('refuses one letter honestly rather than saying there are no matches', () => {
     // "No matches" for a single letter is a lie about what the register holds.
+    // The screen has to say *keep typing* rather than *nothing found*; the
+    // sentence explaining why one letter matches almost everything went with
+    // the rest of the app's explanatory prose on 11 September 2026.
     expect(core).toContain('if (q.length < 2) return [];');
-    expect(mod).toContain('One letter matches almost everything.');
+    expect(mod).toContain('Keep typing');
+    expect(mod).toContain('Type two or more letters.');
   });
 
   it('works with scripting off', () => {

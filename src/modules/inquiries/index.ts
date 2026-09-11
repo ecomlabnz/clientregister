@@ -290,8 +290,8 @@ export const inquiriesModule: AppModule = {
         ${breadcrumbs([{ href: '/inquiries', label: 'Inquiries' }, { label: 'New' }])}
         ${pageHeader('Record an inquiry')}
         ${prefilled
-          ? html`<div class="alert alert-ok">Filled in from what the assistant read. Check it before
-                   saving — it is a reading, not a fact.</div>`
+          ? html`<div class="alert alert-ok">Filled in from what the assistant read. Check it
+                   before saving.</div>`
           : ''}
         <form method="post" action="/inquiries" class="form-grid" data-draft>
           ${csrfField(csrf)}
@@ -411,7 +411,9 @@ export const inquiriesModule: AppModule = {
                    Filed on ${filedOn && filedTarget
                      ? html`<a href="/${filedTarget === 'case' ? 'cases' : 'clients'}/${filedTarget === 'case' ? inq.case_id : inq.client_id}">${filedOn}</a>`
                      : 'a record that has since gone'}
-                   — ${dateShort(inq.filed_at)}. The inquiry itself is kept, unchanged.
+                   — ${dateShort(inq.filed_at)}.
+                   ${'' /* Filing moves the inquiry to the Filed tab; the inquiry row itself
+                            is never deleted or altered. Said in the code, not on screen. */}
                    ${writable ? html`
                      <form method="post" action="/inquiries/${inq.id}/unfile" class="inline-form">
                        ${csrfField(csrf)}
@@ -422,10 +424,11 @@ export const inquiriesModule: AppModule = {
             ? card('File it on a matter or client', filingPicker({
                 action: `/inquiries/${inq.id}/file`, findAction: `/inquiries/${inq.id}`, csrf,
                 query: find, hits: fileTargets,
-                hint: html`<p class="hint">Search by name, reference, or an INZ application number.
-                   A note is written on that record with this inquiry's date, contact and text, and
-                   the inquiry moves to the Filed tab. Nothing is deleted, and you can put it
-                   back.</p>`,
+                /* Filing writes a note on the chosen record with this inquiry's date,
+                   contact and text, moves the inquiry to the Filed tab, and can be undone
+                   with "Put it back in the list". */
+                hint: html`<p class="hint">Search by name, reference, or an INZ application
+                   number.</p>`,
               }))
             : ''}
 

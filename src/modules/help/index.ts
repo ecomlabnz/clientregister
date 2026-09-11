@@ -37,6 +37,20 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.49.0', date: '12 September 2026',
+    notes: [
+      'There is far less writing on the screen. About seventy paragraphs of explanation are gone '
+        + 'or cut to a line, right across the register.',
+      'Field names and the small notes under a box are untouched \u2014 those tell you what to '
+        + 'type. What went was the writing that explained why things work the way they do.',
+      'A police certificate, medical or x-ray now has an Edit button. Every change is written to '
+        + 'the client\u2019s file and to the audit log, and the expiry still looks after itself.',
+      'The \u201cSubmitted with an application on\u201d box disappears once you have used it. '
+        + 'Change the date afterwards under Edit.',
+      'The expiry date is printed once on a certificate and once on a passport, not twice.',
+    ],
+  },
+  {
     version: '1.48.0', date: '12 September 2026',
     notes: [
       'A client\u2019s Immigration tab now takes \u201cVisa conditions\u201d and a \u201cStay '

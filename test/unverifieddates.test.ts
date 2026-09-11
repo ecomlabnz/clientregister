@@ -183,9 +183,15 @@ describe('a date read by a machine (0045)', () => {
   });
 
   it('shows the machine-read caution and stays flagged until a person confirms', async () => {
+    // The wording shortened on 11 September 2026 with the rest of the page's
+    // explanatory prose — *"the app should look like an app and not an
+    // annotated form"*. What has to survive that is the caution itself: the
+    // badge saying the date is unverified, where the date came from, and a way
+    // to confirm it. The sentence explaining what unverified means does not.
     const h = await withOcrCertificate();
     const body = await (await h.request('/clients/cl_1')).text();
-    expect(body).toContain('Read off the scanned certificate by a machine');
-    expect(body).toContain('I have checked it against the certificate');
+    expect(body).toContain('issue date unverified');
+    expect(body).toContain('Read by machine.');
+    expect(body).toContain('Confirm against the certificate');
   });
 });

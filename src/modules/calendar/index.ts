@@ -188,9 +188,10 @@ export const calendarModule: AppModule = {
           ${chosen.length ? html`<a class="btn btn-link" href="${href({ s: '' })}">Show all kinds</a>` : ''}
         </div>
 
-        ${mine ? html`<p class="hint">Showing only what is assigned to you. Client dates —
-           visas, passports, certificates — belong to a client rather than to a person, so they
-           are not in this view.</p>` : ''}
+        ${'' /* Client dates — visas, passports, certificates — belong to a client
+                 rather than to a person, so "Mine" cannot show them. */}
+        ${mine ? html`<p class="hint">Showing only what is assigned to you — client dates are not
+           in this view.</p>` : ''}
 
         ${'' /* Every grid is hidden under 760px by CSS and the agenda below
                  takes over: seven columns on a phone is seven columns of

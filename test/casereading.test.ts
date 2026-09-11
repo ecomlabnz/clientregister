@@ -386,8 +386,12 @@ describe('on the matter itself', () => {
     const body = await (await h.request('/cases/k1')).text();
     expect(body).toContain('Read a document into this matter');
     expect(body).toContain('action="/cases/k1/read"');
-    // Says what it will and will not do, before anything is uploaded.
-    expect(body).toContain('never written over');
+    // Says the one thing that has to be said before anything is uploaded: that
+    // nothing is written until a person presses the button on the next screen.
+    // The sentence about a filled box never being written over went with the
+    // rest of the page's explanatory prose on 11 September 2026 — it is a true
+    // fact about the review screen, and the review screen shows it.
+    expect(body).toContain('Nothing is written until you press the button');
   });
 });
 
