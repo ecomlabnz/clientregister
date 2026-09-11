@@ -7,6 +7,28 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.53.1 — 12 September 2026
+
+### Fixed
+**Cases, Quotes, Passports and Certificates are open when a client's page
+loads.** Closing everything went a step too far. Files, the histories, Military
+records and File notes still start closed — those are what you go looking for.
+
+**One line down the middle of Key details.** The card is several lists under
+several headings, and each was sizing its own label column, so the values
+started at three different places. They start at one now.
+
+**The warning band is brighter.** The red it was using is the one chosen to be
+readable as text; as an edge it looked dark. The band has its own now.
+
+**An x-ray takes "Submitted with an application on" too.** It was only offered
+where the date *moved* the expiry, which confused what the register records with
+what it calculates. The day a document went in with an application is a fact
+about any document.
+
+Its expiry does not move, because an x-ray's is the one you typed — and the note
+on the file no longer says it did.
+
 ## 1.53.0 — 12 September 2026
 
 ### Changed

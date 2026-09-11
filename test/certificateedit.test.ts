@@ -218,3 +218,83 @@ describe('a date is printed once', () => {
     expect(body).toContain('expired 02 Dec 2021');
   });
 });
+
+/**
+ * **Asked on 12 September 2026:** *"why does the x-ray cert not have 'Submitted
+ * with an application on' field?"*
+ *
+ * No good reason. The box was offered only where it *moved* something — a
+ * police certificate or a medical, whose expiry the database works out from it —
+ * which confused what the register is *recording* with what it is
+ * *calculating*. The day a document went in with an application is a fact about
+ * any document.
+ *
+ * The expiry is the one thing that stays different: derived for the two, typed
+ * for an x-ray. Checked here, because a trigger that recomputed an x-ray's
+ * expiry on submission would wipe the date somebody typed.
+ */
+describe('an x-ray records the day it went in too', () => {
+  async function withXray(h: ReturnType<typeof mount>) {
+    const res = await h.post('/clients/cl1/certificates', {
+      kind: 'chest_xray', issued_on: '2026-08-11', issued_on_provenance: 'verified',
+      expires_on: '2027-08-11',
+    });
+    expect(res.status).toBe(303);
+    return h.get<{ id: string; expires_on: string }>(
+      'SELECT id, expires_on FROM client_certificates')!;
+  }
+
+  it('offers the box on the page', async () => {
+    const h = mount();
+    await withXray(h);
+    const body = await (await h.request('/clients/cl1?open=certificates')).text();
+    expect(body).toContain('Submitted with an application on');
+  });
+
+  it('records the date through the quick box', async () => {
+    const h = mount();
+    const cert = await withXray(h);
+    await h.post(`/clients/cl1/certificates/${cert.id}/submitted`, { submitted_on: '2026-08-12' });
+    expect(h.get<{ submitted_on: string }>(
+      'SELECT submitted_on FROM client_certificates')!.submitted_on).toBe('2026-08-12');
+  });
+
+  it('records it through Edit as well', async () => {
+    const h = mount();
+    const cert = await withXray(h);
+    await h.post(`/clients/cl1/certificates/${cert.id}`, {
+      issued_on: '2026-08-11', issued_on_provenance: 'verified',
+      submitted_on: '2026-08-12', expires_on: '2027-08-11',
+    });
+    expect(h.get<{ submitted_on: string }>(
+      'SELECT submitted_on FROM client_certificates')!.submitted_on).toBe('2026-08-12');
+  });
+
+  it('does not move the expiry somebody typed', async () => {
+    // The thing that could have gone wrong. An x-ray derives nothing, so the
+    // date on the record is the only one there is.
+    const h = mount();
+    const cert = await withXray(h);
+    await h.post(`/clients/cl1/certificates/${cert.id}/submitted`, { submitted_on: '2026-08-12' });
+    expect(h.get<{ expires_on: string }>(
+      'SELECT expires_on FROM client_certificates')!.expires_on).toBe('2027-08-11');
+  });
+
+  it('and does not claim on the file that it moved', async () => {
+    // "Now good until" on an append-only note, about a date that did not
+    // change, is a false sentence that can never be taken back.
+    const h = mount();
+    const cert = await withXray(h);
+    await h.post(`/clients/cl1/certificates/${cert.id}/submitted`, { submitted_on: '2026-08-12' });
+    const body = notes(h).map((n) => n.body).join('\n');
+    expect(body).toContain('recorded as submitted with an application on 12 Aug 2026');
+    expect(body).not.toContain('now good until');
+  });
+
+  it('still moves it for a police certificate, which does derive it', async () => {
+    const h = mount();
+    const cert = await withPolice(h);
+    await h.post(`/clients/cl1/certificates/${cert.id}/submitted`, { submitted_on: '2026-04-01' });
+    expect(notes(h).map((n) => n.body).join('\n')).toContain('now good until');
+  });
+});

@@ -116,6 +116,13 @@
   --l-amber-bg: #fdf1dc; --d-amber-bg: #33280f;
   --l-red: #a3271f;     --d-red: #f08f86;
   --l-red-bg: #fbe6e4;  --d-red-bg: #3a1d1a;
+  /* One bright red, used by the warning band and nothing else.
+     `--red` is a brick red chosen to be *readable as text* — a deadline in a
+     table cell, an error line — and at that job it is right. As an edge it was
+     dark: *"too dark on the edges, make it bright reddish."* So the band gets
+     its own, loud, and carries no text, which is the only reason it can be
+     this saturated without being hard to read. */
+  --l-flag-edge: #ec1c2b;  --d-flag-edge: #ff4d5a;
   --l-blue: #14496b;    --d-blue: #7fb4d8;
   --l-blue-bg: #e4eef6; --d-blue-bg: #142836;
   --l-shadow: 0 1px 2px rgba(16, 30, 45, 0.06), 0 1px 8px rgba(16, 30, 45, 0.04);
@@ -163,6 +170,7 @@
   --amber-bg: var(--l-amber-bg);
   --red: var(--l-red);
   --red-bg: var(--l-red-bg);
+  --flag-edge: var(--l-flag-edge);
   --blue: var(--l-blue);
   --blue-bg: var(--l-blue-bg);
   --grey: var(--l-grey);
@@ -219,6 +227,7 @@
     --amber-bg: var(--d-amber-bg);
     --red: var(--d-red);
     --red-bg: var(--d-red-bg);
+    --flag-edge: var(--d-flag-edge);
     --blue: var(--d-blue);
     --blue-bg: var(--d-blue-bg);
     --grey: var(--d-grey);
@@ -242,6 +251,7 @@
   --amber-bg: var(--d-amber-bg);
   --red: var(--d-red);
   --red-bg: var(--d-red-bg);
+  --flag-edge: var(--d-flag-edge);
   --blue: var(--d-blue);
   --blue-bg: var(--d-blue-bg);
   --grey: var(--d-grey);
@@ -1345,6 +1355,33 @@ details[open] > summary { margin-bottom: 12px; }
 .kv { display: grid; grid-template-columns: minmax(90px, auto) 1fr; gap: 5px 12px; margin: 0; font-size: 0.88rem; }
 .kv dt { color: var(--muted); font-weight: 500; }
 .kv dd { margin: 0; word-break: break-word; }
+
+/* One label column for a card of several lists.
+   **Reported 12 September 2026**, with a line drawn down a client's Key details:
+   *"general alignment of the data column should be along that line. for all
+   clients."* Right — the card is seven `<dl>`s under seven subheadings, each its
+   own grid, so `auto` sized each label column to the widest label *in that
+   group*. Measured in Chromium: the values started at three different x
+   positions, 29px apart. The eye reads a column, and there were three.
+
+   A fixed width rather than one grid spanning the card, because the two ways of
+   making a grid span several lists both cost something real: `display: contents`
+   on a `<dl>` drops its list semantics in some screen readers, and folding the
+   subheadings into one `<dl>` means a `<dt>` that is a heading rather than a
+   term. A number is the plain answer.
+
+   9.5rem against a measured widest label of 119px (7.4rem) at this size, so
+   there is room for a longer one; anything longer still wraps rather than
+   pushing the values out of line. */
+.kv-aligned { grid-template-columns: 9.5rem 1fr; }
+.kv-aligned dt { overflow-wrap: anywhere; }
+
+/* On a phone the card is the full width and a fixed label column is most of it,
+   so the pairs stack instead — which is what the rest of the register does at
+   this width. */
+@media (max-width: 640px) {
+  .kv-aligned { grid-template-columns: minmax(90px, auto) 1fr; }
+}
 
 .timeline { list-style: none; margin: 0; padding: 0; }
 .timeline-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
@@ -2626,14 +2663,14 @@ body.site { background: var(--bg); }
   background:
     linear-gradient(
       to right,
-      color-mix(in srgb, var(--red) 38%, var(--amber-bg)) 0%,
-      color-mix(in srgb, var(--red) 10%, var(--amber-bg)) 14%,
-      var(--amber-bg) 38%,
-      var(--amber-bg) 62%,
-      color-mix(in srgb, var(--red) 10%, var(--amber-bg)) 86%,
-      color-mix(in srgb, var(--red) 38%, var(--amber-bg)) 100%);
-  border: 1px solid var(--red);
-  border-left: 6px solid var(--red); border-right: 6px solid var(--red);
+      color-mix(in srgb, var(--flag-edge) 52%, var(--amber-bg)) 0%,
+      color-mix(in srgb, var(--flag-edge) 14%, var(--amber-bg)) 16%,
+      var(--amber-bg) 40%,
+      var(--amber-bg) 60%,
+      color-mix(in srgb, var(--flag-edge) 14%, var(--amber-bg)) 84%,
+      color-mix(in srgb, var(--flag-edge) 52%, var(--amber-bg)) 100%);
+  border: 1px solid var(--flag-edge);
+  border-left: 7px solid var(--flag-edge); border-right: 7px solid var(--flag-edge);
   border-radius: 6px;
 }
 .flag { display: flex; flex-direction: column; gap: 3px; }

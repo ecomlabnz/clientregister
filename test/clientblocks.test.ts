@@ -75,23 +75,41 @@ describe('the order the practice asked for', () => {
   });
 });
 
-describe('every block starts closed', () => {
-  it.each(['cases', 'quotes', 'passports', 'certificates', 'files', 'filenotes'])(
-    '%s', async (id) => {
-      expect(isOpen(await page(mount()), id)).toBe(false);
-    });
+describe('what is open when the page is drawn', () => {
+  // Everything started closed for about an hour on 12 September 2026, which
+  // went a step too far: *"Cases Quotes Passports and Certificates should be
+  // open by default."* Those four are what the page is opened *for* — what is
+  // running, what was quoted, and the two sets of dates that decide whether a
+  // matter can be lodged.
+  it.each(['cases', 'quotes', 'passports', 'certificates'])('%s is open', async (id) => {
+    expect(isOpen(await page(mount()), id)).toBe(true);
+  });
 
-  it('opens the one the address names', async () => {
+  it.each(['files', 'filenotes'])('%s is closed', async (id) => {
+    // Things you go looking for. The file notes alone can run for pages.
+    expect(isOpen(await page(mount()), id)).toBe(false);
+  });
+
+  it('leaves the histories and the military block closed', async () => {
+    const body = await page(mount());
+    for (const id of ['history-employment', 'history-education', 'history-travel']) {
+      expect(isOpen(body, id), id).toBe(false);
+    }
+  });
+
+  it('opens the one the address names, on top of the four', async () => {
     // A link from the client's own form lands on an open block. A `#fragment`
     // never reaches the server, so it cannot decide what is open.
-    const body = await page(mount(), '?open=passports');
-    expect(isOpen(body, 'passports')).toBe(true);
-    expect(isOpen(body, 'certificates')).toBe(false);
+    const body = await page(mount(), '?open=filenotes');
+    expect(isOpen(body, 'filenotes')).toBe(true);
+    expect(isOpen(body, 'cases')).toBe(true);
+    expect(isOpen(body, 'files')).toBe(false);
   });
 
   it('ignores a name it does not know', async () => {
     const body = await page(mount(), '?open=nonsense');
-    expect(isOpen(body, 'cases')).toBe(false);
+    expect(isOpen(body, 'files')).toBe(false);
+    expect(isOpen(body, 'cases')).toBe(true);
   });
 
   it('is what every link to a block actually sends', async () => {
@@ -354,5 +372,46 @@ describe('how long a warning stands, on the form', () => {
     const { FLAG_KIND_VOCAB, parseVocabulary } = await import('../src/core/vocabulary');
     const keys = parseVocabulary(FLAG_KIND_VOCAB.defaults).map((t) => t.key);
     expect(keys).toContain('border');
+  });
+});
+
+/**
+ * **Reported 12 September 2026**, with a line drawn down a client's Key details:
+ * *"general alignment of the data column should be along that line. for all
+ * clients."*
+ *
+ * The card is several `<dl>`s under several subheadings, and each was its own
+ * grid — so `auto` sized each label column to the widest label *in that group*.
+ * Measured in Chromium: the values started at three x positions, 29px apart.
+ * The eye reads a column, and there were three.
+ *
+ * The width itself is a CSS matter and is checked there. What is pinned here is
+ * that every list in the card asks for the shared column, because the fault
+ * returns the moment somebody adds a group and forgets.
+ */
+describe('the value column is one column', () => {
+  it('puts every list in Key details on the shared label width', async () => {
+    const body = await page(mount());
+    const card = body.slice(body.indexOf('<h2>Key details</h2>'),
+      body.indexOf('Open tasks'));
+    const plain = [...card.matchAll(/<dl class="kv">/g)].length;
+    const aligned = [...card.matchAll(/<dl class="kv kv-aligned">/g)].length;
+    expect(aligned).toBeGreaterThanOrEqual(6);
+    expect(plain, 'a list in Key details that does not share the column').toBe(0);
+  });
+
+  it('defines that width once, and stacks the pairs on a phone', async () => {
+    const { readFileSync } = await import('node:fs');
+    const css = readFileSync('public/app.css', 'utf8');
+    expect(css).toMatch(/\.kv-aligned \{ grid-template-columns: [\d.]+rem 1fr; \}/);
+    // A fixed label column is most of the width on a phone, so it goes back to
+    // sizing itself there.
+    expect(css).toMatch(/@media \(max-width: 640px\) \{\s*\.kv-aligned \{/);
+  });
+
+  it('leaves every other key-value list alone', async () => {
+    // A matter's Key details is a single list and already aligns with itself.
+    const { readFileSync } = await import('node:fs');
+    expect(readFileSync('src/modules/cases/index.ts', 'utf8')).not.toContain('kv-aligned');
   });
 });
