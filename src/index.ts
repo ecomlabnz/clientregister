@@ -19,6 +19,8 @@ import { syncAllFollowUps } from './core/kb';
 import { runAutomations } from './core/automations';
 import { syncAllCaseFollowUps } from './core/decisions';
 import { sweepStaged } from './core/intakefiles';
+import { nightlyBackup } from './core/autobackup';
+import { APP_VERSION } from './version';
 import { autoResetIfDue } from './core/testseed';
 
 const app = createApp();
@@ -103,6 +105,17 @@ async function housekeeping(env: Env): Promise<void> {
     // ones they marked by hand in order to rehearse with. See `core/testseed`.
     const testReset = await autoResetIfDue(env);
 
+    // **The backup, last, and after everything else has finished writing.**
+    // Tonight's archive should be of the register as it will be read in the
+    // morning — quotes already expired, follow-ups already reconciled — rather
+    // than of a half-swept state nobody ever saw. It returns rather than
+    // throws, so a register with no bucket, or a store that refused the write,
+    // still expires its quotes and sends its mail.
+    //
+    // **Asked for on 12 September 2026**, and the last of the five things that
+    // stood between this register and holding another practice's files.
+    const backup = await nightlyBackup(env, { version: APP_VERSION });
+
     // Files staged by a reading nobody acted on. They are client documents
     // sitting in a bucket with nothing pointing at them; keeping them because a
     // page was closed is the quiet accumulation that makes a register
@@ -113,7 +126,7 @@ async function housekeeping(env: Env): Promise<void> {
       action: 'cron.housekeeping',
       actorLabel: 'system',
       meta: { mail, quotesExpired: expired.meta?.changes ?? 0, followUps, chases, automations,
-              staleFiles, testReset },
+              staleFiles, testReset, backup },
     });
   } catch (err) {
     console.error('scheduled housekeeping failed', err);

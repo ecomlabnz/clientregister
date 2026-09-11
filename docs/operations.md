@@ -281,25 +281,47 @@ the output can be read before it is applied.
 
 ## Backups
 
-**There is no automated backup.** Set one up before the register holds anything
-you would mind losing:
+**There is a nightly backup, since 12 September 2026.** It runs in the register's
+own overnight pass, writes a copy of the whole database into R2 under
+`backups/`, reads the bytes back to confirm they are there, and keeps the last
+30 by default. Settings → Nightly backup turns it down; it is on by default and
+never removes the newest archive whatever the count is set to.
 
-```bash
-npx wrangler d1 export clientregister-db --remote --output=backup-$(date +%F).sql
-```
+Whether it is actually happening is on **Settings → Exports and backups**, as a
+date rather than a tick. A register with no backup for two nights shows a red
+band there. That page is the one to look at if you ever wonder.
 
-Run it on a schedule you can live with — a practice register would want daily —
-and keep the dumps somewhere off Cloudflare. The dump contains client identity
-data: encrypt it at rest and treat it as you would a paper file.
+### What it protects against, and what it does not
 
-To restore into a fresh database:
+- **The database.** Rows deleted by mistake, a bad change, a table dropped, the
+  database itself gone. That is the likely bad day and this answers it.
+- **Not the Cloudflare account.** The archive is written inside it. Losing the
+  account loses both. For that, take a manual backup from the same page and
+  keep it somewhere else — that copy is the whole register including the
+  documents, which the nightly one leaves out.
+- **Cloudflare's own Time Travel** can rewind a D1 database to a point in time
+  and is a genuine safety net, but it is their copy in their account. This is
+  the practice's own, which is the point.
 
-```bash
-npx wrangler d1 create clientregister-restore
-npx wrangler d1 execute clientregister-restore --remote --file=backup-2026-01-31.sql
-```
+### The documents are not in the nightly one
 
-Then point `wrangler.jsonc` at the new `database_id` and deploy.
+Deliberate, for two reasons. They already live in the bucket the archive is
+written to, so copying them from a bucket into a file in the same bucket buys
+nothing against a lost database. And the archive is built in memory inside a
+Worker: one that grows with every document uploaded works every night until the
+night it silently stops.
+
+The manual backup button includes them. That one is for taking the register
+away with you.
+
+### On a register with no document store
+
+The trial has no R2 bucket yet, so it has **no automatic backup** and its
+Exports page says so in those words. Creating that bucket is the step that
+turns its backups on — see the trial section above for why it is created by
+hand from a browser in New Zealand.
+
+### Taking one by hand, or restoring
 
 ## Scheduled work
 
@@ -421,5 +443,5 @@ data because there is only test data.
 ### What is still missing before doing this
 
 Nothing in the code. What is missing is the same thing missing everywhere else
-in this document: **there is still no automated backup**, and a second
+in this document: the nightly backup is **inside the Cloudflare account**, and a second
 deployment is a second database nobody is backing up.
