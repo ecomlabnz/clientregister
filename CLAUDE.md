@@ -99,6 +99,24 @@ When they say they do not follow, the fix is **shorter and more concrete**, not
 more detail — walk through what actually happens, step by step, with real
 things.
 
+**Write every issue down when it is found** (standing instruction, 12 September
+2026): *"make sure all issues resolved or unresolved are documented with
+solutions - when found."*
+
+[`docs/issues.md`](docs/issues.md) — everything known to be wrong, incomplete or
+decided against, **including what nobody has fixed yet**, each with what would
+fix it. An issue goes in when it is *found*, not when it is closed: a list that
+only gains entries on the way out hides the thing somebody actually needs, which
+is what is wrong now.
+
+It is not `docs/spec/mistakes.md`, which holds faults the register has
+**suffered** and the rule that now prevents each — closed by definition. A fault
+with no rule yet is not a lesson, it is an open issue. When an open issue is
+fixed *because it bit us*, it earns an entry in both.
+
+"Decided against" belongs there too, with the reasoning: the answer to
+*"why isn't there a trial-only login?"* is worth more than its absence.
+
 **Keep a progress note as you go** (standing instruction, 12 September 2026):
 *"make sure detailed progress is maintained at all times for reference."*
 
