@@ -22,7 +22,7 @@ import {
 } from '../../ui/components';
 import { dateInputValue, dateOrDateTime, dateShort, dateTime, truncate } from '../../ui/format';
 import {
-  CASE_STATUS_LABELS, CHOOSABLE_ENTRY_KINDS, ENTRY_KIND_LABELS, ENTRY_KINDS,
+  CASE_STATUS_LABELS, ENTRY_KIND_LABELS, type EntryKind,
   INQUIRY_SOURCE_LABELS, INQUIRY_SOURCES, INQUIRY_STATUS_LABELS, INQUIRY_STATUSES,
   type InquirySource, type InquiryStatus,
 } from '../../domain';
@@ -37,7 +37,9 @@ import {
 } from '../../core/timeline';
 import { openThreadCount } from '../../core/channels';
 import { can } from '../../core/rbac';
-import { caseTypes, isTerm, labelFor, termOptions } from '../../core/vocabulary';
+import {
+  caseTypes, isTerm, labelFor, noteKindLabel, noteKinds, termOptions,
+} from '../../core/vocabulary';
 import { fileOntoRecord, filingSearch, filingTargetLabel, markLinkedFiled, parseFilingChoice, unfile } from '../../core/filing';
 
 export interface InquiryRow {
@@ -341,6 +343,8 @@ export const inquiriesModule: AppModule = {
     });
 
     r.get('/:id', requirePermission('register:read'), async (c) => {
+      // What this practice calls its own file notes. See NOTE_KIND_VOCAB.
+      const noteKindList = await noteKinds(c.env);
       const types = await caseTypes(c.env);
       const id = c.req.param('id')!;
       const inq = await one<InquiryRow & { client_name: string | null; client_ref: string | null; case_ref: string | null }>(
@@ -498,7 +502,7 @@ export const inquiriesModule: AppModule = {
                 <form method="post" action="/inquiries/${inq.id}/entries" class="entry-form">
                   ${csrfField(csrf)}
                   ${select({ label: 'Kind', name: 'kind', value: 'note', includeBlank: false,
-                             options: optionsFrom(CHOOSABLE_ENTRY_KINDS as any, ENTRY_KIND_LABELS as any) })}
+                             options: termOptions(noteKindList) })}
                   ${field({ label: 'Entry', name: 'body', type: 'textarea', rows: 3, required: true, maxlength: 5000 })}
                   <button class="btn btn-primary" type="submit">Add</button>
                 </form>` : ''}
@@ -506,15 +510,13 @@ export const inquiriesModule: AppModule = {
                 <ul class="timeline">${entries.map((e) => html`
                   ${timelineItem({
                     entry: e,
-                    kindLabel: ENTRY_KIND_LABELS[e.kind] ?? e.kind,
+                    kindLabel: noteKindLabel(noteKindList, e.kind, ENTRY_KIND_LABELS),
                     mail: canReadMail ? mailLinkFor(e, sentMail, recordMailHref('inquiry', inq.id)) : null,
                     happened: stamp(e.occurred_at),
                     written: stamp(e.created_at),
                     correction: writable && correctable(e, c.get('user')?.id ?? null)
                       ? { csrf, minutes: CORRECTION_WINDOW_MINUTES,
-                          kindOptions: optionsFrom(
-                            CHOOSABLE_ENTRY_KINDS as any,
-                            ENTRY_KIND_LABELS as any) }
+                          kindOptions: termOptions(noteKindList) }
                       : null,
                   })}`)}</ul>`}`)}
           </div>
@@ -683,7 +685,12 @@ export const inquiriesModule: AppModule = {
     r.post('/:id/entries', requirePermission('register:write'), async (c) => {
       const id = c.req.param('id')!;
       const f = new FormReader(await c.req.formData());
-      const kind = f.enum('kind', ENTRY_KINDS, { fallback: 'note' })!;
+      // Checked against the practice's own list rather than a list in the
+      // code — see NOTE_KIND_VOCAB. A kind that is not on it falls back to
+      // a plain note rather than being refused: the words are the note.
+      const writable_kinds = await noteKinds(c.env);
+      const submitted = f.optional('kind', { max: 40 });
+      const kind = (isTerm(writable_kinds, submitted) ? submitted : 'note') as EntryKind;
       const body = f.text('body', { required: true, label: 'Entry', max: 5000 });
       if (!f.valid) return redirectWith(c, `/inquiries/${id}`, Object.values(f.errors)[0]!, 'err');
       await addEntry(c.env, { entityType: 'inquiry', entityId: id, kind, body, createdBy: c.get('user')!.id });

@@ -273,25 +273,20 @@ export const ENTRY_KIND_LABELS: Record<EntryKind, string> = {
 };
 
 /**
- * The kinds a person may choose when writing a note.
+ * The kinds a person may pick moved to a vocabulary on 11 September 2026.
  *
- * Everything else on the list is written by the register about itself: `system`
- * when a status changes, `email_in` and `email_out` when mail actually moves.
- * Offering those to somebody typing a note invites a file note that says an
- * email was sent when none was — which is a record of something that did not
- * happen, on a table that cannot be corrected after five minutes.
+ * There used to be a `CHOOSABLE_ENTRY_KINDS` here, and it was the second of two
+ * lists describing one idea — the very fault migration 0064 was written about,
+ * where the list in the code and the list the database would accept drifted
+ * apart and a dropdown was silently broken for a week. Keeping a copy here
+ * after moving the list to `NOTE_KIND_VOCAB` would have rebuilt that fault with
+ * the settings page playing the part of the database.
  *
- * The practice asked for the two email kinds to be taken out of the choices on
- * 8 September, having found them there and had no use for them. They stay as
- * kinds because the register writes them and one of each already exists.
- *
- * One list, in one place. Until now three forms each remembered to filter out
- * `system` and none of them filtered anything else — which is how the two email
- * kinds came to be offered at all.
+ * So the practice's own list lives in one place, in `core/vocabulary.ts`, and
+ * `ENTRY_KINDS` above stays only as the type: it still names `system`,
+ * `email_in` and `email_out`, which are what the register writes about itself
+ * and are nobody's to rename.
  */
-export const CHOOSABLE_ENTRY_KINDS: EntryKind[] = [
-  'note', 'status_query', 'consult', 'call', 'meeting', 'message', 'file',
-];
 
 /**
  * How a client relates to a particular case.

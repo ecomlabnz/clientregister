@@ -19,7 +19,8 @@ import { describe, expect, it } from 'vitest';
 import { migratedSqlite, mountModule, fakeUser } from './support/d1';
 import { CORRECTION_WINDOW_MINUTES, correctable } from '../src/core/timeline';
 import { notesModule } from '../src/modules/notes';
-import { CHOOSABLE_ENTRY_KINDS, ENTRY_KINDS, ENTRY_KIND_LABELS } from '../src/domain';
+import { ENTRY_KINDS, ENTRY_KIND_LABELS } from '../src/domain';
+import { NOTE_KIND_VOCAB, parseVocabulary } from '../src/core/vocabulary';
 import { readFileSync } from 'node:fs';
 
 const AT = '2026-09-01T09:00:00Z';
@@ -271,47 +272,66 @@ describe('correcting through the register', () => {
  * So now it writes one of each, against the real schema.
  */
 describe('the kinds a note may be', () => {
+  // Moved to a vocabulary on 11 September 2026, at the practice's request:
+  // *"same for this one? cannot use dropdown?"* Migration 0064 had already
+  // removed the database CHECK and argued that the list is configuration; this
+  // is the other half of that argument, finally done.
+  const offered = parseVocabulary(NOTE_KIND_VOCAB.defaults).map((t) => t.key);
+
   it('can every one of them actually be written', () => {
     const db = seeded();
-    expect(CHOOSABLE_ENTRY_KINDS.length, 'no kinds were read').toBeGreaterThan(4);
-    for (const kind of CHOOSABLE_ENTRY_KINDS) {
+    expect(offered.length, 'no kinds were read').toBeGreaterThan(4);
+    for (const kind of offered) {
       expect(() => db.prepare(
         `INSERT INTO entries (id, entity_type, entity_id, kind, body, occurred_at, created_at)
          VALUES (?, 'client', 'cl1', ?, 'x', ?, ?)`,
       ).run(`e_${kind}`, kind, AT, AT), `a note of kind ${kind} is refused`).not.toThrow();
     }
     const written = (db.prepare('SELECT COUNT(*) AS n FROM entries') as any).get() as { n: number };
-    expect(written.n).toBe(CHOOSABLE_ENTRY_KINDS.length);
+    expect(written.n).toBe(offered.length);
   });
 
   it('offers the two the practice asked for, by the names they use', () => {
-    expect(CHOOSABLE_ENTRY_KINDS).toContain('status_query');
-    expect(ENTRY_KIND_LABELS.status_query).toBe('Status query');
-    expect(CHOOSABLE_ENTRY_KINDS).toContain('consult');
-    expect(ENTRY_KIND_LABELS.consult).toBe('Consult');
+    const terms = parseVocabulary(NOTE_KIND_VOCAB.defaults);
+    expect(terms.find((t) => t.key === 'status_query')?.label).toBe('Status query');
+    expect(terms.find((t) => t.key === 'consult')?.label).toBe('Consult');
   });
 
   it('does not offer a kind the register writes about itself', () => {
     // A note that says an email was sent, written by hand when none was, is a
     // record of something that did not happen — on a table that cannot be
-    // corrected after five minutes. Asked for on 8 September; `system` was
-    // already excluded, by three separate filters that each remembered it.
+    // corrected after five minutes. Asked for on 8 September. These three are
+    // now excluded by not being in the list at all, rather than by three
+    // filters that each had to remember them; and an administrator cannot add
+    // them back, because the settings box only names what a person may choose.
     for (const written of ['system', 'email_in', 'email_out'] as const) {
-      expect(CHOOSABLE_ENTRY_KINDS, `${written} is still offered`).not.toContain(written);
+      expect(offered, `${written} is still offered`).not.toContain(written);
       expect(ENTRY_KINDS, `${written} has stopped being a kind at all`).toContain(written);
     }
   });
 
   it('keeps one list rather than three that each remember to filter', () => {
-    // Every form that writes a note reads the same list. Three did their own
-    // filtering, all three remembered `system`, and none of them filtered
-    // anything else — which is how the email kinds came to be on offer.
+    // Every form that writes a note reads the same list — now the practice's
+    // own, from settings. Three used to do their own filtering, all three
+    // remembered `system`, and none filtered anything else, which is how the
+    // email kinds came to be on offer.
     for (const path of ['src/modules/cases/index.ts', 'src/modules/clients/index.ts',
                         'src/modules/inquiries/index.ts']) {
       const src = readFileSync(path, 'utf8');
       expect(src, `${path} still filters the list itself`)
         .not.toContain("ENTRY_KINDS.filter((k) => k !== 'system')");
-      expect(src, `${path} does not use the shared list`).toContain('CHOOSABLE_ENTRY_KINDS');
+      expect(src, `${path} keeps a second copy of the list`)
+        .not.toContain('CHOOSABLE_ENTRY_KINDS');
+      expect(src, `${path} does not read the practice's list`).toContain('noteKinds(c.env)');
     }
   });
+
+  it('shows the stored key when a kind is taken off the list', () => {
+    // File notes are append-only. A note filed as a Consult stays a Consult
+    // even if the word is removed from the list; what it loses is its label.
+    const src = readFileSync('src/core/vocabulary.ts', 'utf8');
+    expect(src).toContain('export function noteKindLabel(');
+    expect(src).toContain('kinds.find((t) => t.key === kind)?.label ?? fixed[kind] ?? kind;');
+  });
 });
+

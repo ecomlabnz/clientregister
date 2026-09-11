@@ -7,6 +7,35 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.47.0 — 12 September 2026
+
+### Added
+**File note kinds are now a list you can edit.** Asked the same day as the case
+statuses, and this one is yes: *"same for this one? cannot use dropdown?"*
+
+**Settings → Lists and dropdowns → File note kinds.** Rename Consult, add
+Site visit, drop Message if you never use it. No deployment.
+
+The two lists are different things, which is why the answers differ. A case
+status decides what the register *does* — which matters count as open, which
+carry a deadline, which raise an alert. A note kind is what you call your own
+work, and it decides nothing.
+
+**Three kinds stay out of your hands** — system notes, and email in and out.
+Those are what the register writes about itself, not words you choose. They
+cannot be added to the list, so a note claiming an email was sent cannot be
+written by hand.
+
+**Removing a kind does not rewrite old notes.** A note filed as a Consult stays
+a Consult — file notes can never be changed. What it loses is its label, and
+the register shows the stored word rather than pretending the note has no kind.
+
+The groundwork for this was laid a while back and never finished: migration
+0064 removed the database's own check on note kinds precisely because *"that
+list is configuration"*. Until now the list still lived in the code — two
+places describing one idea, which is the fault that migration was written
+about. There is one place now.
+
 ## 1.46.0 — 12 September 2026
 
 ### Added

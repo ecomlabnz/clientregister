@@ -26,7 +26,7 @@ import {
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate, dateOrDateTime, instantForDate } from '../../ui/format';
 import {
   canTransition, CASE_STATUS_HELP, CASE_STATUS_LABELS, CASE_STATUSES, CASE_TRANSITIONS,
-  DEADLINE_CASE_STATUSES, CHOOSABLE_ENTRY_KINDS, ENTRY_KIND_LABELS, ENTRY_KINDS,
+  DEADLINE_CASE_STATUSES, ENTRY_KIND_LABELS, type EntryKind,
   isAwaitingStatus, isOpenStatus, isPartyRole, OPEN_CASE_STATUSES, PARTY_ROLE_LABELS, PARTY_ROLES, PRIORITIES,
   PRIORITY_LABELS, TASK_STATUS_LABELS, type CaseStatus,
 } from '../../domain';
@@ -51,7 +51,8 @@ import {
   AI_BRIEF_NOTE_PREFIX, briefCase, briefNoteBody, latestBrief, markBriefDiscarded, markBriefKept,
 } from '../../ai/brief';
 import {
-  VOCABULARY_SETTINGS, caseTypes, docCategories, isTerm, labelFor, termOptions, type Term,
+  VOCABULARY_SETTINGS, caseTypes, docCategories, isTerm, labelFor, noteKindLabel, noteKinds,
+  termOptions, type Term,
 } from '../../core/vocabulary';
 import { caseNameFrom } from '../../core/casename';
 import { readingCard, registerReadingRoutes } from './reading';
@@ -668,6 +669,8 @@ export const casesModule: AppModule = {
 
     // --- Detail -------------------------------------------------------------
     r.get('/:id', requirePermission('register:read'), async (c) => {
+      // What this practice calls its own file notes. See NOTE_KIND_VOCAB.
+      const noteKindList = await noteKinds(c.env);
       const types = await caseTypes(c.env);
       const id = c.req.param('id')!;
       const viewer = c.get('user')!;
@@ -1094,7 +1097,7 @@ export const casesModule: AppModule = {
                             placeholder: 'What happened, what was said, what was advised.' })}
                   <div class="row-form">
                     ${select({ label: 'Kind', name: 'kind', value: 'note', includeBlank: false,
-                               options: optionsFrom(CHOOSABLE_ENTRY_KINDS as any, ENTRY_KIND_LABELS as any) })}
+                               options: termOptions(noteKindList) })}
                     ${field({ label: 'It happened on', name: 'occurred_at', type: 'date',
                               value: nowIso().slice(0, 10),
                               hint: 'Backdate a note written up later.' })}
@@ -1121,15 +1124,13 @@ export const casesModule: AppModule = {
                 <ul class="timeline">
                   ${entries.map((e) => timelineItem({
                     entry: e,
-                    kindLabel: ENTRY_KIND_LABELS[e.kind] ?? e.kind,
+                    kindLabel: noteKindLabel(noteKindList, e.kind, ENTRY_KIND_LABELS),
                     mail: canReadMail ? mailLinkFor(e, sentMail, recordMailHref('case', kase.id)) : null,
                     happened: stamp(e.occurred_at),
                     written: stamp(e.created_at),
                     correction: writable && correctable(e, c.get('user')?.id ?? null)
                       ? { csrf, minutes: CORRECTION_WINDOW_MINUTES,
-                          kindOptions: optionsFrom(
-                            CHOOSABLE_ENTRY_KINDS as any,
-                            ENTRY_KIND_LABELS as any) }
+                          kindOptions: termOptions(noteKindList) }
                       : null,
                   }))}
                 </ul>`}`)}
@@ -1734,7 +1735,12 @@ export const casesModule: AppModule = {
 
       const form = await c.req.formData();
       const f = new FormReader(form);
-      const kind = f.enum('kind', ENTRY_KINDS, { fallback: 'note' })!;
+      // Checked against the practice's own list rather than a list in the
+      // code — see NOTE_KIND_VOCAB. A kind that is not on it falls back to
+      // a plain note rather than being refused: the words are the note.
+      const writable_kinds = await noteKinds(c.env);
+      const submitted = f.optional('kind', { max: 40 });
+      const kind = (isTerm(writable_kinds, submitted) ? submitted : 'note') as EntryKind;
       const body = f.text('body', { required: true, label: 'Note', max: 20000 });
       // A note written up on Thursday about a call on Monday belongs on Monday,
       // but the file must still show when it was actually written — the created
