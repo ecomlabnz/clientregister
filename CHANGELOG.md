@@ -7,6 +7,40 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.52.0 — 12 September 2026
+
+### Changed
+**Help is in parts now.** Asked for in the middle of taking explanatory text off
+the screens: *"re Less on the screen - i believe it is good time to thoroughly
+review and update the help section."*
+
+What was wrong with it was not the writing. All twenty-eight sections and
+**every release ever made** were on one page — about eleven thousand words of
+guidance and twenty-two thousand of release notes, on the page you open when you
+are already stuck.
+
+Now: six tabs, grouped by when you would be asking rather than by which part of
+the register the answer lives in — **Day to day**, **Dates and documents**,
+**Money**, **Work coming in**, **Running the practice**, **Settings and setup**,
+and **What changed**. Inside a tab each section is a heading you open. A tab is
+a short list of questions instead of a wall.
+
+The biggest tab is now about three thousand words, and closed until you open
+something. It was thirty-four thousand.
+
+**Recent changes shows the last twenty**, and says how many there have been in
+all. It was showing all 200.
+
+### Added
+The guidance now covers everything that shipped today, none of which it
+mentioned: correcting a certificate and the note it writes, the submitted box
+that goes away, how a certificate's expiry works itself out, visa conditions and
+stay limits, the three histories and how a gap is drawn, the military records
+placeholder, the five blocks on a matter that start closed, recording an INZ
+extension without a status change, the practice caseload and why there is no
+trial-only login, the new editable lists, and a calendar decision saying which
+way it went.
+
 ## 1.51.2 — 12 September 2026
 
 ### Fixed

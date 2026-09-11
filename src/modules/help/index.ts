@@ -26,6 +26,63 @@ const ROLES = ['owner', 'admin', 'adviser', 'assistant', 'readonly'] as const;
 interface Section { id: string; title: string; body: Raw }
 
 /**
+ * Help, in parts, because the whole of it is a book.
+ *
+ * **Asked for on 12 September 2026**, in the middle of taking explanatory text
+ * off the screens: *"re Less on the screen - i believe it is good time to
+ * thoroughly review and update the help section, please do."*
+ *
+ * What was wrong with it was not the writing. It was that all twenty-eight
+ * sections and every release ever made were rendered into **one page** — about
+ * eleven thousand words of guidance and twenty-two thousand of release notes,
+ * on a page a person opens when they are already stuck. The standing rule
+ * covers exactly this: tabs when a page would run past one screen.
+ *
+ * So: six groups as tabs, and inside a tab each section is a heading you open.
+ * A tab is then a short list of questions rather than a wall, which is the same
+ * shape as the matter page after this morning.
+ *
+ * The groups are by *when you would be asking*, not by which part of the code
+ * the answer lives in. Somebody looking up how a police certificate expires is
+ * thinking about dates and paper, not about the clients module.
+ */
+const GROUPS: Array<{ id: string; label: string; sections: string[] }> = [
+  {
+    id: 'day', label: 'Day to day',
+    sections: ['getting-around', 'search', 'clients', 'cases', 'notes', 'tasks', 'calendar'],
+  },
+  {
+    id: 'dates', label: 'Dates and documents',
+    sections: ['alerts', 'decisions', 'certificates', 'files', 'flags'],
+  },
+  { id: 'money', label: 'Money', sections: ['fees', 'quotes', 'invoices'] },
+  {
+    id: 'incoming', label: 'Work coming in',
+    sections: ['inquiries', 'conversations', 'intake', 'assistant'],
+  },
+  {
+    id: 'running', label: 'Running the practice',
+    sections: ['knowledge', 'automations', 'export', 'website'],
+  },
+  {
+    id: 'settings', label: 'Settings and setup',
+    sections: ['account', 'admin', 'lists', 'connecting'],
+  },
+  { id: 'changes', label: 'What changed', sections: ['changes'] },
+];
+
+/**
+ * How many releases the Recent changes section shows.
+ *
+ * Every one of them was being rendered, which by 12 September 2026 was about
+ * two hundred releases and twenty-two thousand words of history on the page
+ * somebody opens when they are already stuck. Twenty is about a fortnight of
+ * this practice's pace — long enough to cover "what changed since I last looked"
+ * and short enough to read.
+ */
+const RECENT_RELEASES = 20;
+
+/**
  * One line per release, for someone who wants to know what changed without
  * reading a developer changelog. The full one is CHANGELOG.md in the
  * repository.
@@ -36,6 +93,18 @@ interface Section { id: string; title: string; body: Raw }
  * developer never sees while working, so it is the one that drifts.
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
+  {
+    version: '1.52.0', date: '12 September 2026',
+    notes: [
+      'Help is in tabs, and each section is a heading you open. It was one page of about '
+        + 'thirty-four thousand words; the biggest tab is now about three thousand.',
+      'The tabs are grouped by when you would be asking \u2014 Day to day, Dates and documents, '
+        + 'Money, Work coming in, Running the practice, Settings and setup.',
+      'Recent changes shows the last twenty releases rather than all two hundred.',
+      'The guidance now covers everything that shipped today \u2014 correcting a certificate, the '
+        + 'three histories, visa conditions, the practice caseload, and the rest.',
+    ],
+  },
   {
     version: '1.51.2', date: '12 September 2026',
     notes: [
@@ -2477,6 +2546,35 @@ function sections(origin: string): Section[] {
            visa may still be stuck in it — but stops being chased. The primary passport is removed
            from the client form rather than from the list, so a record can never end up with
            passports but no primary.</p>
+        <h4>What the visa lets them do</h4>
+        <p>The Immigration tab takes the visa type, the day it was granted and the day it expires.
+           Two more boxes are words rather than dates:</p>
+        <p><strong>Visa conditions</strong> — what the grant allows and forbids, in INZ's own
+           wording. <strong>Stay limit</strong> — the line you would otherwise put in a note:
+           <em>4 months per entry, 6 months in any 12</em>.</p>
+        <p>Nothing is counted from either and neither raises an alert, on purpose. A stay limit
+           only starts when the person crosses a border, and the register has no way of knowing
+           when they did. A date it guessed would be worse than none, because dates are what the
+           alerts read. The visa's own expiry is still the only date watched on a visa.</p>
+        <h4>Employment, education and travel history</h4>
+        <p>Three blocks on the client's page, under Certificates. Each starts closed. None is
+           compulsory — they are there for the application forms that ask for them.</p>
+        <p>They are edited the way quotation lines are: change anything on any line, type a number
+           in the <strong>#</strong> box to move a row up or down, tick the red cross to take a
+           line out, and one <strong>Save</strong> does the lot. <strong>Add a line</strong>
+           underneath adds one.</p>
+        <p><strong>A period of unemployment is a row like any other.</strong> Choose what the
+           period was — Unemployed, Studying, Caring for family — leave the employer blank,
+           and write what was happening in the note. A work history with the gaps left out is not
+           a work history, and INZ asks about the gaps.</p>
+        <p>Where two employment periods do not meet, the register draws the gap between them as a
+           shaded line saying how many months. It is never refused and never raises an alert: a
+           history half entered legitimately has gaps, and a gap is often the true answer. It is a
+           question to answer, not a mistake.</p>
+        <p>Dates are whole dates. Where only the month is known, use the 1st.</p>
+        <h4>Military records</h4>
+        <p>A heading on the client's page and nothing behind it yet. It is there because the
+           practice asked for the block before the shape of it was decided.</p>
         <h4>Companies and organisations</h4>
         <p>Choose <em>Company or organisation</em> as the record type and the form changes: a
            registered name, an NZBN and a Companies Office number instead of personal details.</p>
@@ -2535,7 +2633,20 @@ function sections(origin: string): Section[] {
            a case cannot go from <em>Lead</em> straight to <em>Approved</em> without passing
            through lodgement, which stops a file quietly skipping a step.</p>
         <p>Set the <strong>response or decision due</strong> date whenever there is one, especially
-           for an RFI or PPI. That is the date the Alerts page watches.</p>
+           for an RFI or PPI. That is the date the Alerts page watches. You can change it on its
+           own, leaving the status alone, which is how an extension from INZ is recorded — the
+           new date goes on the file as a note saying what it was before.</p>
+        <h4>The blocks on a matter</h4>
+        <p>Every heading on a matter opens and closes. Five of them start closed: <strong>Read a
+           document into this matter</strong>, <strong>Brief me on this matter</strong>,
+           <strong>Files</strong>, <strong>File notes</strong> and <strong>Tasks</strong>. Those
+           are the things you <em>do</em>; click the heading and it opens. What you read to see
+           where a matter stands — status, parties, key details, the next action — is open
+           when the page loads.</p>
+        <p><strong>Invoices</strong> starts closed too, and for a different reason: it is the one
+           thing on the page a client leaning over the desk should not read by accident.</p>
+        <p>Nothing is remembered between visits. A section missing because of something you did on
+           another matter last week would be worse than one you close again.</p>
         <h4>Two alerts that are not about a date</h4>
         <p>Everything else on the Alerts page answers <em>what is due</em>. These two answer
            <em>what is wrong</em>, which is how matters are actually lost — rarely to a missed
@@ -2785,7 +2896,7 @@ function sections(origin: string): Section[] {
            <code>ANTHROPIC_API_KEY</code> for the better reading, or to <code>workers-ai</code> to
            use Cloudflare's own models with nothing leaving their network. Both are repository
            secrets, set the same way as everything else in
-           <a href="/help#connecting">the setup guide</a>.</p>`,
+           <a href="/help?s=connecting">the setup guide</a>.</p>`,
     },
     {
       id: 'intake',
@@ -2853,7 +2964,7 @@ function sections(origin: string): Section[] {
         <p>A note can carry a file — a letter, a scan, a signed form — which is then linked from the
            note and listed under Documents. This needs R2 storage switched on; until it is, the file
            box says so and everything else works. See
-           <a href="/help#connecting">Connecting Telegram, WhatsApp and email</a> for how to enable
+           <a href="/help?s=connecting">Connecting Telegram, WhatsApp and email</a> for how to enable
            it.</p>
         <p>If a file cannot be stored for any reason, the note is still saved and you are told —
            what you typed is never lost because an upload failed.</p>`,
@@ -3067,7 +3178,29 @@ function sections(origin: string): Section[] {
            accept it for.</p>
         <p>The alerts page watches the current one of each kind. Where several police certificates
            are current, it watches the one expiring soonest, because that is the one that bites
-           first.</p>`,
+           first.</p>
+        <h4>The expiry works itself out</h4>
+        <p>You do not type the expiry of a police certificate or a medical. INZ works it out from
+           the issue date, and so does the register: a police certificate is good for six months,
+           or twenty-four once it has gone in with an application; a medical is three months, or
+           thirty-six. Record the day it was submitted and the expiry moves by itself.</p>
+        <p>The <strong>Submitted with an application on</strong> box sits under a certificate until
+           you have used it, then goes away. Changing it afterwards is a correction, and
+           corrections go through Edit.</p>
+        <h4>Correcting one</h4>
+        <p><strong>Edit</strong> under any certificate changes the issue date, the country, the
+           reference or the note. Every change is written onto the client's file as a note saying
+           what moved — <em>issued 03 Feb 2026 — 03 Mar 2026; expires 03 Aug 2026 —
+           03 Sep 2026</em> — and into the audit log. That is what makes it safe to correct one an
+           application already relied on.</p>
+        <p>What you cannot change is <em>which kind</em> it is. A police certificate that turns out
+           to be a medical is a different document, not a corrected one — record it as a new
+           one and remove the wrong one.</p>
+        <h4>A date read by a machine</h4>
+        <p>Where an issue date came from a filename or from reading a scan, the certificate carries
+           <strong>issue date unverified</strong> in amber and says where the date came from.
+           The expiry above it is worked out from that date, so it is unverified too. Check it
+           against the paper and press <strong>Confirm against the certificate</strong>.</p>`,
     },
     {
       id: 'export',
@@ -3107,7 +3240,11 @@ function sections(origin: string): Section[] {
            visa expires, so the calendar does not offer to.</p>
         <p><strong>The colours are the filter.</strong> The row of keys under the month is not
            just a legend: click one and that kind comes off the month, click it again and it
-           comes back. The number beside each says how many there are this month.</p>
+           comes back. The number beside each says how many there are this month. Nothing is
+           remembered between visits — the calendar opens the same way every time.</p>
+        <p>A decision says which way it went: <strong>Approved — </strong> or
+           <strong>Declined — </strong>, taken from the matter's status. Where a matter was
+           decided and later closed, the first words of the outcome are used instead.</p>
         <p><strong>Everyone or just yours.</strong> "Mine" narrows it to matters and tasks
            assigned to you. Client dates — visas, passports, certificates — belong to a client
            rather than to a person, so they step aside in that view rather than being listed
@@ -3140,7 +3277,9 @@ function sections(origin: string): Section[] {
       title: 'Your account and security',
       body: html`
         <p>Under <strong>My account</strong> you can change your password, see every device you are
-           signed in on, and sign any of them out.</p>
+           signed in on, and sign any of them out. The line under the heading is your name, your
+           email address and your role — an administrator changes the first two, under
+           Settings → People.</p>
         <p><strong>Turn on two-factor authentication.</strong> This register holds passport numbers,
            immigration histories and fee arrangements. Two-factor is the single biggest thing you
            can do to protect it. You will be given eight recovery codes when you set it up — save
@@ -3537,6 +3676,14 @@ wv_partner | WV. Partner</pre>
         <p>Removing a type does not touch cases already filed under it. Those keep their value and
            display it as it stands, because a case filed last year under a type you no longer offer
            is still that kind of case.</p>
+        <p>The same page holds the other lists the practice uses: titles, genders, relationship
+           statuses, visa types, English tests, document categories, warning kinds, file note
+           kinds, and — since the histories were added — <strong>employment kinds</strong> and
+           <strong>education levels</strong>.</p>
+        <p><strong>Case statuses are deliberately not here.</strong> They decide what the register
+           <em>does</em> — which matters count as open, which carry a deadline, which raise an
+           alert — so changing them would change how the system behaves rather than what it
+           calls things. A file note kind decides nothing, which is why that one is yours.</p>
         <p><strong>Case statuses are deliberately not here.</strong> They decide which moves are
            legal — what a case may become from where it is — so changing them would change how the
            system behaves rather than what it is called. Kinds of knowledge base article live under
@@ -3562,6 +3709,32 @@ wv_partner | WV. Partner</pre>
         <p>Whether the practice is GST registered and at what rate, how new fee lines default, what
            the split is calculated on, and the default shares for new cases. Changing a default
            affects new records only.</p>
+        <h4>Test data, and a caseload to learn on</h4>
+        <p><strong>Settings → Test data.</strong> Anything in the register can be marked as test
+           data — a client, a matter, a quotation, an inquiry, an invoice, a task — from a
+           small box on its own page. Marking a client marks everything filed under them. The
+           screen lists every marked record by name, and one button deletes the lot.</p>
+        <p>A quotation cannot be unmarked once marked. That is deliberate: the mark is what
+           releases it from being a signed contract, and letting it back would be a way of
+           un-signing one.</p>
+        <p><strong>Load the caseload</strong> lays down twelve invented clients with families,
+           about thirty matters, quotations, passports, certificates and histories. None of it is
+           real. It is deliberately messy — a declined application, a section 61 request, an
+           expired police certificate beside a current one, a passport renewed in the middle of an
+           application, a gap in a work history — because a caseload where everything goes
+           right teaches nobody anything.</p>
+        <p><strong>Put it back as it was</strong> deletes everything marked as test data and lays
+           the caseload down again, so whatever somebody added while trying things is
+           disregarded.</p>
+        <p>It can also put itself back on a timer, under <strong>Settings → Practice
+           caseload</strong>. On this register that is set to <strong>never</strong> and should
+           stay there: the records marked as test data here are ones you marked by hand to
+           rehearse with, and a timer would delete them one night without asking.</p>
+        <p>A login that can only see the test data is <em>not</em> available, and deliberately.
+           Holding somebody inside the test data would mean adding "and only the test data" to
+           every question the register asks its database — six hundred of them — and the one
+           that got missed would show a real client's file. Somebody learning the register gets
+           their own copy of it instead, where there is nothing else to see.</p>
         <h4>The audit log</h4>
         <p>Every action anyone takes: sign-ins and failed attempts, every record created or
            changed, every fee altered, every passport revealed, every document downloaded. Filter
@@ -3575,12 +3748,19 @@ wv_partner | WV. Partner</pre>
       id: 'changes',
       title: 'Recent changes',
       body: html`
-        <p>You are using version <strong>${APP_VERSION}</strong>.</p>
-        ${RELEASES.map((release) => html`
+        ${'' /* The last twenty, not all of them. There are close to two hundred
+                 releases and every one of them was being rendered onto this
+                 page — twenty-two thousand words of history, on the page
+                 somebody opens when they are stuck. "Recent" was doing no work
+                 at all. The whole list is in CHANGELOG.md, where a list that
+                 long belongs. */}
+        <p>You are using version <strong>${APP_VERSION}</strong>.
+           The last ${String(Math.min(RECENT_RELEASES, RELEASES.length))} releases:</p>
+        ${RELEASES.slice(0, RECENT_RELEASES).map((release) => html`
           <h4>${release.version} — ${release.date}</h4>
           <ul>${release.notes.map((note) => html`<li>${note}</li>`)}</ul>`)}
-        <p class="hint">The full technical changelog is <code>CHANGELOG.md</code> in the
-           repository.</p>`,
+        <p class="hint">There have been ${String(RELEASES.length)} releases in all.
+           The full list is <code>CHANGELOG.md</code> in the repository.</p>`,
     },
   ];
 }
@@ -3597,29 +3777,51 @@ export const helpModule: AppModule = {
 
     r.get('/', async (c) => {
       const all = sections(new URL(c.req.url).origin);
-      return page(c, { title: 'Help', active: '/help' }, html`
-        ${pageHeader('How to use the register',
-          `A practical guide to the parts of this system. Version ${APP_VERSION}.`)}
+      const byId = new Map(all.map((x) => [x.id, x]));
 
-        <div class="cols">
-          <div class="col-main">
-            ${all.map((section) => html`
-              <section class="card" id="${section.id}">
-                <header class="card-head"><h2>${section.title}</h2></header>
-                <div class="card-body manual">${section.body}</div>
-              </section>`)}
-          </div>
-          <div class="col-side">
-            ${card('Contents', html`
-              <ul class="list">
-                ${all.map((section) => html`<li><a href="#${raw(section.id)}">${section.title}</a></li>`)}
-              </ul>`)}
-            ${card('Still stuck?', html`
-              <p>If something looks wrong rather than merely confusing, note what you were doing and
-                 the reference number on any error page — it identifies the exact request in the
-                 log.</p>`)}
-          </div>
-        </div>`);
+      // Which group is on screen. An unknown or absent one falls to the first
+      // rather than to nothing: a help page that opens empty because of a stale
+      // link is the worst version of this page there is.
+      const askedGroup = c.req.query('g') ?? '';
+      const group = GROUPS.find((g) => g.id === askedGroup) ?? GROUPS[0]!;
+
+      // One section opened by name, so a link from elsewhere in the register
+      // still lands on the answer. `/help?s=connecting` opens that section, on
+      // whichever tab it lives.
+      const asked = c.req.query('s') ?? '';
+      const opened = byId.has(asked) ? asked : '';
+      const openedGroup = opened
+        ? GROUPS.find((g) => g.sections.includes(opened)) ?? group
+        : group;
+
+      const showing = openedGroup.sections
+        .map((id) => byId.get(id)).filter((x): x is Section => Boolean(x));
+
+      return page(c, { title: 'Help', active: '/help' }, html`
+        ${pageHeader('How to use the register')}
+
+        <nav class="tabs">
+          ${GROUPS.map((g) => html`
+            <a class="${g.id === openedGroup.id ? 'tab current' : 'tab'}"
+               href="/help?g=${raw(g.id)}">${g.label}</a>`)}
+        </nav>
+
+        ${'' /* Each section is a heading you open. Closed unless it is the one a
+                 link asked for, so a tab is a short list of questions rather
+                 than the wall of prose this page used to be. */}
+        ${showing.map((section) => html`
+          <section class="card" id="${section.id}">
+            <details class="card-fold" ${section.id === opened || showing.length === 1
+              ? raw('open') : ''}>
+              <summary class="card-head"><h2>${section.title}</h2></summary>
+              <div class="card-body manual">${section.body}</div>
+            </details>
+          </section>`)}
+
+        ${card('Still stuck?', html`
+          <p>If something looks wrong rather than merely confusing, note what you were doing and
+             the reference number on any error page — it identifies the exact request in the
+             log.</p>`)}`);
     });
 
     app.route('/help', r);
