@@ -7,6 +7,33 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.62.0 — 12 September 2026
+
+### Removed
+**Nothing can put invented clients into your register any more.**
+
+*"yes, remove it, no need for the test data to be loaded into the live
+register."*
+
+Two things went, and they were the last of one story.
+
+**The "Demonstration data" button in the build pipeline.** Built in August,
+before the register held anything real. Anybody with access to the repository
+could press it and write twenty invented clients straight into your live
+database. It has been replaced for weeks by Settings → Test data, which lives
+inside the register, marks every row it creates, and can take them out again.
+
+**The "Remove all demonstration data" card on Settings → Maintenance.** That
+card existed to clean up after the button. It only appeared when such rows were
+present, and there are none — your register holds 245 clients and 199 matters,
+every one of them real, and the trial holds none at all. So it could never
+appear on either register, and a card nobody can ever see is a thing to delete
+rather than carry.
+
+**Nothing to do, and nothing was deleted from your register.** Your own way of
+loading a caseload to practise on — Settings → Test data — is untouched and is
+now the only one.
+
 ## 1.61.0 — 12 September 2026
 
 ### Fixed

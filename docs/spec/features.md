@@ -38,7 +38,7 @@ dashboard, and why a test holds them there.
 | 21 | `knowledge` | Knowledge base | `/knowledge` | 14 | Tools → Knowledge |
 | 22 | `assistant` | Assistant | `/assistant` | 5 | Tools → Assistant |
 | 23 | `workflows` | Workflows | `/workflows` | 4 | — |
-| 24 | `admin` | Settings | `/admin` | 25 | Settings |
+| 24 | `admin` | Settings | `/admin` | 24 | Settings |
 | 25 | `help` | Help | `/help` | 1 | Help |
 
 ## What each module owns
@@ -393,7 +393,6 @@ Settings: **AI Assistant** (2 keys)
 | POST | `/admin/automations/:id/toggle` |
 | POST | `/admin/automations/run` |
 | POST | `/admin/backup` |
-| POST | `/admin/demo-data/remove` |
 | GET | `/admin/export` |
 | GET | `/admin/export/:key{.+\.csv}` |
 | POST | `/admin/mail/flush` |

@@ -59,13 +59,23 @@ marks every row `is_test`, lists what it would delete before deleting it,
 removes them again on request, works on any practice's register, and cannot be
 reached by anyone without an administrator's sign-in.
 
-**Two things were deliberately left alone.** The **Remove all demonstration
-data** button on Admin → Maintenance stays: any register seeded by the old
-workflow may still hold rows whose identifier begins `demo_`, and that button is
-the only way to take them out. It only appears when there are such rows, so on a
-clean register nobody ever sees it. And `CHANGELOG.md` and the Recent changes
-list in Help still mention the demonstration data, because they are the record
-of what shipped when and are not rewritten.
+**The removal button went too, once the question it turned on was answered.**
+It was kept at first because nobody could see whether the practice's register
+held rows the old workflow had left — and a button is cheap next to stranding
+data. Then both registers were read: the practice's holds **245 clients and 199
+matters, every one of them real and not one `demo_` row**; the trial holds
+nothing at all. The card only ever rendered when such rows existed, so it could
+never appear on either. Deleted in 1.62.0.
+
+If a register ever does turn up with them — a copy restored from an old backup —
+they come out with a `DELETE` against the `demo_` prefix, and the statements are
+in the history of `scripts/seed-demo-remove.sql`. Standing code paid for every
+day against an event that has not happened and now cannot is the definition of
+the accommodation `CLAUDE.md` forbids.
+
+**What was left alone:** `CHANGELOG.md` and the Recent changes list in Help
+still mention the demonstration data, because they are the record of what
+shipped when and are not rewritten.
 
 ### 1a. The practice's register briefly refuses, and we do not know why
 
