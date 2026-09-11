@@ -94,6 +94,17 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.54.0', date: '12 September 2026',
+    notes: [
+      'A date in a history can be just a month. Write 2019-03 where you only know the month, or '
+        + '2019-03-15 where you know the day. A month shows as \u201cMar 2019\u201d.',
+      'Gaps still read correctly: a period that ended in March ran to the end of March, so '
+        + 'starting the next job in April is not a gap.',
+      'A wrong date no longer half-saves a history \u2014 nothing is written unless every row is '
+        + 'right.',
+    ],
+  },
+  {
     version: '1.53.1', date: '12 September 2026',
     notes: [
       'Cases, Quotes, Passports and Certificates are open when a client\u2019s page loads. Files, '
@@ -2615,7 +2626,9 @@ function sections(origin: string): Section[] {
            shaded line saying how many months. It is never refused and never raises an alert: a
            history half entered legitimately has gaps, and a gap is often the true answer. It is a
            question to answer, not a mistake.</p>
-        <p>Dates are whole dates. Where only the month is known, use the 1st.</p>
+        <p>A date can be a whole date or just a month: write <code>2019-03-15</code>, or
+           <code>2019-03</code> where the day is not known. A month shows as
+           <em>Mar 2019</em>.</p>
         <h4>Military records</h4>
         <p>A heading on the client's page and nothing behind it yet. It is there because the
            practice asked for the block before the shape of it was decided.</p>

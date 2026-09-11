@@ -195,6 +195,47 @@ export async function allHistories(
  * started the next on the Monday has not been unemployed, and an alert about it
  * would be the kind of noise the practice has asked twice not to have.
  */
+/**
+ * A date in a history, which may be a day or a month.
+ *
+ * **Asked for on 12 September 2026:** *"in the histories - can we allow filling
+ * in only the Month and year if the date is not available?"* Yes, and it is the
+ * ordinary case: a person remembers leaving a job in March 2019, an application
+ * form asks for MM/YYYY, a reference letter says "June 2015 to August 2018".
+ *
+ * Migration 0089 said to use the 1st where the day was unknown, which is the
+ * register writing down a day nobody said. A history full of 1sts reads as
+ * precision that is not there.
+ *
+ * Both live in the same column. The string says which it is by being seven
+ * characters or ten — a second column saying so could disagree with the date
+ * beside it, and `2019-03-15` marked "month only" is a state with no meaning.
+ */
+export const HISTORY_DATE_RE = /^\d{4}-\d{2}(-\d{2})?$/;
+
+export function isMonthOnly(value: string): boolean {
+  return value.length === 7;
+}
+
+/**
+ * A history date as an instant, for arithmetic.
+ *
+ * A month is not a point, so which end of it is meant depends on what the date
+ * *is*. A period that started in March 2019 started at the beginning of March;
+ * one that ended in March 2019 ran to the end of it. Reading both as the 1st
+ * would invent a month-long gap after every period that ends in a month.
+ *
+ * This is the only place that arithmetic lives. Nothing else widens a month.
+ */
+export function historyDateAt(value: string | null, end: boolean): number | null {
+  if (!value || !HISTORY_DATE_RE.test(value)) return null;
+  if (!isMonthOnly(value)) return Date.parse(`${value}T00:00:00Z`);
+  const [y, m] = value.split('-').map(Number) as [number, number];
+  // Day 0 of the next month is the last day of this one, which is also how
+  // February and a leap year are got right without knowing about either.
+  return end ? Date.UTC(y, m, 0) : Date.UTC(y, m - 1, 1);
+}
+
 export const GAP_DAYS = 31;
 
 export function gapsIn(rows: HistoryRow[]): Map<number, number> {
@@ -214,8 +255,14 @@ export function gapsIn(rows: HistoryRow[]): Map<number, number> {
         : null;
     if (!pair) continue;
 
-    const days = Math.round(
-      (Date.parse(`${pair[1]}T00:00:00Z`) - Date.parse(`${pair[0]}T00:00:00Z`)) / 86_400_000);
+    // The earlier of the pair is an end and the later is a start, whichever way
+    // round the practice ordered the table — so a month at the earlier end is
+    // read as its last day and one at the later end as its first. That is the
+    // narrowest honest reading of the gap between them.
+    const from = historyDateAt(pair[0]!, true);
+    const to = historyDateAt(pair[1]!, false);
+    if (from === null || to === null) continue;
+    const days = Math.round((to - from) / 86_400_000);
     if (Number.isFinite(days) && days > GAP_DAYS) out.set(i, days);
   }
   return out;
@@ -228,9 +275,20 @@ export function readHistoryRow(
   const values: Record<string, string | null> = {};
   for (const col of def.columns) {
     const name = `${col.name}${suffix}`;
-    values[col.name] = col.kind === 'date'
-      ? f.date(name)
-      : f.optional(name, { max: col.max ?? 200 });
+    if (col.kind === 'date') {
+      // Read as text and checked against the shape, rather than through
+      // `f.date`, which knows only `YYYY-MM-DD`. The database holds the same
+      // rule (migration 0091); this is here so the message names the box.
+      const raw = (f.optional(name, { max: 10 }) ?? '').trim();
+      if (raw && !HISTORY_DATE_RE.test(raw)) {
+        f.errors[name] = `${col.label} is a day or a month — 2019-03-15, or 2019-03.`;
+        values[col.name] = null;
+      } else {
+        values[col.name] = raw || null;
+      }
+    } else {
+      values[col.name] = f.optional(name, { max: col.max ?? 200 });
+    }
   }
   values.notes = f.optional(`notes${suffix}`, { max: HISTORY_NOTE_MAX });
   return values;
@@ -276,6 +334,20 @@ export async function saveHistory(
   env: Env, def: HistoryDef, clientId: string, f: FormReader,
 ): Promise<HistorySave> {
   const rows = await historyRows(env, def, clientId);
+
+  // Every row read before anything is written.
+  //
+  // The save is a row at a time, so a bad date on the fourth row would
+  // otherwise be found after three rows had already been written — a half-saved
+  // table, and the reader has no way to tell which half. Reading first costs a
+  // second pass over the form and makes the save all-or-nothing.
+  const proposed = new Map<string, Record<string, string | null>>();
+  for (const row of rows) {
+    if (f.checkbox(`remove_${row.id}`)) continue;
+    proposed.set(row.id, readHistoryRow(def, f, `_${row.id}`));
+  }
+  if (!f.valid) return { changed: 0, removed: 0 };
+
   let removed = 0;
   let changed = 0;
 
@@ -288,7 +360,7 @@ export async function saveHistory(
 
   const keeping = rows.filter((r) => !f.checkbox(`remove_${r.id}`));
   for (const row of keeping) {
-    const values = readHistoryRow(def, f, `_${row.id}`);
+    const values = proposed.get(row.id)!;
     // Read as text rather than through `int`, which would record a validation
     // error and refuse the whole save over one mistyped order box. A number
     // that makes no sense means "leave this row where it was".
