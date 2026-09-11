@@ -109,6 +109,27 @@ export async function tallyTestData(env: Env): Promise<TestTally[]> {
 export interface TestRecord { table: TestTable; noun: string; id: string; ref: string; title: string }
 
 /**
+ * Which column names each record on the list, per table.
+ *
+ * Written out one table at a time rather than derived, because the six tables
+ * genuinely disagree: a matter has a `title`, a quotation has a `description`,
+ * an inquiry has a `subject`, and a task has no reference number at all. An
+ * earlier version guessed `description` for anything it had not named, which
+ * meant the page died with *no such column* the moment a matter was marked —
+ * the practice saw only *Something went wrong*. A table added to `TEST_TABLES`
+ * without a line here now fails the test in `test/testdata.test.ts`, which
+ * marks one row in every table and reads the list back.
+ */
+const LIST_COLUMNS: Record<TestTable, { ref: string; title: string }> = {
+  invoices: { ref: 'ref', title: 'description' },
+  quotes: { ref: 'ref', title: 'description' },
+  inquiries: { ref: 'ref', title: "COALESCE(subject, '')" },
+  tasks: { ref: "''", title: 'title' },
+  cases: { ref: 'ref', title: 'title' },
+  clients: { ref: 'ref', title: 'full_name' },
+};
+
+/**
  * Every marked record, named, for the screen that lists them before taking any.
  *
  * The practice chose to see the list first: *"show a list first, then delete
@@ -117,11 +138,7 @@ export interface TestRecord { table: TestTable; noun: string; id: string; ref: s
 export async function listTestData(env: Env, limitPerTable = 200): Promise<TestRecord[]> {
   const out: TestRecord[] = [];
   for (const table of DELETE_ORDER) {
-    const title = table === 'clients' ? 'full_name'
-      : table === 'tasks' ? 'title'
-      : table === 'inquiries' ? "COALESCE(subject, '')"
-      : 'description';
-    const ref = table === 'tasks' ? "''" : 'ref';
+    const { ref, title } = LIST_COLUMNS[table];
     const rows = await all<{ id: string; ref: string; title: string }>(
       env.DB,
       `SELECT id, ${ref} AS ref, COALESCE(${title}, '') AS title

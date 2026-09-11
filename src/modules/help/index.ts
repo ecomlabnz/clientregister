@@ -37,6 +37,15 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.47.1', date: '12 September 2026',
+    notes: [
+      'Settings \u2192 Test data opens again. It had shown \u201cSomething went wrong\u201d every '
+        + 'time since it was added.',
+      'The page reads the name of each marked record out of six different tables, and it was '
+        + 'asking one of them for a column that is called something else there.',
+    ],
+  },
+  {
     version: '1.47.0', date: '12 September 2026',
     notes: [
       'The Kind list on a file note is now yours to edit, under Settings \u2192 Lists and '

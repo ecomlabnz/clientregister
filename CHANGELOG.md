@@ -7,6 +7,24 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.47.1 — 12 September 2026
+
+### Fixed
+**Test data opened, instead of showing an error.** Clicking **Test data** under
+Settings gave *Something went wrong*, every time, since the page was added in
+1.40.0.
+
+The page lists every record you have marked as a test, across six kinds —
+clients, matters, quotations, inquiries, invoices and tasks. To name each one it
+has to read a different column from each table, and it asked the matters table
+for a column that lives under another name there. The database refuses the whole
+question before it looks at a single row, so the page failed even with no matter
+marked at all.
+
+The six columns are now written out one table at a time, and a test marks a row
+in each of the six and reads the list back — so the same fault cannot return
+quietly for one table.
+
 ## 1.47.0 — 12 September 2026
 
 ### Added
