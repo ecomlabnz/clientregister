@@ -37,6 +37,16 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.51.1', date: '12 September 2026',
+    notes: [
+      'The calendar opens on what is coming. Lodged and Decided are off unless you tick them on '
+        + '\u2014 a decision that has already arrived is not a date to plan around, and it could '
+        + 'never show in a month ahead anyway.',
+      'They are still there to tick, for looking back at a month to see what went in and what '
+        + 'came back.',
+    ],
+  },
+  {
     version: '1.51.0', date: '12 September 2026',
     notes: [
       'Settings \u2192 Test data can now load a whole invented caseload to learn on \u2014 twelve '

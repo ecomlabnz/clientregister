@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
-import { byDay, calendarEvents, CALENDAR_SOURCES } from '../src/core/calendar';
+import { byDay, calendarEvents, CALENDAR_SOURCES, defaultSources } from '../src/core/calendar';
 import { mountModule, fakeUser } from './support/d1';
 import { calendarModule } from '../src/modules/calendar';
 const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
@@ -325,5 +325,84 @@ describe('three views of the same events', () => {
     // nothing.
     expect(page).toMatch(/day < range\.from \|\| day > range\.to/);
     expect(page).toMatch(/validDate\(c\.req\.query\('d'\)\)/);
+  });
+});
+
+/**
+ * What the calendar opens with.
+ *
+ * **Reported 12 September 2026**, looking at a September full of decisions that
+ * had already arrived: *"why do i see in calendar a useless status 'Decided'???
+ * how does that help?"*
+ *
+ * It did not help. A calendar is what is coming. Lodged and Decided are the
+ * only two kinds that are in the past by nature — a decision cannot be entered
+ * before it arrives, so those rows can never appear in a future month. They
+ * filled the month in front of the practice and left the next one empty.
+ *
+ * The `historic` flag had said exactly that since the calendar was built, and
+ * nothing read it. These tests are what make it mean something.
+ */
+/** A matter decided in September, and one still waiting on a decision. */
+function mounted() {
+  const h = mountModule(calendarModule, { user: fakeUser({ id: 'u1' }) });
+  h.db.prepare(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
+                VALUES ('u1','a@b.test','A Lawyer','x','owner','active',?,?)`).run(AT, AT);
+  h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,status,created_at,updated_at)
+             VALUES ('c1','CL-9001','individual','Hemi Rangi TAWHAI','active','${AT}','${AT}')`);
+  h.db.prepare(
+    `INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
+        lodged_at, decided_at, outcome, created_at, updated_at)
+     VALUES ('k1','CASE-26-901','c1','A decided matter','wv_aewv','approved','u1',
+             '2026-09-01','2026-09-08','approved',?,?)`).run(AT, AT);
+  h.db.prepare(
+    `INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
+        decision_due_at, next_action, next_action_due, created_at, updated_at)
+     VALUES ('k2','CASE-26-902','c1','A waiting matter','wv_aewv','lodged','u1',
+             '2026-09-22','Chase INZ','2026-09-22',?,?)`).run(AT, AT);
+  return h;
+}
+
+describe('the calendar opens on what is coming', () => {
+  it('leaves the two backward-looking kinds out by default', () => {
+    expect(defaultSources()).not.toContain('decided');
+    expect(defaultSources()).not.toContain('lodged');
+  });
+
+  it('keeps every kind that is still ahead', () => {
+    const ahead = CALENDAR_SOURCES.filter((s) => !s.historic).map((s) => s.id);
+    expect(defaultSources().sort()).toEqual(ahead.sort());
+    // The ones that matter most: a deadline, a task, an expiry.
+    for (const id of ['decision_due', 'task', 'visa_expiry']) {
+      expect(defaultSources(), id).toContain(id);
+    }
+  });
+
+  it('marks exactly the two kinds that are in the past by nature', () => {
+    expect(CALENDAR_SOURCES.filter((s) => s.historic).map((s) => s.id).sort())
+      .toEqual(['decided', 'lodged']);
+  });
+
+  it('does not draw a decision that has already arrived', async () => {
+    const h = mounted();
+    const body = await (await h.request('/calendar?m=2026-09')).text();
+    expect(body).not.toContain('Decided — ');
+    expect(body).not.toContain('Lodged — ');
+  });
+
+  it('draws it when the reader ticks it on', async () => {
+    // Kept rather than deleted, because there is one real use: looking back at
+    // a month to see what was lodged and what came back.
+    const h = mounted();
+    const body = await (await h.request('/calendar?m=2026-09&s=decided')).text();
+    expect(body).toContain('Decided');
+  });
+
+  it('still shows a deadline that has not been reached', async () => {
+    // The point of the change is that what is ahead survives it.
+    const h = mounted();
+    const body = await (await h.request('/calendar?m=2026-09')).text();
+    expect(body).toContain('A waiting matter');
+    expect(body).toContain('CASE-26-902');
   });
 });
