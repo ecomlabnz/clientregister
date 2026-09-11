@@ -22,11 +22,20 @@ Making one now needs the same permission as working the inbox: owner,
 administrator, specialist and assistant. Read only sees the page and is told
 why the button is not there.
 
-**Revoking a token is unchanged and deliberately not restricted.** Somebody
-moved to "Read only" may still have a token on a laptop, and the screen where
-they cancel it has to keep working.
+**And a token already made now stops working if its holder moves to "Read
+only".** The first version of this fix only guarded the button. That was not
+enough: a token lives on a laptop and does not disappear when somebody's role
+changes, and because a token can only be cancelled by the person who made it,
+the practice had no way to take it back short of suspending their whole account.
+The check is now made when the token is *used*, so a change of role stops it at
+the next file sent, with nothing to remember to do.
 
-Nobody has to do anything. Existing tokens keep working; nothing was revoked.
+**Revoking a token is unchanged and deliberately not restricted.** The screen
+where somebody cancels their own token keeps working whatever their role.
+
+**What you need to do: nothing, unless somebody in the practice is on "Read
+only" and has an upload token.** Their shortcut will stop working — which is
+the point. Everyone else's tokens are untouched and none were cancelled.
 
 ### Added
 **A test that checks every route against every role.** The register has 233
@@ -34,8 +43,8 @@ routes and five roles, and until now three tests checked that a route refused
 the wrong person. A route added without its permission check was invisible
 until somebody with the wrong role opened it. The new test reads the routes out
 of the running application, insists every one of them names the permission it
-needs, and then signs in as each of the five roles in turn and proves the 285
-combinations that should be refused really are.
+needs, and then signs in as each of the five roles in turn and proves that every
+combination which should be refused really is.
 
 ## 1.60.0 — 12 September 2026
 
@@ -49,10 +58,10 @@ not a document, and until now the only way to see what a change actually looked
 like was to go and find a real quotation.
 
 There is now a **Preview** button on each of those two settings pages. It draws
-the real document, with your wording as it stands, on your **most recently
-issued quotation** — so nothing on it is invented. If nothing has been issued
-yet it uses the newest quotation on the register and says so; if there are no
-quotations at all it says that in words, rather than showing an error.
+the real document, with your wording as it stands, on your **most recently sent
+quotation** — so nothing on it is invented. If you have not sent one yet it uses
+the newest quotation on the register and says so; if there are no quotations at
+all it says that in words, rather than showing an error.
 
 The preview writes nothing. No record of a document being printed, no change to
 the quotation, no client link. It is reading, not sending.

@@ -40,14 +40,47 @@ function mount(user = OWNER) {
   return h;
 }
 
-/** Two quotations, the second issued a week after the first. */
+/**
+ * Two quotations, the second sent a week after the first.
+ *
+ * Both carry `issued_on`, because the register sets it on **every** quotation
+ * as it is created — which is exactly why the preview must not read it. What
+ * separates a quotation that went out from one that did not is `sent_at`.
+ */
 function twoQuotes(h: ReturnType<typeof mount>) {
   h.db.exec(`INSERT INTO quotes (id,ref,client_id,description,amount_cents,gst_cents,
-                                 disbursements_cents,status,with_letter,issued_on,created_at,updated_at)
+                                 disbursements_cents,status,with_letter,issued_on,sent_at,
+                                 created_at,updated_at)
              VALUES ('q_old','Q-0001','cl_old','An earlier piece of work',500000,75000,0,'sent',1,
-                     '2026-09-01','2026-09-01T09:00:00Z','2026-09-01T09:00:00Z'),
+                     '2026-09-01','2026-09-01T10:00:00Z','2026-09-01T09:00:00Z','2026-09-01T09:00:00Z'),
                     ('q_new','Q-0002','cl_new','The most recent piece of work',700000,105000,0,'sent',1,
-                     '2026-09-08','2026-09-08T09:00:00Z','2026-09-08T09:00:00Z')`);
+                     '2026-09-08','2026-09-08T10:00:00Z','2026-09-08T09:00:00Z','2026-09-08T09:00:00Z')`);
+}
+
+/**
+ * A draft, as `POST /quotes` actually writes one: `status = 'draft'`, no
+ * `sent_at`, and **`issued_on` already set to the day it was created**.
+ *
+ * This shape is the whole reason the first version of this page was wrong. It
+ * read `issued_on`, found one, and told the practice it was looking at "the
+ * last quotation you issued" — of a draft nobody had ever sent. Found in
+ * review, 12 September 2026.
+ */
+function draftQuote(
+  h: ReturnType<typeof mount>,
+  over: { id?: string; ref?: string; client?: string | null; isTest?: 0 | 1;
+          withLetter?: 0 | 1 | null; created?: string } = {},
+) {
+  const id = over.id ?? 'q_draft';
+  const client = over.client === undefined ? "'cl_new'" : over.client === null ? 'NULL' : `'${over.client}'`;
+  const created = over.created ?? '2026-09-10T09:00:00Z';
+  const withLetter = over.withLetter === undefined ? 1 : over.withLetter;
+  h.db.exec(`INSERT INTO quotes (id,ref,client_id,description,amount_cents,gst_cents,
+                                 disbursements_cents,status,with_letter,is_test,issued_on,
+                                 created_at,updated_at)
+             VALUES ('${id}','${over.ref ?? 'Q-0009'}',${client},'A draft',100000,15000,0,'draft',
+                     ${withLetter === null ? 'NULL' : withLetter},${over.isTest ?? 0},
+                     '${created.slice(0, 10)}','${created}','${created}')`);
 }
 
 const wording = (h: ReturnType<typeof mount>) =>
@@ -75,7 +108,7 @@ describe('who may see a preview', () => {
 });
 
 describe('what the preview is drawn on', () => {
-  it('is the most recently issued quotation, not the oldest', async () => {
+  it('is the most recently sent quotation, not the oldest', async () => {
     const h = mount();
     twoQuotes(h);
     const body = await (await h.request('/quotes/preview')).text();
@@ -83,19 +116,40 @@ describe('what the preview is drawn on', () => {
     expect(body).not.toContain('Q-0001');
   });
 
-  it('falls back to the newest quotation when none has been issued', async () => {
-    // A register can hold drafts and nothing else. Showing the draft beats
-    // telling somebody there is nothing here when there plainly is.
+  it('prefers a quotation that was sent over a newer one that was not', async () => {
+    // The draft is newer by a fortnight and carries `issued_on`, because every
+    // quotation does. A quotation that actually went out is still the better
+    // thing to show, and reading `issued_on` would have picked the draft.
     const h = mount();
-    h.db.exec(`INSERT INTO quotes (id,ref,client_id,description,amount_cents,gst_cents,
-                                   disbursements_cents,status,with_letter,created_at,updated_at)
-               VALUES ('q_draft','Q-0009','cl_new','A draft',100000,15000,0,'draft',1,
-                       '2026-09-10T09:00:00Z','2026-09-10T09:00:00Z')`);
+    twoQuotes(h);
+    draftQuote(h, { created: '2026-09-22T09:00:00Z' });
+    const body = await (await h.request('/quotes/preview')).text();
+    expect(body).toContain('Q-0002');
+    expect(body).toContain('the last quotation you sent');
+    expect(body).not.toContain('Q-0009');
+  });
+
+  it('falls back to the newest quotation when none has been sent, and calls it a draft', async () => {
+    // A register can hold drafts and nothing else. Showing the draft beats
+    // telling somebody there is nothing here when there plainly is — but it
+    // must not be described as something the practice sent.
+    const h = mount();
+    draftQuote(h);
     const res = await h.request('/quotes/preview');
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain('Q-0009');
-    expect(body).toContain('has not been issued yet');
+    expect(body).toContain('has not been sent');
+    expect(body).not.toContain('you sent, on');
+  });
+
+  it('prefers a real quotation over one marked as test data', async () => {
+    const h = mount();
+    draftQuote(h, { id: 'q_test', ref: 'Q-0100', isTest: 1, created: '2026-09-30T09:00:00Z' });
+    draftQuote(h, { id: 'q_real', ref: 'Q-0101', created: '2026-09-20T09:00:00Z' });
+    const body = await (await h.request('/quotes/preview')).text();
+    expect(body).toContain('Q-0101');
+    expect(body).not.toContain('Q-0100');
   });
 
   it('shows the wording as it is now, which is the whole point', async () => {
@@ -144,6 +198,45 @@ describe('the preview says what it is', () => {
     expect(banner, 'no banner found').not.toBeNull();
     expect(banner![1]).not.toContain('no-print');
     expect(banner![1]).toContain('preview-note');
+  });
+});
+
+describe('the banner says only what is true of the quotation it got', () => {
+  /**
+   * Every sentence in the banner is conditional on the row. These three cases
+   * are the ones the first version asserted regardless, found in review on
+   * 12 September 2026: a draft called sent, a nameless quotation said to carry
+   * a client's name, and test data called a real client's.
+   */
+  it('does not claim a client’s name is on a quotation that has no client', async () => {
+    const h = mount();
+    draftQuote(h, { id: 'q_none', ref: 'Q-0011', client: null });
+    const res = await h.request('/quotes/preview');
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain('Q-0011');
+    expect(body).not.toContain('their name is on it');
+  });
+
+  it('says test data is test data, rather than a real client', async () => {
+    const h = mount();
+    draftQuote(h, { id: 'q_test', ref: 'Q-0100', isTest: 1 });
+    const body = await (await h.request('/quotes/preview')).text();
+    expect(body).toContain('marked as test data');
+    expect(body).not.toContain('It is a real client');
+  });
+
+  it('says so when the quotation it drew the letter on carries no letter', async () => {
+    const h = mount();
+    draftQuote(h, { id: 'q_nl', ref: 'Q-0013', withLetter: 0 });
+    const res = await h.request('/quotes/preview/letter');
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain('without a letter of engagement');
+
+    // The fee quotation's own banner has nothing to say about letters.
+    const quote = await (await h.request('/quotes/preview')).text();
+    expect(quote).not.toContain('without a letter of engagement');
   });
 });
 

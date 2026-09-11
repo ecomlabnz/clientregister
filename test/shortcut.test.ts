@@ -285,6 +285,53 @@ describe('a bad token is refused without saying why', () => {
 
 // --- 4. Stored hashed, shown once --------------------------------------------
 
+describe('a token outlives the decision that allowed it, so the role is checked on use', () => {
+  /**
+   * Minting one needs `ingest:triage`. But a token already on a laptop does not
+   * disappear when somebody is moved to "Read only", and revoking is scoped to
+   * the token's own owner — so without a check here the practice would have no
+   * way to take the credential back short of suspending the account.
+   *
+   * Found in review on 12 September 2026, when the gate on minting was added
+   * and the credential itself was left role-blind.
+   */
+  it('stops working the moment its holder is moved to Read only', async () => {
+    const h = mountShortcut();
+    const token = await tokenFor(h);
+    expect((await verifyUploadToken(h.env as any, token)).ok).toBe(true);
+
+    h.db.exec(`UPDATE users SET role = 'readonly' WHERE id = '${USER.id}'`);
+    expect((await verifyUploadToken(h.env as any, token)).ok).toBe(false);
+
+    // And the live route refuses it too, not just the check in isolation.
+    const res = await h.send({ token, files: [pdf('offer.pdf')] });
+    expect(res.status).toBe(401);
+    expect(h.count('SELECT COUNT(*) AS n FROM ingest_messages')).toBe(0);
+  });
+
+  it('starts working again if they are moved back', async () => {
+    const h = mountShortcut();
+    const token = await tokenFor(h);
+    h.db.exec(`UPDATE users SET role = 'readonly' WHERE id = '${USER.id}'`);
+    expect((await verifyUploadToken(h.env as any, token)).ok).toBe(false);
+    h.db.exec(`UPDATE users SET role = 'assistant' WHERE id = '${USER.id}'`);
+    expect((await verifyUploadToken(h.env as any, token)).ok).toBe(true);
+  });
+
+  it('accepts every role that may work the inbox, and refuses only the one that may not', async () => {
+    for (const role of ['owner', 'admin', 'adviser', 'assistant'] as const) {
+      const h = mountShortcut();
+      const token = await tokenFor(h);
+      h.db.exec(`UPDATE users SET role = '${role}' WHERE id = '${USER.id}'`);
+      expect((await verifyUploadToken(h.env as any, token)).ok, role).toBe(true);
+    }
+    const h = mountShortcut();
+    const token = await tokenFor(h);
+    h.db.exec(`UPDATE users SET role = 'readonly' WHERE id = '${USER.id}'`);
+    expect((await verifyUploadToken(h.env as any, token)).ok).toBe(false);
+  });
+});
+
 describe('the token is stored hashed and shown once', () => {
   it('keeps a PBKDF2 hash and nothing that resembles the token', async () => {
     const h = mountShortcut();

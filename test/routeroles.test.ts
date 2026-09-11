@@ -94,6 +94,40 @@ interface Route {
   permissions: Permission[];
 }
 
+/**
+ * What the enumeration above steps over, kept rather than dropped.
+ *
+ * A route registered with `.all()`, or on a wildcard path, is not a concrete
+ * method+path and cannot be swept per-role. The first version of this file
+ * simply filtered those away — which meant a handler registered as
+ * `r.get('/leak/*', …)` or `r.all('/leak', …)` was invisible to the one test
+ * that exists to make ungated routes visible. Proved in review on 12 September
+ * 2026 by adding exactly those two to a module: 26 tests still passed, and both
+ * answered a signed-in `readonly` user with 200.
+ *
+ * So the discarded set is now asserted instead of assumed. Today it is the
+ * handful of top-level middlewares and nothing else; the moment it is anything
+ * else, this fails and somebody has to look.
+ */
+const setAside = entries
+  .filter((e) => (e.method === 'ALL' || e.path.endsWith('*')) && !isGate(e.handler))
+  .map((e) => `${e.method} ${e.path} — ${e.handler.name || '(anonymous)'}`);
+
+/**
+ * Middleware mounted across the whole application, named where it has one.
+ *
+ * Four, and all four run on every request rather than answering one:
+ * the security headers, the session reader, and two anonymous wrappers. None
+ * of them is a route, which is why none of them can be swept per-role. Anything
+ * appearing here that *does* answer a request is a route hiding from this file.
+ */
+const KNOWN_SET_ASIDE = [
+  'ALL /* — securityHeaders',
+  'ALL /* — attachSession',
+  'ALL /* — (anonymous)',
+  'ALL /* — (anonymous)',
+];
+
 const routes: Route[] = entries
   .filter((e) => e.method !== 'ALL' && !e.path.endsWith('*') && !isGate(e.handler))
   .map((h) => {
@@ -191,6 +225,19 @@ describe('the route table is read from the built application', () => {
 });
 
 // --- 2. every route declares a gate -----------------------------------------
+
+describe('nothing is quietly stepped over', () => {
+  /**
+   * The sweep can only exercise a concrete method and path, so `.all()` and
+   * wildcard registrations are set aside. Setting aside is fine; doing it
+   * silently is not — a handler on `GET /leak/*` would be no route at all as
+   * far as this file is concerned, and that is precisely the shape somebody
+   * would add by accident.
+   */
+  it('accounts for every registration the sweep cannot reach', () => {
+    expect([...setAside].sort()).toEqual([...KNOWN_SET_ASIDE].sort());
+  });
+});
 
 describe('every route declares a gate', () => {
   it('no route reaches its handler without a permission, unless it is a named exception', () => {

@@ -184,10 +184,70 @@ Looking writes nothing: no record of a document being printed, no change to the
 quotation, no client link minted. Only somebody who can already open Settings
 can open a preview, because it shows a client file.
 
-If nothing has been issued yet it uses the newest quotation on the register and
-says it is not issued. With no quotations at all it says so in a sentence and
-tells you to create one — which is what a trial register will see on its first
-day.
+If you have not sent one yet it uses the newest quotation on the register and
+says it has not been sent. With no quotations at all it says so in a sentence
+and tells you to create one — which is what a trial register will see on its
+first day.
+
+**This paragraph said "issued" until it was reviewed, and so did the page.**
+That was wrong, and wrong in the ordinary case: the register stamps a date of
+issue on *every* quotation the moment it is created, so reading that date told
+us a draft nobody had ever sent was "the last quotation you issued". What
+records a quotation going out is a separate mark, set when it is sent. Caught
+before it reached you, by having the work reviewed by somebody who had not
+written it.
+
+---
+
+## 8. Every page now says which role may open it — and the check found a real hole
+
+The register has 233 pages and five roles. Three tests in the whole suite
+checked that a page refused the wrong person. The thing that catches is not an
+attack: it is a page added without its permission check, which looks exactly
+like working software until somebody with the wrong role opens it.
+
+There is now a test that reads every page out of the running application and
+insists each one names the permission it needs, then signs in as each of the
+five roles and proves that every combination which should be refused is. A page
+added without its check now fails the build.
+
+**On its first run it found one.** An upload token is the credential your Apple
+shortcut carries when it sends a file in. Anyone who could sign in could make
+one — including somebody on Read only, whose whole point is that they change
+nothing. Making a token was a way of writing into your inbox that their role
+should never have had. Making one now needs the same permission as working the
+inbox.
+
+**And the fix was half a fix, which the review caught.** Guarding the button was
+not enough: a token lives on a laptop and does not disappear when somebody's
+role changes, and a token can only be cancelled by the person who made it — so
+you would have had no way to take it back short of suspending their whole
+account. The check is now made when the token is *used*. A change of role stops
+it at the next file sent.
+
+**What this means for you: nothing, unless somebody in the practice is on Read
+only and has an upload token.** Theirs will stop working, which is the point.
+No other token was touched and none were cancelled.
+
+---
+
+## 9. One thing found that I have not changed, because you should decide
+
+Somebody on **Read only** — or an assistant — can open a quotation, read the
+client's acceptance link off the page, and use it to accept the quotation in the
+client's name. The register then records the contract as formed, sends the
+letters, and says the acceptance cannot be undone.
+
+Every individual permission here is correct, which is why the new test cannot
+see it. The page is one those roles are entitled to read. The *link on it* is
+the whole authority — it has to be, because the client has no account.
+
+The fix is small: show that a link exists and when it went out, but put the link
+itself behind the permission that may send one. It is a change to what a page
+shows to whom, nobody asked for it, and the standing rule is that a change
+nobody asked for goes to you before it is built. So it is in front of you.
+
+It is written up in full as issue 13 in `docs/issues.md`.
 
 ---
 
@@ -228,14 +288,17 @@ first one's world. "It only affects the trial" is something to check, not to
 assume.
 
 All four are in `docs/spec/mistakes.md` as faults 39 to 42, each with the rule
-that now prevents it.
+that now prevents it. A fifth was added later the same day — fault 43, the
+upload token above: **a credential outlives the decision that allowed it, so the
+permission is checked where it is spent, not only where it is issued.**
 
 ---
 
 ## What is waiting on you
 
-1. **The seeded caseload for the trial** — 20 matters, 5 simple, 10 complicated,
-   5 unusual, people from different countries. Asked for; not built yet.
+1. **The client acceptance link, and who may see it** — section 9 above. A
+   small change to what a quotation page shows to Read only and to an
+   assistant. Your call; nothing has been changed.
 2. **The demonstration-data workflow** from August, which can still load
    invented clients into your live register with one click. It should go; the
    Test Data page inside the register replaced it.

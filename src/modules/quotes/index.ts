@@ -1146,6 +1146,15 @@ export const quotesModule: AppModule = {
       return redirectWith(c, '/quotes/clauses', 'Updated.');
     });
 
+    /**
+     * The few facts about a quotation the preview banner is allowed to state.
+     * Every one of them is read from the row; none is assumed.
+     */
+    interface PreviewQuote {
+      id: string; ref: string; sent_at: string | null; is_test: number;
+      with_letter: number | null; client_name: string | null;
+    }
+
     // --- Preview -------------------------------------------------------------
     //
     // **Asked for on 12 September 2026:** *"in the settings quotes and Letter of
@@ -1176,30 +1185,56 @@ export const quotesModule: AppModule = {
      * recent quotation of any kind, so a register holding only drafts still
      * gets a preview. The banner says which of the two it is.
      */
-    const previewQuote = (env: Env) => one<{
-      id: string; ref: string; issued_on: string | null; client_name: string | null;
-    }>(
+    /**
+     * The quotation a preview is drawn on.
+     *
+     * **`sent_at`, not `issued_on`.** The first draft of this read `issued_on`
+     * and called whatever it found “the last quotation you issued”. That is
+     * false, and falsely in the commonest case: `POST /quotes` sets `issued_on`
+     * on **every** quotation as it is created — today’s date, or whatever was
+     * typed in the New quote form — so a draft nobody has ever sent carries
+     * one. What records a quotation going out is `sent_at` with
+     * `status = 'sent'`. Found in review, 12 September 2026.
+     *
+     * The order is: a real quotation before test data, one that was sent
+     * before one that was not, then the most recent of whichever won. The
+     * banner then says which of those it got, because a preview that
+     * misdescribes what it is drawn on is worse than no preview.
+     */
+    const previewQuote = (env: Env) => one<PreviewQuote>(
       env.DB,
-      `SELECT q.id, q.ref, q.issued_on, cl.full_name AS client_name FROM quotes q
+      `SELECT q.id, q.ref, q.sent_at, q.is_test, q.with_letter, cl.full_name AS client_name
+         FROM quotes q
          LEFT JOIN clients cl ON cl.id = q.client_id
-        ORDER BY q.issued_on IS NULL, q.issued_on DESC, q.created_at DESC
+        ORDER BY q.is_test, q.sent_at IS NULL, q.sent_at DESC, q.created_at DESC
         LIMIT 1`,
     );
 
-    /** Said above the document, and on paper too if somebody prints it. */
-    const previewBanner = (
-      chosen: { ref: string; issued_on: string | null; client_name: string | null },
-      tab: string,
-    ) => html`
+    /**
+     * Said above the document, and on paper too if somebody prints it.
+     *
+     * Every clause here is conditional on something true of the row. Nothing
+     * in it is asserted because it is usually the case.
+     */
+    const previewBanner = (chosen: PreviewQuote, tab: string, letter = false) => html`
       <div class="alert alert-warn preview-note">
         <strong>This is a preview.</strong>
         It shows your current wording on quote ${chosen.ref}${chosen.client_name
           ? html` for ${chosen.client_name}` : ''} —
-        ${chosen.issued_on
-          ? html`the last quotation you issued, on ${dateShort(chosen.issued_on)}.`
-          : html`the newest quotation on the register, which has not been issued yet.`}
-        It is a real client’s quotation, so their name is on it. Nothing here has been
-        sent, changed or recorded. <a href="/admin/settings?tab=${tab}">Back to the wording</a>
+        ${chosen.sent_at
+          ? html`the last quotation you sent, on ${dateShort(chosen.sent_at)}.`
+          : html`the newest quotation on the register, which has not been sent.`}
+        ${chosen.is_test
+          ? html`It is marked as test data, not a real client.`
+          : chosen.client_name
+            ? html`It is a real client’s quotation, so their name is on it.`
+            : ''}
+        ${letter && chosen.with_letter === 0
+          ? html`That quotation is marked as going out without a letter of engagement;
+                 this shows how the letter would read if it did.`
+          : ''}
+        Nothing here has been sent, changed or recorded.
+        <a href="/admin/settings?tab=${tab}">Back to the wording</a>
       </div>`;
 
     /** No quotation to draw on. Say so, and say what to do. */
@@ -1234,7 +1269,7 @@ export const quotesModule: AppModule = {
       const d = chosen ? await loadLetter(c.env, chosen.id) : null;
       if (!chosen || !d) return previewNothing(c, 'the letter of engagement', 'engagement');
       return page(c, { title: `Preview — letter ${d.q.ref}`, bare: true, paper: true }, html`
-        ${previewBanner(chosen, 'engagement')}
+        ${previewBanner(chosen, 'engagement', true)}
         ${letterArticle(d, html`
           <footer class="quote-doc-foot no-print">
             <a class="btn btn-secondary" href="/admin/settings?tab=engagement">Back to the wording</a>

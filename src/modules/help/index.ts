@@ -99,9 +99,13 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
       'Only the people who work the inbox can make an upload token now \u2014 the owner, an '
         + 'administrator, a specialist or an assistant. A token is how a file gets sent in from '
         + 'a Mac or a phone, so somebody on Read only should never have been able to make one.',
-      'Revoking a token is unchanged, and on purpose: if you are moved to Read only and still '
-        + 'have a token on a laptop, the screen where you cancel it keeps working.',
-      'Nothing to do. Tokens already made still work; none were cancelled.',
+      'A token already made now stops working if its holder is moved to Read only. A token '
+        + 'lives on a laptop and does not vanish when a role changes, and only the person who '
+        + 'made one can cancel it \u2014 so the check is made when the token is used.',
+      'Revoking a token is unchanged, and on purpose: the screen where somebody cancels their '
+        + 'own token keeps working whatever their role.',
+      'Nothing to do unless somebody on Read only has a token. Theirs will stop working, which '
+        + 'is the point. No other token was cancelled.',
       'Behind the scenes: a new test checks all 233 pages of the register against all five '
         + 'roles, so a page added without its permission check now fails the build instead of '
         + 'being found by somebody opening it.',
@@ -113,9 +117,9 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
       'A Preview button on Settings \u2192 Quotes and on Settings \u2192 Letter of engagement. '
         + 'It shows the finished document with your wording in it, so you can see a change '
         + 'before a client does.',
-      'It draws on your most recently issued quotation, so nothing on it is made up \u2014 which '
-        + 'also means a client\u2019s name is on it. A band at the top of the page says so, and '
-        + 'that band prints too.',
+      'It draws on the last quotation you sent, so nothing on it is made up \u2014 which also '
+        + 'means a real client\u2019s name is on it. A band at the top of the page says whose, '
+        + 'and whether that quotation was sent or is still a draft. That band prints too.',
       'Nothing is sent, changed or recorded by looking. If you have no quotations yet, the '
         + 'preview says so instead of showing an error.',
     ],
