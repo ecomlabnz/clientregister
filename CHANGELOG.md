@@ -7,6 +7,42 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.51.0 — 12 September 2026
+
+### Added
+**A practice's worth of invented files, to learn on.** Settings → Test data now
+has **Load the caseload**. It lays down twelve invented clients with families,
+matters, quotations, passports, certificates and histories — about thirty
+matters in all, none of it real.
+
+It is deliberately not tidy. Between them those files carry a declined
+application, a section 61 request, an expired police certificate beside a
+current one, a passport renewed in the middle of an application, a visa with no
+fixed expiry date, a gap in an employment history, a quotation accepted and one
+declined, and a matter waiting on an RFI. A caseload where everything goes right
+teaches nobody anything, because the awkward files are what the register is for.
+
+Every row is marked as test data on the way in, so it is in the list on that
+same screen and goes with one press.
+
+**Put it back as it was.** The same screen. It deletes everything marked as test
+data and lays the caseload down again, so whatever somebody added while trying
+things is disregarded.
+
+**It can put itself back on a timer.** Settings → Practice caseload → *Put the
+caseload back every … days*. **This is zero — never — unless you set it**, and
+on this register it should stay at zero: the records marked as test data here
+are the ones you marked by hand to rehearse quotations with, and a timer would
+delete those one night without asking.
+
+### Note
+**A login that can only see the test data is not built, and should not be.** The
+reason is in `docs/operations.md`. In short: the only way to hold a trial user
+inside the test data in *this* register is to add "and only the test data" to
+every one of the register's queries, and the one that gets missed shows a real
+client file. A person trying the register gets their own copy of it instead —
+which is the same answer the practice already chose for a second practice.
+
 ## 1.50.0 — 12 September 2026
 
 ### Added

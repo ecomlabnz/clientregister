@@ -29,6 +29,7 @@ import { dateShort, dateTime, timeShort, truncate } from '../../ui/format';
 import {
   isTestTable, listTestData, purgeTestData, setTestMark, tallyTestData, TEST_TABLES,
 } from '../../core/testdata';
+import { resetTestData, seedState, seedTestData } from '../../core/testseed';
 import { safeReturn } from '../../core/returnto';
 import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../core/rbac';
 import { GST_TREATMENT_LABELS, GST_TREATMENTS, parsePercentToBp, SPLIT_BASE_LABELS, SPLIT_BASES } from '../../core/money';
@@ -151,11 +152,43 @@ export function adminTabs(current: string): Raw {
     <a class="${x.id === current ? 'tab current' : 'tab'}" href="${x.href}">${x.label}</a>`)}</nav>`;
 }
 
+/**
+ * The trial caseload's own settings.
+ *
+ * One setting, and the interesting thing about it is its default.
+ *
+ * **Asked for on 11 September 2026:** *"the test data can be reset to initial
+ * state or auto resets in 15 days - so extra data that a user may have entered
+ * - is disregarded."*
+ *
+ * A timer that deletes is dangerous in a way a button is not, and this same
+ * code runs on the practice's own register — where the records marked as test
+ * data are ones they marked by hand in order to rehearse a quotation. A default
+ * of fifteen days would delete those one night without anybody asking.
+ *
+ * So the default is **0, meaning never**. A database set up for people to try
+ * the register on sets it to 15; the practice's own leaves it alone and the
+ * nightly check does nothing for ever.
+ */
+export const TEST_DATA_SETTINGS: SettingsGroup = {
+  id: 'testdata',
+  title: 'Practice caseload',
+  description: 'For a register set up so people can try it and learn. '
+    + 'Leave this alone on a register holding real files.',
+  order: 90,
+  settings: [
+    { key: 'testdata.auto_reset_days', type: 'integer',
+      label: 'Put the caseload back every … days', default: '0', min: 0, max: 365,
+      help: 'Zero means never, which is what a register holding real files wants. '
+        + 'Anything else deletes every record marked as test data on that schedule.' },
+  ],
+};
+
 export const adminModule: AppModule = {
   name: 'admin',
   title: 'Settings',
   basePaths: ['/admin'],
-  settings: [PRACTICE_SETTINGS],
+  settings: [PRACTICE_SETTINGS, TEST_DATA_SETTINGS],
   nav: [{ href: '/admin', label: 'Settings', permission: 'admin:settings', order: 10, corner: true }],
 
   register(app) {
@@ -816,10 +849,40 @@ export const adminModule: AppModule = {
     r.get('/test-data', requirePermission('data:test'), async (c) => {
       const [tally, records] = await Promise.all([tallyTestData(c.env), listTestData(c.env)]);
       const total = tally.reduce((sum, t) => sum + t.count, 0);
+      const seed = await seedState(c.env);
 
       return page(c, { title: 'Test data', active: '/admin' }, html`
         ${pageHeader('Test data')}
         ${adminTabs('testdata')}
+
+        ${'' /* A caseload to learn on. Asked for on 11 September 2026: "This is so
+                that some users can try the system and learn." The whole of it is
+                invented — the standing rule is that real client data never enters the
+                repository — and every row is written already marked, so it shows in
+                the list below and goes with one press like anything else marked. */}
+        ${card('A caseload to practise on', html`
+          ${seed.seededAt
+            ? html`<p>Laid down ${stamp(seed.seededAt)}.
+                     ${seed.dueAt
+                       ? html`Puts itself back ${stamp(seed.dueAt)}.`
+                       : 'It does not put itself back on its own.'}</p>`
+            : html`<p>Twelve invented clients with families, matters and quotations \u2014
+                      enough to learn on. Nothing in it is real.</p>`}
+          <div class="admin-links">
+            <form method="post" action="/admin/test-data/seed" class="inline-form"
+                  data-confirm="${seed.seededAt
+                    ? 'Put the practice caseload back as it was? Everything currently marked as test data is deleted first, including anything you have added to it.'
+                    : 'Load the practice caseload?'}">
+              ${csrfField(c.get('session')!.csrf)}
+              <input type="hidden" name="reset" value="${seed.seededAt ? '1' : ''}">
+              <button type="submit" class="btn btn-secondary">
+                ${seed.seededAt ? 'Put it back as it was' : 'Load the caseload'}</button>
+            </form>
+          </div>
+          ${seed.seededAt
+            ? html`<p class="hint">Putting it back deletes everything marked as test data first,
+                      including anything you added.</p>`
+            : ''}`)}
 
         ${total === 0
           ? emptyState('Nothing marked yet — use “Mark as test data” on any record.')
@@ -883,6 +946,26 @@ export const adminModule: AppModule = {
           ? `Marked as test data. Everything filed under this ${noun} is marked too.`
           : `This ${noun} is a real record again.`,
         'ok');
+    });
+
+    // Laying the practice caseload down, or putting it back as it was.
+    //
+    // One route for both, because a reset *is* a purge followed by a seed and
+    // there is no cleverer version: working out which rows were original would
+    // mean holding a second copy of the answer to compare against.
+    r.post('/test-data/seed', requirePermission('data:test'), async (c) => {
+      const user = c.get('user')!;
+      const f = new FormReader(await c.req.formData());
+      const reset = f.text('reset', { max: 1 }) === '1';
+      const result = reset
+        ? await resetTestData(c.env, user.id)
+        : await seedTestData(c.env, user.id);
+      await auditFrom(c, {
+        action: reset ? 'data.test_reset_by' : 'data.test_seeded_by',
+        entityType: 'settings', entityId: 'test-data', meta: { ...result } });
+      return redirectWith(c, '/admin/test-data',
+        `${result.clients} clients, ${result.cases} matters and ${result.quotes} quotations `
+        + `${reset ? 'put back' : 'laid down'}.`);
     });
 
     r.post('/test-data/delete', requirePermission('data:test'), async (c) => {

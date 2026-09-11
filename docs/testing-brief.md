@@ -38,7 +38,7 @@ Treat confidentiality as the dominant risk, well above availability.
 - **One JavaScript file** (~620 lines), and every feature works with it blocked.
 - **CSP:** `default-src 'none'; script-src 'self'; style-src 'self'`. No inline
   script, no inline style, no third-party origins, no iframes.
-- ~45,800 lines of application code; 25 modules; **227 routes**; **56 tables**;
+- ~45,800 lines of application code; 25 modules; **228 routes**; **56 tables**;
   87 forward-only migrations.
 - Sessions are cookie-based, held in KV. Roles: owner, admin, adviser,
   assistant, readonly — **14 permissions** across them, and every route declares
@@ -90,7 +90,7 @@ the Cloudflare console, the D1 HTTP API and `wrangler` alike.
 5. **Google Drive**, read-only, reached by pasting an address. The address is
    parsed for an id and never fetched directly.
 6. **Outbound email**, with recipients drawn from the register.
-7. **Multi-role access control** across 227 routes.
+7. **Multi-role access control** across 228 routes.
 
 ### What to produce
 
