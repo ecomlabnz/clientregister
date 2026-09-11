@@ -405,10 +405,62 @@ message | Message
 file | Document`,
 };
 
+/**
+ * What a period in an employment history *was*.
+ *
+ * The reason this exists at all: *"Critical - periods of unemployment must also
+ * be able to be entered into the Employment history with appropriate notes."*
+ * A work history with the gaps left out is not a work history — INZ asks for
+ * the gaps, and a row saying "unemployed, looking for work" is an answer.
+ *
+ * So an employment row does not need an employer, and the kind is what says
+ * why. A vocabulary rather than a CHECK constraint because the list is exactly
+ * the sort that differs between practices and changes wording over time; the
+ * standing rule is that every dropdown is editable by an administrator without
+ * a deployment.
+ */
+export const EMPLOYMENT_KIND_VOCAB: VocabularyDef = {
+  key: 'vocab.employment_kinds',
+  label: 'Employment kinds',
+  help: 'One per line, written as \u201ckey | Label\u201d. What a period in an employment '
+    + 'history was. A period of unemployment is one of these, not a missing row. Blank lines and '
+    + 'lines starting with # are ignored.',
+  defaults: `employed | Employed
+self_employed | Self-employed
+unemployed | Unemployed
+studying | Studying
+caring | Caring for family
+volunteer | Voluntary work
+other | Other`,
+};
+
+/**
+ * How far a qualification went.
+ *
+ * Seeded from the levels the application forms ask about rather than from the
+ * New Zealand Qualifications Framework, which asks a different question and
+ * would need translating for every overseas qualification anyway.
+ */
+export const EDUCATION_LEVEL_VOCAB: VocabularyDef = {
+  key: 'vocab.education_levels',
+  label: 'Education levels',
+  help: 'One per line, written as \u201ckey | Label\u201d. Offered against a row of a client\u2019s '
+    + 'education history. Blank lines and lines starting with # are ignored.',
+  defaults: `secondary | Secondary school
+certificate | Certificate
+diploma | Diploma
+bachelor | Bachelor\u2019s degree
+postgrad_diploma | Postgraduate diploma
+masters | Master\u2019s degree
+doctorate | Doctorate
+other | Other`,
+};
+
 export const VOCABULARIES: VocabularyDef[] = [
   CASE_TYPE_VOCAB, VISA_TYPE_VOCAB,
   TITLE_VOCAB, GENDER_VOCAB, RELATIONSHIP_STATUS_VOCAB,
   ENGLISH_TEST_VOCAB, DOC_CATEGORY_VOCAB, FLAG_KIND_VOCAB, NOTE_KIND_VOCAB,
+  EMPLOYMENT_KIND_VOCAB, EDUCATION_LEVEL_VOCAB,
 ];
 
 export const VOCABULARY_SETTINGS: SettingsGroup = {

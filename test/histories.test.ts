@@ -1,0 +1,335 @@
+/**
+ * Employment, education and travel, under a client.
+ *
+ * **Asked for on 11 September 2026:** *"build placeholders for the histories
+ * discussed - employment, education, international travel ... they will live
+ * under a client ... each also starts collapsed, they are not mandatory, but
+ * can be filled by the AI ... Critical - periods of unemployment must also be
+ * able to be entered into the Employment history with appropriate notes. IF AI
+ * is filling it in - it must leave blank space if there is a gap, the user must
+ * be able to move the table rows up or down - if possible, and add or delete
+ * more lines for the entries."*
+ *
+ * Four things in that paragraph are requirements rather than description, and
+ * each has a test here:
+ *
+ *  * a period of unemployment is a row, with a note, and needs no employer;
+ *  * a gap between two periods is **shown**, never refused;
+ *  * rows reorder, and lines are added and taken away;
+ *  * the blocks start closed.
+ *
+ * The database rules are attacked directly, as the rest of this suite does,
+ * because a rule that only holds when the route is involved is not a rule.
+ */
+
+import { describe, expect, it } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { mountModule, fakeUser } from './support/d1';
+import { clientsModule } from '../src/modules/clients';
+import { gapsIn, HISTORIES, type HistoryRow } from '../src/core/histories';
+
+const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
+const AT = '2026-09-11T09:00:00Z';
+const USER = fakeUser();
+
+function bareRegister() {
+  const db = new DatabaseSync(':memory:');
+  db.exec('PRAGMA foreign_keys = ON;');
+  for (const f of readdirSync('migrations').filter((f) => f.endsWith('.sql')).sort()) {
+    db.exec(readFileSync(`migrations/${f}`, 'utf8'));
+  }
+  db.prepare(`INSERT INTO clients (id, ref, kind, full_name, status, created_at, updated_at)
+              VALUES ('c1','CL-9001','individual','A Person','active',?,?)`).run(AT, AT);
+  return db;
+}
+
+function mount() {
+  const h = mountModule(clientsModule, { user: USER });
+  h.db.prepare(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
+                VALUES (?,?,?,'x',?,'active',?,?)`).run(USER.id, USER.email, USER.name, USER.role, AT, AT);
+  h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,status,created_at,updated_at)
+             VALUES ('cl1','CL-0901','individual','A Person','active','${AT}','${AT}')`);
+  return h;
+}
+
+const rowsOf = (h: ReturnType<typeof mount>, table: string) =>
+  h.db.prepare(`SELECT * FROM ${table} WHERE client_id = 'cl1' ORDER BY position, created_at`)
+    .all() as unknown as HistoryRow[];
+
+// ---------------------------------------------------------------------------
+// The row that had to be possible
+// ---------------------------------------------------------------------------
+
+describe('a period of unemployment is a row like any other', () => {
+  it('saves with no employer and no role, carrying its note', async () => {
+    // The practice called this out as critical. A work history with the gaps
+    // left out is not a work history: INZ asks about them, and "unemployed,
+    // looking for work" is an answer rather than a missing row.
+    const h = mount();
+    const res = await h.post('/clients/cl1/history/employment/add', {
+      kind: 'unemployed', started_on: '2023-04-01', ended_on: '2023-11-30',
+      notes: 'Made redundant; looking for work throughout.',
+    });
+    expect(res.status).toBe(303);
+
+    const rows = rowsOf(h, 'client_employment');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.kind).toBe('unemployed');
+    expect(rows[0]!.employer).toBe(null);
+    expect(rows[0]!.role).toBe(null);
+    expect(rows[0]!.notes).toContain('Made redundant');
+  });
+
+  it('the database asks for no employer either', () => {
+    // Not only the form. A reading that fills a history in is a second way in.
+    const db = bareRegister();
+    db.prepare(
+      `INSERT INTO client_employment (id, client_id, kind, notes, created_at, updated_at)
+       VALUES ('e1','c1','unemployed','Caring for a parent',?,?)`).run(AT, AT);
+    expect((db.prepare(`SELECT COUNT(*) AS n FROM client_employment`) as any).get().n).toBe(1);
+  });
+
+  it('offers unemployed in the list an administrator can edit', () => {
+    // Every dropdown the practice uses is editable without a deployment, and
+    // this is exactly the list that differs between practices.
+    const vocab = readFileSync('src/core/vocabulary.ts', 'utf8');
+    expect(vocab).toContain("key: 'vocab.employment_kinds'");
+    expect(vocab).toContain('unemployed | Unemployed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The gap is shown, not refused
+// ---------------------------------------------------------------------------
+
+describe('a gap between two periods', () => {
+  const row = (over: Partial<HistoryRow>): HistoryRow =>
+    ({ id: 'x', position: 0, notes: null, started_on: null, ended_on: null, ...over } as HistoryRow);
+
+  it('is found where two periods do not meet', () => {
+    const gaps = gapsIn([
+      row({ started_on: '2020-01-01', ended_on: '2021-06-30' }),
+      row({ started_on: '2022-03-01', ended_on: '2023-01-31' }),
+    ]);
+    expect(gaps.has(1)).toBe(true);
+    expect(gaps.get(1)).toBeGreaterThan(200);
+  });
+
+  it('is not found where one job runs into the next', () => {
+    // A person who left on the Friday and started on the Monday has not been
+    // unemployed, and a marker about it would be exactly the noise the practice
+    // has asked twice not to have.
+    const gaps = gapsIn([
+      row({ started_on: '2020-01-01', ended_on: '2021-06-30' }),
+      row({ started_on: '2021-07-05', ended_on: '2023-01-31' }),
+    ]);
+    expect(gaps.size).toBe(0);
+  });
+
+  it('is found whichever way round the practice has ordered the table', () => {
+    // Most people write a history newest first. The order is the practice's to
+    // choose, so the gap is read from whichever pair of dates is the earlier.
+    const gaps = gapsIn([
+      row({ started_on: '2022-03-01', ended_on: '2023-01-31' }),
+      row({ started_on: '2020-01-01', ended_on: '2021-06-30' }),
+    ]);
+    expect(gaps.has(1)).toBe(true);
+  });
+
+  it('is not looked for where a row has no dates yet', () => {
+    const gaps = gapsIn([
+      row({ started_on: '2020-01-01', ended_on: '2021-06-30' }),
+      row({}),
+    ]);
+    expect(gaps.size).toBe(0);
+  });
+
+  it('is never a refusal', async () => {
+    // A history part-way through entry legitimately has gaps, and a gap is
+    // often the true answer. Nothing about it stops a row being saved.
+    const h = mount();
+    await h.post('/clients/cl1/history/employment/add',
+      { kind: 'employed', employer: 'One', started_on: '2020-01-01', ended_on: '2021-06-30' });
+    const res = await h.post('/clients/cl1/history/employment/add',
+      { kind: 'employed', employer: 'Two', started_on: '2023-03-01' });
+    expect(res.status).toBe(303);
+    expect(rowsOf(h, 'client_employment')).toHaveLength(2);
+  });
+
+  it('is drawn on the employment history and not on the others', async () => {
+    const h = mount();
+    await h.post('/clients/cl1/history/employment/add',
+      { kind: 'employed', employer: 'One', started_on: '2020-01-01', ended_on: '2021-06-30' });
+    await h.post('/clients/cl1/history/employment/add',
+      { kind: 'employed', employer: 'Two', started_on: '2023-03-01', ended_on: '2024-01-01' });
+    await h.post('/clients/cl1/history/travel/add',
+      { country: 'VN', started_on: '2020-01-01', ended_on: '2020-02-01' });
+    await h.post('/clients/cl1/history/travel/add',
+      { country: 'AU', started_on: '2024-01-01', ended_on: '2024-02-01' });
+
+    const body = await (await h.request('/clients/cl1')).text();
+    expect(body).toContain('history-gap');
+    // One marker, from the employment table. The travel rows are four years
+    // apart and that is not a gap in anything — it is the rest of a life.
+    expect(body.match(/history-gap/g)).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Adding, reordering, removing
+// ---------------------------------------------------------------------------
+
+describe('the table is edited the way quotation lines are', () => {
+  it('reorders by the number typed in the # box', async () => {
+    const h = mount();
+    await h.post('/clients/cl1/history/education/add',
+      { institution: 'First', started_on: '2010-01-01' });
+    await h.post('/clients/cl1/history/education/add',
+      { institution: 'Second', started_on: '2014-01-01' });
+    const before = rowsOf(h, 'client_education');
+    expect(before.map((r) => r.institution)).toEqual(['First', 'Second']);
+
+    await h.post('/clients/cl1/history/education', {
+      [`position_${before[0]!.id}`]: '2', [`institution_${before[0]!.id}`]: 'First',
+      [`position_${before[1]!.id}`]: '1', [`institution_${before[1]!.id}`]: 'Second',
+    });
+    expect(rowsOf(h, 'client_education').map((r) => r.institution)).toEqual(['Second', 'First']);
+  });
+
+  it('takes a line out when its cross is ticked', async () => {
+    const h = mount();
+    await h.post('/clients/cl1/history/travel/add', { country: 'VN', purpose: 'Family' });
+    await h.post('/clients/cl1/history/travel/add', { country: 'AU', purpose: 'Work' });
+    const rows = rowsOf(h, 'client_travel');
+
+    await h.post('/clients/cl1/history/travel', {
+      [`position_${rows[0]!.id}`]: '1', [`country_${rows[0]!.id}`]: 'VN',
+      [`position_${rows[1]!.id}`]: '2', [`country_${rows[1]!.id}`]: 'AU',
+      [`remove_${rows[1]!.id}`]: 'on',
+    });
+    const after = rowsOf(h, 'client_travel');
+    expect(after).toHaveLength(1);
+    expect(after[0]!.country).toBe('VN');
+  });
+
+  it('edits every field of every row in one press', async () => {
+    const h = mount();
+    await h.post('/clients/cl1/history/employment/add',
+      { kind: 'employed', employer: 'Old name', role: 'Chef', country: 'NZ' });
+    const [row] = rowsOf(h, 'client_employment');
+
+    await h.post('/clients/cl1/history/employment', {
+      [`position_${row!.id}`]: '1',
+      [`kind_${row!.id}`]: 'self_employed',
+      [`employer_${row!.id}`]: 'New name',
+      [`role_${row!.id}`]: 'Head chef',
+      [`country_${row!.id}`]: 'VN',
+      [`started_on_${row!.id}`]: '2021-02-01',
+      [`notes_${row!.id}`]: 'Bought the business.',
+    });
+    const after = rowsOf(h, 'client_employment')[0]!;
+    expect(after.kind).toBe('self_employed');
+    expect(after.employer).toBe('New name');
+    expect(after.role).toBe('Head chef');
+    expect(after.country).toBe('VN');
+    expect(after.started_on).toBe('2021-02-01');
+    expect(after.notes).toBe('Bought the business.');
+  });
+
+  it('refuses an empty row rather than storing a blank line', async () => {
+    const h = mount();
+    const res = await h.post('/clients/cl1/history/travel/add', {});
+    expect(res.status).toBe(303);
+    expect(rowsOf(h, 'client_travel')).toHaveLength(0);
+  });
+
+  it('writes to the file and the audit log', async () => {
+    // A history is a claim about somebody's life that goes onto an application.
+    // A register that cannot say when a period appeared is worse than one that
+    // never held it.
+    const h = mount();
+    await h.post('/clients/cl1/history/employment/add', { kind: 'employed', employer: 'One' });
+    const notes = h.db.prepare(
+      `SELECT body FROM entries WHERE entity_id = 'cl1'`).all() as Array<{ body: string }>;
+    expect(notes.map((n) => n.body).join('\n')).toContain('Employment history');
+    expect(h.count(`SELECT COUNT(*) AS n FROM audit_log WHERE action = 'client.history_added'`))
+      .toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The database's own rules
+// ---------------------------------------------------------------------------
+
+describe('the database refuses what it can check', () => {
+  it.each(['client_employment', 'client_education', 'client_travel'])(
+    '%s refuses a period that ends before it starts', (table) => {
+      const db = bareRegister();
+      expect(() => db.prepare(
+        `INSERT INTO ${table} (id, client_id, started_on, ended_on, created_at, updated_at)
+         VALUES ('x','c1','2021-01-01','2020-01-01',?,?)`).run(AT, AT))
+        .toThrow(/cannot end before it starts/);
+    });
+
+  it.each(['client_employment', 'client_education', 'client_travel'])(
+    '%s refuses a country that is not one', (table) => {
+      const db = bareRegister();
+      expect(() => db.prepare(
+        `INSERT INTO ${table} (id, client_id, country, created_at, updated_at)
+         VALUES ('x','c1','Vietnam',?,?)`).run(AT, AT))
+        .toThrow(/ISO 3166-1 alpha-2/);
+    });
+
+  it.each(['client_employment', 'client_education', 'client_travel'])(
+    '%s bounds the note', (table) => {
+      const db = bareRegister();
+      expect(() => db.prepare(
+        `INSERT INTO ${table} (id, client_id, notes, created_at, updated_at)
+         VALUES ('x','c1',?,?,?)`).run('x'.repeat(1001), AT, AT))
+        .toThrow(/1000 characters or fewer/);
+    });
+
+  it.each(['client_employment', 'client_education', 'client_travel'])(
+    '%s goes with the client', (table) => {
+      const db = bareRegister();
+      db.prepare(`INSERT INTO ${table} (id, client_id, created_at, updated_at)
+                  VALUES ('x','c1',?,?)`).run(AT, AT);
+      db.prepare(`DELETE FROM clients WHERE id = 'c1'`).run();
+      expect((db.prepare(`SELECT COUNT(*) AS n FROM ${table}`) as any).get().n).toBe(0);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// On the page
+// ---------------------------------------------------------------------------
+
+describe('on the client page', () => {
+  it('shows all three, each closed', async () => {
+    const body = await (await mount().request('/clients/cl1')).text();
+    for (const def of HISTORIES) {
+      expect(body, def.title).toContain(`<h2>${def.title}</h2>`);
+      const at = body.indexOf(`<h2>${def.title}</h2>`);
+      const tag = body.slice(body.lastIndexOf('<details', at), body.indexOf('>', body.lastIndexOf('<details', at)));
+      expect(tag, `${def.title} should start closed`).not.toMatch(/ open/);
+    }
+  });
+
+  it('shows the military block, as a placeholder and nothing more', async () => {
+    // *"create the block but keep it as a placeholder for now."* There is
+    // deliberately no table behind it: the shape of a military record is the
+    // part nobody has decided.
+    const body = await (await mount().request('/clients/cl1')).text();
+    expect(body).toContain('<h2>Military records</h2>');
+    expect(body).toContain('Not built yet.');
+    expect(body).not.toContain('history/military');
+  });
+
+  it('shows none of them on an organisation', async () => {
+    const h = mount();
+    h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,status,created_at,updated_at)
+               VALUES ('org1','CL-0902','organisation','Acme Limited','active','${AT}','${AT}')`);
+    const body = await (await h.request('/clients/org1')).text();
+    expect(body).not.toContain('<h2>Employment history</h2>');
+    expect(body).not.toContain('<h2>Military records</h2>');
+  });
+});

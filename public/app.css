@@ -645,6 +645,21 @@ tr:last-child td { border-bottom: none; }
 .row-muted { opacity: 0.55; }
 .edit-table input { width: 100%; }
 .edit-table td { padding: 5px 6px; }
+
+/* The space between two periods that do not meet.
+ *
+ * **Asked for on 11 September 2026**, about the histories: *"IF AI is filling
+ * it in - it must leave blank space if there is a gap."* So it is drawn as
+ * space — a shorter, emptier row between the two periods — rather than as a
+ * warning. A gap in a work history is a question to answer, not a fault, and
+ * often the true answer. Striped rather than coloured for the same reason:
+ * nothing here is wrong. */
+.history-gap td {
+  padding: 2px 6px;
+  background: repeating-linear-gradient(
+    45deg, transparent, transparent 5px, var(--surface-2) 5px, var(--surface-2) 10px);
+  border-bottom: none;
+}
 /* A table read as a block rather than scrolled.
  *
  * **Asked for on 9 September 2026:** *"think of making things compact."* A

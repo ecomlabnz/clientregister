@@ -298,9 +298,32 @@ drift from the first is worse than no version. **Do not build these.** If a
 future session finds a reason to, the reason has to be better than "the form
 asks for it", because that reason was already weighed and rejected here.
 
-**The histories remain undecided** — the practice is still weighing them
-(11 September 2026: *"Re the histories - i am thinking."*). The plan above is
-what to build **if** they are built; nothing starts until they say so.
+**Built on 11 September 2026**, when the practice stopped weighing and asked:
+*"build placeholders for the histories discussed - employment, education,
+international travel."* Three of the four are in — `client_employment`,
+`client_education` and `client_travel`, migration 0089, with the shape above.
+
+**`client_residence` was not asked for and is not built.** It is still the one
+that earns its keep soonest, because it drives which police certificates a
+client needs, and the 12-months-in-10-years question is still a query over it
+rather than a field anybody types. Put that to the practice before building it;
+do not build it because this document said it was first.
+
+Two things the request added that the plan above did not have, both built:
+
+  * **A period of unemployment is a row** in the employment history, with a
+    note and no employer. *"Critical"*, in the practice's word. `kind` is a
+    vocabulary, so the list of what a period can be is theirs to edit.
+  * **The gap between two periods is drawn**, never refused. *"IF AI is filling
+    it in - it must leave blank space if there is a gap."* A gap is a question
+    to answer, not a fault, and a history part-way through entry has them
+    legitimately. Nothing alerts on one.
+
+**Military records** is a block on the client page and nothing behind it, by
+the practice's own instruction: *"create the block but keep it as a placeholder
+for now."* The shape is the undecided part — whether it is one period or
+several, whether a rank and a discharge belong on it, whether it is a history
+like the three above or a set of flat facts like the ones on a client record.
 
 #### The direction the practice actually wants: the client sends documents, not data
 

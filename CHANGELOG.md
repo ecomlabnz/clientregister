@@ -7,6 +7,31 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.50.0 — 12 September 2026
+
+### Added
+**Employment, education and travel history, on a client.** Three new blocks
+under Certificates, each closed until you open it. None of them is compulsory
+and most clients will have none.
+
+Each is a table you edit all at once, the same way quotation lines work: type a
+number in the **#** box to move a row, tick the red cross to take one out, press
+**Save the table**. Nothing happens until you save, so a slip can be untitled.
+
+**A period of unemployment is a row like any other.** Choose what the period
+was — employed, self-employed, unemployed, studying, caring for family — and
+leave the employer blank. That list is yours to edit under Settings → Lists and
+dropdowns, along with the education levels.
+
+**A gap in an employment history is drawn, not complained about.** Where two
+periods do not meet, the space between them shows as a shaded line saying how
+many months. It is never refused and never alerts: a gap is a question to
+answer, and often the true answer.
+
+**Military records** is a block and nothing behind it yet, which is what was
+asked for. What a military record should hold is the part nobody has decided,
+and guessing now would mean rebuilding.
+
 ## 1.49.0 — 12 September 2026
 
 ### Changed
