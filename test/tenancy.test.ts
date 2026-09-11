@@ -82,17 +82,26 @@ describe.each(environments)('the %s environment', (name, env) => {
     expect(env.vars.APP_ENV).not.toBe(top.vars.APP_ENV);
   });
 
-  it('answers on an address of its own', () => {
-    // A practice reached at another practice's address is the same fault as a
-    // practice reading another practice's database, arriving one layer up.
-    const routes: any[] = env.routes ?? [];
-    for (const route of routes) {
-      expect(route.pattern, 'two practices on one address').not.toBe(
-        (top.routes ?? []).map((r: any) => r.pattern).find((p: string) => p === route.pattern));
-    }
-    if (routes.length) {
-      expect(env.vars.APP_ORIGIN).toContain(routes[0].pattern);
-    }
+  it('does not declare its address here, so a deploy cannot re-assert it', () => {
+    // **This one is a fault, not a preference.** `trial.immigration.kiwi` was
+    // declared as a `custom_domain` route on 12 September 2026, and within the
+    // hour the practice's own register was returning a bare 403 for under a
+    // minute at a time, clearing itself, repeatedly. Both addresses are on one
+    // zone; a route in the config is re-asserted on every deploy, and that
+    // reconciliation disturbs the other hostname on the zone — which is the
+    // register somebody is working in.
+    //
+    // `app.immigration.kiwi` has never been in the file and has never
+    // flickered. A practice's address is attached once and left alone.
+    expect(env.routes, 'a practice address in the config is re-asserted every deploy')
+      .toBeUndefined();
+  });
+
+  it('still knows the address it answers on', () => {
+    // Removing the route must not lose the address: `APP_ORIGIN` builds the
+    // links in the nightly summary and is a different fact from how the
+    // hostname got attached.
+    expect(env.vars.APP_ORIGIN).toMatch(/^https:\/\//);
   });
 
   it('links to itself, never to the practice’s register', () => {

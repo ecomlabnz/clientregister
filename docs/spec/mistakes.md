@@ -746,6 +746,45 @@ keeping: `wrangler d1 migrations list <name> --local` fails exactly as the
 deploy did, and with `--env trial` lists all 92 migrations. No API token, no
 push, no waiting for a run.
 
+
+### 42. A hostname in the deploy config is re-asserted on every deploy
+
+**What happened.** A second practice was given an address,
+`trial.immigration.kiwi`, declared in `wrangler.jsonc` as a `custom_domain`
+route on its environment. It worked.
+
+Within the hour the **practice's own register** began returning a bare 403 for
+under a minute at a time, clearing itself, several times over — while somebody
+was working in it. *"it stays down for a minute or less and then fine again."*
+
+Both addresses are on one zone. A route in the config is reconciled by wrangler
+on **every deploy**, and deploys were running every fifteen minutes that
+afternoon. Re-asserting one Worker hostname on a zone briefly disturbs the
+other.
+
+The evidence was already in the repository and had been for weeks:
+`app.immigration.kiwi` **has never been in `wrangler.jsonc`**. It was attached
+once, by hand, and had survived dozens of deploys without a flicker. The new
+address was done differently for no better reason than that it seemed tidier to
+have it in the file.
+
+**The rule.** **A practice's address is attached once and then left alone.** It
+is not deployment configuration — it is a fact about the practice, like its
+name, and it belongs with the things that are set up once. What stays in the
+file is `APP_ORIGIN`, because the application does need to know where it
+answers; that is a different fact from how the hostname got attached.
+
+An attached custom domain is **not** removed by a deploy that does not mention
+it, which is the thing that makes this safe, and which this account had already
+been demonstrating for weeks.
+
+**The wider one, and the reason this is worth a numbered entry:** the fault was
+not in the new practice. It was in the *old* one, which nobody had changed. Two
+practices share a zone, an account, and a rate limit, and the second one being
+set up is a change to the first one's world. **"It only affects the trial" is a
+claim to check, not an assumption** — and the thing to check it against is
+whatever the practice is using while the work is going on.
+
 ---
 
 ---

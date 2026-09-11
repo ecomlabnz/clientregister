@@ -112,21 +112,28 @@
       "workers_dev": true,
       "observability": { "enabled": true },
 
-      // **Asked for on 12 September 2026:** *"lets create a subdomain.
-      // trial.immigration.kiwi"*
+      // **No `routes` here, and that is the fix for a live fault.**
       //
-      // `custom_domain` rather than a plain route: Wrangler creates the DNS
-      // record and orders the certificate itself, so the address is one line
-      // here rather than three places to keep in step. The zone is the
-      // practice's own, which is what makes that possible.
+      // The trial's address, `trial.immigration.kiwi`, was first declared here
+      // as a `custom_domain` route on 12 September 2026. It worked — and within
+      // the hour the practice's own register began returning a bare 403 for
+      // under a minute at a time, clearing itself, several times over.
       //
-      // A practice's own address matters more than tidiness. A trial on a
-      // `workers.dev` address is obviously somebody's experiment; a trial on a
-      // subdomain of the practice's domain is something you can put in front of
-      // a paying customer. The `workers.dev` address keeps working alongside it.
-      "routes": [
-        { "pattern": "trial.immigration.kiwi", "custom_domain": true }
-      ],
+      // The two addresses are on one zone. A `custom_domain` in this file is
+      // re-asserted by wrangler on **every deploy**, and that reconciliation
+      // briefly disturbs the zone's other Worker hostname — which is the
+      // register the practice is working in.
+      //
+      // `app.immigration.kiwi` is the proof and the pattern: it has never been
+      // in this file. It was attached once, by hand, and has survived dozens of
+      // deploys without a flicker. An attached custom domain is not removed by
+      // a deploy that does not mention it — this account has been demonstrating
+      // that for weeks.
+      //
+      // **So a practice's address is attached once and then left alone.** It is
+      // not deployment configuration; it is a fact about the practice, like its
+      // name. `APP_ORIGIN` below still carries it, because the application does
+      // need to know where it answers.
 
       "assets": {
         "directory": "./public",

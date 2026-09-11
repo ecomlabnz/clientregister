@@ -14,6 +14,7 @@ register.
 | Migrations | **1** (0092) |
 | Tests | **2,618** in 158 files, up from 2,541 |
 | Registers running | **2** — the practice's, and a trial |
+| Faults found and fixed | **4**, one of them affecting the live register |
 | Still open at the end of the day | the demonstration-data workflow, and the seeded caseload |
 
 ---
@@ -160,7 +161,7 @@ Oceania.
 
 ---
 
-## Three things I got wrong, and what changed because of them
+## Four things I got wrong, and what changed because of them
 
 Written down because they cost real time and the same shapes will come back.
 
@@ -180,8 +181,22 @@ screenshot of your live register. The repository's own test found them before
 anything was committed and I replaced them with invented ones. Nothing real was
 committed.
 
-All three are in `docs/spec/mistakes.md` as faults 39, 40 and 41, each with the
-rule that now prevents it.
+**Your register going down for a minute at a time.** The worst of the four,
+because you were working in it. Giving the trial its address put that address
+into the deploy configuration — which means every deploy re-stated it, and
+because both addresses sit on the same domain, re-stating one briefly knocked
+the other over. Your own address had never been done that way: it was set up
+once, by hand, and has never flickered in weeks. Now the trial's is set up the
+same way.
+
+The wider lesson, and the reason it is written down: **the fault was not in the
+new register, it was in yours** — and nobody had changed yours. Two registers
+share a domain and an account, so setting the second one up *is* a change to the
+first one's world. "It only affects the trial" is something to check, not to
+assume.
+
+All four are in `docs/spec/mistakes.md` as faults 39 to 42, each with the rule
+that now prevents it.
 
 ---
 
