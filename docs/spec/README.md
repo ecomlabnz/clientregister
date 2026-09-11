@@ -14,6 +14,7 @@ claim, not a fact.
 | | What it holds | How it is kept true |
 |---|---|---|
 | [`mistakes.md`](mistakes.md) | Every fault this register has actually suffered, and the rule that now prevents it | Written by hand, added to whenever something breaks |
+| [`../issues.md`](../issues.md) | Everything known to be wrong or incomplete **right now**, each with what would fix it | Written by hand, added to when something is *found* |
 | [`features.md`](features.md) | 25 modules — what each is, where it is mounted, every route it owns, its settings and its place in the menu | `npm run spec`, from the registry |
 | [`invariants.md`](invariants.md) | The 161 things the database refuses to do, in its own words, and the 13 uniqueness rules | `npm run spec`, from the built schema |
 | [`data-model.md`](data-model.md) | 56 tables, every column | `npm run spec`, from the built schema |
