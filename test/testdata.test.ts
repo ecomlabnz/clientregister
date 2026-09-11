@@ -15,6 +15,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
+import { listTestData, tallyTestData } from '../src/core/testdata';
+import { fakeD1 } from './support/d1';
 const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
 
 const AT = '2026-09-01T00:00:00.000Z';
@@ -412,5 +414,61 @@ describe('every kind of record offers the mark the same way', () => {
     for (const [, path] of modules.filter(([t]) => t !== 'quotes')) {
       expect(readFileSync(path, 'utf8'), path).not.toContain('oneWay: true');
     }
+  });
+});
+
+/**
+ * The list screen reads a different column from every one of the six tables.
+ *
+ * This is the test the practice paid for: clicking **Test data** with a matter
+ * marked gave *Something went wrong*, because the list asked every table it had
+ * not named by hand for a `description` column, and a matter has a `title`.
+ * Marking one row in each table and reading the list back is the only shape of
+ * test that catches it — a test that marks a client alone passes while five
+ * other tables are wrong.
+ */
+describe('the list of marked records reads every table', () => {
+  it('names one marked row from each of the six', async () => {
+    const db = register();
+    aUser(db);
+    aClient(db, 'c1');
+    aCase(db, 'k1', 'c1');
+    aQuote(db, 'q1', true);
+    db.prepare(
+      `INSERT INTO inquiries (id, ref, source, received_at, subject, is_test, created_at, updated_at)
+       VALUES ('n1','N1','web',?,'An asking',1,?,?)`).run(AT, AT, AT);
+    db.prepare(
+      `INSERT INTO invoices (id, ref, description, status, is_test, created_at, updated_at)
+       VALUES ('i1','I1','Work done','draft',1,?,?)`).run(AT, AT);
+    db.prepare(
+      `INSERT INTO tasks (id, title, assigned_to, is_test, created_at, updated_at)
+       VALUES ('t1','Ring them back','u1',1,?,?)`).run(AT, AT);
+    db.exec(`UPDATE clients SET is_test = 1 WHERE id = 'c1'`);
+
+    const env = { DB: fakeD1(db) } as unknown as Parameters<typeof listTestData>[0];
+    const records = await listTestData(env);
+
+    const seen = (t: string) => records.find((r) => r.table === t)!;
+    expect(records.map((r) => r.table).sort())
+      .toEqual(['cases', 'clients', 'inquiries', 'invoices', 'quotes', 'tasks']);
+    expect(seen('clients').title).toBe('A Person');
+    expect(seen('cases').title).toBe('A matter');
+    expect(seen('quotes').title).toBe('A matter');
+    expect(seen('inquiries').title).toBe('An asking');
+    expect(seen('invoices').title).toBe('Work done');
+    expect(seen('tasks').title).toBe('Ring them back');
+    // A task has no reference number of its own, and must not claim one.
+    expect(seen('tasks').ref).toBe('');
+    expect(seen('cases').ref).toBe('K1');
+  });
+
+  it('counts the same six', async () => {
+    const db = register();
+    aQuote(db, 'q1', true);
+    const env = { DB: fakeD1(db) } as unknown as Parameters<typeof tallyTestData>[0];
+    const tally = await tallyTestData(env);
+    expect(tally.map((t) => t.table).sort())
+      .toEqual(['cases', 'clients', 'inquiries', 'invoices', 'quotes', 'tasks']);
+    expect(tally.find((t) => t.table === 'quotes')?.count).toBe(1);
   });
 });
