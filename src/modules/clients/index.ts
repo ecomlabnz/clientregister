@@ -53,7 +53,8 @@ import { preferencesFor } from '../../core/preferences';
 import {
   caseTypes, docCategories, englishTests, genders, isTerm, labelFor, noteKindLabel, noteKinds,
   relationshipStatuses, termOptions, titles, visaTypes, vocabulary,
-  EDUCATION_LEVEL_VOCAB, EMPLOYMENT_KIND_VOCAB, type Term,
+  EDUCATION_LEVEL_VOCAB, EDUCATION_OUTCOME_VOCAB, EMPLOYMENT_KIND_VOCAB,
+  TRAVEL_MODE_VOCAB, TRAVEL_PURPOSE_VOCAB, type Term,
 } from '../../core/vocabulary';
 import { renameMattersFor } from '../../core/casename';
 import { detachTag, attachTag, findOrCreateTag, listTags, tagsForClient, tagsForClients } from '../../core/tags';
@@ -137,6 +138,31 @@ export interface ClientRow {
 
 
 /** Show a date with a warning when it has passed or is close. */
+/**
+ * The same date, inline, for a sentence rather than a column.
+ *
+ * `expiryCell` puts the relative age in a `<div>`, which is right in a table
+ * cell and wrong in the middle of a line. Reported 12 September 2026: the
+ * derived expiry of a certificate belongs on the line that states the rule it
+ * came from — *"'Submitted 12 Aug 2026 · 24 months from issue' should also say
+ * the actual calculated end date"* — and that line is prose.
+ */
+/**
+ * One block on a client's page: a heading that opens, with a name a link can
+ * ask for. See `openBlocks` in the detail route for why the name is a query
+ * rather than a fragment.
+ */
+function block(id: string, open: Set<string>, title: string, body: Raw): Raw {
+  return html`<div id="${id}">${foldingCard(title, body, undefined, { open: open.has(id) })}</div>`;
+}
+
+function expiryInline(value: string, warnDays = 90): Raw {
+  const due = Date.parse(value);
+  const soon = !Number.isNaN(due) && due - Date.now() < warnDays * 86_400_000;
+  return html`<strong class="${isOverdue(value) ? 'warn' : ''}">${dateShort(value)}</strong>${
+    soon ? html` <span class="muted">(${relativeDays(value)})</span>` : ''}`;
+}
+
 function expiryCell(value: string | null, warnDays = 90): Raw {
   if (!value) return html`<span class="muted">—</span>`;
   const due = Date.parse(value);
@@ -450,7 +476,7 @@ function clientForm(
              this file works from. A client may hold more than one: a dual national holds two at
              once, and someone who has just renewed holds the new one plus the old one carrying a
              live visa. Second and third passports are kept on the client's own
-             page${values.id ? html` — <a href="/clients/${values.id}#passports">add one there</a>` : ''},
+             page${values.id ? html` — <a href="/clients/${values.id}?open=passports#passports">add one there</a>` : ''},
              each with its own country and dates, and every one still held is watched for expiry.</p>
         </div>
       </div>
@@ -528,7 +554,7 @@ function clientForm(
                      to stay answerable. A single set of dates here could
                      represent neither. */}
             ${values.id
-              ? html`<p><a class="btn btn-secondary" href="/clients/${values.id}#certificates">Add
+              ? html`<p><a class="btn btn-secondary" href="/clients/${values.id}?open=certificates#certificates">Add
                        a police certificate, medical or x-ray</a></p>
                      ${'' /* Both branches used to explain why certificates are records
                              rather than boxes — a client may hold several at once, and a
@@ -1414,15 +1440,36 @@ export const clientsModule: AppModule = {
       if (!client) return c.notFound();
       const clientNationalities = await nationalitiesFor(c.env, id);
       const [clientFlags, flagKindTerms, clientTags, allTags,
-             histories, employmentKinds, educationLevels] = await Promise.all([
+             histories, employmentKinds, educationLevels, educationOutcomes,
+             travelPurposes, travelModes] = await Promise.all([
         flagsForClient(c.env, id), flagKinds(c.env),
         tagsForClient(c.env, id), listTags(c.env),
         allHistories(c.env, id),
         vocabulary(c.env, EMPLOYMENT_KIND_VOCAB), vocabulary(c.env, EDUCATION_LEVEL_VOCAB),
+        vocabulary(c.env, EDUCATION_OUTCOME_VOCAB),
+        vocabulary(c.env, TRAVEL_PURPOSE_VOCAB), vocabulary(c.env, TRAVEL_MODE_VOCAB),
       ]);
       const historyVocab: HistoryVocab = {
         employment_kinds: employmentKinds, education_levels: educationLevels,
+        education_outcomes: educationOutcomes,
+        travel_purposes: travelPurposes, travel_modes: travelModes,
       };
+
+      // Which blocks on this page start open.
+      //
+      // **Asked for on 12 September 2026:** *"The block need to be collapsible,
+      // starting from collapsed position, when client file is opened."* A
+      // client's page is nine blocks and the file notes alone can run for
+      // pages; opening it on a list of headings is the difference between a
+      // page you scan and a page you scroll.
+      //
+      // Named in the address rather than remembered, for the reason the
+      // calendar and the matter page give: a block missing because of something
+      // you did on another client last week is worse than one you open again.
+      // `?open=passports` is how a link from the client's own form still lands
+      // on an open block — a `#fragment` never reaches the server, so it cannot
+      // decide what is open.
+      const openBlocks = new Set((c.req.query('open') ?? '').split(',').filter(Boolean));
 
       const canReadMail = can(c.get('user'), 'mail:send');
       const [cases, quotes, inquiries, entries, sentMail, tasks, partyCases, related, employer, people,
@@ -1532,7 +1579,7 @@ export const clientsModule: AppModule = {
 
         <div class="cols">
           <div class="col-main">
-            ${card('Cases', table(['Reference', 'Matter', 'Type', 'Status', 'Next action'], cases.map((k: any) => html`
+            ${block('cases', openBlocks, 'Cases', table(['Reference', 'Matter', 'Type', 'Status', 'Next action'], cases.map((k: any) => html`
               <tr>
                 <td><a href="/cases/${k.id}"><code>${k.ref}</code></a></td>
                 <td><a href="/cases/${k.id}">${k.title}</a></td>
@@ -1541,7 +1588,7 @@ export const clientsModule: AppModule = {
                 <td class="small">${k.next_action ? html`${truncate(k.next_action, 60)}<div class="muted">${dateShort(k.next_action_due)}</div>` : '—'}</td>
               </tr>`)))}
 
-            ${card('Quotes', table(['Reference', 'Description', 'Total', 'Status', 'Raised'], quotes.map((qt: any) => html`
+            ${block('quotes', openBlocks, 'Quotes', table(['Reference', 'Description', 'Total', 'Status', 'Raised'], quotes.map((qt: any) => html`
               <tr>
                 <td><a href="/quotes/${qt.id}"><code>${qt.ref}</code></a></td>
                 <td>${truncate(qt.description, 70)}</td>
@@ -1550,30 +1597,6 @@ export const clientsModule: AppModule = {
                 <td class="small">${stamp(qt.created_at)}</td>
               </tr>`)))}
 
-            ${card('File notes', html`
-              ${writable ? html`
-              <form method="post" action="/clients/${client.id}/entries" class="entry-form">
-                ${csrfField(csrf)}
-                ${select({ label: 'Kind', name: 'kind', value: 'note', includeBlank: false,
-                           options: termOptions(noteKindList) })}
-                ${field({ label: 'Note', name: 'body', type: 'textarea', rows: 3, required: true, maxlength: 5000,
-                          placeholder: 'What happened, what was advised, what was agreed.' })}
-                <button class="btn btn-primary" type="submit">Add a note</button>
-              </form>` : ''}
-              ${entries.length === 0 ? emptyState('Nothing on the file yet.') : html`
-                <ul class="timeline">
-                  ${entries.map((e) => timelineItem({
-                    entry: e,
-                    kindLabel: noteKindLabel(noteKindList, e.kind, ENTRY_KIND_LABELS),
-                    mail: canReadMail ? mailLinkFor(e, sentMail, recordMailHref('client', client.id)) : null,
-                    happened: stamp(e.occurred_at),
-                    written: stamp(e.created_at),
-                    correction: writable && correctable(e, c.get('user')?.id ?? null)
-                      ? { csrf, minutes: CORRECTION_WINDOW_MINUTES,
-                          kindOptions: termOptions(noteKindList) }
-                      : null,
-                  }))}
-                </ul>`}`)}
 
             ${(() => {
               const past = clientFlags.filter((f) => !isShowing(f));
@@ -1582,16 +1605,8 @@ export const clientsModule: AppModule = {
                               csrf: writable ? csrf : null }));
             })()}
 
-            ${card('Files', filesPanel({
-              csrf, entityType: 'client', entityId: client.id, returnTo: `/clients/${client.id}`,
-              files: clientFiles as any, categories: docCats,
-              canDelete: can(c.get('user'), 'register:delete'),
-            }))}
 
-            ${isOrg ? '' : html`
-              <section class="card" id="passports">
-                <header class="card-head"><h2>Passports</h2></header>
-                <div class="card-body">
+            ${isOrg ? '' : block('passports', openBlocks, 'Passports', html`
                   ${passports.length === 0
                     ? emptyState('No passport recorded yet. The first one is entered on the client\u2019s '
                         + 'own form, under Identity.')
@@ -1599,7 +1614,12 @@ export const clientsModule: AppModule = {
                         ${passports.map((pp) => html`
                           <li class="list-row">
                             <div>
-                              <strong>${pp.country ?? 'Passport'}</strong>
+                              ${'' /* The country's name, not its code. Reported 12 September
+                                      2026, looking at a Tongan passport headed "TO": *"Do not
+                                      like the country abbreviation - insufficient - Use full
+                                      country name."* Right — the code is how the register
+                                      stores it, and a stored form is not a heading. */}
+                              <strong>${countryName(pp.country) || 'Passport'}</strong>
                               ${pp.is_primary === 1 ? badge('primary', 'green') : ''}
                               ${pp.status === 'held' ? '' : badge(passportStatusLabel(pp.status), 'grey')}
                               <div class="small muted">
@@ -1655,14 +1675,9 @@ export const clientsModule: AppModule = {
                               because a visa may still be stuck in it. All true; the Status
                               dropdown above already offers the choice. */}
                       <p class="hint">Only a passport marked held is watched for expiry.</p>
-                    </details>` : ''}
-                </div>
-              </section>`}
+                    </details>` : ''}`)}
 
-            ${isOrg ? '' : html`
-              <section class="card" id="certificates">
-                <header class="card-head"><h2>Certificates</h2></header>
-                <div class="card-body">
+            ${isOrg ? '' : block('certificates', openBlocks, 'Certificates', html`
                   ${certificates.length === 0
                     ? emptyState('No police certificate, medical or x-ray recorded yet.')
                     : html`${CERTIFICATE_KINDS.map((kind) => {
@@ -1675,7 +1690,8 @@ export const clientsModule: AppModule = {
                             ${mine.map((cert) => html`
                               <li class="list-row">
                                 <div>
-                                  <strong>${cert.country ?? (cert.subtype ? medicalTypeLabel(cert.subtype) : CERTIFICATE_LABELS[kind])}</strong>
+                                  <strong>${countryName(cert.country)
+                                    || (cert.subtype ? medicalTypeLabel(cert.subtype) : CERTIFICATE_LABELS[kind])}</strong>
                                   ${current.has(cert.id) ? badge('current', 'green') : badge('superseded', 'grey')}
                                   <div class="small muted">
                                     ${cert.issued_on ? html`Issued ${dateShort(cert.issued_on)}` : 'Issue date not recorded'}
@@ -1685,14 +1701,33 @@ export const clientsModule: AppModule = {
                                         database from the issue date and this; saying so on the page
                                         is the difference between a date you trust and one you
                                         re-check against the certificate every time. */ ''}
+                                  ${'' /* The rule, and the date it comes out at. Reported 12
+                                          September 2026: *"'Submitted 12 Aug 2026 · 24 months
+                                          from issue' should also say the actual calculated end
+                                          date - in that case 29 Jun 2028."* Right: a line that
+                                          states an arithmetic and stops before the answer makes
+                                          the reader do the sum. The date is still the database's
+                                          — this only prints it beside the rule that produced it. */}
                                   ${expiryIsDerived(kind) ? html`
                                     <div class="small muted">
                                       ${cert.submitted_on
                                         ? html`Submitted ${dateShort(cert.submitted_on)} ·
                                                ${CERTIFICATE_VALIDITY[kind]!.submitted} months from issue`
                                         : html`Not submitted ·
-                                               ${CERTIFICATE_VALIDITY[kind]!.held} months from issue`}
+                                               ${CERTIFICATE_VALIDITY[kind]!.held} months from issue`}${
+                                        cert.expires_on
+                                          ? html` · expires ${current.has(cert.id)
+                                              ? expiryInline(cert.expires_on)
+                                              : html`<strong>${dateShort(cert.expires_on)}</strong>`}`
+                                          : ''}
                                     </div>` : ''}
+                                  ${'' /* An x-ray derives nothing, so its expiry has no rule to
+                                          sit beside. It gets its own line, in the same place the
+                                          eye is already looking. */}
+                                  ${!expiryIsDerived(kind) && cert.expires_on ? html`
+                                    <div class="small muted">Expires ${current.has(cert.id)
+                                      ? expiryInline(cert.expires_on)
+                                      : html`<strong>${dateShort(cert.expires_on)}</strong>`}</div>` : ''}
                                   ${/* A date nobody read off the paper must never look like one
                                         somebody did — the expiry above is computed from it. */ ''}
                                   ${issueDateUnverified(cert) ? html`
@@ -1784,11 +1819,13 @@ export const clientsModule: AppModule = {
                                           register is actually watching; a superseded one keeps its
                                           date, quietly, because a matter lodged in March relied on
                                           what was held in March. */}
-                                  ${cert.expires_on
-                                    ? current.has(cert.id)
-                                      ? expiryCell(cert.expires_on)
-                                      : html`<span class="muted">${dateShort(cert.expires_on)}</span>`
-                                    : ''}
+                                  ${'' /* The date used to be repeated here, in the column at the
+                                          right. It now sits on the line that explains where it
+                                          came from, which is where the practice asked for it and
+                                          where it reads as an answer rather than as a loose date.
+                                          A superseded certificate still shows its expiry plainly
+                                          rather than in alarm red — the red is for the one the
+                                          register is actually watching. */}
                                   ${writable ? actionButton(`/clients/${client.id}/certificates/${cert.id}/remove`, csrf,
                                       'Remove this certificate',
                                       { className: 'btn-remove', icon: '\u00d7',
@@ -1839,9 +1876,13 @@ export const clientsModule: AppModule = {
                       <p class="hint">The expiry is worked out from the issue date: a police
                          certificate is ${validityRule('police')} A medical is
                          ${validityRule('medical')}</p>
-                    </details>` : ''}
-                </div>
-              </section>`}
+                    </details>` : ''}`)}
+
+            ${block('files', openBlocks, 'Files', filesPanel({
+              csrf, entityType: 'client', entityId: client.id, returnTo: `/clients/${client.id}`,
+              files: clientFiles as any, categories: docCats,
+              canDelete: can(c.get('user'), 'register:delete'),
+            }))}
 
             ${'' /* Employment, education and travel, each closed. Asked for on 11
                     September 2026, to be "formatted in a fashion that is similar to
@@ -1858,6 +1899,36 @@ export const clientsModule: AppModule = {
               ${'' /* Asked for on the same day, and deliberately empty: "create the
                       block but keep it as a placeholder for now." */}
               ${militaryPlaceholder()}`}
+
+            ${'' /* Last on the page, by instruction on 12 September 2026: "reorder,
+                    Cases, Quotes, Passports, Certificates, Files, the rest, and at the
+                    bottom - File Notes." It is the longest block on a client and the
+                    one that grows for ever, so anything under it would be unreachable
+                    in practice. */}
+            ${block('filenotes', openBlocks, 'File notes', html`
+              ${writable ? html`
+              <form method="post" action="/clients/${client.id}/entries" class="entry-form">
+                ${csrfField(csrf)}
+                ${select({ label: 'Kind', name: 'kind', value: 'note', includeBlank: false,
+                           options: termOptions(noteKindList) })}
+                ${field({ label: 'Note', name: 'body', type: 'textarea', rows: 3, required: true, maxlength: 5000,
+                          placeholder: 'What happened, what was advised, what was agreed.' })}
+                <button class="btn btn-primary" type="submit">Add a note</button>
+              </form>` : ''}
+              ${entries.length === 0 ? emptyState('Nothing on the file yet.') : html`
+                <ul class="timeline">
+                  ${entries.map((e) => timelineItem({
+                    entry: e,
+                    kindLabel: noteKindLabel(noteKindList, e.kind, ENTRY_KIND_LABELS),
+                    mail: canReadMail ? mailLinkFor(e, sentMail, recordMailHref('client', client.id)) : null,
+                    happened: stamp(e.occurred_at),
+                    written: stamp(e.created_at),
+                    correction: writable && correctable(e, c.get('user')?.id ?? null)
+                      ? { csrf, minutes: CORRECTION_WINDOW_MINUTES,
+                          kindOptions: termOptions(noteKindList) }
+                      : null,
+                  }))}
+                </ul>`}`)}
           </div>
 
           <div class="col-side">
@@ -1955,8 +2026,8 @@ export const clientsModule: AppModule = {
                       : html`${countryName(client.passport_country) || 'Primary'}${
                           client.passport_expiry ? html` · ${expiryCell(client.passport_expiry, 180)}` : ''}
                              ${passports.length > 1
-                               ? html`<div class="muted small"><a href="#passports">${passports.length} passports on file</a></div>`
-                               : html`<div class="muted small"><a href="#passports">Details</a></div>`}`}</dd>
+                               ? html`<div class="muted small"><a href="?open=passports#passports">${passports.length} passports on file</a></div>`
+                               : html`<div class="muted small"><a href="?open=passports#passports">Details</a></div>`}`}</dd>
                     ${'' /* Beside the passport, because it is the other
                              identity document a client hands over, and never
                              without its issuing country — which the database
@@ -2222,11 +2293,11 @@ export const clientsModule: AppModule = {
       const notes = f.optional('notes', { max: 300 });
 
       if (!country && !number && !issuedOn && !expiresOn) {
-        return redirectWith(c, `/clients/${id}#passports`,
+        return redirectWith(c, `/clients/${id}?open=passports#passports`,
           'A passport needs at least a country, a number or a date.', 'err');
       }
       if (issuedOn && expiresOn && expiresOn < issuedOn) {
-        return redirectWith(c, `/clients/${id}#passports`,
+        return redirectWith(c, `/clients/${id}?open=passports#passports`,
           'A passport cannot expire before it was issued.', 'err');
       }
 
@@ -2241,7 +2312,7 @@ export const clientsModule: AppModule = {
         body: `Passport added${country ? ` (${country})` : ''}.`, createdBy: c.get('user')!.id });
       await auditFrom(c, { action: 'client.passport_added', entityType: 'client', entityId: id,
         meta: { country, hadNumber: Boolean(number) } });
-      return redirectWith(c, `/clients/${id}#passports`, 'Passport recorded.');
+      return redirectWith(c, `/clients/${id}?open=passports#passports`, 'Passport recorded.');
     });
 
     r.post('/:id/passports/:pid/primary', requirePermission('register:write'), async (c) => {
@@ -2253,7 +2324,7 @@ export const clientsModule: AppModule = {
         await auditFrom(c, { action: 'client.passport_primary_set', entityType: 'client',
           entityId: id, meta: { passportId: c.req.param('pid') } });
       }
-      return redirectWith(c, `/clients/${id}#passports`,
+      return redirectWith(c, `/clients/${id}?open=passports#passports`,
         ok ? 'Primary passport changed.' : 'That passport was not found.', ok ? 'ok' : 'err');
     });
 
@@ -2262,7 +2333,7 @@ export const clientsModule: AppModule = {
       const pid = c.req.param('pid')!;
       const target = await passportById(c.env, id, pid);
       if (target?.is_primary === 1) {
-        return redirectWith(c, `/clients/${id}#passports`,
+        return redirectWith(c, `/clients/${id}?open=passports#passports`,
           'The primary passport is removed from the client form, not here \u2014 so that the '
           + 'record never ends up with none.', 'err');
       }
@@ -2271,7 +2342,7 @@ export const clientsModule: AppModule = {
         await auditFrom(c, { action: 'client.passport_removed', entityType: 'client', entityId: id,
           meta: { country: target?.country ?? null } });
       }
-      return redirectWith(c, `/clients/${id}#passports`,
+      return redirectWith(c, `/clients/${id}?open=passports#passports`,
         ok ? 'Passport removed.' : 'That passport was already gone.', ok ? 'ok' : 'err');
     });
 
@@ -2296,20 +2367,20 @@ export const clientsModule: AppModule = {
       // record: the expiry follows from it, so without one there is nothing to
       // work out and nothing to watch.
       if (derived && !issuedOn) {
-        return redirectWith(c, `/clients/${id}#certificates`,
+        return redirectWith(c, `/clients/${id}?open=certificates#certificates`,
           `A ${CERTIFICATE_LABELS[kind as CertificateKind].toLowerCase()} needs its issue date — `
           + 'the expiry is worked out from it.', 'err');
       }
       if (!derived && !issuedOn && !expiresOn) {
-        return redirectWith(c, `/clients/${id}#certificates`,
+        return redirectWith(c, `/clients/${id}?open=certificates#certificates`,
           'Give at least one date — otherwise there is nothing to watch.', 'err');
       }
       if (submittedOn && issuedOn && submittedOn < issuedOn) {
-        return redirectWith(c, `/clients/${id}#certificates`,
+        return redirectWith(c, `/clients/${id}?open=certificates#certificates`,
           'A certificate cannot have been submitted before it was issued.', 'err');
       }
       if (!derived && issuedOn && expiresOn && expiresOn < issuedOn) {
-        return redirectWith(c, `/clients/${id}#certificates`,
+        return redirectWith(c, `/clients/${id}?open=certificates#certificates`,
           'A certificate cannot expire before it was issued.', 'err');
       }
 
@@ -2341,7 +2412,7 @@ export const clientsModule: AppModule = {
       });
       await auditFrom(c, { action: 'client.certificate_added', entityType: 'client', entityId: id,
         meta: { kind, expiresOn } });
-      return redirectWith(c, `/clients/${id}#certificates`, 'Certificate recorded.');
+      return redirectWith(c, `/clients/${id}?open=certificates#certificates`, 'Certificate recorded.');
     });
 
     // Whether a certificate went in with an application is usually known after
@@ -2360,7 +2431,7 @@ export const clientsModule: AppModule = {
         certId, id);
       if (!cert) return c.notFound();
       if (submittedOn && cert.issued_on && submittedOn < cert.issued_on) {
-        return redirectWith(c, `/clients/${id}#certificates`,
+        return redirectWith(c, `/clients/${id}?open=certificates#certificates`,
           'A certificate cannot have been submitted before it was issued.', 'err');
       }
 
@@ -2379,7 +2450,7 @@ export const clientsModule: AppModule = {
       });
       await auditFrom(c, { action: 'client.certificate_submitted', entityType: 'client', entityId: id,
         meta: { certId, submittedOn } });
-      return redirectWith(c, `/clients/${id}#certificates`,
+      return redirectWith(c, `/clients/${id}?open=certificates#certificates`,
         submittedOn ? 'Noted — the expiry has moved with it.' : 'Cleared.');
     });
 
@@ -2407,7 +2478,7 @@ export const clientsModule: AppModule = {
         await auditFrom(c, { action: 'client.certificate_issue_date_confirmed',
           entityType: 'client', entityId: id, meta: { certId } });
       }
-      return redirectWith(c, `/clients/${id}#certificates`,
+      return redirectWith(c, `/clients/${id}?open=certificates#certificates`,
         ok ? 'Confirmed — the date now counts as read from the certificate.'
            : 'Nothing to confirm on that certificate.', ok ? 'ok' : 'err');
     });
@@ -2438,20 +2509,20 @@ export const clientsModule: AppModule = {
       // The same three refusals the add form makes, in the same words, because
       // they are the same three facts.
       if (derived && !issuedOn) {
-        return redirectWith(c, `/clients/${id}#certificates`,
+        return redirectWith(c, `/clients/${id}?open=certificates#certificates`,
           `A ${CERTIFICATE_LABELS[existing.kind].toLowerCase()} needs its issue date — `
           + 'the expiry is worked out from it.', 'err');
       }
       if (!derived && !issuedOn && !expiresOn) {
-        return redirectWith(c, `/clients/${id}#certificates`,
+        return redirectWith(c, `/clients/${id}?open=certificates#certificates`,
           'Give at least one date — otherwise there is nothing to watch.', 'err');
       }
       if (submittedOn && issuedOn && submittedOn < issuedOn) {
-        return redirectWith(c, `/clients/${id}#certificates`,
+        return redirectWith(c, `/clients/${id}?open=certificates#certificates`,
           'A certificate cannot have been submitted before it was issued.', 'err');
       }
       if (!derived && issuedOn && expiresOn && expiresOn < issuedOn) {
-        return redirectWith(c, `/clients/${id}#certificates`,
+        return redirectWith(c, `/clients/${id}?open=certificates#certificates`,
           'A certificate cannot expire before it was issued.', 'err');
       }
 
@@ -2483,7 +2554,7 @@ export const clientsModule: AppModule = {
         await auditFrom(c, { action: 'client.certificate_edited', entityType: 'client', entityId: id,
           meta: { certId, changes } });
       }
-      return redirectWith(c, `/clients/${id}#certificates`,
+      return redirectWith(c, `/clients/${id}?open=certificates#certificates`,
         changes.length > 0 ? 'Certificate updated.' : 'Nothing changed.');
     });
 
@@ -2492,7 +2563,7 @@ export const clientsModule: AppModule = {
       const ok = await removeCertificate(c.env, id, c.req.param('certId')!);
       await auditFrom(c, { action: 'client.certificate_removed', entityType: 'client', entityId: id,
         meta: { ok } });
-      return redirectWith(c, `/clients/${id}#certificates`,
+      return redirectWith(c, `/clients/${id}?open=certificates#certificates`,
         ok ? 'Certificate removed.' : 'That certificate was already gone.', ok ? 'ok' : 'err');
     });
 

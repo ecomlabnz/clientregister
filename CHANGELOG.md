@@ -7,6 +7,49 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.53.0 — 12 September 2026
+
+### Changed
+**A client's page is a list of headings, in the order you asked for.** Cases,
+Quotes, Passports, Certificates, Files, the histories, Military records, and
+File notes at the bottom. Every one starts closed — click a heading to open it.
+
+File notes last because it is the longest block and the one that grows for ever;
+anything under it would be unreachable in practice.
+
+The summary down the right — who they are, their dates, their fees — stays open.
+That is the part you read to know where things stand, and collapsing it would
+open the page on nothing.
+
+A link that points at a block now opens it. *Add a passport* from the client's
+own form lands on Passports, open.
+
+**A certificate says the date its rule works out to.** *"'Submitted 12 Aug 2026
+· 24 months from issue' should also say the actual calculated end date."*
+
+It now reads **Submitted 12 Aug 2026 · 24 months from issue · expires 29 Jun
+2028**, on the one line, with the red and the "in 4 months" on it where the
+certificate is the one being watched. The date is no longer adrift in a column
+of its own. X-rays get the same line, since they have no rule to sit beside.
+
+### Added
+**Education history: whether the course was finished.** Completed, Not
+completed, or Still studying. It is most of the point of an education history —
+a qualification claimed on an application has to be finished, and a year
+abandoned is still a year to account for.
+
+**Travel history: a purpose you pick, and how they travelled.** Purpose is now
+Family, Holiday, Business, Work, Study, Transit or Other. Beside it, **By** —
+Air, Sea or Land.
+
+All three are lists you can edit yourself under **Settings → Lists and
+dropdowns**, like every other dropdown here.
+
+### Fixed
+**Countries are named, not abbreviated.** A Tongan passport and a Tongan police
+certificate were both headed **TO**. They say **Tonga**. So does the alerts
+page, which was showing *Passport (TO)*.
+
 ## 1.52.1 — 12 September 2026
 
 ### Fixed

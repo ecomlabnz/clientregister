@@ -44,10 +44,13 @@ describe('the panel is called the same thing on every page', () => {
   });
 
   it('carries the panel on every page that has one', () => {
-    // The four places a running record is kept.
+    // The four places a running record is kept. Matched on the heading rather
+    // than on the helper that draws it: a client's block became `block(...)` on
+    // 12 September 2026 so it could be named in the address and start closed,
+    // and a matter's is `foldedCard`. What must not drift is the name.
     for (const page of ['clients', 'cases', 'inquiries', 'quotes']) {
       const src = readFileSync(`src/modules/${page}/index.ts`, 'utf8');
-      expect(/Card\('File notes'|card\('File notes'/.test(src), page).toBe(true);
+      expect(/(Card|card|block)\(([^)]*?, )?'File notes'/.test(src), page).toBe(true);
     }
   });
 
