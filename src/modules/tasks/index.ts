@@ -192,7 +192,7 @@ export const tasksModule: AppModule = {
       ];
 
       return page(c, { title: 'Tasks', active: '/tasks' }, html`
-        ${pageHeader('Tasks', 'Everything outstanding, and what it belongs to.')}
+        ${pageHeader('Tasks')}
         <nav class="tabs">
           ${views.map((v) => html`
             <a class="${v.id === scope ? 'tab current' : 'tab'}"
@@ -218,8 +218,10 @@ export const tasksModule: AppModule = {
               ${select({ label: 'Assign to', name: 'assigned_to', value: user.id, required: true,
                          options: users, includeBlank: false })}
               ${field({ label: 'Details', name: 'details', type: 'textarea', rows: 2, maxlength: 2000 })}
-              <p class="hint">Every task has an owner — it defaults to you. Attaching it to a case or
-                 client is optional: add it from that record’s page to do so.</p>
+              ${'' /* Every task has an owner, and it defaults to whoever is
+                       writing it. */}
+              <p class="hint">To attach a task to a case or client, add it from that record’s
+                 page.</p>
               <button class="btn btn-primary" type="submit">Add task</button>
             </form>`) : ''}
         </div>
@@ -629,8 +631,8 @@ export const tasksModule: AppModule = {
               <a class="btn btn-secondary" href="${back}">Nothing to add</a>
             </div>
           </form>`)}
-        <p class="hint">This box can be turned off under your account preferences, and a note can
-           always be added later by editing the task.</p>`);
+        ${'' /* A note can always be added later by editing the task. */}
+        <p class="hint">This box can be turned off under your account preferences.</p>`);
     });
 
     r.post('/:id/note', requirePermission('register:write'), async (c) => {

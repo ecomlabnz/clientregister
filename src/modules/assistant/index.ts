@@ -40,12 +40,10 @@ import { assistantTabs, registerIntakeRoutes } from './intake';
 function notConfigured(): ReturnType<typeof html> {
   return html`
     <div class="alert alert-warn">
-      <p><strong>The AI layer is not switched on.</strong> Everything in this register works
-         without it — this page is the only thing that needs it.</p>
-      <p class="mb">To enable it, set <code>AI_PROVIDER</code> to <code>anthropic</code> with an
-         <code>ANTHROPIC_API_KEY</code>, or to <code>workers-ai</code> to use Cloudflare's own
-         models with nothing leaving their network. Both are repository secrets; see
-         <a href="/help#connecting">the setup guide</a>.</p>
+      ${'' /* The how-to (AI_PROVIDER / ANTHROPIC_API_KEY / workers-ai, both repository
+            secrets) lives in the setup guide rather than on this page. */}
+      <p><strong>The AI layer is not switched on.</strong>
+         <a href="/help#connecting">Set it up</a>.</p>
     </div>`;
 }
 
@@ -77,77 +75,63 @@ export const assistantModule: AppModule = {
       const suggestion = runId ? await latestTriage(c.env, 'assistant', runId) : null;
 
       return page(c, { title: 'Assistant', active: '/assistant' }, html`
-        ${pageHeader('Assistant',
-          'Paste something in and it will tell you what it is. It never writes anything itself.')}
+        ${pageHeader('Assistant')}
         ${assistantTabs('read')}
 
         ${enabled ? '' : notConfigured()}
 
-        <div class="cols">
-          <div class="col-main">
-            ${card('Read this for me', html`
-              <form method="post" action="/assistant" class="entry-form">
-                ${csrfField(session.csrf)}
-                ${field({ label: 'Subject or heading', name: 'subject', maxlength: 200,
-                          placeholder: 'Optional — the subject line, or what this is' })}
-                ${field({ label: 'The text', name: 'body', type: 'textarea', rows: 14, required: true,
-                          maxlength: 40000,
-                          placeholder: 'Paste an email, a letter, or your notes from a call.' })}
-                <button class="btn btn-primary" type="submit" ${enabled ? '' : raw('disabled')}>
-                  Read it
-                </button>
-                <p class="hint">Sent to the configured provider and recorded here. Nothing is
-                   created in the register until you choose to.</p>
-              </form>`)}
+        ${card('Read this for me', html`
+          <form method="post" action="/assistant" class="entry-form">
+            ${csrfField(session.csrf)}
+            ${field({ label: 'Subject or heading', name: 'subject', maxlength: 200,
+                      placeholder: 'Optional — the subject line, or what this is' })}
+            ${field({ label: 'The text', name: 'body', type: 'textarea', rows: 14, required: true,
+                      maxlength: 40000,
+                      placeholder: 'Paste an email, a letter, or your notes from a call.' })}
+            <button class="btn btn-primary" type="submit" ${enabled ? '' : raw('disabled')}>
+              Read it
+            </button>
+            <p class="hint">Sent to the configured AI provider, and recorded here.</p>
+          </form>`)}
 
-            ${suggestion ? card('What it found', html`
-              <p class="lede-sm">${suggestion.summary}</p>
-              <dl class="kv">
-                <dt>Urgency</dt><dd>${badge(suggestion.urgency, statusTone(suggestion.urgency))}</dd>
-                <dt>Name</dt><dd>${suggestion.contact_name ?? '—'}</dd>
-                <dt>Email</dt><dd>${suggestion.contact_email ?? '—'}</dd>
-                <dt>Phone</dt><dd>${suggestion.contact_phone ?? '—'}</dd>
-                <dt>Nationality</dt><dd>${suggestion.nationality ?? '—'}</dd>
-                <dt>Likely matter</dt><dd>${suggestion.suggested_case_type
-                  ? labelFor(types, suggestion.suggested_case_type) : '—'}</dd>
-                <dt>Suggested title</dt><dd>${suggestion.suggested_title ?? '—'}</dd>
-                <dt>Next action</dt><dd>${suggestion.suggested_next_action ?? '—'}</dd>
-                <dt>Dates mentioned</dt><dd>${suggestion.key_dates.length ? suggestion.key_dates.join(', ') : '—'}</dd>
-                ${suggestion.is_spam ? html`<dt>Note</dt><dd class="warn">Flagged as likely spam.</dd>` : ''}
-              </dl>
+        ${suggestion ? card('What it found', html`
+          <p class="lede-sm">${suggestion.summary}</p>
+          <dl class="kv">
+            <dt>Urgency</dt><dd>${badge(suggestion.urgency, statusTone(suggestion.urgency))}</dd>
+            <dt>Name</dt><dd>${suggestion.contact_name ?? '—'}</dd>
+            <dt>Email</dt><dd>${suggestion.contact_email ?? '—'}</dd>
+            <dt>Phone</dt><dd>${suggestion.contact_phone ?? '—'}</dd>
+            <dt>Nationality</dt><dd>${suggestion.nationality ?? '—'}</dd>
+            <dt>Likely matter</dt><dd>${suggestion.suggested_case_type
+              ? labelFor(types, suggestion.suggested_case_type) : '—'}</dd>
+            <dt>Suggested title</dt><dd>${suggestion.suggested_title ?? '—'}</dd>
+            <dt>Next action</dt><dd>${suggestion.suggested_next_action ?? '—'}</dd>
+            <dt>Dates mentioned</dt><dd>${suggestion.key_dates.length ? suggestion.key_dates.join(', ') : '—'}</dd>
+            ${suggestion.is_spam ? html`<dt>Note</dt><dd class="warn">Flagged as likely spam.</dd>` : ''}
+          </dl>
 
-              <div class="admin-links mt">
-                <a class="btn btn-primary" href="${`/inquiries/new?${new URLSearchParams({
-                  contact_name: suggestion.contact_name ?? '',
-                  contact_email: suggestion.contact_email ?? '',
-                  contact_phone: suggestion.contact_phone ?? '',
-                  subject: suggestion.suggested_title ?? '',
-                }).toString()}`}">Start an inquiry</a>
-                <a class="btn btn-secondary" href="${`/clients/new?${new URLSearchParams({
-                  given_names: (suggestion.contact_name ?? '').split(' ').slice(0, -1).join(' '),
-                  family_name: (suggestion.contact_name ?? '').split(' ').slice(-1).join(''),
-                  email: suggestion.contact_email ?? '',
-                  phone: suggestion.contact_phone ?? '',
-                  nationality: suggestion.nationality ?? '',
-                }).toString()}`}">Start a client record</a>
-                <a class="btn btn-secondary" href="/knowledge/new">File in the knowledge base</a>
-              </div>
-              <p class="hint">Each of these opens a form filled in with what was found. Check it
-                 before saving — the model reads carefully but it is still reading, not knowing.</p>`) : ''}
+          <div class="admin-links mt">
+            <a class="btn btn-primary" href="${`/inquiries/new?${new URLSearchParams({
+              contact_name: suggestion.contact_name ?? '',
+              contact_email: suggestion.contact_email ?? '',
+              contact_phone: suggestion.contact_phone ?? '',
+              subject: suggestion.suggested_title ?? '',
+            }).toString()}`}">Start an inquiry</a>
+            <a class="btn btn-secondary" href="${`/clients/new?${new URLSearchParams({
+              given_names: (suggestion.contact_name ?? '').split(' ').slice(0, -1).join(' '),
+              family_name: (suggestion.contact_name ?? '').split(' ').slice(-1).join(''),
+              email: suggestion.contact_email ?? '',
+              phone: suggestion.contact_phone ?? '',
+              nationality: suggestion.nationality ?? '',
+            }).toString()}`}">Start a client record</a>
+            <a class="btn btn-secondary" href="/knowledge/new">File in the knowledge base</a>
           </div>
+          <p class="hint">Check what is filled in before you save.</p>`) : ''}
 
-          <div class="col-side">
-            ${card('What this does', html`
-              <p class="small">It reads text you give it and pulls out names, contact details,
-                 dates and what kind of matter it looks like. It also drafts a brief on any case,
-                 from the <strong>Brief me</strong> button on that case.</p>
-              <p class="small"><strong>It never writes to the register.</strong> Every suggestion
-                 becomes a form you look at and submit. Nothing it offers is a step you could not
-                 take by hand, which is why the whole register works with this switched off.</p>
-              <p class="small">Every run is recorded — what was asked, what came back, and how long
-                 it took — so a suggestion acted on months ago can still be traced.</p>`)}
-          </div>
-        </div>`);
+        ${'' /* The "What this does" side card went on 11 September 2026 with the rest of
+              the on-screen explanation. What it said is still true and is written up in
+              the module comment above: the assistant only reads, every suggestion has to
+              be submitted by a person, and every run is recorded in `ai_runs`. */}`);
     });
 
     r.post('/', requirePermission('ai:run'), async (c) => {

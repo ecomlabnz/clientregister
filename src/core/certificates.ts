@@ -193,6 +193,101 @@ export async function setCertificateSubmitted(
 }
 
 /**
+ * Change what a certificate says.
+ *
+ * **Asked for on 11 September 2026:** *"need an option to edit PC and Medical
+ * Cert details when needed, with appropriate log entries."*
+ *
+ * Until now the only editable thing was the submitted date, on the reasoning
+ * that everything else is a fact about a piece of paper and a wrong fact should
+ * be removed and re-entered. That reasoning was wrong in practice for one
+ * reason: removing and re-entering loses the record, and a certificate read in
+ * by machine arrives with a date that is *probably* right and needs correcting,
+ * not deleting.
+ *
+ * What cannot be changed is the `kind` and the client. A police certificate
+ * that turns out to be a medical is a different record, not a corrected one;
+ * making them interchangeable would let one row's history describe two
+ * documents.
+ *
+ * The expiry is not settable for a kind that derives it. The database owns that
+ * column (migration 0029) and recomputes it the moment the issue or submitted
+ * date moves — passing a value here would give the column a second owner and
+ * the trigger would overwrite it anyway.
+ *
+ * Returns the row as it was, so the caller can say what changed. Null if there
+ * is no such certificate on that client.
+ */
+export async function updateCertificate(
+  env: Env,
+  clientId: string,
+  id: string,
+  input: {
+    subtype: string | null; country: string | null; reference: string | null;
+    issuedOn: string | null; issuedOnProvenance: IssueDateProvenance | null;
+    submittedOn: string | null; expiresOn: string | null; notes: string | null;
+  },
+): Promise<CertificateRow | null> {
+  const before = await one<CertificateRow>(
+    env.DB, 'SELECT * FROM client_certificates WHERE id = ? AND client_id = ?', id, clientId);
+  if (!before) return null;
+
+  const derived = expiryIsDerived(before.kind);
+  await run(
+    env.DB,
+    `UPDATE client_certificates
+        SET subtype = ?, country = ?, reference = ?,
+            issued_on = ?, issued_on_provenance = ?, submitted_on = ?,
+            notes = ?${derived ? '' : ', expires_on = ?'}
+      WHERE id = ? AND client_id = ?`,
+    ...[
+      before.kind === 'medical' ? input.subtype : null,
+      before.kind === 'police' ? input.country : null,
+      input.reference,
+      input.issuedOn,
+      input.issuedOn ? input.issuedOnProvenance : null,
+      derived ? input.submittedOn : null,
+      input.notes,
+      ...(derived ? [] : [input.expiresOn]),
+      id, clientId,
+    ],
+  );
+  await refreshClientCache(env, clientId);
+  return before;
+}
+
+/**
+ * What actually changed, in the practice's words, for the file note.
+ *
+ * A note reading "certificate edited" records that somebody pressed a button.
+ * A note naming the date that moved records what happened, which is the point
+ * of an append-only file note.
+ */
+export function certificateChanges(
+  before: CertificateRow, after: CertificateRow,
+  dateShort: (value: string) => string,
+): string[] {
+  const out: string[] = [];
+  const moved = (label: string, a: string | null, b: string | null) => {
+    if ((a ?? '') === (b ?? '')) return;
+    out.push(`${label} ${a ? dateShort(a) : 'blank'} \u2192 ${b ? dateShort(b) : 'blank'}`);
+  };
+  const changed = (label: string, a: string | null, b: string | null) => {
+    if ((a ?? '') === (b ?? '')) return;
+    out.push(`${label} ${a || 'blank'} \u2192 ${b || 'blank'}`);
+  };
+  moved('issued', before.issued_on, after.issued_on);
+  moved('submitted', before.submitted_on, after.submitted_on);
+  moved('expires', before.expires_on, after.expires_on);
+  changed('country', before.country, after.country);
+  changed('type', before.subtype, after.subtype);
+  changed('reference', before.reference, after.reference);
+  changed('issue date source', before.issued_on_provenance, after.issued_on_provenance);
+  if ((before.notes ?? '') !== (after.notes ?? '')) out.push('note changed');
+  return out;
+}
+
+/**
  * Confirm — after the fact — that an issue date was read from the certificate.
  *
  * The way an unverified date stops being one: somebody holds the paper, checks

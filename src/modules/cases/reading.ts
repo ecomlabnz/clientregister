@@ -203,10 +203,8 @@ export function readingCard(opts: {
   const skipped = offered.filter((d) => d.why !== null);
 
   return foldedCard('Read a document into this matter', html`
-    <p class="small">Point it at a document already on this file, drop a new one in, or both.
-       It reads them and shows you what it could fill in. <strong>Nothing is written until you
-       press the button on the next screen</strong>, and a box that already has something in it
-       is never written over.</p>
+    <p class="small">Point it at a document on this file, drop a new one in, or both.
+       <strong>Nothing is written until you press the button on the next screen.</strong></p>
     <form method="post" action="/cases/${opts.caseId}/read" enctype="multipart/form-data"
           class="entry-form">
       ${csrfField(opts.csrf)}
@@ -274,10 +272,8 @@ export function readingCard(opts: {
     ${opts.driveOn ? html`
       <hr>
       <h4>Or read it out of Google Drive</h4>
-      <p class="small">Paste the address of this matter’s folder in Drive, or of one file in it.
-         The next screen lists what is there and you tick what to read.
-         <strong>Nothing is stored</strong> unless you tick to keep a copy — the file stays where
-         it is, in the drive.</p>
+      <p class="small">Paste the address of a folder or a file.
+         <strong>Nothing is stored</strong> unless you tick to keep a copy.</p>
       <form method="post" action="/cases/${opts.caseId}/drive" class="entry-form">
         ${csrfField(opts.csrf)}
         ${field({ label: 'Drive folder or file address', name: 'link', maxlength: 500,
@@ -340,10 +336,11 @@ function drivePicker(opts: {
            want is not here, open the file in Drive and paste its own address instead.</p>` : ''}
 
       ${opts.filesKept ? html`
-        <p class="hint"><strong>Keep a copy</strong> stores the file in the register as well as
-           reading it. Tick it for something whose disappearance from the drive would matter —
-           a signed letter of engagement, an INZ decision. Leave it for everything else: the
-           file stays in the drive, which is where the practice keeps it anyway.</p>`
+        ${'' /* Was four sentences on when to tick it: something whose disappearance
+                from the drive would matter — a signed letter of engagement, an INZ
+                decision — and not otherwise, since the drive is where the practice
+                keeps its files anyway. */}
+        <p class="hint">Tick it for a document whose loss from the drive would matter.</p>`
         : html`<p class="hint">File storage is not switched on, so nothing can be kept — every
            file here is read and dropped.</p>`}
 
@@ -698,19 +695,14 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
         'Nothing has been written yet. Check it, then press the button at the bottom.')}
 
       <div class="alert">
-        <p><strong>Only empty boxes are filled.</strong> Anything this matter or
-           ${client.full_name} already holds is left exactly as it is — you can see below what
-           the document said about it, and it is kept in the file note either way. To change
-           something the record already holds, edit it yourself.</p>
+        <p><strong>Only empty boxes are filled.</strong> What the record already holds is
+           left alone \u2014 and shown below, so you can change it yourself.</p>
       </div>
 
       ${foundNothing ? html`
         <div class="alert alert-warn">
-          <p><strong>The reading found nothing in ${from}.</strong> That happens when a document
-             is a photograph or a scan with no text in it — the words are a picture, and there is
-             nothing to read — or when what it holds is not the kind of fact this matter has a box
-             for. Nothing is wrong with the file: try a clearer copy, a text or Word version, or
-             type what you know into the box on the matter.</p>
+          <p><strong>The reading found nothing in ${from}.</strong> Usually a photograph or a
+             scan with no text in it. Try a clearer copy, or a text or Word version.</p>
         </div>` : ''}
 
       ${plan.match ? '' : html`
@@ -757,10 +749,8 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
             ${reviewTable(plan.clientHeld, false, from)}` : ''}`)}
 
         ${card('The file note', note ? html`
-          <p class="hint">Everything the reading found that the register has no box for goes on
-             this matter as a file note, exactly as written below. It records what a document
-             said — not something the register is asserting — and once saved it cannot be
-             changed, like every file note.</p>
+          <p class="hint">Everything with no box of its own goes on the matter as a file note,
+             exactly as written below.</p>
           <pre class="prewrap-pre">${note}</pre>` : html`
           <p class="muted">There is nothing left over to record.</p>`)}
 
@@ -801,11 +791,10 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
                       ${file.content_type}</span></li>`)}
               </ul>` : ''}
             ${sources.length > 1 ? html`
-              <p class="hint">These were read <strong>together</strong>, as one reading, so what
-                 is proposed above is the assistant's reading of all of them at once. Where two
-                 documents disagree — two spellings of a name, two dates of birth — read them one
-                 at a time to see each document's own answer, and fill the box from the one you
-                 trust.</p>` : ''}`) : ''}
+              ${'' /* Where two documents disagree — two spellings of a name, two dates of
+                      birth — reading them one at a time is how you see each document's own
+                      answer. Said here rather than on the screen. */}
+              <p class="hint">Read <strong>together</strong>, as one reading.</p>` : ''}`) : ''}
 
         <div class="form-actions">
           <button class="btn btn-primary" type="submit">

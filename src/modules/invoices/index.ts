@@ -151,9 +151,9 @@ export const invoicesModule: AppModule = {
 
       return page(c, { title: 'New invoice', active: '/invoices' }, html`
         ${breadcrumbs([{ href: '/invoices', label: 'Invoices' }, { label: 'New' }])}
-        ${pageHeader('New invoice',
-          'For work you are billing without having quoted it first. Start with who it is for; '
-          + 'the lines go on next, and nothing is fixed until you issue it.')}
+        ${'' /* For work billed without a quotation first. Nothing is fixed
+                 until it is issued. */}
+        ${pageHeader('New invoice')}
         <form method="post" action="/invoices" class="form-grid" data-draft>
           ${csrfField(csrf)}
           <div class="form-section">
@@ -262,7 +262,7 @@ export const invoicesModule: AppModule = {
       ];
 
       return page(c, { title: 'Invoices', active: '/invoices' }, html`
-        ${pageHeader('Invoices', 'What has been billed, and what is still owed.',
+        ${pageHeader('Invoices', undefined,
           can(c.get('user'), 'quote:write')
             ? html`<a class="btn btn-primary" href="/invoices/new">New invoice</a>`
             : undefined)}
@@ -366,8 +366,6 @@ export const invoicesModule: AppModule = {
         ${invoice.status === 'void' ? html`
           <div class="alert alert-warn">
             <p><strong>This invoice is void.</strong> ${invoice.void_reason ?? ''}</p>
-            <p class="mb">The number stays in the sequence deliberately — a gap is what somebody
-               later asks about.</p>
           </div>` : ''}
         ${isOverdue(invoice, today) ? html`
           <div class="alert alert-warn">
@@ -498,9 +496,10 @@ export const invoicesModule: AppModule = {
                     ${field({ label: 'Note', name: 'note', maxlength: 300 })}
                     <button class="btn btn-primary" type="submit">Record it</button>
                   </form>
-                  <p class="hint">Payments are added, never edited. A mistake is corrected by a
-                     second entry — choose <strong>Adjustment</strong> and enter a negative amount,
-                     which is how a ledger stays a record rather than an opinion.</p>
+                  ${'' /* Added and never edited, which is how a ledger stays a
+                           record rather than an opinion. */}
+                  <p class="hint">Payments are added, never edited — correct a mistake with an
+                     <strong>Adjustment</strong> for a negative amount.</p>
                 </details>` : ''}`)}
 
             ${'' /* The split, asked for as a control rather than a fixture:
@@ -527,8 +526,7 @@ export const invoicesModule: AppModule = {
                    <strong>${money(splitBase_cents, invoice.currency)}</strong></p>
 
                 ${shares.length === 0
-                  ? html`<p class="hint">Nothing is split. Most bills are not — leave this alone and
-                           the whole amount is the practice's.</p>`
+                  ? html`<p class="hint">Nothing is split — the whole amount is the practice's.</p>`
                   : table(['Party', 'Share', 'Amount', ''], [
                       ...allocation.map((a) => html`
                         <tr>
@@ -551,9 +549,9 @@ export const invoicesModule: AppModule = {
                     ], { fixed: false })}
 
                 ${bpTotal !== 0 && bpTotal !== 10000
-                  ? html`<p class="warn small">This split comes to ${formatBp(bpTotal)}. It has to
-                           come to 100% before the invoice can be issued — the database refuses
-                           otherwise.</p>`
+                  /* The database refuses to issue it otherwise. */
+                  ? html`<p class="warn small">This split comes to ${formatBp(bpTotal)} — it has to
+                           come to 100% before the invoice can be issued.</p>`
                   : ''}
 
                 ${invoice.status === 'draft' && writable ? html`
@@ -565,8 +563,7 @@ export const invoicesModule: AppModule = {
                               placeholder: '30%' })}
                     <button class="btn btn-secondary" type="submit">Add</button>
                   </form>
-                  <p class="hint">Shares are set while the invoice is a draft. Once it is issued the
-                     split is fixed with everything else on it.</p>` : ''}
+                  <p class="hint">Shares can only be set while the invoice is a draft.</p>` : ''}
               </details>`)}
           </div>
 
@@ -592,8 +589,9 @@ export const invoicesModule: AppModule = {
                 ${csrfField(csrf)}
                 ${field({ label: 'Date of issue', name: 'issued_on', type: 'date', value: today, required: true })}
                 <button class="btn btn-primary" type="submit">Issue this invoice</button>
-                <p class="hint">Once issued, the amounts, dates and lines are fixed — the database
-                   refuses to change them. If it is wrong after that, void it and raise another.</p>
+                ${'' /* The database refuses to change them, not merely the page. */}
+                <p class="hint">Once issued, the amounts, dates and lines are fixed — void it and
+                   raise another if it is wrong.</p>
               </form>`) : ''}
 
             ${invoice.status !== 'void' && invoice.status !== 'draft' && can(c.get('user'), 'quote:write')
@@ -609,9 +607,9 @@ export const invoicesModule: AppModule = {
               ${invoice.xero_invoice_id
                 ? html`<p class="small">Pushed on ${stamp(invoice.xero_pushed_at)} as
                          <code>${invoice.xero_invoice_id}</code>.</p>`
-                : html`<p class="small muted">Not connected yet. When it is, an issued invoice can be
-                          pushed from here and the Xero identifier recorded against it, so the two
-                          systems agree about which invoice is which.</p>`}
+                /* Once connected, an issued invoice is pushed from here and the Xero
+                   identifier recorded against it. */
+                : html`<p class="small muted">Not connected yet.</p>`}
               ${invoice.xero_error ? html`<p class="small warn">${invoice.xero_error}</p>` : ''}`)}
           </div>
         </div>`);

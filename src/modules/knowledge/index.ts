@@ -122,8 +122,7 @@ function fileField(label: string): Raw {
     <div class="field">
       <label for="f_files">${label}</label>
       <input id="f_files" type="file" name="files" multiple>
-      <p class="hint">The circular, the instructions, whatever this article is about.
-         ${MAX_UPLOAD_BYTES / 1024 / 1024} MB each at most.</p>
+      <p class="hint">${MAX_UPLOAD_BYTES / 1024 / 1024} MB each at most.</p>
     </div>`;
 }
 
@@ -230,8 +229,9 @@ export const knowledgeModule: AppModule = {
       };
 
       return page(c, { title: 'Knowledge base', active: '/knowledge' }, html`
-        ${pageHeader('Knowledge base',
-          'Visa packs, circulars, legal material and announcements — with the dates they take effect.',
+        ${'' /* Visa packs, circulars, legal material and announcements, with the
+                 dates they take effect. */}
+        ${pageHeader('Knowledge base', undefined,
           html`<a class="btn btn-primary" href="/knowledge/new">New article</a>`)}
 
         ${'' /* An article's state is an errand, not a filter — you come here
@@ -521,11 +521,11 @@ export const knowledgeModule: AppModule = {
                       confirm: 'Stop sharing? The link stops working immediately, including for '
                              + 'clients already holding it.' }) : ''}`
               : html`
-                <p class="small">Not shared. Nobody outside the practice can read it.</p>
+                <p class="small">Not shared.</p>
                 ${writable ? actionButton(`/knowledge/${article.id}/share`, session.csrf,
                     'Create a link', { className: 'btn btn-secondary btn-small' }) : ''}
-                <p class="hint">Creates an address you can send. Whatever you edit afterwards is
-                   what the client sees, so a correction reaches everybody holding it.</p>`)}
+                <p class="hint">Creates an address you can send; whatever you edit afterwards is
+                   what the client sees.</p>`)}
 
             ${card('Dates', html`
               <dl class="kv">
@@ -546,8 +546,8 @@ export const knowledgeModule: AppModule = {
                     <div class="muted small">Due ${dateShort(f.due_at)} · ${f.task_status}</div>
                   </li>`)}</ul>
                   <p class="hint">Raised automatically from the dates above, and kept in step with them.</p>`
-              : html`<p class="muted small">No follow-up tasks. They are raised for a published article
-                       that carries a date, using the lead time in
+              : html`<p class="muted small">No follow-up tasks — they are raised for a published
+                       article that carries a date, with the lead time under
                        <a href="/admin/settings?tab=knowledge">Settings → Knowledge base</a>.</p>`)}
 
             ${card('Tags', html`
@@ -765,8 +765,10 @@ export const knowledgeModule: AppModule = {
           { href: `/knowledge/${article.id}`, label: article.ref },
           { label: 'History' }])}
         ${pageHeader(`History of ${article.ref}`, article.title)}
-        <p class="hint">Each row is what the article said before an edit. This history cannot be
-           altered or deleted — the database refuses it, not just the application.</p>
+        ${'' /* The database refuses to alter or delete it, not just the
+                 application. */}
+        <p class="hint">Each row is what the article said before an edit, and cannot be altered or
+           deleted.</p>
         ${versions.length === 0
           ? emptyState('No edits yet — this is still the original.')
           : html`<ul class="timeline">${versions.map((v) => html`

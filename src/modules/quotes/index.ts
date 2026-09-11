@@ -642,7 +642,7 @@ export const quotesModule: AppModule = {
       ];
 
       return page(c, { title: 'Quotes', active: '/quotes' }, html`
-        ${pageHeader('Quotes', 'Fees proposed, and how they landed.',
+        ${pageHeader('Quotes', undefined,
           can(c.get('user'), 'quote:write') ? html`<a class="btn btn-primary" href="/quotes/new">New quote</a>` : undefined)}
         <div class="fee-summary">
           <div class="stat"><span class="stat-label">Awaiting reply</span><span class="stat-value">${outstanding.length}</span></div>
@@ -701,7 +701,7 @@ export const quotesModule: AppModule = {
 
       return page(c, { title: 'New quote', active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { label: 'New' }])}
-        ${pageHeader('New quote', 'Start with who it is for and what it covers. The items go on next.')}
+        ${pageHeader('New quote')}
         <form method="post" action="/quotes" class="form-grid" data-draft>
           ${csrfField(csrf)}
           <input type="hidden" name="inquiry_id" value="${presetInquiry}">
@@ -874,8 +874,11 @@ export const quotesModule: AppModule = {
 
       return page(c, { title: 'Standard items', active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { label: 'Standard items' }])}
+        ${'' /* A quote keeps its own copy of a line, so a price changed here
+                 never alters a quotation already sent. Said in one sentence
+                 below rather than explained. */}
         ${pageHeader('Standard items',
-          'The things this practice quotes for, and what they usually cost. Choosing one on a quote fills the line in; the quote then keeps its own copy, so changing a price here never alters a quote already sent.')}
+          'Changing a price here does not change a quote already sent.')}
 
         ${table(['Item', 'Type', 'Unit', 'Usual price', 'GST', ''], items.map((it) => html`
           <tr class="${it.active ? '' : 'row-muted'}">
@@ -1003,16 +1006,15 @@ export const quotesModule: AppModule = {
 
       return page(c, { title: 'Letter clauses', active: '/quotes' }, html`
         ${breadcrumbs([{ href: '/quotes', label: 'Quotes' }, { label: 'Letter clauses' }])}
-        ${pageHeader('Letter clauses',
-          'The headed sections in the middle of a letter of engagement. The parties, the work and '
-          + 'the fees are not here — they are on the quotation the letter goes out with. A clause '
-          + 'can be limited to certain kinds of matter, so the partnership assessment does not '
-          + 'appear on an employer accreditation.')}
+        ${'' /* These are the headed sections in the middle of a letter of
+                 engagement. The parties, the work and the fees are not here —
+                 they are on the quotation the letter goes out with. A clause
+                 can be limited to certain kinds of matter. */}
+        ${pageHeader('Letter clauses')}
 
         ${clauses.length === 0
           ? card('Nothing yet', emptyState(
-              'A letter of engagement will print with no clauses in it until you add some. '
-              + 'Nothing is supplied: this is your wording, not the register’s.'))
+              'No clauses yet — a letter of engagement will print without any.'))
           : table(['Order', 'Clause', 'On which matters', ''], clauses.map((cl: ClauseRow) => html`
               <tr class="${cl.active ? '' : 'row-muted'}">
                 <td class="num small">${String(cl.position)}</td>
@@ -1043,8 +1045,7 @@ export const quotesModule: AppModule = {
                      a modifier key nobody has on a phone. */}
             <div class="field">
               <label>On which matters</label>
-              <p class="hint">Tick none for every matter. Tick some, and the clause is printed only
-                 when the quotation covers one of them.</p>
+              <p class="hint">Tick none to print it on every matter.</p>
               <div class="pick-grid">
                 ${types.map((t: Term) => html`
                   <label class="check small">
@@ -1406,12 +1407,10 @@ export const quotesModule: AppModule = {
                      practice had just reported on the dashboard, built fresh.
                      Editing several people is a form, and forms stack. */}
             ${card('The people on this engagement', html`
-              <p class="hint mb">Everybody the letter of engagement names besides the client:
-                 the other applicants, the partner and children whose details the application
-                 needs, and anybody at an agency who may be told how it is going. The client
-                 does not need a row — they are already on the quotation.</p>
+              <p class="hint mb">The client does not need a row — they are already on the
+                 quotation.</p>
               ${parties.length === 0
-                ? emptyState('Nobody else named yet. The letter will name the client alone.')
+                ? emptyState('Nobody else named yet — the letter will name the client alone.')
                 : writable
                   ? html`
                     <form method="post" action="/quotes/${q.id}/parties">
@@ -1476,7 +1475,7 @@ export const quotesModule: AppModule = {
 
               ${!parties.some((p) => p.is_representative) ? html`
                 <p class="hint">Nobody is nominated to instruct, so the letter will say the client
-                   is — which is the usual arrangement.</p>` : ''}
+                   is.</p>` : ''}
 
               ${writable ? html`
                 <details class="reveal mt">
@@ -1511,9 +1510,11 @@ export const quotesModule: AppModule = {
                 </details>` : ''}`)}
 
             ${card('Payment stages', html`
-              <p class="hint mb">When each part falls due. Kept apart from the items above, because
-                 the two do not line up: one piece of work can be split across a deposit and a
-                 balance, and one stage can gather several fees into a single payment.</p>
+              ${'' /* Kept apart from the items above because the two do not line
+                       up: one piece of work can be split across a deposit and a
+                       balance, and one stage can gather several fees into a
+                       single payment. */}
+              <p class="hint mb">When each part falls due.</p>
               ${'' /* The figure the client pays, and the same one the
                        printed quotation shows.
 
@@ -1540,7 +1541,7 @@ export const quotesModule: AppModule = {
                        a lie on the INZ fee, which is GST inclusive: nothing is
                        added to it. */}
               ${stages.length === 0
-                ? emptyState('No stages set out. Payment terms alone will be printed.')
+                ? emptyState('No stages set out — payment terms alone will be printed.')
                 : table(['Stage', 'Description', 'Amount'], [
                     ...stages.map((s) => html`
                       <tr>
@@ -1585,8 +1586,7 @@ export const quotesModule: AppModule = {
                   ${stageTotal > totals.totalCents
                     ? html`The stages come to <strong>${money(stageTotal, q.currency)}</strong>,
                            which is ${money(stageTotal - totals.totalCents, q.currency)} more than
-                           the quotation's ${money(totals.totalCents, q.currency)}. That happens
-                           when a fee line is lowered under a schedule already written. Lower a
+                           the quotation's ${money(totals.totalCents, q.currency)}. Lower a
                            stage to match before this goes out.`
                     : stageTotal === totals.totalCents
                     ? html`<strong>${money(stageTotal, q.currency)}</strong> allocated across
@@ -1677,9 +1677,10 @@ export const quotesModule: AppModule = {
                 ${field({ label: 'Payment terms (days)', name: 'term_days', type: 'number', value: '7' })}
                 <button class="btn btn-primary" type="submit">Raise an invoice</button>
               </form>
+              ${'' /* Nothing here consumes the quote: a quote can reasonably be
+                       invoiced more than once — staged fees are precisely that. */}
               <p class="hint">The lines are copied onto a new draft invoice; this quote is left
-                 exactly as it is. A quote can reasonably be invoiced more than once — staged fees
-                 are precisely that — so nothing here consumes it.</p>`) : ''}
+                 as it is.</p>`) : ''}
 
             ${'' /* A note of an email sent offers the email.
 
@@ -1720,9 +1721,7 @@ export const quotesModule: AppModule = {
                     <div class="muted small">${m.to_addr} · ${stamp(m.sent_at ?? m.created_at)}</div>
                   </div>
                   <div>${badge(sendState(m).words, sendState(m).tone)}</div>
-                </li>`)}</ul>
-              <p class="hint">Each one opens exactly as it left the office — the recipients, the
-                 subject and the letter itself.</p>`) : ''}
+                </li>`)}</ul>`) : ''}
           </div>
 
           <div class="col-side">
@@ -1741,17 +1740,18 @@ export const quotesModule: AppModule = {
                   <dt>Received</dt><dd>${printedAt(q.accepted_at)}</dd>
                   ${q.accepted_from ? html`<dt>Recorded</dt><dd class="small">${q.accepted_from}</dd>` : ''}
                 </dl>
-                <p class="hint">An acceptance cannot be changed or removed — it is the moment the
-                   contract was formed. If it was made in error, issue a new quotation.</p>`)}`
+                ${'' /* It is the moment the contract was formed, which is why
+                         nothing here can undo it. */}
+                <p class="hint">An acceptance cannot be undone — issue a new quotation if it was
+                   made in error.</p>`)}`
               : q.share_token ? html`
               ${card('The client\u2019s link', html`
-                <p class="small">This is the address the client opens. It carries the quotation
-                   ${q.with_letter === 1 ? 'and the letter of engagement ' : ''}and the acceptance
-                   form.</p>
+                ${'' /* The link carries the quotation, the letter of engagement
+                         where there is one, and the acceptance form. It does not
+                         change once sent. */}
                 <p><a class="break-url small" href="/q/${q.share_token}" target="_blank"
                       rel="noopener">/q/${q.share_token}</a></p>
-                <p class="hint">Anybody holding this address can read the quotation, so treat it as
-                   you would the email it went in. It does not change once sent.</p>`)}`
+                <p class="hint">Anybody holding this address can read the quotation.</p>`)}`
               : ''}
 
             ${card('Status', html`
@@ -1767,14 +1767,14 @@ export const quotesModule: AppModule = {
             ${card('Letter of engagement', html`
               ${q.with_letter === 1
                 ? html`<p class="small">This quotation goes out <strong>with</strong> a letter of
-                         engagement. The letter states no parties, scope or fees — it refers to
-                         this quotation, which carries all three.</p>
+                         engagement.</p>
                        <a class="btn btn-secondary btn-block" href="/quotes/${q.id}/letter"
                           target="_blank" rel="noopener">Read the letter</a>`
                 : q.with_letter === 0
                   ? html`<p class="small">This quotation goes out <strong>on its own</strong>.</p>`
-                  : html`<p class="small">Nobody has said yet whether this goes out with a letter.
-                           Quotations made before the question existed are in this state.</p>`}
+                  /* Quotations made before the question existed are in this state. */
+                  : html`<p class="small">Nobody has said yet whether this goes out with a
+                           letter.</p>`}
               ${writable ? html`
                 <form method="post" action="/quotes/${q.id}/letter" class="mt">
                   ${csrfField(csrf)}
@@ -1806,8 +1806,7 @@ export const quotesModule: AppModule = {
                   ${field({ label: 'Stands for (days)', name: 'validity_days',
                             value: String(q.validity_days ?? qSettings.validityDays), maxlength: 3 })}
                   <button class="btn btn-secondary btn-small" type="submit">Set validity</button>
-                  <p class="hint">Counted inclusive of the day of issue. The quote prints the date,
-                     not the number of days.</p>
+                  <p class="hint">Counted inclusive of the day of issue.</p>
                 </form>` : ''}`)}
 
             ${card('Notes', html`<p class="prewrap">${q.notes || '—'}</p>`)}
@@ -1917,9 +1916,9 @@ export const quotesModule: AppModule = {
 
         ${configured
           ? ''
-          : html`<div class="alert alert-warn">No outgoing mail provider is configured, so this will
-                   be recorded and queued but not delivered. It sends as soon as one is set up —
-                   see Settings → Integrations.</div>`}
+          /* It is still recorded, and sends as soon as a provider is set up. */
+          : html`<div class="alert alert-warn">No outgoing mail provider is configured, so this
+                   will be queued but not delivered — see Settings → Integrations.</div>`}
 
         ${'' /* Laid out the way every mail client lays this out: one column,
                  the addresses stacked at the top, the subject under them, then
@@ -1984,10 +1983,10 @@ export const quotesModule: AppModule = {
           </div>
 
           ${recipients.length ? html`
-            <p class="hint">Start typing a name or an address in <strong>To</strong> or
-               <strong>Copy to</strong> and the register offers the people it already holds —
-               clients and agencies both. An address that is on nobody’s record can still be
-               typed in full; the next screen will say so before anything is sent.</p>` : ''}
+            ${'' /* An address on nobody's record can still be typed in full; the
+                     preview screen names it before anything is sent. */}
+            <p class="hint">Start typing a name or an address to pick from the people the register
+               already holds.</p>` : ''}
 
           <div class="compose-bar">
             <div class="compose-tools">
@@ -2032,12 +2031,10 @@ export const quotesModule: AppModule = {
                    explains a choice already made rather than one being made. */}
           <details class="compose-help">
             <summary>What “Formatted” does</summary>
-            <p class="hint">The message is written as plain text. Choosing <strong>Formatted</strong>
-               sends a tidy HTML version as well, with a plain-text copy for clients whose mail
-               client prefers it — <code>**bold**</code>, <code>*italic*</code>,
-               <code>## heading</code>, lines starting <code>-</code> or <code>1.</code> for lists,
-               and web addresses become links. Nothing else is interpreted, so what you type is what
-               is sent.</p>
+            <p class="hint"><strong>Formatted</strong> sends an HTML version as well:
+               <code>**bold**</code>, <code>*italic*</code>, <code>## heading</code>, lines
+               starting <code>-</code> or <code>1.</code> for lists, and web addresses become
+               links.</p>
           </details>
         </form>`);
     });
@@ -2156,7 +2153,7 @@ export const quotesModule: AppModule = {
               ${unknown.length === 1 ? 'is not' : 'are not'} something the register can fill:</strong>
             ${unknown.map((name) => html`<code>{${name}}</code> `)}
             <div class="small mt-sm">${unknown.length === 1 ? 'It' : 'They'} will be sent to the
-              client exactly as written. The ones that work are listed at the foot of this page.</div>
+              client exactly as written.</div>
           </div>` : ''}
 
         ${'' /* The letter as the client reads it. Rendered by the same function
@@ -2190,9 +2187,7 @@ export const quotesModule: AppModule = {
                   ${join(strangers.map((a) => html`<strong>${a}</strong>${canAddClient ? html`
                     (<a href="/clients?q=${encodeURIComponent(a)}">find who holds it</a> or
                      <a href="/clients/new?email=${encodeURIComponent(a)}">add them as a client</a>)` : ''}`), '; ')}.
-                  ${strangers.length === 1 ? 'It will still be sent' : 'They will still be sent'} —
-                  the register is not keeping the address anywhere; it belongs on the record of the
-                  person who holds it.
+                  ${strangers.length === 1 ? 'It will still be sent.' : 'They will still be sent.'}
                 </p>` : ''}
               <div class="email-preview">
                 ${'' /* Plain text is previewed with the emphasis marks off, because
@@ -2200,9 +2195,10 @@ export const quotesModule: AppModule = {
                          2026: "what are the ** characters in the body?" */}
                 ${asHtml ? renderRichText(body) : html`<pre class="prewrap-pre">${toPlainText(body)}</pre>`}
               </div>
+              ${'' /* The colours belong to this page; the words, the bold and the
+                       lists are the email's. */}
               <p class="hint">${asHtml
-                ? 'Formatted exactly as it will be sent. The colours are this page\u2019s; the words, '
-                  + 'the bold and the lists are the email\u2019s.'
+                ? 'Formatted exactly as it will be sent.'
                 : 'Sent exactly as shown, as plain text.'}</p>`)}
 
             <div class="compose-actions">

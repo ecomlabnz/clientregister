@@ -258,7 +258,7 @@ describe('creating a party from the matter', () => {
     // person's page. A longer form here would be a second client form to keep
     // in step with the first.
     const form = cases.slice(cases.indexOf('<h4>Somebody not on file yet</h4>'),
-                             cases.indexOf('Creates a client record'));
+                             cases.indexOf('Creates the client and adds them here'));
     const fields = [...form.matchAll(/name: '(\w+)'/g)].map((m) => m[1]!);
     expect(fields).toEqual(['given_names', 'family_name', 'role', 'email']);
   });

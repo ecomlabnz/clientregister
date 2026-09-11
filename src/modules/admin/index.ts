@@ -89,8 +89,8 @@ async function defaultSharesCard(c: any, csrf: string): Promise<Raw> {
   try { shares = JSON.parse(raw_); } catch { shares = []; }
 
   return card('Default revenue split for new cases', html`
-    <p class="hint">Each case starts from this and can be adjusted on the case itself. Shares must
-       total 100%.</p>
+    ${'' /* Each case starts from this split and can be adjusted on the case itself. */}
+    <p class="hint">Shares must total 100%.</p>
     <form method="post" action="/admin/settings/default-shares">
       ${csrfField(csrf)}
       <div class="table-wrap">
@@ -181,7 +181,7 @@ export const adminModule: AppModule = {
       ]);
 
       return page(c, { title: 'Settings', active: '/admin' }, html`
-        ${pageHeader('Settings', 'Who can get in, how the practice is configured, and what is wired up.')}
+        ${pageHeader('Settings')}
         ${adminTabs(tab)}
 
         ${tab === 'overview' ? html`
@@ -190,13 +190,13 @@ export const adminModule: AppModule = {
           <div class="stat"><span class="stat-label">Inbox pending</span><span class="stat-value">${pendingIngest}</span></div>
           <div class="stat"><span class="stat-label">Mail queued</span><span class="stat-value">${queuedMail}</span></div>
         </div>
-        <p class="hint">Everything in this section is on the bar above.</p>` : ''}
+        ` : ''}
 
         ${tab === 'integrations' ? card('Integrations', html`
-          <p class="hint mb">Step-by-step instructions for connecting each of these are in
-             <a href="/help#connecting">Help → Connecting Telegram, WhatsApp and email</a>.
-             Keys are set as GitHub repository secrets and reach the Worker on the next deploy —
-             they are never stored in this database.</p>
+          ${'' /* Keys are GitHub repository secrets and reach the Worker on the next deploy;
+                   none of them is stored in this database. */}
+          <p class="hint mb">Step-by-step instructions are in
+             <a href="/help#connecting">Help → Connecting Telegram, WhatsApp and email</a>.</p>
           ${mailConfigured(env) ? html`
             <form method="post" action="/admin/mail/test" class="row-form mb">
               ${csrfField(c.get('session')!.csrf)}
@@ -257,19 +257,17 @@ export const adminModule: AppModule = {
 
         ${tab === 'maintenance' ? html`
         ${demoCount > 0 ? card('Demonstration data', html`
-          <p>This register contains <strong>${demoCount}</strong> fabricated client and case records,
-             loaded to show how the system behaves with a realistic caseload.</p>
-          <p>They are marked three ways so none of it can be mistaken for a real file: every
-             identifier begins <code>demo_</code>, every client note starts <code>[TEST DATA]</code>,
-             and every case carries the red <strong>Test data</strong> tag —
-             <a href="/cases?tag=Test+data&scope=all">see them all</a>.</p>
+          ${'' /* Marked three ways so none of it can be mistaken for a real file: every
+                   identifier begins `demo_`, every client note starts [TEST DATA], and every
+                   case carries the red Test data tag. */}
+          <p>This register contains <strong>${demoCount}</strong> fabricated client and case
+             records — <a href="/cases?tag=Test+data&scope=all">see them all</a>.</p>
           <form method="post" action="/admin/demo-data/remove"
                 data-confirm="Delete all ${demoCount} demonstration records? Real records are untouched.">
             ${csrfField(c.get('session')!.csrf)}
             <button class="btn btn-danger" type="submit">Remove all demonstration data</button>
           </form>
-          <p class="hint">Only rows whose identifier begins <code>demo_</code> are removed. The audit
-             log is append-only and keeps the record that this data existed.</p>`) : ''}
+          <p class="hint">Only rows whose identifier begins <code>demo_</code> are removed.</p>`) : ''}
 
         ${inboxCredentials(c.env) ? card('Forwarded mail', html`
           <p>Reading <strong>${c.env.GMAIL_INBOX_ADDRESS ?? 'the authorised mailbox'}</strong>
@@ -278,9 +276,9 @@ export const adminModule: AppModule = {
             ${csrfField(c.get('session')!.csrf)}
             <button class="btn btn-secondary" type="submit">Check for mail now</button>
           </form>
-          <p class="hint">The same pass the schedule runs, on demand. It says what it looked at
-             and what it took, so a mailbox that is connected but silent can be told apart from
-             one that is not connected at all — which is otherwise the same picture from here.</p>`)
+          ${'' /* The button runs the same pass as the schedule and reports what it looked at
+                   and what it took, so a connected-but-silent mailbox can be told apart from
+                   one that is not connected at all. */}`)
           : ''}
 
         ${card('Outbound mail queue', html`
@@ -289,8 +287,8 @@ export const adminModule: AppModule = {
             ${csrfField(c.get('session')!.csrf)}
             <button class="btn btn-secondary" type="submit">Attempt delivery now</button>
           </form>
-          <p class="hint">Mail queues rather than failing when no transport is configured, so
-             nothing is lost while one is being set up.</p>`)}` : ''}`);
+          ${'' /* Mail queues rather than failing when no transport is configured, so nothing
+                   is lost while one is being set up. */}`)}` : ''}`);
     });
 
     /**
@@ -516,8 +514,7 @@ export const adminModule: AppModule = {
                 <option value="suspended" ${u.status === 'suspended' ? raw('selected') : ''}>Suspended</option>
               </select>
               ${u.id === me.id
-                ? html`<p class="hint">This is you. You can change your own name and email, but not
-                         your own role or status.</p>`
+                ? html`<p class="hint">This is you — you cannot change your own role or status.</p>`
                 : ''}
             </td>
             <td class="col-sm-hide">${badge(u.status, u.status === 'active' ? 'green' : 'red')}
@@ -694,7 +691,7 @@ export const adminModule: AppModule = {
       const csrf = c.get('session')!.csrf;
 
       return page(c, { title: `Settings — ${group.title}`, active: '/admin' }, html`
-        ${pageHeader('Settings', 'Parameters of the system, grouped by what they affect.')}
+        ${pageHeader('Settings')}
         ${adminTabs('settings')}
 
         ${/* Two bars: the section, then the groups within it. The second is
@@ -729,11 +726,10 @@ export const adminModule: AppModule = {
 
         ${group.note === 'default-shares' ? await defaultSharesCard(c, csrf) : ''}
 
-        ${card('What is not here', html`
-          <p>API keys, webhook secrets and the field-encryption key are deliberately not settings.
-             They are held outside the database, so reading it never yields a credential and
-             changing one leaves a trace in the deployment. See
-             <strong>Settings → Integrations</strong> for what is connected.</p>`)}`);
+        ${'' /* A "What is not here" card said this: API keys, webhook secrets and the
+                 field-encryption key are deliberately not settings. They are held outside the
+                 database, so reading it never yields a credential and changing one leaves a
+                 trace in the deployment. Settings → Integrations shows what is connected. */}`);
     });
 
     r.post('/settings', requirePermission('admin:settings'), async (c) => {
@@ -822,28 +818,22 @@ export const adminModule: AppModule = {
       const total = tally.reduce((sum, t) => sum + t.count, 0);
 
       return page(c, { title: 'Test data', active: '/admin' }, html`
-        ${pageHeader('Test data',
-          'Records marked as tests, and one button to be rid of them.')}
+        ${pageHeader('Test data')}
         ${adminTabs('testdata')}
 
         ${total === 0
-          ? emptyState('Nothing is marked as test data. '
-              + 'Open any client, matter, quotation, inquiry, invoice or task and use '
-              + '“Mark as test data” to add it here.')
+          ? emptyState('Nothing marked yet — use “Mark as test data” on any record.')
           : html`
             <div class="alert alert-warn">
               <p><strong>${total} ${total === 1 ? 'record' : 'records'} will be deleted
                  permanently</strong>, together with everything filed under them — fee lines,
                  payment stages, passports, certificates, documents and file notes.</p>
-              <p>Two things do not go, and cannot:</p>
-              <ul>
-                <li><strong>The audit log.</strong> It is append-only in the database and stays
-                    that way. Afterwards it will still record that these records were created and
-                    deleted, naming ids that no longer lead anywhere. That is the log doing its
-                    job: it is the register’s account of what people did, not a copy of the data.</li>
-                <li><strong>Emails already sent.</strong> A quotation emailed to a real address
-                    was really emailed.</li>
-              </ul>
+              ${'' /* Two things do not go, and cannot. The audit log is append-only, so it
+                       will still record that these records were created and deleted, naming
+                       ids that no longer lead anywhere — it is the account of what people
+                       did, not a copy of the data. And a quotation emailed to a real address
+                       was really emailed. */}
+              <p>The audit log and any emails already sent are not affected.</p>
             </div>
 
             ${card('What will go', html`
@@ -944,10 +934,10 @@ export const adminModule: AppModule = {
             : 'Every action taken in the register, by whom, and when.')}
         ${adminTabs('audit')}
 
+        ${'' /* Database triggers refuse every attempt to change or delete a row — from this
+                 application, the Cloudflare console, or the API alike. */}
         <div class="alert alert-ok">
-          This log is append-only in the database itself. Triggers refuse every attempt to change or
-          delete a row — from this application, the Cloudflare console, or the API alike. Entries can
-          only be added.
+          This log is append-only: entries can only be added, never changed or deleted.
         </div>
 
         <form method="get" action="/admin/audit" class="filters">

@@ -315,9 +315,12 @@ describe('reading what is already on the file', () => {
     expect(h.count('SELECT COUNT(*) AS n FROM ai_run_documents')).toBe(2);
     expect(body).toContain('inz-letter.txt');
     expect(body).toContain('passport-page.txt');
-    // Where two documents disagree, the screen says how to see each one's own
-    // answer rather than pretending it knows which said what.
-    expect(body).toContain('at a time to see each document');
+    // The screen says the documents were read as one reading, so a reader knows
+    // the proposal is the assistant's reading of all of them at once rather
+    // than of any one of them. The paragraph explaining what to do when two
+    // documents disagree moved into a code comment on 11 September 2026 with
+    // the rest of the page's explanatory prose.
+    expect(body).toContain('as one reading');
   });
 
   it('writes nothing at all until the confirming press', async () => {

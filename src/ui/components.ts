@@ -177,9 +177,12 @@ export function flagBand(opts: {
                   <input type="hidden" name="_csrf" value="${opts.clear.csrf}">
                   <button class="btn btn-danger btn-small" type="submit">Delete it instead</button>
                 </form>
-                <p class="hint">Take it down when it stops applying — the record keeps it.
-                   Delete it only when it should never have been here. Either way the audit
-                   log records what it said.</p>
+                ${'' /* Was three sentences explaining the difference between taking a
+                        warning down and deleting it, and that the audit log keeps both.
+                        Cut to the operative half on 11 September 2026 — "the app should
+                        look like an app and not an annotated form". The distinction is
+                        already in the two button labels. */}
+                <p class="hint">Delete it only when it should never have been here.</p>
               </details>` : ''}
           </div>
         </div>`)}
@@ -306,9 +309,9 @@ export function flagRaiser(opts: {
                      includeBlank: false, options: opts.lives })}
           <button class="btn btn-primary" type="submit">Raise it</button>
         </form>
-        <p class="hint">It shows at the top of this record until it is taken down, or until the
-           date you choose. A warning on a client also shows on all of their matters, because the
-           fact is about the person.</p>
+        ${'' /* The reason a client's warning reaches their matters is that the fact
+                is about the person. Said in a comment rather than on the page. */}
+        <p class="hint">A warning on a client shows on all of their matters.</p>
       </div></section>
     </details>`;
 }
@@ -445,10 +448,15 @@ export function timelineItem(opts: {
                         value: entry.occurred_at.slice(0, 10) })}
             </div>
             <button class="btn btn-secondary btn-small" type="submit">Save the correction</button>
-            <p class="hint">Only for ${String(opts.correction.minutes)} minutes after a note is
-               written, and only once. After that the note stands and a correction goes in as a new
-               note — that is what makes the file worth something later. What it said before is
-               kept in the audit log either way.</p>
+            ${'' /* This rendered under the correction form on every file note on every
+                    client and matter page — the most-repeated paragraph in the
+                    register. What it explained: that the window is short and single
+                    because an append-only file is what makes the record worth
+                    something, and that the old wording is kept in the audit log
+                    regardless. Both are true and neither is needed at the moment of
+                    pressing the button. */}
+            <p class="hint">Once, within ${String(opts.correction.minutes)} minutes. After that,
+               add a new note.</p>
           </form>
         </details>` : ''}
     </li>`;
@@ -894,12 +902,11 @@ export function testDataBand(opts: {
     return html`
       <details class="test-mark-offer">
         <summary>Mark as test data</summary>
-        <p class="hint">Test data can be deleted in one go from Admin → Test data.
-           Marking this ${opts.noun} also marks everything filed under it.
-           ${opts.oneWay
-             ? html`A quotation cannot be unmarked afterwards, because the mark is
-                    what releases it from being a signed contract.`
-             : ''}</p>
+        ${'' /* The reason a quotation's mark is one-way: it is what releases the
+                quotation from being a signed contract. The confirmation below still
+                says so at the moment it matters. */}
+        <p class="hint">Marks everything filed under this ${opts.noun} too.${opts.oneWay
+          ? ' A quotation cannot be unmarked.' : ''}</p>
         ${actionButton(action, opts.csrf, 'Mark as test data', {
           className: 'btn btn-secondary btn-small',
           fields: { ...common, mark: '1' },

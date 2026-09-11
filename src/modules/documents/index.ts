@@ -248,8 +248,7 @@ export const documentsModule: AppModule = {
             <p>Document storage needs an R2 bucket. R2 has to be switched on once in the
                Cloudflare dashboard, then:</p>
             <pre>npx wrangler r2 bucket create clientregister-docs</pre>
-            <p>Then uncomment the <code>r2_buckets</code> binding in <code>wrangler.jsonc</code> and redeploy.
-               Everything else keeps working in the meantime.</p>`)}`);
+            <p>Then uncomment the <code>r2_buckets</code> binding in <code>wrangler.jsonc</code> and redeploy.</p>`)}`);
       }
 
       const recent = await all<DocumentRow>(
@@ -524,7 +523,7 @@ export function filesPanel(opts: {
         <div class="field"><label for="f_lcat">Category</label><select id="f_lcat" name="category">${options}</select></div>
         <button class="btn btn-secondary" type="submit">Add link</button>
       </form>
-      <p class="hint">The register controls who sees the link. The drive controls who can open
-         the file — check its sharing settings there.</p>
+      <p class="hint">The drive controls who can open the file — check its sharing settings
+         there.</p>
     </details>`;
 }

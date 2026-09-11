@@ -178,9 +178,12 @@ describe('an address the register does not hold', () => {
     const body = await preview(harness(), 'someone.new@example.test');
     expect(body).toContain('/clients/new?email=someone.new%40example.test');
     expect(body).toContain('/clients?q=someone.new%40example.test');
-    // The point of the line, said in the words the practice would use.
-    expect(body.replace(/\s+/g, ' '))
-      .toContain('it belongs on the record of the person who holds it');
+    // The two links are the offer, and they are what this test is about. The
+    // sentence that used to follow them — that the register keeps no address of
+    // its own, because an address belongs on the record of whoever holds it —
+    // went with the rest of the app's explanatory prose on 11 September 2026.
+    // What must survive is that the quotation still goes out regardless.
+    expect(body.replace(/\s+/g, ' ')).toMatch(/will still be sent/i);
   });
 
   it('says nothing when every recipient is on a record', async () => {

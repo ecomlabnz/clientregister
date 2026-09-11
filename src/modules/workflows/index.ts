@@ -157,8 +157,8 @@ export const workflowsModule: AppModule = {
       ]);
 
       return page(c, { title: 'Workflows', active: '/alerts' }, html`
-        ${pageHeader('For approval',
-          'What the register would do about the dates it is watching. Nothing here has happened yet.')}
+        ${'' /* What the register would do about the dates it is watching. */}
+        ${pageHeader('For approval', 'Nothing here has happened yet.')}
         ${alertCounters(alerts)}
         ${alertTabs({ alerts, awaiting: pending?.n ?? 0, horizon, current: 'approval' })}
         ${queueTabs(view, pending?.n ?? 0)}
@@ -206,10 +206,12 @@ export const workflowsModule: AppModule = {
                 </td>
               </tr>`), { sticky: true, fixed: true, empty: 'Nothing waiting.' })}
 
-        <p class="hint">A task is internal, so a rule may be written to create one on its own.
-           Anything that leaves the practice waits here for a person, whatever the rule says —
-           that is enforced where the rules are stored, not only where they are written.${
-             canEdit ? html` The rules themselves are under
+        ${'' /* A task is internal, so a rule may create one on its own. Anything
+                 that leaves the practice waits here for a person whatever the rule
+                 says, and that is enforced where the rules are stored rather than
+                 only where they are written. */}
+        <p class="hint">Anything that leaves the practice waits here for a person.${
+             canEdit ? html` The rules are under
                <a href="/admin/automations">Settings → Automations</a>.` : ''}</p>`);
     });
 
@@ -263,14 +265,15 @@ export const workflowsModule: AppModule = {
       const config = current ? parseActionConfig(current.action_json) : {};
 
       return page(c, { title: 'Automations', active: '/alerts' }, html`
-        ${pageHeader('Automations',
-          'Rules that watch the dates already in the register and propose what to do about them.')}
+        ${'' /* Rules that watch the dates already in the register and propose
+                 what to do about them. */}
+        ${pageHeader('Automations')}
         ${adminTabs('automations')}
 
         <div class="cols">
           <div class="col-main">
             ${rules.length === 0
-              ? card('No rules yet', emptyState('Nothing is watching anything. Write the first rule on the right.'))
+              ? card('No rules yet', emptyState('Write the first rule on the right.'))
               : card('Rules', html`
                 <ul class="list">
                   ${rules.map((rule) => html`
@@ -318,9 +321,11 @@ export const workflowsModule: AppModule = {
                   </tr>`), { fixed: true }))}
 
             ${card('Run it now', html`
-              <p class="small">It runs by itself every night. Running it here does the same thing —
-                 and running it twice proposes nothing the second time, because every proposal is
-                 keyed to its rule, its record and its date.</p>
+              ${'' /* Running it twice proposes nothing the second time, because
+                       every proposal is keyed to its rule, its record and its
+                       date. */}
+              <p class="small">It runs by itself every night, and running it again proposes
+                 nothing new.</p>
               <form method="post" action="/admin/automations/run">
                 ${csrfField(session.csrf)}
                 <button class="btn btn-primary" type="submit">Run the rules now</button>
@@ -380,8 +385,10 @@ export const workflowsModule: AppModule = {
                   <label><input type="checkbox" name="requires_approval" value="1"
                            ${current && !current.requires_approval ? '' : raw('checked')}>
                     Wait for somebody to approve it</label>
-                  <p class="hint">Only a task may be done without approval. An email waits for a
-                     person however this is left — the database refuses to store it otherwise.</p>
+                  ${'' /* The database refuses to store an email rule that does not
+                           wait, however this box is left. */}
+                  <p class="hint">Only a task may be done without approval; an email always waits
+                     for a person.</p>
                 </div>
 
                 <button class="btn btn-primary" type="submit">${current ? 'Save rule' : 'Create rule'}</button>
@@ -393,8 +400,8 @@ export const workflowsModule: AppModule = {
               <ul class="list small">
                 ${TEMPLATE_TOKENS.map((t) => html`<li><code>${t}</code></li>`)}
               </ul>
-              <p class="small muted">Plain substitution, nothing else. A rule is configuration,
-                 not a program.</p>`)}
+              ${'' /* Plain substitution, nothing else: a rule is configuration,
+                       not a program. */}`)}
           </div>
         </div>`);
     });

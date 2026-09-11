@@ -65,9 +65,8 @@ export function assistantTabs(current: 'read' | 'intake'): ReturnType<typeof htm
 function notConfigured(): ReturnType<typeof html> {
   return html`
     <div class="alert alert-warn">
-      <p><strong>The AI layer is not switched on.</strong> Everything here can still be done by
-         hand — <a href="/clients/new">start a client</a>, then <a href="/cases/new">open a
-         matter</a>. This page is the shortcut, not the road.</p>
+      <p><strong>The AI layer is not switched on.</strong> Do it by hand —
+         <a href="/clients/new">start a client</a>, then <a href="/cases/new">open a matter</a>.</p>
     </div>`;
 }
 
@@ -202,61 +201,47 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
 
     if (!reading) {
       return page(c, { title: 'Open a matter', active: '/assistant' }, html`
-        ${pageHeader('Open a matter from what you already have',
-          'Drop a document in, or paste the details. You get the form back with the boxes filled.')}
+        ${pageHeader('Open a matter from what you already have')}
         ${assistantTabs('intake')}
         ${enabled ? '' : notConfigured()}
 
-        <div class="cols">
-          <div class="col-main">
-            ${card('What have you got?', html`
-              <form method="post" action="/assistant/intake" enctype="multipart/form-data" class="entry-form">
-                ${csrfField(session.csrf)}
-                <div class="field">
-                  <label for="f_files">Files</label>
-                  ${'' /* A plain file input, wrapped in a target the script
-                          teaches to accept a drop. With scripting off the
-                          input is still an input and still works. */}
-                  <div class="dropzone js-dropzone">
-                    <input id="f_files" name="files" type="file" multiple
-                           accept="${ACCEPTED_UPLOADS.join(',')}">
-                    <p class="dropzone-hint">Drop files here, or choose them above.</p>
-                    <p class="dropzone-list" data-dropzone-list></p>
-                  </div>
-                  <p class="hint">Up to ${MAX_UPLOADS}. ${describeAccepted()}</p>
-                </div>
-                ${field({ label: 'Or type or paste what you know', name: 'text', type: 'textarea',
-                          rows: 10, maxlength: 40000,
-                          placeholder: 'Submitted 20 August 2026. TAWHAI, Hemi Rangi — Partner Work Visa '
-                            + '(partner of TRUONG, Thi Kim Oanh aka Teera). A4374768' })}
-                <button class="btn btn-primary" type="submit" ${enabled ? '' : raw('disabled')}>
-                  Read it
-                </button>
-                <p class="hint">Nothing is created yet. The next screen is the form, filled in,
-                   for you to correct.</p>
-              </form>`)}
-          </div>
-          <div class="col-side">
-            ${card('What this does and does not do', html`
-              <p class="small">It reads what you give it and fills in the client, the other people
-                 named, and the matter. You check it and press the button — that is the moment
-                 anything is written.</p>
-              ${filesKept
-                ? html`<p class="small"><strong>The file is kept.</strong> It goes onto the matter
-                     when you press the button, so the document the matter was opened from is on
-                     the file. Read a document and never press the button and the copy is deleted
-                     after a week.</p>`
-                : html`<p class="small"><strong>The file is not kept.</strong> File storage is not
-                     switched on for this register, so an upload is read and dropped. Attach it to
-                     the matter afterwards if you need it on the file.</p>`}
-              <p class="small"><strong>Passport numbers are not extracted</strong>, even when they
-                 are in the document. Pulling them out here would write them into the run log on the
-                 way past, and a passport number belongs in one place only — typed once, on the
-                 client's record, and kept out of exports.</p>
-              <p class="small">Every reading is recorded — what was asked, what came back, how long
-                 it took — so anything acted on months from now can still be traced.</p>`)}
-          </div>
-        </div>`);
+        ${card('What have you got?', html`
+          <form method="post" action="/assistant/intake" enctype="multipart/form-data" class="entry-form">
+            ${csrfField(session.csrf)}
+            <div class="field">
+              <label for="f_files">Files</label>
+              ${'' /* A plain file input, wrapped in a target the script
+                      teaches to accept a drop. With scripting off the
+                      input is still an input and still works. */}
+              <div class="dropzone js-dropzone">
+                <input id="f_files" name="files" type="file" multiple
+                       accept="${ACCEPTED_UPLOADS.join(',')}">
+                <p class="dropzone-hint">Drop files here, or choose them above.</p>
+                <p class="dropzone-list" data-dropzone-list></p>
+              </div>
+              <p class="hint">Up to ${MAX_UPLOADS}. ${describeAccepted()}</p>
+            </div>
+            ${field({ label: 'Or type or paste what you know', name: 'text', type: 'textarea',
+                      rows: 10, maxlength: 40000,
+                      placeholder: 'Submitted 20 August 2026. TAWHAI, Hemi Rangi — Partner Work Visa '
+                        + '(partner of TRUONG, Thi Kim Oanh aka Teera). A4374768' })}
+            <button class="btn btn-primary" type="submit" ${enabled ? '' : raw('disabled')}>
+              Read it
+            </button>
+            ${'' /* The "What this does and does not do" card went on 11 September 2026.
+                     What it said, kept here: the reading fills in the client, the other
+                     people named and the matter, and nothing is written until the button
+                     on the next screen is pressed. A staged upload that is never applied
+                     is deleted after a week. Every reading is recorded in `ai_runs`.
+                     Passport numbers are deliberately never extracted — pulling one out
+                     here would write it into the run log on the way past, and a passport
+                     number belongs in one place only: typed once, on the client's record,
+                     and kept out of exports. That promise stays on screen below. */}
+            <p class="hint">Nothing is created yet. Passport numbers are never extracted.
+               ${filesKept
+                 ? 'An uploaded file goes onto the matter when you open it.'
+                 : 'File storage is off, so an uploaded file is read and not kept.'}</p>
+          </form>`)}`);
     }
 
     // --- The form, filled in ------------------------------------------------
@@ -304,9 +289,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       ${breadcrumbs([{ label: 'Assistant', href: '/assistant' },
                      { label: 'Open a matter', href: '/assistant/intake' },
                      { label: 'Check it' }])}
-      ${pageHeader('Check it, then open it',
-        'Everything below came out of what you gave it. Correct anything that is wrong — nothing '
-        + 'has been written yet.')}
+      ${pageHeader('Check it, then open it', 'Nothing has been written yet.')}
       ${assistantTabs('intake')}
 
       ${reading.missing.length ? html`
@@ -318,7 +301,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       ${existing ? html`
         <div class="alert">
           <p><strong>${existing.full_name}</strong> (${existing.ref}) is already on the register and
-             looks like the same person. Choose below whether to use that record or create a new one.</p>
+             looks like the same person.</p>
         </div>` : ''}
 
       <form method="post" action="/assistant/intake/apply" class="entry-form">
@@ -329,7 +312,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
           `${staged.length === 1 ? 'The file this was read from' : 'The files this was read from'}`,
           html`
             <p class="hint">${staged.length === 1 ? 'It goes' : 'They go'} onto the matter when you
-               press the button below, so the document the matter was opened from is on the file.</p>
+               press the button below.</p>
             <ul class="list">
               ${staged.map((file) => html`
                 <li><strong>${file.filename}</strong>
@@ -349,7 +332,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
                 <option value="">Create a new client record</option>
               </select>
               <p class="hint">Using the existing record leaves it untouched — the boxes below are
-                 ignored, and nothing about ${existing.full_name} is overwritten by this reading.</p>
+                 ignored.</p>
             </div>` : ''}
           <div class="settings-form">
             ${personFields('a_', applicant, 'principal_applicant', visaTypeOptions,
@@ -373,8 +356,8 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
                       (${partyMatches[i]!.ref}) — already on the register</option>
                     <option value="">Create a new record</option>
                   </select>
-                  <p class="hint">Using the existing record leaves it untouched. The boxes below
-                     are ignored, except where they fill in something it has left empty.</p>
+                  <p class="hint">Using the existing record leaves it untouched, except where the
+                     boxes fill in something it has left empty.</p>
                 </div>` : ''}
               <div class="settings-form">
                 ${personFields(`p${i}_`, person, null, visaTypeOptions,

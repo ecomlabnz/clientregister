@@ -38,8 +38,7 @@ export const searchModule: AppModule = {
         .filter((g) => g.rows.length > 0);
 
       return page(c, { title: q ? `Search — ${q}` : 'Search', active: '/search' }, html`
-        ${pageHeader('Search', 'Clients, matters, tasks, quotes, invoices, inquiries, file notes, '
-          + 'documents and the knowledge base.')}
+        ${pageHeader('Search')}
 
         <form method="get" action="/search" class="filters" data-live-search>
           <input type="search" name="q" value="${q}" autofocus
@@ -54,8 +53,7 @@ export const searchModule: AppModule = {
           ${!q
             ? card('Nothing typed yet', emptyState('Type two letters or more.'))
             : q.length < 2
-              ? card('Keep typing', emptyState('One letter matches almost everything. '
-                  + 'Type two or more.'))
+              ? card('Keep typing', emptyState('Type two or more letters.'))
               : grouped.length === 0
                 ? card('No matches', emptyState(`Nothing in the register matches “${q}”.`))
               : html`${grouped.map((group) => card(
