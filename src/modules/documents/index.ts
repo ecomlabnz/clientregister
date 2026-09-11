@@ -218,6 +218,46 @@ export async function readingSourcesForCase(
 }
 
 /**
+ * The documents a reading on one **client** may be taken from.
+ *
+ * **Asked for on 12 September 2026:** *"Read a document into this matter
+ * section in cases must also be available for clients as well - as we have a
+ * lot of info to add to clients. probably more than we have for cases."*
+ *
+ * The privacy boundary again, and narrower than the matter's: a client may
+ * read **their own documents and nothing else**. Not their matters' documents,
+ * which is the one thing somebody might expect to see here and should not —
+ * a document filed to a matter was filed there on purpose, and widening this
+ * to sweep them up would make the client's file a way of reaching material
+ * that was put somewhere more specific.
+ *
+ * The same clause answers both of the reading's questions — *what may I offer*
+ * and *may I read this one* — for the same reason the matter's does: two
+ * queries that had to agree would one day not.
+ */
+const CLIENT_READING_SOURCES = `
+    SELECT d.id, d.filename, d.content_type, d.size_bytes, d.r2_key, d.external_url,
+           d.entity_type, d.description, d.uploaded_at
+      FROM documents d
+     WHERE d.entity_type = 'client' AND d.entity_id = ?1`;
+
+/** Everything this client may read from, newest first. */
+export async function readingSourcesForClient(
+  env: Env, clientId: string,
+): Promise<ReadingSourceDoc[]> {
+  return all<ReadingSourceDoc>(
+    env.DB, `${CLIENT_READING_SOURCES} ORDER BY d.uploaded_at DESC`, clientId);
+}
+
+/** One document, but only if this client may read it. Null covers both cases. */
+export async function readingSourceForClient(
+  env: Env, clientId: string, documentId: string,
+): Promise<ReadingSourceDoc | null> {
+  return one<ReadingSourceDoc>(
+    env.DB, `${CLIENT_READING_SOURCES} AND d.id = ?2`, clientId, documentId);
+}
+
+/**
  * One document, but only if this matter may read it.
  *
  * Null covers both "no such document" and "somebody else's document", and the

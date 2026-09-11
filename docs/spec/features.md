@@ -25,7 +25,7 @@ dashboard, and why a test holds them there.
 | 8 | `alerts` | Alerts | `/alerts` | 1 | Alerts |
 | 9 | `inbox` | Inbox | `/inbox` | 23 | — |
 | 10 | `inquiries` | Inquiries | `/inquiries` | 12 | Incoming |
-| 11 | `clients` | Clients | `/clients` | 26 | Clients |
+| 11 | `clients` | Clients | `/clients` | 31 | Clients |
 | 12 | `cases` | Cases | `/cases` | 20 | Cases |
 | 13 | `quotes` | Quotes | `/quotes` | 30 | Money → Quotes |
 | 14 | `mail` | Sent email | `/mail` | 2 | — |
@@ -187,6 +187,8 @@ Settings: **Inbound channels** (1 keys)
 | POST | `/clients/:id/certificates/:certId/remove` |
 | POST | `/clients/:id/certificates/:certId/submitted` |
 | POST | `/clients/:id/delete` |
+| POST | `/clients/:id/drive` |
+| POST | `/clients/:id/drive/read` |
 | GET | `/clients/:id/edit` |
 | POST | `/clients/:id/entries` |
 | POST | `/clients/:id/history/:key` |
@@ -195,6 +197,9 @@ Settings: **Inbound channels** (1 keys)
 | POST | `/clients/:id/passports/:pid/primary` |
 | POST | `/clients/:id/passports/:pid/remove` |
 | POST | `/clients/:id/primary-contact` |
+| GET | `/clients/:id/read` |
+| POST | `/clients/:id/read` |
+| POST | `/clients/:id/read/apply` |
 | POST | `/clients/:id/status` |
 | POST | `/clients/:id/tags` |
 | POST | `/clients/:id/tags/:tagId/remove` |

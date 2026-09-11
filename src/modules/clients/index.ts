@@ -58,7 +58,10 @@ import {
 } from '../../core/vocabulary';
 import { renameMattersFor } from '../../core/casename';
 import { detachTag, attachTag, findOrCreateTag, listTags, tagsForClient, tagsForClients } from '../../core/tags';
-import { filesPanel, listDocuments } from '../documents';
+import { filesPanel, listDocuments, readingSourcesForClient } from '../documents';
+import { CLIENT_READING, readingCard, registerReadingRoutes } from '../../core/reading';
+import { isAiEnabled } from '../../ai/provider';
+import { driveConfigured } from '../../integrations/gdrive';
 import { countryCodeFor, countryName, countryOptions } from '../../core/countries';
 import {
   HISTORIES, historyPanel, militaryPlaceholder, registerHistoryRoutes, type HistoryVocab,
@@ -949,6 +952,18 @@ export const clientsModule: AppModule = {
     const r = new Hono<AppContext>();
     r.use('*', requireAuth);
 
+    // "Read a document into this client's file", registered first for the same
+    // reason the matter's is: a parameterised route added above it would
+    // swallow `/:id/read`.
+    //
+    // **Asked for on 12 September 2026:** *"Read a document into this matter
+    // section in cases must also be available for clients as well - as we have
+    // a lot of info to add to clients. probably more than we have for cases."*
+    // Right about the shape of the register — a client carries far more boxes
+    // than a matter — and it is the same routes, from `core/reading.ts`, told
+    // which file they are working on.
+    registerReadingRoutes(r, CLIENT_READING);
+
     // --- List ---------------------------------------------------------------
     r.get('/', requirePermission('register:read'), async (c) => {
       const q = (c.req.query('q') ?? '').trim();
@@ -1522,9 +1537,16 @@ export const clientsModule: AppModule = {
       ]);
 
       const canReadMail = can(c.get('user'), 'mail:send');
+      // Whether the reading card is drawn at all, and what it may be pointed
+      // at. Only this client's own documents — a document filed to one of their
+      // matters was filed there on purpose, and the query in
+      // `modules/documents` is the whole of that boundary.
+      const readingAvailable = isAiEnabled(c.env) && can(c.get('user'), 'ai:run')
+        && can(c.get('user'), 'register:write');
       const [cases, quotes, inquiries, entries, sentMail, tasks, partyCases, related, employer, people,
              feesByCase, englishTestTerms, visaTerms, certificates, passports, threads,
-             clientFiles, docCats, titleTerms, genderTerms, relationshipTerms] = await Promise.all([
+             clientFiles, docCats, titleTerms, genderTerms, relationshipTerms,
+             readingSources] = await Promise.all([
         all<any>(c.env.DB, `SELECT id, ref, title, case_type, status, priority, next_action, next_action_due, updated_at
                               FROM cases WHERE client_id = ? ORDER BY updated_at DESC`, id),
         all<any>(c.env.DB, `SELECT id, ref, description, amount_cents, gst_cents, disbursements_cents, currency, status, created_at
@@ -1575,6 +1597,8 @@ export const clientsModule: AppModule = {
         titles(c.env),
         genders(c.env),
         relationshipStatuses(c.env),
+        // Asked for only where the card is drawn.
+        readingAvailable ? readingSourcesForClient(c.env, id) : Promise.resolve([]),
       ]);
 
       // Cases where this client is a party but not the file owner — an
@@ -1938,6 +1962,18 @@ export const clientsModule: AppModule = {
                          certificate is ${validityRule('police')} A medical is
                          ${validityRule('medical')}</p>
                     </details>` : ''}`)}
+
+            ${'' /* Asked for on 12 September 2026: *"Read a document into this
+                     matter section in cases must also be available for clients
+                     as well."* The same card, the same routes and the same
+                     press as the matter's — see `core/reading.ts` — pointed at
+                     this client's file. It sits above Files because what it
+                     reads is what is in there. */}
+            ${readingAvailable
+              ? readingCard({ host: CLIENT_READING, id: client.id, csrf,
+                              filesKept: Boolean(c.env.DOCS), sources: readingSources as any,
+                              driveOn: driveConfigured(c.env) })
+              : ''}
 
             ${block('files', openBlocks, 'Files', filesPanel({
               csrf, entityType: 'client', entityId: client.id, returnTo: `/clients/${client.id}`,

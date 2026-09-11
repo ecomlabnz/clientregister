@@ -19,6 +19,7 @@ import { describe, expect, it } from 'vitest';
 import { mountModule, fakeUser } from './support/d1';
 import { casesModule } from '../src/modules/cases';
 import { foldedCard, foldingCard } from '../src/ui/components';
+import { CASE_READING, CLIENT_READING, readingCard } from '../src/core/reading';
 import { html } from '../src/ui/html';
 
 const AT = '2026-09-11T09:00:00Z';
@@ -67,10 +68,19 @@ describe('the five sections a person acts in start closed', () => {
       .toContain("foldedCard('Brief me on this matter'");
   });
 
-  it('Read a document into this matter is built from the folded card', async () => {
-    const { readFileSync } = await import('node:fs');
-    expect(readFileSync('src/modules/cases/reading.ts', 'utf8'))
-      .toContain("foldedCard('Read a document into this matter'");
+  // The reading card is drawn straight rather than read out of the source: it
+  // takes no database and no request, so there is nothing to be gained by
+  // asserting that a line was typed. It also now serves two files — a matter
+  // and a client — and both are checked here, which a source match could not
+  // have done at all.
+  it.each([
+    [CASE_READING, 'Read a document into this matter'],
+    [CLIENT_READING, 'Read a document into this client\u2019s file'],
+  ])('the reading card starts closed, and says which file it reads into', (host, title) => {
+    const drawn = readingCard({
+      host, id: 'x1', csrf: 'c', filesKept: false, sources: [], driveOn: false,
+    }).toString();
+    expect(foldState(drawn, title)).toBe('closed');
   });
 });
 

@@ -94,6 +94,21 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.56.0', date: '12 September 2026',
+    notes: [
+      'Read a document into a client\u2019s file, not only into a matter. The same card, above '
+        + 'Files on the client\u2019s page: drop a document in, tick one already on the file, or '
+        + 'point it at Google Drive \u2014 then the same review and the same press before '
+        + 'anything is written.',
+      'It fills the boxes a client has and a matter does not: title, gender, place of birth, '
+        + 'national identity, nationalities, passport and visa details, INZ number.',
+      'Anything it reads that belongs on a matter goes into the file note instead of being '
+        + 'dropped, and says so.',
+      'A client can only be pointed at their own documents \u2014 not another client\u2019s, and '
+        + 'not the ones filed to their matters.',
+    ],
+  },
+  {
     version: '1.55.0', date: '12 September 2026',
     notes: [
       'Surnames come first. A matter now reads \u201cRV. Partner \u2014 VUONG, Bao Long\u201d '

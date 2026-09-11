@@ -152,12 +152,19 @@ export interface IntakeRunRow {
  *
  * A reading that opens a matter belongs to nothing yet — that is the point of
  * it — so it is recorded against itself. A reading taken into an existing
- * matter belongs to that matter, and saying so in `ai_runs` is what lets the
+ * record belongs to that record, and saying so in `ai_runs` is what lets the
  * review screen refuse a run id that came from somewhere else. Added
  * 11 September 2026 with "Read a document into this matter".
+ *
+ * **A client joined it on 12 September 2026**, when the practice asked for the
+ * same reading on a client's own file: *"as we have a lot of info to add to
+ * clients. probably more than we have for cases."* The two are the same act
+ * against a different record, so this widened by one word rather than growing
+ * a second kind of run — and the scoping the review screen leans on works
+ * unchanged, because it compares both halves of the pair.
  */
 export interface IntakeSubject {
-  entityType: 'case';
+  entityType: 'case' | 'client';
   entityId: string;
 }
 

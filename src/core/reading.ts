@@ -42,41 +42,44 @@
  */
 
 import type { Hono } from 'hono';
-import type { AppContext } from '../../types';
-import { requirePermission } from '../../core/auth';
-import { auditFrom } from '../../core/audit';
-import { nowIso, one, run } from '../../core/db';
-import { addEntry } from '../../core/timeline';
-import { can } from '../../core/rbac';
-import { nationalitiesFor } from '../../core/nationalities';
-import { countryName } from '../../core/countries';
-import { genders, relationshipStatuses, titles, visaTypes } from '../../core/vocabulary';
+import type { AppContext } from '../types';
+import { requirePermission } from './auth';
+import { auditFrom } from './audit';
+import { nowIso, one, run } from './db';
+import { addEntry } from './timeline';
+import { can } from './rbac';
+import { nationalitiesFor } from './nationalities';
+import { countryName } from './countries';
+import { genders, relationshipStatuses, titles, visaTypes } from './vocabulary';
 import {
   fillEmptyClientFields, fillEmptyNationalities, setInzClientNumber, setNationalIdentity,
   type ClientFillColumn, type ClientFillValues,
-} from '../../core/clientfill';
+} from './clientfill';
 import {
   attachStagedTo, documentsReadBy, driveReadsBy, markDriveReadLinked, recordDocumentRead,
   recordDriveRead, stageUpload, stagedFor, type DriveRead,
-} from '../../core/intakefiles';
+} from './intakefiles';
 import {
   driveConfigured, driveCredentials, driveEntry, driveFileIdIn, listDriveFolder, openDriveFile,
   parseDriveTarget, describeDriveType, isExported, MAX_LISTED, type DriveEntry,
-} from '../../integrations/gdrive';
-import { isAiEnabled } from '../../ai/provider';
+} from '../integrations/gdrive';
+import { isAiEnabled } from '../ai/provider';
 import {
   ACCEPTED_UPLOADS, MAX_UPLOAD_BYTES, MAX_UPLOADS, describeAccepted, intakeRunFor, plainType,
   readUpload, runIntake,
-} from '../../ai/intake';
-import { addExternalDocument, readingSourceForCase, type ReadingSourceDoc } from '../documents';
+} from '../ai/intake';
+import {
+  addExternalDocument, readingSourceForCase, readingSourceForClient,
+  type ReadingSourceDoc,
+} from '../modules/documents';
 import {
   planReading, readingNote,
   type CaseFacts, type ClientFacts, type Placement, type ReadingPlan,
-} from '../../ai/casefill';
-import { page, redirectWith, breadcrumbs } from '../../ui/layout';
-import { html, type Raw } from '../../ui/html';
-import { card, csrfField, field, foldedCard, pageHeader, table } from '../../ui/components';
-import { dateShort } from '../../ui/format';
+} from '../ai/casefill';
+import { page, redirectWith, breadcrumbs } from '../ui/layout';
+import { html, type Raw } from '../ui/html';
+import { card, csrfField, field, foldedCard, pageHeader, table } from '../ui/components';
+import { dateShort } from '../ui/format';
 
 const CASE_COLUMNS = `id, ref, descriptor, inz_application_number, lodged_at,
                       decision_due_at, next_action, summary, client_id`;
@@ -86,6 +89,77 @@ const CLIENT_COLUMNS = `id, ref, full_name, kind, given_names, family_name, pref
                         title, gender, relationship_status, other_names,
                         birth_country, birth_region, birth_town,
                         national_id_number, national_id_country`;
+
+/**
+ * Which file a reading is being read into.
+ *
+ * **Asked for on 12 September 2026:** *"Read a document into this matter
+ * section in cases must also be available for clients as well - as we have a
+ * lot of info to add to clients. probably more than we have for cases."*
+ *
+ * They are right about the shape of the register: a client carries far more
+ * boxes than a matter does — name, title, gender, birthplace, national
+ * identity, passport, visa, INZ number, nationalities — and until now the only
+ * way to fill any of them from a document was through a matter the client
+ * might not have.
+ *
+ * **So this file was made to take either, rather than copied.** One extraction,
+ * one review screen, one press, one set of rules about what may be written to
+ * a client's file. Fault 26 in the specification is this register's own record
+ * of what the other choice costs: one idea in two places, and only one of them
+ * grows.
+ *
+ * What actually differs between the two is small enough to be a value rather
+ * than a branch: where the pages live, what a run and a note are recorded
+ * against, and the words for the thing being read into.
+ */
+export interface ReadingHost {
+  /** `case` or `client`: what the run, the note and a kept document belong to. */
+  entity: 'case' | 'client';
+  /** `/cases` or `/clients`. Every link on these screens is built from it. */
+  base: string;
+  /** The word in the breadcrumb: `Cases`, `Clients`. */
+  crumb: string;
+  /** `this matter`, `this client\u2019s file`. On screen and in the file note. */
+  into: string;
+}
+
+export const CASE_READING: ReadingHost = {
+  entity: 'case', base: '/cases', crumb: 'Cases', into: 'this matter',
+};
+
+export const CLIENT_READING: ReadingHost = {
+  entity: 'client', base: '/clients', crumb: 'Clients', into: 'this client\u2019s file',
+};
+
+/** The record being read into, as the screens need to name it. */
+async function loadSubject(
+  env: AppContext['Bindings'], host: ReadingHost, id: string,
+): Promise<{ id: string; ref: string } | null> {
+  return one<{ id: string; ref: string }>(
+    env.DB,
+    host.entity === 'case'
+      ? 'SELECT id, ref FROM cases WHERE id = ?'
+      : 'SELECT id, ref FROM clients WHERE id = ?',
+    id,
+  );
+}
+
+/**
+ * One document, if this file may read it.
+ *
+ * The privacy boundary, and it is deliberately not the same for the two. A
+ * matter may read its own documents and its client's; a client may read only
+ * their own. Both are one WHERE clause in `modules/documents`, and neither
+ * takes a client id from the request.
+ */
+async function readingSource(
+  env: AppContext['Bindings'], host: ReadingHost, id: string, documentId: string,
+): Promise<ReadingSourceDoc | null> {
+  return host.entity === 'case'
+    ? readingSourceForCase(env, id, documentId)
+    : readingSourceForClient(env, id, documentId);
+}
 
 /**
  * A document the reading may be pointed at, and why it may not be.
@@ -186,8 +260,10 @@ function whyNotReadable(d: ReadableSource, driveOn: boolean): string | null {
  * no button and no mention of one — the register works exactly as it did.
  */
 export function readingCard(opts: {
-  caseId: string; csrf: string; filesKept: boolean;
-  /** This matter's files and its client's, as the page already listed them. */
+  /** Which file is being read into — see `ReadingHost`. */
+  host: ReadingHost;
+  id: string; csrf: string; filesKept: boolean;
+  /** The files this record may read, as the page already listed them. */
   sources: ReadableSource[];
   /**
    * Whether the practice's Google Drive is connected.
@@ -202,10 +278,10 @@ export function readingCard(opts: {
   const readable = offered.filter((d) => d.why === null);
   const skipped = offered.filter((d) => d.why !== null);
 
-  return foldedCard('Read a document into this matter', html`
+  return foldedCard(`Read a document into ${opts.host.into}`, html`
     <p class="small">Point it at a document on this file, drop a new one in, or both.
        <strong>Nothing is written until you press the button on the next screen.</strong></p>
-    <form method="post" action="/cases/${opts.caseId}/read" enctype="multipart/form-data"
+    <form method="post" action="${opts.host.base}/${opts.id}/read" enctype="multipart/form-data"
           class="entry-form">
       ${csrfField(opts.csrf)}
 
@@ -215,8 +291,9 @@ export function readingCard(opts: {
       ${readable.length ? html`
         <fieldset class="field-group reading-sources">
           <legend>Already on this file</legend>
-          <p class="hint">Tick any of these — several can be read together. Only this matter's
-             own documents and this client's are ever listed here.</p>
+          <p class="hint">Tick any of these — several can be read together. ${opts.host.entity === 'case'
+             ? 'Only this matter\u2019s own documents and this client\u2019s are ever listed here.'
+             : 'Only this client\u2019s own documents are ever listed here.'}</p>
           <ul class="pick-list">
             ${readable.map((d) => html`
               <li class="pick"><label>
@@ -274,7 +351,7 @@ export function readingCard(opts: {
       <h4>Or read it out of Google Drive</h4>
       <p class="small">Paste the address of a folder or a file.
          <strong>Nothing is stored</strong> unless you tick to keep a copy.</p>
-      <form method="post" action="/cases/${opts.caseId}/drive" class="entry-form">
+      <form method="post" action="${opts.host.base}/${opts.id}/drive" class="entry-form">
         ${csrfField(opts.csrf)}
         ${field({ label: 'Drive folder or file address', name: 'link', maxlength: 500,
                   placeholder: 'https://drive.google.com/drive/folders/…' })}
@@ -291,14 +368,14 @@ export function readingCard(opts: {
  * browser history, a bookmark or a proxy log.
  */
 function drivePicker(opts: {
-  caseId: string; caseRef: string; csrf: string; filesKept: boolean;
+  host: ReadingHost; id: string; ref: string; csrf: string; filesKept: boolean;
   entries: DriveEntry[]; truncated: boolean; folderName: string | null;
 }): Raw {
   const readable = opts.entries.filter((e) => e.why === null);
   const skipped = opts.entries.filter((e) => e.why !== null);
 
   return html`
-    <form method="post" action="/cases/${opts.caseId}/drive/read" class="entry-form">
+    <form method="post" action="${opts.host.base}/${opts.id}/drive/read" class="entry-form">
       ${csrfField(opts.csrf)}
       ${readable.length ? html`
         ${table([{ label: 'Read', width: '6' }, { label: 'Keep a copy', width: '10' },
@@ -347,12 +424,12 @@ function drivePicker(opts: {
       ${readable.length ? html`
         <div class="form-actions">
           <button class="btn btn-primary" type="submit">Read the ticked files</button>
-          <a class="btn btn-secondary" href="/cases/${opts.caseId}">Cancel</a>
+          <a class="btn btn-secondary" href="${opts.host.base}/${opts.id}">Cancel</a>
         </div>
         <p class="hint">This reads them and shows you what it could fill in.
            <strong>Nothing is written to the matter until you press the button on the next
            screen.</strong></p>` : html`
-        <p><a class="btn btn-secondary" href="/cases/${opts.caseId}">Back to ${opts.caseRef}</a></p>`}
+        <p><a class="btn btn-secondary" href="${opts.host.base}/${opts.id}">Back to ${opts.ref}</a></p>`}
     </form>`;
 }
 
@@ -400,7 +477,7 @@ function reviewTable(rows: Placement[], offer: boolean, from: string): Raw {
   );
 }
 
-export function registerReadingRoutes(r: Hono<AppContext>): void {
+export function registerReadingRoutes(r: Hono<AppContext>, host: ReadingHost): void {
   // --- Read it out of the practice's Google Drive --------------------------
   //
   // **Asked for on 11 September 2026:** the practice keeps a folder per matter
@@ -428,11 +505,10 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
   // that does anything, and no mention of the feature anywhere.
   r.post('/:id/drive', requirePermission('ai:run'), async (c) => {
     const id = c.req.param('id')!;
-    const kase = await one<{ id: string; ref: string }>(
-      c.env.DB, 'SELECT id, ref FROM cases WHERE id = ?', id);
-    if (!kase) return c.notFound();
+    const subject = await loadSubject(c.env, host, id);
+    if (!subject) return c.notFound();
     const ready = driveReady(c.env);
-    if ('error' in ready) return redirectWith(c, `/cases/${id}`, ready.error, 'err');
+    if ('error' in ready) return redirectWith(c, `${host.base}/${id}`, ready.error, 'err');
 
     const form = await c.req.formData();
     // Parsed, never fetched. What comes out is a Google file id checked against
@@ -440,30 +516,30 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     // against `www.googleapis.com`, so a pasted address cannot cause a request
     // to the host it names. See `integrations/gdrive.ts`.
     const target = parseDriveTarget(String(form.get('link') ?? '').slice(0, 500));
-    if ('error' in target) return redirectWith(c, `/cases/${id}`, target.error, 'err');
+    if ('error' in target) return redirectWith(c, `${host.base}/${id}`, target.error, 'err');
 
     // What the link *said* it was is a hint. What it is comes from Google — a
     // bare id says nothing, and a folder link can point at a file.
     const entry = await driveEntry(c.env, ready.creds, target.id);
-    if ('error' in entry) return redirectWith(c, `/cases/${id}`, entry.error, 'err');
+    if ('error' in entry) return redirectWith(c, `${host.base}/${id}`, entry.error, 'err');
 
     let entries: DriveEntry[] = [entry];
     let truncated = false;
     if (entry.isFolder) {
       const listed = await listDriveFolder(c.env, ready.creds, entry.id);
-      if ('error' in listed) return redirectWith(c, `/cases/${id}`, listed.error, 'err');
+      if ('error' in listed) return redirectWith(c, `${host.base}/${id}`, listed.error, 'err');
       entries = listed.entries;
       truncated = listed.truncated;
     }
 
-    return page(c, { title: `${kase.ref} — what is in the drive`, active: '/cases' }, html`
-      ${breadcrumbs([{ href: '/cases', label: 'Cases' },
-                     { href: `/cases/${kase.id}`, label: kase.ref },
+    return page(c, { title: `${subject.ref} — what is in the drive`, active: host.base }, html`
+      ${breadcrumbs([{ href: host.base, label: host.crumb },
+                     { href: `${host.base}/${subject.id}`, label: subject.ref },
                      { label: 'Google Drive' }])}
       ${pageHeader(entry.isFolder ? entry.name : 'One file in the drive',
         'Tick what to read. Nothing has been read yet and nothing has been written.')}
       ${card('What is here', drivePicker({
-        caseId: kase.id, caseRef: kase.ref, csrf: c.get('session')!.csrf,
+        host, id: subject.id, ref: subject.ref, csrf: c.get('session')!.csrf,
         filesKept: Boolean(c.env.DOCS), entries, truncated,
         folderName: entry.isFolder ? entry.name : null,
       }))}
@@ -483,20 +559,19 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
   r.post('/:id/drive/read', requirePermission('ai:run'), async (c) => {
     const id = c.req.param('id')!;
     const user = c.get('user')!;
-    const kase = await one<{ id: string; ref: string }>(
-      c.env.DB, 'SELECT id, ref FROM cases WHERE id = ?', id);
-    if (!kase) return c.notFound();
+    const subject = await loadSubject(c.env, host, id);
+    if (!subject) return c.notFound();
     const ready = driveReady(c.env);
-    if ('error' in ready) return redirectWith(c, `/cases/${id}`, ready.error, 'err');
+    if ('error' in ready) return redirectWith(c, `${host.base}/${id}`, ready.error, 'err');
 
     const form = await c.req.formData();
     const wanted = [...new Set(form.getAll('drive').map(String).filter(Boolean))];
     const keep = new Set(form.getAll('keep').map(String));
     if (wanted.length === 0) {
-      return redirectWith(c, `/cases/${id}`, 'Nothing was ticked, so nothing was read.', 'err');
+      return redirectWith(c, `${host.base}/${id}`, 'Nothing was ticked, so nothing was read.', 'err');
     }
     if (wanted.length > MAX_UPLOADS) {
-      return redirectWith(c, `/cases/${id}`, `That is more than ${MAX_UPLOADS} files.`, 'err');
+      return redirectWith(c, `${host.base}/${id}`, `That is more than ${MAX_UPLOADS} files.`, 'err');
     }
 
     const files = [];
@@ -506,18 +581,18 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
       // and the size decide whether a file may be read at all, and a posted
       // value is what the browser was told to send, not what the file is.
       const entry = await driveEntry(c.env, ready.creds, fileId);
-      if ('error' in entry) return redirectWith(c, `/cases/${id}`, entry.error, 'err');
+      if ('error' in entry) return redirectWith(c, `${host.base}/${id}`, entry.error, 'err');
       const opened = await openDriveFile(c.env, ready.creds, entry);
-      if ('error' in opened) return redirectWith(c, `/cases/${id}`, opened.error, 'err');
+      if ('error' in opened) return redirectWith(c, `${host.base}/${id}`, opened.error, 'err');
       const read = await readUpload(opened.file);
-      if ('error' in read) return redirectWith(c, `/cases/${id}`, read.error, 'err');
+      if ('error' in read) return redirectWith(c, `${host.base}/${id}`, read.error, 'err');
       files.push(read);
       taken.push({ entry, file: opened.file, mediaType: read.mediaType,
                    keep: keep.has(entry.id) });
     }
 
     const outcome = await runIntake(c.env, { text: '', files },
-      { userId: user.id, subject: { entityType: 'case', entityId: id } });
+      { userId: user.id, subject: { entityType: host.entity, entityId: id } });
 
     let kept = 0;
     if (outcome.ok) {
@@ -545,7 +620,7 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     }
 
     await auditFrom(c, {
-      action: 'case.read_from_drive', entityType: 'case', entityId: id,
+      action: `${host.entity}.read_from_drive`, entityType: host.entity, entityId: id,
       // The Google file ids, which are handles rather than content, and counts.
       // Nothing about the credentials, and nothing the documents said.
       meta: { ok: outcome.ok, files: files.length, kept,
@@ -553,20 +628,19 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
               run: outcome.ok ? outcome.runId : null },
     });
     return outcome.ok
-      ? c.redirect(`/cases/${id}/read?run=${outcome.runId}`, 303)
-      : redirectWith(c, `/cases/${id}`, outcome.error, 'err');
+      ? c.redirect(`${host.base}/${id}/read?run=${outcome.runId}`, 303)
+      : redirectWith(c, `${host.base}/${id}`, outcome.error, 'err');
   });
 
   // --- Give it something to read -------------------------------------------
   r.post('/:id/read', requirePermission('ai:run'), async (c) => {
     const id = c.req.param('id')!;
     if (!isAiEnabled(c.env)) {
-      return redirectWith(c, `/cases/${id}`, 'The AI layer is not switched on.', 'err');
+      return redirectWith(c, `${host.base}/${id}`, 'The AI layer is not switched on.', 'err');
     }
     const user = c.get('user')!;
-    const kase = await one<{ id: string; ref: string }>(
-      c.env.DB, 'SELECT id, ref FROM cases WHERE id = ?', id);
-    if (!kase) return c.notFound();
+    const subject = await loadSubject(c.env, host, id);
+    if (!subject) return c.notFound();
 
     const form = await c.req.formData();
     const text = String(form.get('text') ?? '').slice(0, 40_000);
@@ -576,7 +650,7 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     // paid twice for the same answer.
     const wanted = [...new Set(form.getAll('documents').map(String).filter(Boolean))];
     if (uploads.length + wanted.length > MAX_UPLOADS) {
-      return redirectWith(c, `/cases/${id}`, `That is more than ${MAX_UPLOADS} files.`, 'err');
+      return redirectWith(c, `${host.base}/${id}`, `That is more than ${MAX_UPLOADS} files.`, 'err');
     }
 
     // --- one reading, whichever way the material arrived ---------------------
@@ -595,7 +669,7 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     const readDocuments: ReadingSourceDoc[] = [];
     for (const upload of uploads) {
       const read = await readUpload(upload);
-      if ('error' in read) return redirectWith(c, `/cases/${id}`, read.error, 'err');
+      if ('error' in read) return redirectWith(c, `${host.base}/${id}`, read.error, 'err');
       files.push(read);
     }
     for (const documentId of wanted) {
@@ -604,26 +678,26 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
       // client from the matter's row rather than from anything posted. A
       // document on another client's file is not found, whoever names it and
       // however the request was built.
-      const doc = await readingSourceForCase(c.env, id, documentId);
+      const doc = await readingSource(c.env, host, id, documentId);
       if (!doc) {
-        return redirectWith(c, `/cases/${id}`,
-          'That document is not on this matter or its client, so it was not read.', 'err');
+        return redirectWith(c, `${host.base}/${id}`,
+          `That document is not on ${host.into}, so it was not read.`, 'err');
       }
       const opened = await openStored(c.env, doc);
-      if ('error' in opened) return redirectWith(c, `/cases/${id}`, opened.error, 'err');
+      if ('error' in opened) return redirectWith(c, `${host.base}/${id}`, opened.error, 'err');
       const read = await readUpload(opened.file);
-      if ('error' in read) return redirectWith(c, `/cases/${id}`, read.error, 'err');
+      if ('error' in read) return redirectWith(c, `${host.base}/${id}`, read.error, 'err');
       files.push(read);
       readDocuments.push(doc);
     }
     if (!text.trim() && files.length === 0) {
-      return redirectWith(c, `/cases/${id}`, 'Give it something to read.', 'err');
+      return redirectWith(c, `${host.base}/${id}`, 'Give it something to read.', 'err');
     }
 
     // Recorded against this matter rather than against itself, which is what
     // lets the review refuse a run id that belongs somewhere else.
     const outcome = await runIntake(c.env, { text, files },
-      { userId: user.id, subject: { entityType: 'case', entityId: id } });
+      { userId: user.id, subject: { entityType: host.entity, entityId: id } });
 
     // Kept only once the reading worked, and keyed to it — the same staging the
     // assistant uses, so the document lands on the matter with the press that
@@ -647,28 +721,28 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     }
 
     await auditFrom(c, {
-      action: 'case.read_document', entityType: 'case', entityId: id,
+      action: `${host.entity}.read_document`, entityType: host.entity, entityId: id,
       meta: { ok: outcome.ok, files: files.length, kept, chars: text.length,
               documents: readDocuments.map((d) => d.id),
               run: outcome.ok ? outcome.runId : null },
     });
     return outcome.ok
-      ? c.redirect(`/cases/${id}/read?run=${outcome.runId}`, 303)
-      : redirectWith(c, `/cases/${id}`, outcome.error, 'err');
+      ? c.redirect(`${host.base}/${id}/read?run=${outcome.runId}`, 303)
+      : redirectWith(c, `${host.base}/${id}`, outcome.error, 'err');
   });
 
   // --- What it found, before anything is written ---------------------------
   r.get('/:id/read', requirePermission('ai:run'), async (c) => {
     const id = c.req.param('id')!;
     if (!isAiEnabled(c.env)) {
-      return redirectWith(c, `/cases/${id}`, 'The AI layer is not switched on.', 'err');
+      return redirectWith(c, `${host.base}/${id}`, 'The AI layer is not switched on.', 'err');
     }
     const runId = c.req.query('run') ?? '';
-    const loaded = await load(c.env, id, runId);
+    const loaded = await load(c.env, host, id, runId);
     if ('error' in loaded) {
-      return redirectWith(c, `/cases/${id}`, loaded.error, 'err');
+      return redirectWith(c, `${host.base}/${id}`, loaded.error, 'err');
     }
-    const { kase, client, plan, note, sources, drive } = loaded;
+    const { kase, client, subject, plan, note, sources, drive } = loaded;
     const staged = await stagedFor(c.env, runId);
     const onFile = await documentsReadBy(c.env, runId);
     // A drive file the practice ticked to keep is staged like an upload, so it
@@ -687,9 +761,9 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     const foundNothing = offered === 0 && !note
       && plan.caseHeld.length === 0 && plan.clientHeld.length === 0;
 
-    return page(c, { title: `${kase.ref} — what the document says`, active: '/cases' }, html`
-      ${breadcrumbs([{ href: '/cases', label: 'Cases' },
-                     { href: `/cases/${kase.id}`, label: kase.ref },
+    return page(c, { title: `${subject.ref} — what the document says`, active: host.base }, html`
+      ${breadcrumbs([{ href: host.base, label: host.crumb },
+                     { href: `${host.base}/${subject.id}`, label: subject.ref },
                      { label: 'What the document says' }])}
       ${pageHeader('What the document says',
         'Nothing has been written yet. Check it, then press the button at the bottom.')}
@@ -709,20 +783,23 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
         <div class="alert alert-warn">
           <p><strong>The document does not look like it is about ${client.full_name}
              (${client.ref}).</strong> Nothing will be written to the client record. Everything
-             the document said is still kept as a file note on this matter.</p>
+             the document said is still kept as a file note on ${host.into}.</p>
         </div>`}
 
-      <form method="post" action="/cases/${kase.id}/read/apply" class="entry-form">
+      <form method="post" action="${host.base}/${subject.id}/read/apply" class="entry-form">
         ${csrfField(session.csrf)}
         <input type="hidden" name="run" value="${runId}">
 
-        ${card('This matter', html`
+        ${'' /* Only where there is a matter. On a client's file there is none,
+                 and anything matter-shaped the document said is in the note
+                 below rather than quietly dropped — see `planReading`. */}
+        ${kase ? card('This matter', html`
           ${plan.caseFill.length
             ? reviewTable(plan.caseFill, true, from)
             : html`<p class="muted">Nothing this matter has left empty.</p>`}
           ${plan.caseHeld.length ? html`
             <h4>Already recorded, and left alone</h4>
-            ${reviewTable(plan.caseHeld, false, from)}` : ''}`)}
+            ${reviewTable(plan.caseHeld, false, from)}` : ''}`) : ''}
 
         ${card(`${client.full_name} (${client.ref})`, html`
           ${plan.clientFill.length
@@ -749,7 +826,7 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
             ${reviewTable(plan.clientHeld, false, from)}` : ''}`)}
 
         ${card('The file note', note ? html`
-          <p class="hint">Everything with no box of its own goes on the matter as a file note,
+          <p class="hint">Everything with no box of its own goes on ${host.into} as a file note,
              exactly as written below.</p>
           <pre class="prewrap-pre">${note}</pre>` : html`
           <p class="muted">There is nothing left over to record.</p>`)}
@@ -782,8 +859,8 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
               </ul>` : ''}
             ${uploaded.length ? html`
               <h4>Uploaded to this reading</h4>
-              <p class="hint">${uploaded.length === 1 ? 'It goes' : 'They go'} onto this matter
-                 when you press the button.</p>
+              <p class="hint">${uploaded.length === 1 ? 'It goes' : 'They go'} onto
+                 ${host.into} when you press the button.</p>
               <ul class="list">
                 ${uploaded.map((file) => html`
                   <li><strong>${file.filename}</strong>
@@ -802,10 +879,10 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
               ? `Fill ${offered} ${offered === 1 ? 'box' : 'boxes'} and save the note`
               : 'Save the note'}
           </button>
-          <a class="btn btn-secondary" href="/cases/${kase.id}">Cancel</a>
+          <a class="btn btn-secondary" href="${host.base}/${subject.id}">Cancel</a>
         </div>
         <p class="hint">This is the press that writes. It is recorded in the audit log against
-           you, and what it changed is written on the matter's timeline.</p>
+           you, and what it changed is written on the timeline of ${host.into}.</p>
       </form>`);
   });
 
@@ -825,9 +902,9 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     const runId = String(form.get('run') ?? '');
     const approved = new Set(form.getAll('fill').map(String));
 
-    const loaded = await load(c.env, id, runId);
-    if ('error' in loaded) return redirectWith(c, `/cases/${id}`, loaded.error, 'err');
-    const { kase, client, plan, note, sources, drive } = loaded;
+    const loaded = await load(c.env, host, id, runId);
+    if ('error' in loaded) return redirectWith(c, `${host.base}/${id}`, loaded.error, 'err');
+    const { kase, client, subject, plan, note, sources, drive } = loaded;
     const stamp = nowIso();
     // What was read, for the timeline entry and the audit line. The file note
     // names them too — `readingNote` puts them in its first sentence — so the
@@ -840,8 +917,10 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     // for a client: the check and the write are one statement, so a value typed
     // by somebody else between this screen being drawn and this button being
     // pressed is still not overwritten.
+    // `plan.caseFill` is empty on a client's file, so this is inert there; the
+    // `kase &&` says so rather than leaving it to be inferred from that.
     const caseChosen = plan.caseFill.filter((p) => approved.has(p.key));
-    if (caseChosen.length) {
+    if (kase && caseChosen.length) {
       await run(
         c.env.DB,
         `UPDATE cases SET ${caseChosen.map((p) =>
@@ -885,7 +964,9 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     // decline to overwrite silently and by design, so the only honest way to
     // say what changed is to look.
     const [caseAfter, clientAfter] = await Promise.all([
-      one<CaseFacts>(c.env.DB, `SELECT ${CASE_COLUMNS} FROM cases WHERE id = ?`, kase.id),
+      kase
+        ? one<CaseFacts>(c.env.DB, `SELECT ${CASE_COLUMNS} FROM cases WHERE id = ?`, kase.id)
+        : Promise.resolve(null),
       one<ClientFacts>(c.env.DB, `SELECT ${CLIENT_COLUMNS} FROM clients WHERE id = ?`, client.id),
     ]);
     const landed = (p: Placement, after: Record<string, unknown> | null): boolean =>
@@ -901,7 +982,8 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     // of what a document said, on a table that cannot be rewritten afterwards.
     const noteId = note
       ? await addEntry(c.env, {
-          entityType: 'case', entityId: kase.id, kind: 'note', body: note, createdBy: user.id,
+          entityType: host.entity, entityId: subject.id, kind: 'note', body: note,
+          createdBy: user.id,
         })
       : null;
 
@@ -910,10 +992,10 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     // ticked to keep, and nothing else: *"throw away by default, tick to
     // keep"*.
     const attached = await attachStagedTo(c.env, {
-      runId, entityType: 'case', entityId: kase.id, userId: user.id,
+      runId, entityType: host.entity, entityId: subject.id, userId: user.id,
       description: drive.length
-        ? `Copy kept from Google Drive on ${stamp.slice(0, 10)}, read into this matter.`
-        : `Read into this matter by the assistant on ${stamp.slice(0, 10)}.`,
+        ? `Copy kept from Google Drive on ${stamp.slice(0, 10)}, read into ${host.into}.`
+        : `Read into ${host.into} by the assistant on ${stamp.slice(0, 10)}.`,
     });
 
     // --- what stays of a drive file ------------------------------------------
@@ -932,9 +1014,9 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
     for (const file of drive) {
       if (file.document_id) continue;
       const made = await addExternalDocument(c.env, {
-        entityType: 'case', entityId: kase.id, url: file.web_url, title: file.filename,
+        entityType: host.entity, entityId: subject.id, url: file.web_url, title: file.filename,
         uploadedBy: user.id,
-        description: `Read into this matter from Google Drive on ${stamp.slice(0, 10)}. `
+        description: `Read into ${host.into} from Google Drive on ${stamp.slice(0, 10)}. `
           + 'The register holds the address, not the document.',
       });
       if ('error' in made) continue;
@@ -955,21 +1037,22 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
         : []),
     ];
     await addEntry(c.env, {
-      entityType: 'case', entityId: kase.id, kind: 'system',
+      entityType: host.entity, entityId: subject.id, kind: 'system',
       body: (changed.length
         ? `A document read by the assistant filled in ${changed.length} empty `
           + `${changed.length === 1 ? 'box' : 'boxes'}: ${changed.join('; ')}. `
           + 'Nothing already recorded was changed.'
-        : 'A document was read into this matter. Nothing was empty for it to fill, so nothing '
-          + 'on the matter or the client was changed.')
+        : `A document was read into ${host.into}. Nothing was empty for it to fill, so `
+          + 'nothing on the record was changed.')
         + ` Read from ${from}.`,
       createdBy: user.id,
     });
 
     await auditFrom(c, {
-      action: 'case.filled_from_reading', entityType: 'case', entityId: kase.id,
+      action: `${host.entity}.filled_from_reading`, entityType: host.entity,
+      entityId: subject.id,
       meta: {
-        run: runId, ref: kase.ref, client: client.ref,
+        run: runId, ref: subject.ref, client: client.ref,
         case_fields: filledCase.map((p) => p.column),
         client_fields: filledClient.map((p) => p.column),
         inz_client_number: inzWritten,
@@ -984,7 +1067,7 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
       },
     });
 
-    return redirectWith(c, `/cases/${kase.id}`,
+    return redirectWith(c, `${host.base}/${subject.id}`,
       (changed.length
         ? `Filled ${changed.length} empty ${changed.length === 1 ? 'box' : 'boxes'}.`
         : 'Nothing was empty to fill.')
@@ -1010,19 +1093,32 @@ export function registerReadingRoutes(r: Hono<AppContext>): void {
  * in boxes that were empty, which is the mistake nobody can see afterwards.
  */
 async function load(
-  env: AppContext['Bindings'], caseId: string, runId: string,
-): Promise<{ kase: CaseFacts; client: ClientFacts; plan: ReadingPlan; note: string | null;
+  env: AppContext['Bindings'], host: ReadingHost, id: string, runId: string,
+): Promise<{ kase: CaseFacts | null; client: ClientFacts; subject: { id: string; ref: string };
+             plan: ReadingPlan; note: string | null;
              sources: string[]; drive: DriveRead[] }
           | { error: string }> {
   if (!runId) return { error: 'There is no reading to act on.' };
-  const kase = await one<CaseFacts & { client_id: string }>(
-    env.DB, `SELECT ${CASE_COLUMNS} FROM cases WHERE id = ?`, caseId);
-  if (!kase) return { error: 'That matter no longer exists.' };
-  const found = await intakeRunFor(env, runId, { entityType: 'case', entityId: caseId });
-  if (!found) return { error: 'That reading does not belong to this matter.' };
+
+  // The matter, where there is one. A reading onto a client's file has none,
+  // and `planReading` is built to take that: no matter boxes are offered, and
+  // anything matter-shaped the document said goes into the note instead of
+  // being dropped.
+  const kase = host.entity === 'case'
+    ? await one<CaseFacts & { client_id: string }>(
+        env.DB, `SELECT ${CASE_COLUMNS} FROM cases WHERE id = ?`, id)
+    : null;
+  if (host.entity === 'case' && !kase) return { error: 'That matter no longer exists.' };
+  const found = await intakeRunFor(env, runId, { entityType: host.entity, entityId: id });
+  if (!found) return { error: `That reading does not belong to ${host.into}.` };
   const client = await one<ClientFacts>(
-    env.DB, `SELECT ${CLIENT_COLUMNS} FROM clients WHERE id = ?`, kase.client_id);
-  if (!client) return { error: 'That matter has no client.' };
+    env.DB, `SELECT ${CLIENT_COLUMNS} FROM clients WHERE id = ?`,
+    host.entity === 'case' ? kase!.client_id : id);
+  if (!client) {
+    return { error: host.entity === 'case' ? 'That matter has no client.'
+                                           : 'That client no longer exists.' };
+  }
+  const subject = kase ? { id: kase.id, ref: kase.ref } : { id: client.id, ref: client.ref };
 
   const [held, visaTerms, titleTerms, genderTerms, relationshipTerms] = await Promise.all([
     nationalitiesFor(env, client.id),
@@ -1056,8 +1152,9 @@ async function load(
     ...drive.map((d) => d.filename),
   ])];
   return {
-    kase, client, plan, sources, drive,
-    note: readingNote(plan, found.result, { sources, at: found.at, by: found.by }),
+    kase, client, subject, plan, sources, drive,
+    note: readingNote(plan, found.result,
+      { sources, at: found.at, by: found.by, into: host.into }),
   };
 }
 

@@ -7,6 +7,39 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.56.0 — 12 September 2026
+
+### Added
+**Read a document into a client's file.** *"Read a document into this matter
+section in cases must also be available for clients as well - as we have a lot
+of info to add to clients. probably more than we have for cases."*
+
+The same card that was on a matter is now on the client too, above Files. Drop a
+document in, tick one already on their file, or point it at Google Drive — then
+the same review screen, the same list of what it would fill, and the same press
+before anything is written.
+
+You were right that a client holds more: name, title, gender, place of birth,
+national identity, passport, visa, INZ number, nationalities. All of those can
+now be filled from a document without opening a matter first.
+
+**Nothing is lost where there is no matter.** If the document also mentions an
+application number or a lodgement date, there is no box for it on a client — so
+it goes into the file note, saying what it was and that it belongs on a matter.
+It is never simply dropped.
+
+**A client can only be pointed at their own documents.** Not another client's,
+and not the ones filed to their own matters — a document filed to a matter was
+filed there on purpose.
+
+The file note now says which file it was read into, because a file note cannot
+be corrected afterwards.
+
+### Changed
+This is the same code as the matter's, told which file it is working on, rather
+than a second copy. Fault 26 in the specification is this register's own record
+of what a second copy costs.
+
 ## 1.55.0 — 12 September 2026
 
 ### Changed
