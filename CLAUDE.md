@@ -134,17 +134,31 @@ introduce anything that would have to be unpicked later:
 - Nothing may assume there is exactly one row in `settings` for the whole world,
   one practice name, or one sending address.
 
-**Not yet answered, and it must be answered before any of this is promised:**
-Cloudflare normally requires a D1 database to be named in `wrangler.jsonc` at
-deploy time, which would mean a deployment per practice signed up. There are
-ways around it. Nobody has confirmed which one works here. Do not plan around
-this being solved.
+**Answered on 12 September 2026**, when the practice said a paying customer
+wanted a trial. A database does have to be named at deploy time *for*
+`wrangler deploy` — but each practice is a Wrangler **environment** with its own
+bindings, deployed from the same bundle by the same workflow, so "a deployment
+per practice" costs a config block rather than a repository. Past about ten, the
+Workers API accepts a script upload with its bindings supplied in the request,
+so no config file needs to exist at all. Both are confirmed, not assumed.
 
-**The order of work, as agreed:** the shape and running routines of the app
-settle first. Until then a second practice is set up by hand — a second Worker,
-a second database, a second address — which the one-database-each decision makes
-possible today and which will not scale past about three. The automation is
-worth building once somebody has paid.
+**The architecture, the costs and the order of work are in
+[`docs/second-practice.md`](docs/second-practice.md).** Read it before touching
+anything to do with a second practice. The runbook — what exists, how to turn a
+trial on, and how to check the two are actually separate — is in
+[`docs/operations.md`](docs/operations.md).
+
+What is built: an `env.trial` block, its own D1 and KV created on 12 September,
+and a deploy job that migrates and deploys it *after* the practice's own
+register, gated on a `TRIAL_SETUP_TOKEN` secret existing. `test/tenancy.test.ts`
+refuses a configuration where two registers share a database, a session store or
+a bucket — that shared binding is the one fault here that cannot be seen from
+inside the application, because every query is *supposed* to return everything.
+
+**Still true, and still the order of work:** the shape and running routines of
+the app settle first. A second practice is still set up by hand, and that will
+not scale past about ten. The automation is worth building once somebody has
+paid — and **before another firm's files are held here at all, the backup is.**
 
 One thing to do before another practice's files are held here at all: **there is
 still no automated backup.** See `docs/operations.md`.
