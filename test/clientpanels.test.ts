@@ -3,24 +3,27 @@
  *
  * Asked for on 10 September 2026: *"see what details you can add or rearrange
  * on the actual client page — on the right side panels — to make it more
- * efficient."*
+ * efficient."* Rearranged again on **12 September 2026**, when the practice
+ * compared it with a matter's: *"the set of panes to the right and the data is
+ * not optimal under a client's profile ... maybe they should all appear under
+ * Key Details? but with the name up top? say Name, Contacts, Passport details,
+ * Certificate, English, and the rest."*
  *
- * Three judgements, each pinned below as a rule rather than as an appearance:
+ * So the two cards became one, grouped. What survives from the first pass:
  *
- * 1. **Identity and compliance leads.** The dates that expire — visa, passport,
- *    police certificate, medical — are why the file is open. Money and contact
- *    details follow.
- * 2. **The INZ client number leads that card.** It is quoted on everything sent
- *    to INZ about this person. The note beside it already claimed it came
- *    first; the order never did.
- * 3. **Contact reaches them first.** Three rows of name parts used to stand
- *    between the reader and the phone number, on a page whose heading says the
- *    name in full. The parts stay — an INZ form asks for them separately — but
- *    below.
+ * 1. **The INZ client number leads.** It is quoted on everything sent to INZ
+ *    about this person — it now leads the Immigration group rather than the
+ *    whole card.
+ * 2. **The age beside the date of birth**, because half the thresholds in the
+ *    instructions are ages and working one out in the head, on a page being
+ *    read for something else, is where a mistake gets made.
  *
- * And one addition: the age beside the date of birth, because half the
- * thresholds in the instructions are ages and working one out in the head, on a
- * page being read for something else, is where a mistake gets made.
+ * And one rule from that pass is **deliberately reversed**. It read: *"Contact
+ * reaches them first. Three rows of name parts used to stand between the reader
+ * and the phone number."* The practice has now asked for the name at the top,
+ * and that is their call about their own page — the name parts are what an INZ
+ * form asks for first. The phone number is one group down rather than three
+ * rows down, so the complaint that produced the old rule does not return.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -55,49 +58,53 @@ const sideColumn = async (h: ReturnType<typeof mount>) => {
 };
 
 describe('the order of the panels', () => {
-  it('leads with Identity and compliance, then Contact', async () => {
+  it('leads with Key details', async () => {
     const side = await sideColumn(mount());
-    expect(side.indexOf('Identity and compliance')).toBeLessThan(side.indexOf('>Contact<'));
+    for (const later of ['Open tasks', '>Notes<', '>Tags<']) {
+      expect(side.indexOf('Key details'), later).toBeLessThan(side.indexOf(later));
+    }
   });
 
   it('leaves Tags at the end, as on a matter', async () => {
     const side = await sideColumn(mount());
-    for (const heading of ['Identity and compliance', '>Contact<', 'Open tasks', '>Notes<']) {
+    for (const heading of ['Key details', 'Open tasks', '>Notes<']) {
       expect(side.indexOf(heading), heading).toBeLessThan(side.indexOf('>Tags<'));
     }
   });
 });
 
-describe('Identity and compliance', () => {
-  it('leads with the INZ client number', async () => {
+describe('Key details', () => {
+  it('leads the Immigration group with the INZ client number', async () => {
     const side = await sideColumn(mount());
-    const card = side.slice(side.indexOf('Identity and compliance'));
-    const inz = card.indexOf('INZ client no.');
+    const group = side.slice(side.indexOf('>Immigration<'), side.indexOf('>Passport<'));
+    const inz = group.indexOf('INZ client no.');
     expect(inz).toBeGreaterThan(-1);
-    for (const later of ['Nationality', 'Date of birth', 'Current visa', 'Police cert.']) {
-      expect(inz, later).toBeLessThan(card.indexOf(later));
+    for (const later of ['Current visa', 'Visa expiry']) {
+      expect(inz, later).toBeLessThan(group.indexOf(later));
     }
   });
 
   it('shows the age beside the date of birth', async () => {
     const side = await sideColumn(mount({ date_of_birth: '1990-06-15' }));
-    const row = side.slice(side.indexOf('Date of birth'), side.indexOf('Current visa'));
+    const row = side.slice(side.indexOf('Date of birth'), side.indexOf('Place of birth'));
     expect(row).toContain(String(ageYears('1990-06-15')));
   });
 
   it('says nothing about age when no birthday is recorded', async () => {
     const side = await sideColumn(mount({ date_of_birth: null }));
-    const row = side.slice(side.indexOf('Date of birth'), side.indexOf('Current visa'));
+    const row = side.slice(side.indexOf('Date of birth'), side.indexOf('Place of birth'));
     expect(row).not.toContain('·');
   });
-});
 
-describe('Contact', () => {
-  it('puts the ways of reaching them above the name parts', async () => {
+  it('puts the name above the ways of reaching them', async () => {
+    // The reversal of 12 September 2026. The name parts are what an INZ form
+    // asks for first, and the phone number is now one group down rather than
+    // three rows down.
     const side = await sideColumn(mount());
-    const card = side.slice(side.indexOf('>Contact<'), side.indexOf('Given names'));
-    expect(card).toContain('<dt>Phone</dt>');
-    expect(card).toContain('<dt>Email</dt>');
+    expect(side.indexOf('>Name<')).toBeLessThan(side.indexOf('>Contact<'));
+    const contact = side.slice(side.indexOf('>Contact<'), side.indexOf('>Immigration<'));
+    expect(contact).toContain('<dt>Phone</dt>');
+    expect(contact).toContain('<dt>Email</dt>');
   });
 
   it('makes the phone number and the email address links', async () => {

@@ -13,7 +13,7 @@ import { requirePermission } from '../../core/auth';
 import { auditFrom } from '../../core/audit';
 import { one } from '../../core/db';
 import { FormReader } from '../../core/validate';
-import { clearFlag, deleteFlag, editFlag, flagKinds, raiseAgain, raiseFlag, type Flag } from '../../core/flags';
+import { clearFlag, deleteFlag, editFlag, flagKinds, raiseAgain, raiseFlag, type Flag, FLAG_LIFE_UNTIL } from '../../core/flags';
 import { isTerm } from '../../core/vocabulary';
 import { redirectWith } from '../../ui/layout';
 
@@ -32,8 +32,13 @@ export const flagsModule: AppModule = {
       const kind = f.text('kind', { required: true, label: 'Kind', max: 40 });
       const body = f.text('body', { required: true, label: 'Warning', max: 500 });
       const life = f.optional('life', { max: 20 });
+      // Only read when the life is "until a date I choose"; see `expiryFor`.
+      const expiresOn = f.date('expires_on');
       const back = backTo(entityType, entityId);
       if (!f.valid) return redirectWith(c, back, Object.values(f.errors)[0]!, 'err');
+      if (life === FLAG_LIFE_UNTIL && !expiresOn) {
+        return redirectWith(c, back, 'Give the date the warning should come down.', 'err');
+      }
 
       // The kind is vocabulary, so what is offered can change between the page
       // being drawn and the form coming back. An unknown one is refused rather
@@ -44,11 +49,11 @@ export const flagsModule: AppModule = {
       }
 
       const id = await raiseFlag(c.env, {
-        entityType, entityId, kind, body, life: life ?? null, byUserId: user.id,
+        entityType, entityId, kind, body, life: life ?? null, expiresOn, byUserId: user.id,
       });
       await auditFrom(c, {
         action: 'flag.raised', entityType: entityType as never, entityId,
-        meta: { flag: id, kind, life: life ?? 'standing' },
+        meta: { flag: id, kind, life: life ?? 'permanent', expiresOn },
       });
       return redirectWith(c, back, 'Warning raised. It shows at the top of this record.');
     });
@@ -63,12 +68,16 @@ export const flagsModule: AppModule = {
       const kind = f.text('kind', { required: true, label: 'Kind', max: 40 });
       const body = f.text('body', { required: true, label: 'Warning', max: 500 });
       const life = f.optional('life', { max: 20 });
+      const expiresOn = f.date('expires_on');
       if (!f.valid) return redirectWith(c, back, Object.values(f.errors)[0]!, 'err');
       if (!isTerm(await flagKinds(c.env), kind)) {
         return redirectWith(c, back, 'Choose what kind of warning this is.', 'err');
       }
+      if (life === FLAG_LIFE_UNTIL && !expiresOn) {
+        return redirectWith(c, back, 'Give the date the warning should come down.', 'err');
+      }
 
-      await editFlag(c.env, { id, kind, body, life: life ?? null });
+      await editFlag(c.env, { id, kind, body, life: life ?? null, expiresOn });
       await auditFrom(c, {
         action: 'flag.edited', entityType: flag.entity_type as never, entityId: flag.entity_id,
         // What it said before, because the audit log is the append-only half and

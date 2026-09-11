@@ -156,9 +156,11 @@ export function flagBand(opts: {
                   ${field({ label: 'What it says', name: 'body', value: f.body, required: true,
                             maxlength: 500 })}
                   ${opts.lives
-                    ? select({ label: 'How long it stands', name: 'life',
-                               value: f.expires_on ? '' : 'standing',
-                               includeBlank: 'Leave as it is', options: opts.lives })
+                    ? html`${select({ label: 'How long it stands', name: 'life',
+                                      value: f.expires_on ? '' : 'permanent',
+                                      includeBlank: 'Leave as it is', options: opts.lives })}
+                           ${field({ label: 'If until a date, which', name: 'expires_on',
+                                     type: 'date', value: f.expires_on ?? '' })}`
                     : ''}
                   <button class="btn btn-primary btn-small" type="submit">Save</button>
                 </form>
@@ -305,8 +307,14 @@ export function flagRaiser(opts: {
           ${field({ label: 'What somebody needs to know', name: 'body', required: true,
                     maxlength: 500,
                     placeholder: 'e.g. Assaulted by a former husband, reported to Police' })}
-          ${select({ label: 'How long it stands', name: 'life', value: 'standing',
+          ${select({ label: 'How long it stands', name: 'life', value: 'permanent',
                      includeBlank: false, options: opts.lives })}
+          ${'' /* The date box for "Until a date I choose", always drawn rather
+                   than revealed: revealing it needs a script, the content policy
+                   forbids an inline one, and a box that only appears when
+                   scripting happens to be on is a box somebody cannot reach. It
+                   is ignored for every other choice — see `expiryFor`. */}
+          ${field({ label: 'If until a date, which', name: 'expires_on', type: 'date' })}
           <button class="btn btn-primary" type="submit">Raise it</button>
         </form>
         ${'' /* The reason a client's warning reaches their matters is that the fact

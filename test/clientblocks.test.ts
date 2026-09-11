@@ -213,3 +213,146 @@ describe('a country is named, not abbreviated', () => {
     expect(src).not.toContain("' (' || p.country || ')'");
   });
 });
+
+/**
+ * **Asked for on 12 September 2026:** *"the set of panes to the right and the
+ * data is not optimal under a client's profile. I can see that under a
+ * particular case - Key Details - is better organised ... maybe they should all
+ * appear under Key Details? but with the name up top? say Name, Contacts,
+ * Passport details, Certificate, English, and the rest."*
+ *
+ * The old arrangement was **Identity and compliance** beside **Contact**, and
+ * it did not survive being looked at: the given names and the family name sat
+ * under *Contact*, which they are not; "Works for" sat under *Identity*, which
+ * it is not either; and eighteen undifferentiated rows is a list nobody reads
+ * to the end of.
+ *
+ * One change to the order asked for, and it is the one worth pinning:
+ * **Immigration comes third**, before the passport. A visa expiry is the single
+ * most-looked-at fact on a client and it was fourteen rows down.
+ */
+describe('the client summary is one grouped card', () => {
+  const summary = async () => {
+    const body = await page(mount());
+    return body.slice(body.indexOf('<div class="col-side">'));
+  };
+
+  it('is called Key details, the same as on a matter', async () => {
+    expect(await summary()).toContain('<h2>Key details</h2>');
+  });
+
+  it('no longer splits into Identity and compliance beside Contact', async () => {
+    const side = await summary();
+    expect(side).not.toContain('Identity and compliance');
+    expect(side).not.toContain('<h2>Contact</h2>');
+  });
+
+  it('groups it in the order asked for, with the name at the top', async () => {
+    const side = await summary();
+    const heads = [...side.matchAll(/<p class="subhead">([^<]+)<\/p>/g)].map((m) => m[1]!);
+    expect(heads.slice(0, 6)).toEqual(
+      ['Name', 'Contact', 'Immigration', 'Passport', 'Certificates', 'English']);
+    expect(heads).toContain('Personal');
+  });
+
+  it('brings the names out of the contact box, where they never belonged', async () => {
+    const side = await summary();
+    const nameBlock = side.slice(side.indexOf('>Name<'), side.indexOf('>Contact<'));
+    expect(nameBlock).toContain('Given names');
+    expect(nameBlock).toContain('Family name');
+    expect(nameBlock).toContain('Preferred');
+  });
+
+  it('puts the visa expiry above the passport', async () => {
+    // The change to the practice's own order, and the reason for it.
+    const side = await summary();
+    expect(side.indexOf('Visa expiry')).toBeLessThan(side.indexOf('National ID'));
+  });
+
+  it('keeps an organisation on its own card, with its contact details', async () => {
+    const h = mount();
+    h.db.exec(`INSERT INTO clients (id,ref,kind,full_name,status,phone,created_at,updated_at)
+               VALUES ('org1','CL-0902','organisation','Acme Limited','active','+64 9 555 0400',
+                       '${AT}','${AT}')`);
+    const body = await (await h.request('/clients/org1')).text();
+    const side = body.slice(body.indexOf('<div class="col-side">'));
+    expect(side).toContain('<h2>Registration</h2>');
+    expect(side).toContain('<h2>Contact</h2>');
+    expect(side).toContain('+64 9 555 0400');
+  });
+});
+
+/**
+ * **Asked for on 12 September 2026:** *"the side panels should also calculate
+ * the english cert duration - it is valid for 2 years from the issue date."*
+ *
+ * Worked out on the page rather than stored: it is a function of the test date
+ * and nothing else, so a stored copy would be a second owner of a fact that
+ * already has one — and it would be the copy that went stale.
+ */
+describe('an English test says how long it is accepted for', () => {
+  const withTest = async (taken: string) => {
+    const h = mount();
+    h.db.prepare(`UPDATE clients SET english_test_type='ielts_general', english_test_score='6.5',
+                                     english_test_date=? WHERE id='cl1'`).run(taken);
+    return page(h);
+  };
+
+  it('adds two years to the test date', async () => {
+    const body = await withTest('2026-03-04');
+    expect(body).toContain('Accepted until');
+    expect(body).toContain('04 Mar 2028');
+  });
+
+  it('handles a leap day without inventing a date', async () => {
+    const body = await withTest('2024-02-29');
+    expect(body).toContain('Accepted until');
+    // Two years on there is no 29 February; the date rolls to 1 March rather
+    // than becoming nothing.
+    expect(body).toMatch(/0[12] Mar 2026/);
+  });
+
+  it('says nothing where no test date is recorded', async () => {
+    const body = await page(mount());
+    expect(body).not.toContain('Accepted until');
+  });
+
+  it('is not stored anywhere', async () => {
+    // One fact, one owner: the test date owns it.
+    const { readdirSync, readFileSync } = await import('node:fs');
+    for (const f of readdirSync('migrations').filter((f) => f.endsWith('.sql'))) {
+      expect(readFileSync(`migrations/${f}`, 'utf8'), f)
+        .not.toMatch(/english_test_expiry|english_accepted_until/);
+    }
+  });
+});
+
+/**
+ * **Asked for on 12 September 2026:** *"there must be more options for the
+ * warning duration, say 1.5 years, 2 years, 3 years or select a date and
+ * permanent? ... there is a character concern and a character waiver must
+ * always be made - regardless."* And: *"What Kind: should have an option for a
+ * border alert."*
+ */
+describe('how long a warning stands, on the form', () => {
+  it('offers permanent, the longer periods, and a date of your own', async () => {
+    const body = await page(mount());
+    for (const label of ['Permanent', 'For 18 months', 'For 2 years', 'For 3 years',
+      'Until a date I choose']) {
+      expect(body, label).toContain(label);
+    }
+  });
+
+  it('draws the date box always, rather than behind a script', async () => {
+    // Revealing it would need an inline script, which the content policy
+    // forbids; a box that only appears when scripting is on is unreachable.
+    const body = await page(mount());
+    expect(body).toContain('name="expires_on"');
+  });
+
+  it('has a border alert among the kinds a new practice starts with', async () => {
+    const { FLAG_KIND_VOCAB, parseVocabulary } = await import('../src/core/vocabulary');
+    const keys = parseVocabulary(FLAG_KIND_VOCAB.defaults).map((t) => t.key);
+    expect(keys).toContain('border');
+  });
+});

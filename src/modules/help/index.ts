@@ -107,6 +107,13 @@ export const RELEASES: Array<{ version: string; date: string; notes: string[] }>
       'Travel history takes a purpose you pick (Family, Holiday, Business, Work \u2026) and how '
         + 'they travelled (Air, Sea, Land). Both are lists you can edit.',
       'A country is named rather than abbreviated \u2014 a Tongan passport says Tonga, not TO.',
+      'The right-hand column is one card again \u2014 Key details, with the name at the top, then '
+        + 'Contact, Immigration, Passport, Certificates, English and Personal.',
+      'An English test now says how long it is accepted for: two years from the test date.',
+      'A warning can stand permanently, for 18 months, 2 years, 3 years, or until a date you '
+        + 'choose. \u201cPermanent\u201d replaces \u201cUntil it is taken down\u201d \u2014 the '
+        + 'same thing, in plainer words.',
+      'The warning band is loud now: red edges fading into the middle, so the eye catches it.',
     ],
   },
   {

@@ -355,6 +355,7 @@ export const FLAG_KIND_VOCAB: VocabularyDef = {
     + 'key. Blank lines and lines starting with # are ignored.',
   defaults: `safety | Safety
 character | Character or conviction
+border | Border alert
 health | Health
 immigration | Immigration history
 contact | How to make contact

@@ -45,6 +45,37 @@ Air, Sea or Land.
 All three are lists you can edit yourself under **Settings → Lists and
 dropdowns**, like every other dropdown here.
 
+**The right-hand column is one card again: Key details.** Name at the top, then
+Contact, Immigration, Passport, Certificates, English, Personal.
+
+The old split was *Identity and compliance* beside *Contact*, and it did not
+survive being looked at: the given names and family name sat under Contact,
+which they are not. Eighteen undifferentiated rows is a list nobody reads to the
+end of.
+
+One change to the order asked for: **Immigration comes third**, before the
+passport. A visa expiry is the most-looked-at fact on a client and it was
+fourteen rows down.
+
+**An English test now says how long it is accepted for.** Two years from the
+test date, worked out rather than typed, with the same colour as every other
+expiry once it is close.
+
+**More options for how long a warning stands.** Permanent, 30 days, 3 months, 6
+months, a year, 18 months, 2 years, 3 years, or a date you choose.
+
+*Permanent* replaces *Until it is taken down* — the same thing, in words you
+would actually pick for a character concern that must be in front of whoever
+handles the next application. Warnings already raised are unaffected.
+
+**Border alert** is now one of the warning kinds. On this register the list is
+already yours, so add it under **Settings → Lists and dropdowns → Warning
+kinds** with the line `border | Border alert`.
+
+**The warning band is loud now.** Bright red edges fading into the amber
+centre, so the eye catches it before anything else on the page. It was the same
+weight as a card heading.
+
 ### Fixed
 **Countries are named, not abbreviated.** A Tongan passport and a Tongan police
 certificate were both headed **TO**. They say **Tonga**. So does the alerts
