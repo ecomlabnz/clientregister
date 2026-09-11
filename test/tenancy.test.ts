@@ -86,12 +86,27 @@ describe.each(environments)('the %s environment', (name, env) => {
 describe('every configured database is migrated by the deploy', () => {
   const workflow = readFileSync('.github/workflows/deploy.yml', 'utf8');
 
-  it.each([top, ...environments.map(([, e]) => e)])(
-    'applies migrations to %#', (env: any) => {
-      const database = env.d1_databases[0].database_name;
-      expect(workflow, `nothing migrates ${database}`)
-        .toContain(`d1 migrations apply ${database} --remote`);
-    });
+  it('applies migrations to the practice’s own database', () => {
+    const database = top.d1_databases[0].database_name;
+    expect(workflow, `nothing migrates ${database}`)
+      .toContain(`d1 migrations apply ${database} --remote`);
+  });
+
+  it.each(environments)('applies migrations to %s, naming the environment', (name, env: any) => {
+    // **`--env` is the part that was missing**, and it was missing while the
+    // test passed. Wrangler looks a database up in the *top-level* config
+    // unless told which environment to read, and a second practice's database
+    // is only ever declared inside one — so the command ran, found nothing,
+    // and failed. 12 September 2026, the first time a trial was switched on.
+    const database = env.d1_databases[0].database_name;
+    expect(workflow, `nothing migrates ${database}`)
+      .toContain(`d1 migrations apply ${database} --remote --env ${name}`);
+  });
+
+  it.each(environments)('deploys %s against its own environment', (name) => {
+    expect(workflow).toContain(`command: deploy --env ${name}`);
+    expect(workflow).toContain(`secret bulk .secrets.json --env ${name}`);
+  });
 
   it('deploys the practice’s register before any other', () => {
     // So a trial that cannot deploy never delays or rolls back the register
