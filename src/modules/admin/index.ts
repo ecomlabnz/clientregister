@@ -229,7 +229,7 @@ export const adminModule: AppModule = {
           ${'' /* Keys are GitHub repository secrets and reach the Worker on the next deploy;
                    none of them is stored in this database. */}
           <p class="hint mb">Step-by-step instructions are in
-             <a href="/help#connecting">Help → Connecting Telegram, WhatsApp and email</a>.</p>
+             <a href="/help?s=connecting">Help → Connecting Telegram, WhatsApp and email</a>.</p>
           ${mailConfigured(env) ? html`
             <form method="post" action="/admin/mail/test" class="row-form mb">
               ${csrfField(c.get('session')!.csrf)}

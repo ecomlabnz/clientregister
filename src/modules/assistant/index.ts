@@ -43,7 +43,7 @@ function notConfigured(): ReturnType<typeof html> {
       ${'' /* The how-to (AI_PROVIDER / ANTHROPIC_API_KEY / workers-ai, both repository
             secrets) lives in the setup guide rather than on this page. */}
       <p><strong>The AI layer is not switched on.</strong>
-         <a href="/help#connecting">Set it up</a>.</p>
+         <a href="/help?s=connecting">Set it up</a>.</p>
     </div>`;
 }
 
