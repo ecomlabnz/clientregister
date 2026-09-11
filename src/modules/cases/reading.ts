@@ -75,7 +75,7 @@ import {
 } from '../../ai/casefill';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, type Raw } from '../../ui/html';
-import { card, csrfField, field, foldingCard, pageHeader, table } from '../../ui/components';
+import { card, csrfField, field, foldedCard, pageHeader, table } from '../../ui/components';
 import { dateShort } from '../../ui/format';
 
 const CASE_COLUMNS = `id, ref, descriptor, inz_application_number, lodged_at,
@@ -202,7 +202,7 @@ export function readingCard(opts: {
   const readable = offered.filter((d) => d.why === null);
   const skipped = offered.filter((d) => d.why !== null);
 
-  return foldingCard('Read a document into this matter', html`
+  return foldedCard('Read a document into this matter', html`
     <p class="small">Point it at a document already on this file, drop a new one in, or both.
        It reads them and shows you what it could fill in. <strong>Nothing is written until you
        press the button on the next screen</strong>, and a box that already has something in it

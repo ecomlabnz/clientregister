@@ -1,12 +1,22 @@
 /**
- * Every section on a matter folds, and only one starts folded.
+ * Every section on a matter folds, and which ones start folded.
  *
  * A matter page is long — status, parties, tasks, files, notes, tags, key
  * details, the lot — and which parts matter depends on what you opened it for.
- * So each heading is a handle. They open on load, because a section you cannot
- * see is a section you forget to read; the exception is the money, which stays shut
- * for the reason it always has: it is the one thing on the page a client
- * leaning over the desk should not read by accident.
+ * So each heading is a handle.
+ *
+ * Until 11 September 2026 every section but the money opened on load. The
+ * practice asked for more than that: *"in a case - Read a document into this
+ * matter and Brief Me on this matter and Files and File Notes - all need to
+ * start collapsed by default - same for tasks."* The line that divides them is
+ * doing from reading — a section you came to the page to *use* costs one click,
+ * and a section you did not costs nothing. What you *read* to know where a
+ * matter stands is still open when the page loads, because a fact you have to
+ * unfold is a fact you forget to check.
+ *
+ * The money stays shut for the reason it always has, which is a different
+ * reason: it is the one thing on the page a client leaning over the desk should
+ * not read by accident.
  *
  * Built on `<details>`, like every other disclosure here — the content policy
  * forbids an inline script, and a fold that stops working when script is
@@ -60,11 +70,22 @@ describe('the sections on a matter', () => {
     expect(rigid, 'these headings are not handles').toEqual([]);
   });
 
-  it('open on load, except the money', async () => {
+  it('start shut where they are things to do, and the money', async () => {
     const h = mount();
     seed(h);
     const shut = sections(await page(h)).filter((s) => !s.open).map((s) => s.title);
-    expect(shut).toEqual(['Invoices']);
+    expect(shut).toEqual(['Invoices', 'Tasks', 'Files', 'File notes']);
+  });
+
+  it('start open where they are things to read', async () => {
+    // The complement, stated rather than implied: a section quietly added to
+    // the shut list is a fact about the matter that stops being read.
+    const h = mount();
+    seed(h);
+    const open = sections(await page(h)).filter((s) => s.open).map((s) => s.title);
+    for (const heading of ['Status', 'Parties', 'Key details', 'Next action', 'Summary']) {
+      expect(open, heading).toContain(heading);
+    }
   });
 
   it('names the money section Invoices', async () => {

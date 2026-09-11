@@ -7,6 +7,32 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.48.0 — 12 September 2026
+
+### Added
+**Visa conditions and stay limits, on a client.** Two new boxes on the
+Immigration tab. Conditions is what the grant allows and forbids, in INZ's own
+words. Stay limit is the line you would otherwise write in a note — *"4 months
+per entry, 6 months in any 12"*.
+
+Neither is counted from and neither raises an alert, on purpose. A stay limit
+only becomes a date when the person crosses a border, and the register has no
+way of knowing when they did. A date the register guessed would be worse than no
+date, because a date is what the alerts read. The visa's own expiry is still the
+only date watched on a visa.
+
+Both are plain words, which is what lets a reading of an approval letter fill
+them in.
+
+### Changed
+**Five sections on a matter now start closed.** Read a document into this
+matter, Brief me on this matter, Files, File notes and Tasks. Those are the
+things you *do*; click the heading and they open. Everything you *read* — status,
+parties, key details, the next action — is still open when the page loads.
+
+**Your name is on your own account page.** It showed the email address and the
+role and left out the name.
+
 ## 1.47.1 — 12 September 2026
 
 ### Fixed

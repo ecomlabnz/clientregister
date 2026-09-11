@@ -27,14 +27,24 @@ export function card(title: string, body: Raw, actions?: Raw): Raw {
  * everything here is: the content policy forbids an inline script, and a fold
  * that stops working when script is blocked is a section nobody can reach.
  *
+ * `{ open: false }` starts it closed. The practice asked for it on 11 September
+ * 2026 for the five sections on a matter that are *things you do* rather than
+ * *things you read* — reading a document in, asking for a brief, files, file
+ * notes and tasks: *"all need to start collapsed by default"*. A section you
+ * came to the page to use is one click; a section you did not is nothing at
+ * all, and a matter now fits on a screen again.
+ *
  * The fold is not remembered between page loads. It could be, and deliberately
  * is not: a section that is missing because of something you did on another
  * matter last week is worse than one you close again.
  */
-export function foldingCard(title: string, body: Raw, actions?: Raw): Raw {
+export function foldingCard(
+  title: string, body: Raw, actions?: Raw, opts: { open?: boolean } = {},
+): Raw {
+  const open = opts.open !== false;
   return html`
     <section class="card">
-      <details class="card-fold" open>
+      <details class="card-fold" ${open ? raw('open') : ''}>
         <summary class="card-head">
           <h2>${title}</h2>
           ${actions ?? ''}
@@ -42,6 +52,22 @@ export function foldingCard(title: string, body: Raw, actions?: Raw): Raw {
         <div class="card-body">${body}</div>
       </details>
     </section>`;
+}
+
+/**
+ * The same card, closed until somebody opens it.
+ *
+ * Its own name rather than an option on `foldingCard`, because it is a
+ * different decision about a section and reads like one at the call site: this
+ * is a section you open when you want it, not one you scroll past.
+ *
+ * Asked for on 11 September 2026 for the five sections on a matter that are
+ * things you *do* — read a document in, ask for a brief, files, file notes,
+ * tasks. Everything that is a thing to *read* — status, parties, key details —
+ * stays open.
+ */
+export function foldedCard(title: string, body: Raw, actions?: Raw): Raw {
+  return foldingCard(title, body, actions, { open: false });
 }
 
 /**
