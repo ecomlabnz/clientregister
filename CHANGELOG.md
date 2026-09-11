@@ -7,6 +7,34 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.46.0 — 12 September 2026
+
+### Added
+**A response or decision date can now be changed on its own.** Reported: *"i
+just received an extension from INZ of time to file an australian PC for a
+client... and I need to record that - Due Date Extended - and enter the new
+date - but I cannot."*
+
+The date was locked behind the status. "Move to" was required, so the only way
+to record an extension was to pretend the matter had moved somewhere it had
+not.
+
+Now the status box says **Leave as it is**. Change the date, add a note saying
+who granted the extension and why, and press Save. The status stays where it
+is, the change is written on the file, and any INZ follow-ups move with the new
+date.
+
+### Why the status list is not editable, unlike the other dropdowns
+The practice asked, and guessed right. A status is not a label. Fifteen of them
+drive behaviour: which matters count as open, which carry a deadline that must
+not be missed, which are with INZ and so raise the no-acknowledgement alert,
+and which record a decision date of their own accord. A status added from a
+settings page would belong to none of those lists and would be invisible to
+every alert — worse than not having it.
+
+Almost every other dropdown in the register *is* editable, and where one is
+not, it is for this reason.
+
 ## 1.45.0 — 11 September 2026
 
 ### Added

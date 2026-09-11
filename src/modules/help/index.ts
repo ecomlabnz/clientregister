@@ -37,6 +37,17 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.46.0', date: '12 September 2026',
+    notes: [
+      'You can now change the response or decision date without moving the status. Leave "Move '
+        + 'to" as it is, put in the new date and a note saying who granted the extension, and '
+        + 'press Save. Any INZ follow-ups move with it.',
+      'The status list stays fixed rather than editable, unlike most dropdowns. A status drives '
+        + 'the alerts \u2014 which matters are open, which carry a deadline, which are with INZ '
+        + '\u2014 so one added in Settings would be invisible to every alert.',
+    ],
+  },
+  {
     version: '1.45.0', date: '11 September 2026',
     notes: [
       'You can now send a file straight from Finder or your phone into the register\u2019s inbox. '
