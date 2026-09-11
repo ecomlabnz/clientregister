@@ -256,9 +256,18 @@ export async function documentAlerts(env: Env, horizonDays = 90): Promise<Alert[
   }>(
     env.DB,
     `SELECT c.id, c.ref, c.full_name,
-            'Passport' || CASE WHEN p.country IS NULL THEN '' ELSE ' (' || p.country || ')' END AS document,
+            -- The country's name, not its code. Reported 12 September 2026 about
+            -- a Tongan passport headed "TO": *"Do not like the country
+            -- abbreviation - insufficient - Use full country name."* The code is
+            -- how the register stores it; a stored form is not a heading. Joined
+            -- rather than translated afterwards, because this row is built in SQL
+            -- and the names are a table (migration 0030). LEFT, so a code that
+            -- somehow has no row still reads as a passport rather than vanishing.
+            'Passport' || CASE WHEN p.country IS NULL THEN ''
+              ELSE ' (' || COALESCE(pc.name, p.country) || ')' END AS document,
             p.expires_on AS expires, NULL AS provenance
        FROM client_passports p JOIN clients c ON c.id = p.client_id
+       LEFT JOIN countries pc ON pc.code = p.country
       WHERE p.status = 'held' AND p.expires_on IS NOT NULL AND p.expires_on <= ?1
         AND c.status != 'archived'
      UNION ALL

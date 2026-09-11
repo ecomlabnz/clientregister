@@ -229,7 +229,7 @@ Settings: **Inbound channels** (1 keys)
 | POST | `/cases/:id/tags/:tagId/remove` |
 | GET | `/cases/new` |
 
-Settings: **Lists and dropdowns** (11 keys), **Decisions and chasing INZ** (4 keys)
+Settings: **Lists and dropdowns** (14 keys), **Decisions and chasing INZ** (4 keys)
 
 ### `quotes` — Quotes
 

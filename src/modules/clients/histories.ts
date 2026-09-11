@@ -53,6 +53,9 @@ import {
 export interface HistoryVocab {
   employment_kinds: Term[];
   education_levels: Term[];
+  education_outcomes: Term[];
+  travel_purposes: Term[];
+  travel_modes: Term[];
 }
 
 function optionsFor(col: { vocab?: keyof HistoryVocab }, vocab: HistoryVocab) {

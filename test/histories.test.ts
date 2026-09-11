@@ -333,3 +333,120 @@ describe('on the client page', () => {
     expect(body).not.toContain('<h2>Military records</h2>');
   });
 });
+
+// ---------------------------------------------------------------------------
+// What the practice asked for the day after
+// ---------------------------------------------------------------------------
+
+/**
+ * **Asked for on 12 September 2026:** *"For Education History - another box -
+ * whether complete or incomplete. For Travel history the purpose should contain
+ * options Family, Holiday, Business, Work, and another field - mode of travel
+ * should have by Air, Sea, Land."*
+ *
+ * All three are lists an administrator edits, like every other dropdown here.
+ * `purpose` had been free text for one day and held nothing in the practice's
+ * register, so it became a list directly rather than through a translation
+ * nobody would have needed — checked against production before the migration
+ * was written.
+ */
+describe('whether a course was finished', () => {
+  it('saves against the row', async () => {
+    const h = mount();
+    await h.post('/clients/cl1/history/education/add', {
+      institution: 'Wintec', qualification: 'Diploma in Business',
+      started_on: '2025-02-17', ended_on: '2026-11-30', completed: 'completed',
+    });
+    expect(rowsOf(h, 'client_education')[0]!.completed).toBe('completed');
+  });
+
+  it('offers completed, not completed and still studying', async () => {
+    // Three rather than two: "still studying" is the answer for every client
+    // currently on a student visa and is neither of the other two.
+    const h = mount();
+    const body = await (await h.request('/clients/cl1?open=history-education')).text();
+    for (const label of ['Completed', 'Not completed', 'Still studying']) {
+      expect(body, label).toContain(label);
+    }
+  });
+
+  it('is not compulsory, like the rest of a history', async () => {
+    const h = mount();
+    const res = await h.post('/clients/cl1/history/education/add', { institution: 'Wintec' });
+    expect(res.status).toBe(303);
+    expect(rowsOf(h, 'client_education')[0]!.completed).toBe(null);
+  });
+});
+
+describe('how a trip was made, and why', () => {
+  it('saves both against the row', async () => {
+    const h = mount();
+    await h.post('/clients/cl1/history/travel/add', {
+      country: 'AU', purpose: 'family', mode: 'air',
+      started_on: '2025-12-18', ended_on: '2026-01-20',
+    });
+    const row = rowsOf(h, 'client_travel')[0]!;
+    expect(row.purpose).toBe('family');
+    expect(row.mode).toBe('air');
+  });
+
+  it('offers the purposes the practice named', async () => {
+    const h = mount();
+    const body = await (await h.request('/clients/cl1?open=history-travel')).text();
+    for (const label of ['Family', 'Holiday', 'Business', 'Work']) {
+      expect(body, label).toContain(`>${label}<`);
+    }
+  });
+
+  it('offers air, sea and land', async () => {
+    const h = mount();
+    const body = await (await h.request('/clients/cl1?open=history-travel')).text();
+    for (const label of ['Air', 'Sea', 'Land']) {
+      expect(body, label).toContain(`>${label}<`);
+    }
+  });
+
+  it('shows the labels back, not the stored keys', async () => {
+    const h = mount();
+    await h.post('/clients/cl1/history/travel/add', {
+      country: 'AU', purpose: 'family', mode: 'air', started_on: '2025-12-18',
+    });
+    const body = await (await h.request('/clients/cl1?open=history-travel')).text();
+    expect(body).toContain('Family');
+    expect(body).toContain('Air');
+  });
+});
+
+describe('the three new lists are an administrator’s', () => {
+  it('are registered as vocabularies, like every other dropdown', async () => {
+    const { VOCABULARIES } = await import('../src/core/vocabulary');
+    const keys = VOCABULARIES.map((v) => v.key);
+    expect(keys).toContain('vocab.education_outcomes');
+    expect(keys).toContain('vocab.travel_purposes');
+    expect(keys).toContain('vocab.travel_modes');
+  });
+
+  it('so the database accepts a word that is not on today’s list', () => {
+    // The proof that these are configuration rather than schema: an
+    // administrator adds "Medical treatment" to the reasons for a trip and it
+    // stores, with no migration. A CHECK listing today's words would need one.
+    const h = mount();
+    h.db.prepare(
+      `INSERT INTO client_travel (id, client_id, purpose, mode, created_at, updated_at)
+       VALUES ('t9','cl1','medical_treatment','ferry',?,?)`).run(AT, AT);
+    h.db.prepare(
+      `INSERT INTO client_education (id, client_id, completed, created_at, updated_at)
+       VALUES ('e9','cl1','abandoned',?,?)`).run(AT, AT);
+    expect(rowsOf(h, 'client_travel')[0]!.purpose).toBe('medical_treatment');
+    expect(rowsOf(h, 'client_education')[0]!.completed).toBe('abandoned');
+  });
+
+  it('but still refuses a paragraph in place of a word', () => {
+    // The one rule they do carry, and it is the database's.
+    const h = mount();
+    expect(() => h.db.prepare(
+      `INSERT INTO client_travel (id, client_id, mode, created_at, updated_at)
+       VALUES ('t8','cl1',?,?,?)`).run('x'.repeat(61), AT, AT))
+      .toThrow(/a word, not a sentence/);
+  });
+});

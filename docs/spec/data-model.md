@@ -255,6 +255,7 @@ later replaced still sits in the file that created it.
 | `created_at` | TEXT | no | — |
 | `updated_at` | TEXT | no | — |
 | `created_by` | TEXT | yes | — |
+| `completed` | TEXT | yes | — |
 
 ## `client_employment`
 
@@ -323,6 +324,7 @@ later replaced still sits in the file that created it.
 | `created_at` | TEXT | no | — |
 | `updated_at` | TEXT | no | — |
 | `created_by` | TEXT | yes | — |
+| `mode` | TEXT | yes | — |
 
 ## `clients`
 

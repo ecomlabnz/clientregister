@@ -456,11 +456,57 @@ doctorate | Doctorate
 other | Other`,
 };
 
+/**
+ * Whether a course was finished.
+ *
+ * **Asked for on 12 September 2026:** *"For Education History - another box -
+ * whether complete or incomplete."*
+ *
+ * Three values rather than two, because "still studying" is the answer for
+ * every client currently on a student visa and is neither of the other two.
+ */
+export const EDUCATION_OUTCOME_VOCAB: VocabularyDef = {
+  key: 'vocab.education_outcomes',
+  label: 'Education outcomes',
+  help: 'One per line, written as \u201ckey | Label\u201d. Whether a course on a client\u2019s '
+    + 'education history was finished. Blank lines and lines starting with # are ignored.',
+  defaults: `completed | Completed
+incomplete | Not completed
+in_progress | Still studying`,
+};
+
+/** Why somebody made a trip. */
+export const TRAVEL_PURPOSE_VOCAB: VocabularyDef = {
+  key: 'vocab.travel_purposes',
+  label: 'Travel purposes',
+  help: 'One per line, written as \u201ckey | Label\u201d. Offered against a row of a client\u2019s '
+    + 'travel history. Blank lines and lines starting with # are ignored.',
+  defaults: `family | Family
+holiday | Holiday
+business | Business
+work | Work
+study | Study
+transit | Transit
+other | Other`,
+};
+
+/** How they made it. */
+export const TRAVEL_MODE_VOCAB: VocabularyDef = {
+  key: 'vocab.travel_modes',
+  label: 'Modes of travel',
+  help: 'One per line, written as \u201ckey | Label\u201d. How a trip on a client\u2019s travel '
+    + 'history was made. Blank lines and lines starting with # are ignored.',
+  defaults: `air | Air
+sea | Sea
+land | Land`,
+};
+
 export const VOCABULARIES: VocabularyDef[] = [
   CASE_TYPE_VOCAB, VISA_TYPE_VOCAB,
   TITLE_VOCAB, GENDER_VOCAB, RELATIONSHIP_STATUS_VOCAB,
   ENGLISH_TEST_VOCAB, DOC_CATEGORY_VOCAB, FLAG_KIND_VOCAB, NOTE_KIND_VOCAB,
-  EMPLOYMENT_KIND_VOCAB, EDUCATION_LEVEL_VOCAB,
+  EMPLOYMENT_KIND_VOCAB, EDUCATION_LEVEL_VOCAB, EDUCATION_OUTCOME_VOCAB,
+  TRAVEL_PURPOSE_VOCAB, TRAVEL_MODE_VOCAB,
 ];
 
 export const VOCABULARY_SETTINGS: SettingsGroup = {

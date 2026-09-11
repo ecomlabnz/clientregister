@@ -15,10 +15,10 @@ claim, not a fact.
 |---|---|---|
 | [`mistakes.md`](mistakes.md) | Every fault this register has actually suffered, and the rule that now prevents it | Written by hand, added to whenever something breaks |
 | [`features.md`](features.md) | 25 modules — what each is, where it is mounted, every route it owns, its settings and its place in the menu | `npm run spec`, from the registry |
-| [`invariants.md`](invariants.md) | The 151 things the database refuses to do, in its own words, and the 13 uniqueness rules | `npm run spec`, from the built schema |
+| [`invariants.md`](invariants.md) | The 155 things the database refuses to do, in its own words, and the 13 uniqueness rules | `npm run spec`, from the built schema |
 | [`data-model.md`](data-model.md) | 56 tables, every column | `npm run spec`, from the built schema |
 | [`routes.md`](routes.md) | 228 routes and the permission each runs behind, the public surface listed first | `npm run spec`, from the built router |
-| [`settings.md`](settings.md) | 92 settings — everything an administrator can change without a deployment | `npm run spec`, from the modules |
+| [`settings.md`](settings.md) | 95 settings — everything an administrator can change without a deployment | `npm run spec`, from the modules |
 | [`permissions.md`](permissions.md) | 14 permissions across 5 roles, as a matrix | `npm run spec`, from `core/rbac.ts` |
 
 ## Read them in this order

@@ -49,7 +49,8 @@ export interface HistoryColumn {
   label: string;
   kind: 'text' | 'date' | 'country' | 'vocab';
   /** For `kind: 'vocab'`, which vocabulary supplies the options. */
-  vocab?: 'employment_kinds' | 'education_levels';
+  vocab?: 'employment_kinds' | 'education_levels' | 'education_outcomes'
+    | 'travel_purposes' | 'travel_modes';
   max?: number;
   /** Width of the input, in characters. Dates and selects size themselves. */
   size?: number;
@@ -110,6 +111,13 @@ export const EDUCATION_HISTORY: HistoryDef = {
     { name: 'country', label: 'Country', kind: 'country' },
     { name: 'started_on', label: 'From', kind: 'date' },
     { name: 'ended_on', label: 'To', kind: 'date' },
+    // Last, because it is the answer the row builds to. Asked for on 12
+    // September 2026: *"another box - whether complete or incomplete."* It is
+    // most of the point of an education history — a qualification claimed on an
+    // application has to be finished, and a year abandoned is still a year to
+    // account for. Without it a row said somebody attended and left the reader
+    // to guess whether they came out with anything.
+    { name: 'completed', label: 'Finished', kind: 'vocab', vocab: 'education_outcomes' },
   ],
 };
 
@@ -121,8 +129,15 @@ export const TRAVEL_HISTORY: HistoryDef = {
   showsGaps: false,
   columns: [
     { name: 'country', label: 'Country', kind: 'country' },
+    // Asked for on 12 September 2026: *"the purpose should contain options
+    // Family, Holiday, Business, Work, and another field - mode of travel
+    // should have by Air, Sea, Land."* Both are lists an administrator edits,
+    // like every other dropdown here. `purpose` was free text for a day and
+    // held nothing, so it became a list directly rather than through a
+    // translation nobody would have needed.
+    { name: 'purpose', label: 'Purpose', kind: 'vocab', vocab: 'travel_purposes' },
+    { name: 'mode', label: 'By', kind: 'vocab', vocab: 'travel_modes' },
     { name: 'port_of_entry', label: 'Port of entry', kind: 'text', max: 120, size: 16 },
-    { name: 'purpose', label: 'Purpose', kind: 'text', max: 200, size: 18 },
     { name: 'started_on', label: 'Arrived', kind: 'date' },
     { name: 'ended_on', label: 'Left', kind: 'date' },
   ],

@@ -94,6 +94,22 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.53.0', date: '12 September 2026',
+    notes: [
+      'A client\u2019s page opens as a list of headings: Cases, Quotes, Passports, Certificates, '
+        + 'Files, the histories, then File notes at the bottom. Click a heading to open it.',
+      'The summary down the right stays open \u2014 that is what you read to know where things '
+        + 'stand.',
+      'A certificate now says the date its rule works out to: \u201cSubmitted 12 Aug 2026 \u00b7 24 '
+        + 'months from issue \u00b7 expires 29 Jun 2028\u201d, on the one line.',
+      'Education history takes whether the course was finished \u2014 Completed, Not completed, '
+        + 'or Still studying.',
+      'Travel history takes a purpose you pick (Family, Holiday, Business, Work \u2026) and how '
+        + 'they travelled (Air, Sea, Land). Both are lists you can edit.',
+      'A country is named rather than abbreviated \u2014 a Tongan passport says Tonga, not TO.',
+    ],
+  },
+  {
     version: '1.52.1', date: '12 September 2026',
     notes: [
       'Saving a client no longer loses what you typed. A visa expiry before the visa start date '
