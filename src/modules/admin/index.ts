@@ -775,6 +775,13 @@ export const adminModule: AppModule = {
           <input type="hidden" name="tab" value="${group.id}">
           <h3 class="settings-head">${group.title}</h3>
           ${group.description ? html`<p class="hint settings-head">${group.description}</p>` : ''}
+          ${/* Where the wording is a document's, a link to go and read it. The
+                group declares these; this page knows nothing about them. */ ''}
+          ${group.links?.length ? html`
+            <div class="settings-head admin-links">
+              ${group.links.map((l) => html`
+                <a class="btn btn-secondary btn-small" href="${l.href}">${l.label}</a>`)}
+            </div>` : ''}
           ${group.settings.map((def) => html`
             <div class="${def.type === 'text' ? 'settings-cell settings-cell-wide' : 'settings-cell'}">
               ${settingField(def, values[def.key] ?? def.default)}

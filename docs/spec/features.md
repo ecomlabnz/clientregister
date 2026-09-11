@@ -27,7 +27,7 @@ dashboard, and why a test holds them there.
 | 10 | `inquiries` | Inquiries | `/inquiries` | 12 | Incoming |
 | 11 | `clients` | Clients | `/clients` | 31 | Clients |
 | 12 | `cases` | Cases | `/cases` | 20 | Cases |
-| 13 | `quotes` | Quotes | `/quotes` | 30 | Money → Quotes |
+| 13 | `quotes` | Quotes | `/quotes` | 32 | Money → Quotes |
 | 14 | `mail` | Sent email | `/mail` | 2 | — |
 | 15 | `invoices` | Invoices | `/invoices` | 12 | Money → Invoices |
 | 16 | `tasks` | Tasks | `/tasks` | 8 | Tasks |
@@ -270,6 +270,8 @@ Settings: **Lists and dropdowns** (14 keys), **Decisions and chasing INZ** (4 ke
 | POST | `/quotes/clauses/:clauseId` |
 | POST | `/quotes/clauses/:clauseId/toggle` |
 | GET | `/quotes/new` |
+| GET | `/quotes/preview` |
+| GET | `/quotes/preview/letter` |
 
 Settings: **Quotes** (8 keys), **Letter of engagement** (18 keys)
 

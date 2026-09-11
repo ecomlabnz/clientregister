@@ -7,6 +7,31 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.60.0 — 12 September 2026
+
+### Added
+**See your quote and your letter of engagement before you send one.** *"in the
+settings quotes and Letter of engagement - there should be a button to preview
+these two documents or how they appear?"*
+
+The wording of both is edited as boxes of text under Settings. A box of text is
+not a document, and until now the only way to see what a change actually looked
+like was to go and find a real quotation.
+
+There is now a **Preview** button on each of those two settings pages. It draws
+the real document, with your wording as it stands, on your **most recently
+issued quotation** — so nothing on it is invented. If nothing has been issued
+yet it uses the newest quotation on the register and says so; if there are no
+quotations at all it says that in words, rather than showing an error.
+
+The preview writes nothing. No record of a document being printed, no change to
+the quotation, no client link. It is reading, not sending.
+
+**It is a real client's quotation**, so their name is on it. A band at the top
+of the page says so — and that band prints, so a printout can never be mistaken
+for the document itself. Only somebody who can already open Settings can open a
+preview.
+
 ## 1.59.0 — 12 September 2026
 
 ### Changed

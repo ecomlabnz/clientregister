@@ -116,6 +116,7 @@ export const QUOTE_SETTINGS: SettingsGroup = {
   title: 'Quotes',
   description: 'How quotes are put together and how long they stand.',
   order: 35,
+  links: [{ href: '/quotes/preview', label: 'Preview the quotation' }],
   settings: [
     { key: 'quotes.email_subject', type: 'string', maxLength: 200,
       label: 'Subject line of the quotation email',
@@ -1143,6 +1144,102 @@ export const quotesModule: AppModule = {
       await auditFrom(c, { action: 'engagement.clause_toggled',
         entityType: 'engagement_clause', entityId: clauseId });
       return redirectWith(c, '/quotes/clauses', 'Updated.');
+    });
+
+    // --- Preview -------------------------------------------------------------
+    //
+    // **Asked for on 12 September 2026:** *"in the settings quotes and Letter of
+    // engagement - there should be a button to preview these two documents or
+    // how they appear?"* The wording of both documents is edited as boxes of
+    // text on the settings page, and a box of text is not a document: until now
+    // the only way to see the effect of a change was to go and find a real
+    // quotation.
+    //
+    // So the preview draws the real document with the real renderer, on the
+    // practice's own most recently issued quotation. No invented client, no
+    // second set of markup that can drift from the first — the page a client
+    // would be sent, with today's wording in it.
+    //
+    // It writes nothing. Not an audit row, not a counter, not `issued_on`: this
+    // is somebody reading their own settings, and a document that records
+    // itself as printed every time an administrator checks a comma would make
+    // the audit log worth less.
+    //
+    // The gate is `admin:settings`, the same one that reaches the wording. It
+    // shows a real client's quotation, so it is not for everybody who may write
+    // one.
+
+    /**
+     * The quotation a preview is drawn on.
+     *
+     * The most recently issued one; where nothing has been issued yet, the most
+     * recent quotation of any kind, so a register holding only drafts still
+     * gets a preview. The banner says which of the two it is.
+     */
+    const previewQuote = (env: Env) => one<{
+      id: string; ref: string; issued_on: string | null; client_name: string | null;
+    }>(
+      env.DB,
+      `SELECT q.id, q.ref, q.issued_on, cl.full_name AS client_name FROM quotes q
+         LEFT JOIN clients cl ON cl.id = q.client_id
+        ORDER BY q.issued_on IS NULL, q.issued_on DESC, q.created_at DESC
+        LIMIT 1`,
+    );
+
+    /** Said above the document, and on paper too if somebody prints it. */
+    const previewBanner = (
+      chosen: { ref: string; issued_on: string | null; client_name: string | null },
+      tab: string,
+    ) => html`
+      <div class="alert alert-warn preview-note">
+        <strong>This is a preview.</strong>
+        It shows your current wording on quote ${chosen.ref}${chosen.client_name
+          ? html` for ${chosen.client_name}` : ''} —
+        ${chosen.issued_on
+          ? html`the last quotation you issued, on ${dateShort(chosen.issued_on)}.`
+          : html`the newest quotation on the register, which has not been issued yet.`}
+        It is a real client’s quotation, so their name is on it. Nothing here has been
+        sent, changed or recorded. <a href="/admin/settings?tab=${tab}">Back to the wording</a>
+      </div>`;
+
+    /** No quotation to draw on. Say so, and say what to do. */
+    const previewNothing = (c: any, what: string, tab: string) =>
+      page(c, { title: `Preview — ${what}`, active: '/quotes' }, html`
+        ${pageHeader(`Preview: ${what}`)}
+        ${card('Nothing to show yet', html`
+          <p>The preview shows your wording in a real document, so it needs a quotation to
+             put it on. There are none in the register yet.</p>
+          <p>Create a quotation and the preview will show it here.</p>
+          <div class="admin-links">
+            ${can(c.get('user'), 'quote:write')
+              ? html`<a class="btn btn-primary" href="/quotes/new">New quote</a>` : ''}
+            <a class="btn btn-secondary" href="/admin/settings?tab=${tab}">Back to the wording</a>
+          </div>`)}`);
+
+    r.get('/preview', requirePermission('admin:settings'), async (c) => {
+      const chosen = await previewQuote(c.env);
+      const d = chosen ? await loadQuotation(c.env, chosen.id) : null;
+      if (!chosen || !d) return previewNothing(c, 'the fee quotation', 'quotes');
+      return page(c, { title: `Preview — quotation ${d.q.ref}`, bare: true, paper: true }, html`
+        ${previewBanner(chosen, 'quotes')}
+        ${quotationArticle(d, html`
+          <footer class="quote-doc-foot no-print">
+            <a class="btn btn-secondary" href="/admin/settings?tab=quotes">Back to the wording</a>
+            <a class="btn btn-secondary" href="/quotes/${d.q.id}">Open this quote</a>
+          </footer>`)}`);
+    });
+
+    r.get('/preview/letter', requirePermission('admin:settings'), async (c) => {
+      const chosen = await previewQuote(c.env);
+      const d = chosen ? await loadLetter(c.env, chosen.id) : null;
+      if (!chosen || !d) return previewNothing(c, 'the letter of engagement', 'engagement');
+      return page(c, { title: `Preview — letter ${d.q.ref}`, bare: true, paper: true }, html`
+        ${previewBanner(chosen, 'engagement')}
+        ${letterArticle(d, html`
+          <footer class="quote-doc-foot no-print">
+            <a class="btn btn-secondary" href="/admin/settings?tab=engagement">Back to the wording</a>
+            <a class="btn btn-secondary" href="/quotes/${d.q.id}">Open this quote</a>
+          </footer>`)}`);
     });
 
     r.get('/:id', requirePermission('register:read'), async (c) => {
