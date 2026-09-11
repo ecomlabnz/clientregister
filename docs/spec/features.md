@@ -25,7 +25,7 @@ dashboard, and why a test holds them there.
 | 8 | `alerts` | Alerts | `/alerts` | 1 | Alerts |
 | 9 | `inbox` | Inbox | `/inbox` | 23 | — |
 | 10 | `inquiries` | Inquiries | `/inquiries` | 12 | Incoming |
-| 11 | `clients` | Clients | `/clients` | 23 | Clients |
+| 11 | `clients` | Clients | `/clients` | 26 | Clients |
 | 12 | `cases` | Cases | `/cases` | 20 | Cases |
 | 13 | `quotes` | Quotes | `/quotes` | 30 | Money → Quotes |
 | 14 | `mail` | Sent email | `/mail` | 2 | — |
@@ -182,12 +182,15 @@ Settings: **Inbound channels** (1 keys)
 | GET | `/clients/:id` |
 | POST | `/clients/:id` |
 | POST | `/clients/:id/certificates` |
+| POST | `/clients/:id/certificates/:certId` |
 | POST | `/clients/:id/certificates/:certId/confirm-issue-date` |
 | POST | `/clients/:id/certificates/:certId/remove` |
 | POST | `/clients/:id/certificates/:certId/submitted` |
 | POST | `/clients/:id/delete` |
 | GET | `/clients/:id/edit` |
 | POST | `/clients/:id/entries` |
+| POST | `/clients/:id/history/:key` |
+| POST | `/clients/:id/history/:key/add` |
 | POST | `/clients/:id/passports` |
 | POST | `/clients/:id/passports/:pid/primary` |
 | POST | `/clients/:id/passports/:pid/remove` |
@@ -226,7 +229,7 @@ Settings: **Inbound channels** (1 keys)
 | POST | `/cases/:id/tags/:tagId/remove` |
 | GET | `/cases/new` |
 
-Settings: **Lists and dropdowns** (9 keys), **Decisions and chasing INZ** (4 keys)
+Settings: **Lists and dropdowns** (11 keys), **Decisions and chasing INZ** (4 keys)
 
 ### `quotes` — Quotes
 

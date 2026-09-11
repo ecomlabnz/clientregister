@@ -37,6 +37,20 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.50.0', date: '12 September 2026',
+    notes: [
+      'A client now has Employment history, Education history and Travel history, under '
+        + 'Certificates. Each starts closed, and none of them is compulsory.',
+      'Each is a table you edit all at once, like quotation lines: type a number in the # box to '
+        + 'move a row, tick the red cross to take one out, press Save the table.',
+      'A period of unemployment is a row like any other \u2014 pick what the period was and leave '
+        + 'the employer blank. That list is yours to edit under Settings.',
+      'Where two jobs do not meet, the gap between them is shown as a shaded line saying how many '
+        + 'months. It is never refused and never raises an alert.',
+      'Military records is there as an empty block for now, as asked.',
+    ],
+  },
+  {
     version: '1.49.0', date: '12 September 2026',
     notes: [
       'There is far less writing on the screen. About seventy paragraphs of explanation are gone '

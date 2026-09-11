@@ -52,12 +52,17 @@ import { clientDeleteCard, deleteRefusal } from '../../core/deletes';
 import { preferencesFor } from '../../core/preferences';
 import {
   caseTypes, docCategories, englishTests, genders, isTerm, labelFor, noteKindLabel, noteKinds,
-  relationshipStatuses, termOptions, titles, visaTypes, type Term,
+  relationshipStatuses, termOptions, titles, visaTypes, vocabulary,
+  EDUCATION_LEVEL_VOCAB, EMPLOYMENT_KIND_VOCAB, type Term,
 } from '../../core/vocabulary';
 import { renameMattersFor } from '../../core/casename';
 import { detachTag, attachTag, findOrCreateTag, listTags, tagsForClient, tagsForClients } from '../../core/tags';
 import { filesPanel, listDocuments } from '../documents';
 import { countryCodeFor, countryName, countryOptions } from '../../core/countries';
+import {
+  HISTORIES, historyPanel, militaryPlaceholder, registerHistoryRoutes, type HistoryVocab,
+} from './histories';
+import { allHistories } from '../../core/histories';
 import { FLAG_LIVES, flagKinds, flagsForClient, isShowing } from '../../core/flags';
 import {
   MAX_NATIONALITIES, nationalitiesByClient, nationalitiesFor, nationalityFieldNames,
@@ -1348,10 +1353,16 @@ export const clientsModule: AppModule = {
       );
       if (!client) return c.notFound();
       const clientNationalities = await nationalitiesFor(c.env, id);
-      const [clientFlags, flagKindTerms, clientTags, allTags] = await Promise.all([
+      const [clientFlags, flagKindTerms, clientTags, allTags,
+             histories, employmentKinds, educationLevels] = await Promise.all([
         flagsForClient(c.env, id), flagKinds(c.env),
         tagsForClient(c.env, id), listTags(c.env),
+        allHistories(c.env, id),
+        vocabulary(c.env, EMPLOYMENT_KIND_VOCAB), vocabulary(c.env, EDUCATION_LEVEL_VOCAB),
       ]);
+      const historyVocab: HistoryVocab = {
+        employment_kinds: employmentKinds, education_levels: educationLevels,
+      };
 
       const canReadMail = can(c.get('user'), 'mail:send');
       const [cases, quotes, inquiries, entries, sentMail, tasks, partyCases, related, employer, people,
@@ -1758,16 +1769,35 @@ export const clientsModule: AppModule = {
                         ${field({ label: 'Note', name: 'notes', maxlength: 300 })}
                         <button class="btn btn-primary" type="submit">Record it</button>
                       </form>
-                      <p class="hint">A new one does not replace the old. The most recent of each
-                         kind is marked current and is what the alerts page watches.</p>
-                      <p class="hint">INZ works the expiry out rather than reading the one printed on
-                         the certificate: a police certificate is
-                         ${validityRule('police')} A medical is ${validityRule('medical')}
-                         So those two are worked out here too, from the issue date — which means
-                         recording that one went in with an application moves its expiry by itself.</p>
+                      ${'' /* Two paragraphs used to sit here: that a new certificate does
+                              not replace the old and the most recent of each kind is what
+                              the alerts watch, and that INZ works the expiry out from the
+                              issue date rather than reading the one printed on the paper —
+                              which is why recording that one went in with an application
+                              moves its expiry by itself. Both still true; `validityRule`
+                              still says the rule beside the box it applies to. */}
+                      <p class="hint">The expiry is worked out from the issue date: a police
+                         certificate is ${validityRule('police')} A medical is
+                         ${validityRule('medical')}</p>
                     </details>` : ''}
                 </div>
               </section>`}
+
+            ${'' /* Employment, education and travel, each closed. Asked for on 11
+                    September 2026, to be "formatted in a fashion that is similar to
+                    existing pattern - whatever blocks there are - Quotes, Files,
+                    Passports, Certificates". So they sit here, under the certificates,
+                    and behave like the quotation lines: one table, a number to reorder
+                    by, a cross to take a line out, one Save. */}
+            ${isOrg ? '' : html`
+              ${HISTORIES.map((def) => html`
+                <div id="history-${def.key}">
+                  ${historyPanel({ def, rows: histories[def.key], vocab: historyVocab,
+                                   clientId: client.id, csrf, writable })}
+                </div>`)}
+              ${'' /* Asked for on the same day, and deliberately empty: "create the
+                      block but keep it as a placeholder for now." */}
+              ${militaryPlaceholder()}`}
           </div>
 
           <div class="col-side">
@@ -2186,6 +2216,11 @@ export const clientsModule: AppModule = {
     });
 
     // --- Certificates -------------------------------------------------------
+    // Employment, education and travel. Registered from their own file, which
+    // is where everything about them lives — the three differ only in their
+    // columns, and one set of routes reads that difference from a definition.
+    registerHistoryRoutes(r);
+
     r.post('/:id/certificates', requirePermission('register:write'), async (c) => {
       const id = c.req.param('id')!;
       const f = new FormReader(await c.req.formData());
