@@ -148,6 +148,26 @@ export interface ClientRow {
  * the actual calculated end date"* — and that line is prose.
  */
 /**
+ * The blocks that are open when a client's page is drawn.
+ *
+ * Everything started closed on 12 September 2026, which went a step too far and
+ * the practice said so the same day: *"Cases Quotes Passports and Certificates
+ * should be open by default."* Those four are what the page is opened *for* —
+ * what is running, what was quoted, and the two sets of dates that decide
+ * whether a matter can be lodged. A heading is the right treatment for a block
+ * you go to occasionally, not for the reason you came.
+ *
+ * What stays closed: files, the three histories, military records, and the file
+ * notes. Those are things you go looking for, and the file notes alone can run
+ * for pages.
+ *
+ * Not remembered between visits, for the reason the calendar and the matter
+ * page give: a block missing because of something you did on another client
+ * last week is worse than one you open again.
+ */
+const OPEN_BY_DEFAULT = ['cases', 'quotes', 'passports', 'certificates'];
+
+/**
  * One block on a client's page: a heading that opens, with a name a link can
  * ask for. See `openBlocks` in the detail route for why the name is a query
  * rather than a fragment.
@@ -1496,7 +1516,10 @@ export const clientsModule: AppModule = {
       // `?open=passports` is how a link from the client's own form still lands
       // on an open block — a `#fragment` never reaches the server, so it cannot
       // decide what is open.
-      const openBlocks = new Set((c.req.query('open') ?? '').split(',').filter(Boolean));
+      const openBlocks = new Set([
+        ...OPEN_BY_DEFAULT,
+        ...(c.req.query('open') ?? '').split(',').filter(Boolean),
+      ]);
 
       const canReadMail = can(c.get('user'), 'mail:send');
       const [cases, quotes, inquiries, entries, sentMail, tasks, partyCases, related, employer, people,
@@ -1751,10 +1774,19 @@ export const clientsModule: AppModule = {
                                   ${'' /* An x-ray derives nothing, so its expiry has no rule to
                                           sit beside. It gets its own line, in the same place the
                                           eye is already looking. */}
-                                  ${!expiryIsDerived(kind) && cert.expires_on ? html`
-                                    <div class="small muted">Expires ${current.has(cert.id)
-                                      ? expiryInline(cert.expires_on)
-                                      : html`<strong>${dateShort(cert.expires_on)}</strong>`}</div>` : ''}
+                                  ${'' /* An x-ray derives nothing, so there is no rule for its
+                                          expiry to sit beside, and no "N months from issue" to
+                                          say. It gets the two facts plainly. */}
+                                  ${!expiryIsDerived(kind) ? html`
+                                    <div class="small muted">
+                                      ${cert.submitted_on
+                                        ? html`Submitted ${dateShort(cert.submitted_on)}`
+                                        : 'Not submitted'}${cert.expires_on
+                                        ? html` \u00b7 expires ${current.has(cert.id)
+                                            ? expiryInline(cert.expires_on)
+                                            : html`<strong>${dateShort(cert.expires_on)}</strong>`}`
+                                        : ''}
+                                    </div>` : ''}
                                   ${/* A date nobody read off the paper must never look like one
                                         somebody did — the expiry above is computed from it. */ ''}
                                   ${issueDateUnverified(cert) ? html`
@@ -1780,7 +1812,7 @@ export const clientsModule: AppModule = {
                                         its function is fulfilled."* Changing the date afterwards
                                         is a correction, and corrections are made under Edit, where
                                         they are written to the file. */ ''}
-                                  ${writable && expiryIsDerived(kind) && !cert.submitted_on ? html`
+                                  ${writable && !cert.submitted_on ? html`
                                     <form method="post" class="inline-form mt-sm"
                                           action="/clients/${client.id}/certificates/${cert.id}/submitted">
                                       ${csrfField(csrf)}
@@ -1815,13 +1847,15 @@ export const clientsModule: AppModule = {
                                         ${select({ label: 'The issue date was', name: 'issued_on_provenance',
                                                    value: cert.issued_on_provenance ?? 'unverified',
                                                    includeBlank: false, options: PROVENANCE_OPTIONS })}
-                                        ${expiryIsDerived(kind)
-                                          ? field({ label: 'Submitted with an application on',
-                                                    name: 'submitted_on', type: 'date',
-                                                    value: cert.submitted_on ?? '',
-                                                    hint: 'Clear it to undo.' })
-                                          : field({ label: 'Expires', name: 'expires_on', type: 'date',
-                                                    value: cert.expires_on ?? '' })}
+                                        ${field({ label: 'Submitted with an application on',
+                                                  name: 'submitted_on', type: 'date',
+                                                  value: cert.submitted_on ?? '',
+                                                  hint: expiryIsDerived(kind)
+                                                    ? 'Clear it to undo. The expiry moves with it.'
+                                                    : 'Clear it to undo.' })}
+                                        ${expiryIsDerived(kind) ? '' : field({
+                                          label: 'Expires', name: 'expires_on', type: 'date',
+                                          value: cert.expires_on ?? '' })}
                                         ${field({ label: 'Reference', name: 'reference', maxlength: 80,
                                                   value: cert.reference ?? '' })}
                                         ${field({ label: 'Note', name: 'notes', maxlength: 300,
@@ -2016,7 +2050,7 @@ export const clientsModule: AppModule = {
                            fourteen rows down. Everything else follows the order asked
                            for. */}
                   <p class="subhead">Name</p>
-                  <dl class="kv">
+                  <dl class="kv kv-aligned">
                     <dt>Full name</dt><dd><strong>${client.full_name}</strong></dd>
                     <dt>Given names</dt><dd>${client.given_names ?? '—'}</dd>
                     <dt>Family name</dt><dd>${client.family_name ?? '—'}</dd>
@@ -2032,7 +2066,7 @@ export const clientsModule: AppModule = {
                   </dl>
 
                   <p class="subhead">Contact</p>
-                  <dl class="kv">
+                  <dl class="kv kv-aligned">
                     <dt>Phone</dt><dd>${client.phone
                       ? html`<a href="tel:${client.phone}">${client.phone}</a>` : '—'}</dd>
                     <dt>Email</dt><dd>${client.email
@@ -2044,7 +2078,7 @@ export const clientsModule: AppModule = {
                   </dl>
 
                   <p class="subhead">Immigration</p>
-                  <dl class="kv">
+                  <dl class="kv kv-aligned">
                     ${'' /* The number quoted on everything sent to INZ about this person,
                              so it leads. */}
                     <dt>INZ client no.</dt><dd>${client.inz_client_number
@@ -2072,7 +2106,7 @@ export const clientsModule: AppModule = {
                   </dl>
 
                   <p class="subhead">Passport</p>
-                  <dl class="kv">
+                  <dl class="kv kv-aligned">
                     <dt>Passport</dt><dd>${passports.length === 0
                       ? html`<span class="muted">—</span>`
                       : html`${countryName(client.passport_country) || 'Primary'}${
@@ -2091,7 +2125,7 @@ export const clientsModule: AppModule = {
                   </dl>
 
                   <p class="subhead">Certificates</p>
-                  <dl class="kv">
+                  <dl class="kv kv-aligned">
                     <dt>Police cert.</dt><dd>${client.police_certificate_country
                       ? html`${countryName(client.police_certificate_country)}<br>` : ''}${expiryCell(client.police_certificate_expiry)}
                       ${certificateDateUnverified(certificates, 'police', client.police_certificate_expiry)
@@ -2103,7 +2137,7 @@ export const clientsModule: AppModule = {
                   </dl>
 
                   <p class="subhead">English</p>
-                  <dl class="kv">
+                  <dl class="kv kv-aligned">
                     <dt>Test</dt><dd>${client.english_test_type
                       ? html`${labelFor(englishTestTerms, client.english_test_type)}${
                           client.english_test_score ? html` · <strong>${client.english_test_score}</strong>` : ''}
@@ -2119,7 +2153,7 @@ export const clientsModule: AppModule = {
                   </dl>
 
                   <p class="subhead">Personal</p>
-                  <dl class="kv">
+                  <dl class="kv kv-aligned">
                     ${'' /* Plural, because a person may be. Listed in the order the
                              practice entered them: the first is the passport an
                              application is likely to be made on. */}
@@ -2151,7 +2185,7 @@ export const clientsModule: AppModule = {
 
                   ${employer ? html`
                     <p class="subhead">Employment</p>
-                    <dl class="kv">
+                    <dl class="kv kv-aligned">
                       <dt>Works for</dt><dd><a href="/clients/${employer.id}">${employer.full_name}</a>
                         ${client.organisation_role ? html`<div class="muted small">${client.organisation_role}</div>` : ''}
                         ${employer.primary_contact_id === client.id ? badge('Primary contact', 'green') : ''}</dd>
@@ -2520,14 +2554,18 @@ export const clientsModule: AppModule = {
       await setCertificateSubmitted(c.env, id, certId, submittedOn);
       const after = await one<{ expires_on: string | null }>(
         c.env.DB, 'SELECT expires_on FROM client_certificates WHERE id = ?', certId);
+      // "Now good until" only where the date actually moved. An x-ray derives
+      // nothing, so its expiry is whatever somebody typed and saying it moved
+      // would put a false sentence on an append-only file.
+      const movedTo = expiryIsDerived(cert.kind as CertificateKind) && after?.expires_on
+        ? `; now good until ${dateShort(after.expires_on)}` : '';
       await addEntry(c.env, {
         entityType: 'client', entityId: id, kind: 'system',
         body: submittedOn
           ? `${CERTIFICATE_LABELS[cert.kind as CertificateKind]} recorded as submitted with an `
-            + `application on ${dateShort(submittedOn)}`
-            + `${after?.expires_on ? `; now good until ${dateShort(after.expires_on)}` : ''}.`
+            + `application on ${dateShort(submittedOn)}${movedTo}.`
           : `${CERTIFICATE_LABELS[cert.kind as CertificateKind]} no longer recorded as submitted`
-            + `${after?.expires_on ? `; now good until ${dateShort(after.expires_on)}` : ''}.`,
+            + `${movedTo}.`,
         createdBy: c.get('user')!.id,
       });
       await auditFrom(c, { action: 'client.certificate_submitted', entityType: 'client', entityId: id,

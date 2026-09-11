@@ -94,6 +94,18 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.53.1', date: '12 September 2026',
+    notes: [
+      'Cases, Quotes, Passports and Certificates are open when a client\u2019s page loads. Files, '
+        + 'the histories and File notes still start closed.',
+      'Key details lines up down one column now, instead of three.',
+      'The warning band is brighter at the edges.',
+      'A chest x-ray takes \u201cSubmitted with an application on\u201d like the others. Its '
+        + 'expiry is still the one you typed \u2014 only a police certificate and a medical work '
+        + 'theirs out.',
+    ],
+  },
+  {
     version: '1.53.0', date: '12 September 2026',
     notes: [
       'A client\u2019s page opens as a list of headings: Cases, Quotes, Passports, Certificates, '

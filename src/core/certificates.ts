@@ -232,6 +232,14 @@ export async function updateCertificate(
     env.DB, 'SELECT * FROM client_certificates WHERE id = ? AND client_id = ?', id, clientId);
   if (!before) return null;
 
+  // The day it went in with an application is a fact about any certificate,
+  // including an x-ray. **Asked on 12 September 2026:** *"why does the x-ray
+  // cert not have 'Submitted with an application on' field?"* No reason — it was
+  // only ever offered where it *moved* something, which confused what the
+  // register was recording with what it was calculating.
+  //
+  // The expiry is still the one thing that differs: for a police certificate or
+  // a medical the database works it out, and for an x-ray somebody types it.
   const derived = expiryIsDerived(before.kind);
   await run(
     env.DB,
@@ -246,7 +254,7 @@ export async function updateCertificate(
       input.reference,
       input.issuedOn,
       input.issuedOn ? input.issuedOnProvenance : null,
-      derived ? input.submittedOn : null,
+      input.submittedOn,
       input.notes,
       ...(derived ? [] : [input.expiresOn]),
       id, clientId,
