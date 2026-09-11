@@ -101,3 +101,85 @@ jobs:
       - name: Remove the secrets file
         if: always()
         run: rm -f .secrets.json
+
+  # ---------------------------------------------------------------------------
+  # The trial practice.
+  #
+  # **Asked for on 12 September 2026:** *"two deployed workers, existing one +
+  # trial one with the test data - and their cores are both updated at the same
+  # time."* Architecture in `docs/second-practice.md`.
+  #
+  # Three things about the shape of this job are deliberate.
+  #
+  #  * **`needs: deploy`.** The practice's own register goes out first and
+  #    alone. A trial that fails to deploy cannot hold up, block or roll back
+  #    the register that is in daily use.
+  #  * **Gated on `TRIAL_SETUP_TOKEN`.** No such secret, no trial, no job — so
+  #    this is inert until somebody deliberately turns it on, and turning it off
+  #    again is deleting one secret.
+  #  * **Its own everything.** Its own database, its own sessions, its own
+  #    secrets, mapped from `TRIAL_`-prefixed repository secrets onto the names
+  #    the Worker reads. Nothing is shared with the practice's Worker but the
+  #    code.
+  # ---------------------------------------------------------------------------
+  deploy-trial:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: ${{ secrets.TRIAL_SETUP_TOKEN != '' }}
+    environment: trial
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Not re-run here: the same commit has already been typechecked, tested
+      # and audited by the job this one needs. Running them twice would only
+      # make the trial slower to reach.
+
+      - name: Apply D1 migrations
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 migrations apply clientregister-trial-db --remote
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --env trial
+
+      # The trial's own secrets, under the names the Worker reads. Only the ones
+      # actually set are uploaded, so a trial can start with nothing but a setup
+      # token and gain mail, Drive and the AI later.
+      - name: Collect configured secrets
+        id: collect
+        env:
+          SETUP_TOKEN: ${{ secrets.TRIAL_SETUP_TOKEN }}
+          MAIL_PROVIDER: ${{ secrets.TRIAL_MAIL_PROVIDER }}
+          MAIL_FROM: ${{ secrets.TRIAL_MAIL_FROM }}
+          RESEND_API_KEY: ${{ secrets.TRIAL_RESEND_API_KEY }}
+          AI_PROVIDER: ${{ secrets.TRIAL_AI_PROVIDER }}
+          ANTHROPIC_API_KEY: ${{ secrets.TRIAL_ANTHROPIC_API_KEY }}
+        run: |
+          node scripts/collect-secrets.mjs .secrets.json
+          if [ -f .secrets.json ]; then echo "found=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Upload secrets to the Worker
+        if: steps.collect.outputs.found == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: secret bulk .secrets.json --env trial
+
+      - name: Remove the secrets file
+        if: always()
+        run: rm -f .secrets.json

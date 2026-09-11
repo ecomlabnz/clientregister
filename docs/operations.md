@@ -12,6 +12,73 @@
 D1 is pinned to Oceania (`oc`), so the register's data sits close to the
 practice.
 
+### The trial practice
+
+A second register, from the same code. Architecture and the order of work:
+[`second-practice.md`](second-practice.md).
+
+| Resource | Name | ID |
+|---|---|---|
+| D1 database | `clientregister-trial-db` | `a2bdf373-974a-47b6-a7a3-72f7bf7b4730` |
+| KV namespace | `clientregister-trial-sessions` | `8e6c31e521fc4226b541003bf27bb466` |
+| R2 bucket | — | **not created; see below** |
+| Worker | `clientregister-trial` | created on its first deploy |
+
+Both were created on 12 September 2026; the database carries the same `oc`
+location hint as the practice's, so a trial that becomes a practice is already
+in the right place.
+
+**Nothing deploys to it until `TRIAL_SETUP_TOKEN` exists** as a repository
+secret. That is the switch: no secret, no job, no Worker.
+
+#### Turning it on
+
+1. **Add `TRIAL_SETUP_TOKEN`** (Settings → Secrets and variables → Actions).
+   Any long random string; it is what `/setup` asks for once, to create the
+   first user. Optionally also `TRIAL_MAIL_PROVIDER`, `TRIAL_MAIL_FROM`,
+   `TRIAL_RESEND_API_KEY`, `TRIAL_AI_PROVIDER`, `TRIAL_ANTHROPIC_API_KEY` —
+   each is uploaded under its unprefixed name and each is optional.
+2. **Push to `main`.** The deploy workflow applies the migrations to
+   `clientregister-trial-db` and deploys `clientregister-trial`, after the
+   practice's own register has finished. The run prints the `workers.dev`
+   address.
+3. **Put that address into `wrangler.jsonc`** as the trial's `APP_ORIGIN`. It
+   is deliberately empty until then: it builds links in the nightly automation
+   output, and a wrong address there is worse than none.
+4. **Open `/setup`** on that address, give it the token, and create the first
+   user.
+5. **Fill in Settings → Practice** as that practice — name, address, bank, GST.
+   Nothing about the practice's identity is in the code.
+6. **Seed it** from the Test Data page, so the trial has a caseload to look at.
+
+#### The R2 bucket, by hand and from New Zealand
+
+Deliberately not created from here. **R2 honours a location hint only on the
+first creation of a name**, and the practice's own bucket had to be renamed to
+`files` because the original name was permanently pinned to eastern North
+America — see the note in `wrangler.jsonc`. A bucket created through the API
+from a container outside New Zealand would land in the wrong place for good.
+
+So: create it in the dashboard, from a browser in New Zealand, under a name
+that has never been used before, then add an `r2_buckets` block to the trial
+environment. Until then the register reports document storage as not enabled,
+which every page that uses it already handles.
+
+#### Checking the two are actually separate
+
+Before any real client data is in either, and after any change to the bindings.
+`test/tenancy.test.ts` refuses a configuration that shares a database, a
+session store or a bucket — but it reads the file, and what matters is what
+Cloudflare is running.
+
+- In the dashboard, open each Worker's settings and read the **database id** it
+  is bound to. They must differ, and must match `wrangler.jsonc`.
+- Ask the trial's database for a count of clients. Before it is seeded the
+  answer is zero; if it is not, it is not the database you think it is.
+- Sign in to one and load the other's address. It must ask you to sign in
+  again — separate session stores, separate signing secrets.
+- After a deploy, compare the migration count in both.
+
 ## Deploying
 
 Cloudflare pulls from GitHub. `main` is the only branch that reaches production.

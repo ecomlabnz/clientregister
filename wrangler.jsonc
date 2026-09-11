@@ -72,5 +72,86 @@
   // five-minute expression, and a test holds the two together.
   "triggers": {
     "crons": ["*/5 * * * *", "0 19 * * *"]
+  },
+
+  // ---------------------------------------------------------------------------
+  // A second practice.
+  //
+  // **Asked for on 12 September 2026:** *"lets pretend that i have a paying
+  // customer who wants to trial the system ... two deployed workers, existing
+  // one + trial one with the test data - and their cores are both updated at
+  // the same time ... if we can do two - we can do 200."*
+  //
+  // The architecture, what it costs and the order of work are in
+  // `docs/second-practice.md`. The short of it: **one practice, one database**,
+  // decided 3 September and unchanged. This is the same bundle deployed twice
+  // with a different set of bindings, not a shared database with a "which
+  // practice" column.
+  //
+  // **Bindings are non-inheritable, and that is the safety here.** Every one is
+  // restated below in full rather than inherited, so a trial Worker cannot end
+  // up on the practice's database because a line was left out. A missing
+  // binding is a deploy that fails; an inherited one would be a deploy that
+  // mixes two firms' files.
+  //
+  // The Worker this deploys is named `clientregister-trial` — Wrangler appends
+  // the environment name — and it is deployed by its own job in the deploy
+  // workflow, *after* the practice's, so a broken trial cannot hold up or roll
+  // back the register that is in daily use.
+  // ---------------------------------------------------------------------------
+  "env": {
+    "trial": {
+      "workers_dev": true,
+      "observability": { "enabled": true },
+
+      "assets": {
+        "directory": "./public",
+        "binding": "ASSETS",
+        "not_found_handling": "none"
+      },
+
+      // Created 12 September 2026, with the location hint `oc`, so a trial that
+      // becomes a practice is already in the right place. Empty until its first
+      // deploy applies the migrations.
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "clientregister-trial-db",
+          "database_id": "a2bdf373-974a-47b6-a7a3-72f7bf7b4730",
+          "migrations_dir": "migrations"
+        }
+      ],
+
+      "kv_namespaces": [
+        {
+          "binding": "SESSIONS",
+          "id": "8e6c31e521fc4226b541003bf27bb466"
+        }
+      ],
+
+      "ai": { "binding": "AI" },
+
+      // No R2 bucket yet, deliberately. R2 honours a location hint only on the
+      // first creation of a name — see the note on the bucket above — and a
+      // bucket created from this account's API rather than from a browser in
+      // New Zealand would be pinned to the wrong side of the world for good.
+      // So it is created by hand, from the dashboard, in New Zealand, and added
+      // here afterwards. Until then the register reports document storage as
+      // not enabled, which it handles on every page that uses it.
+
+      "vars": {
+        "APP_NAME": "Client Register",
+        "APP_ENV": "trial",
+        // Filled in once the address is known — the first deploy prints the
+        // workers.dev URL. Empty rather than guessed: it is used to build links
+        // in the nightly automation output, and a wrong address there is worse
+        // than none.
+        "APP_ORIGIN": ""
+      },
+
+      "triggers": {
+        "crons": ["*/5 * * * *", "0 19 * * *"]
+      }
+    }
   }
 }
