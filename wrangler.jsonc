@@ -44,8 +44,16 @@
   // attempt here was created through the API — which has no location
   // parameter, so "automatic" placed it near the caller rather than near the
   // practice — and every recreation of that name came back in eastern North
-  // America. A new name, created from a browser in New Zealand, landed in
-  // Oceania. Hence "files" rather than "docs".
+  // America. A new name landed in Oceania. Hence "files" rather than "docs".
+  //
+  // **Corrected 12 September 2026.** This note used to end "created from a
+  // browser in New Zealand", and that was the workaround rather than the rule.
+  // `wrangler r2 bucket create <name> --location oc` says where the bucket goes
+  // explicitly, so it lands in Oceania wherever it is run from — a laptop in
+  // Auckland or a GitHub runner in Virginia. What is permanent is still the
+  // name, so the rule that matters is: **name it once, and say the location
+  // when you do.** See `.github/workflows/provision.yml`, which is the button
+  // that does exactly that.
   "r2_buckets": [
     { "binding": "DOCS", "bucket_name": "clientregister-files" }
   ],
