@@ -95,6 +95,26 @@ should rest on a captured failure rather than on reasoning.
 **What would close it:** a captured 403 with its `cf-ray`, looked up in
 Cloudflare's logs to see what refused it.
 
+**Readings so far.** Every deploy adds one; a clean reading is not a cure,
+because the fault was always intermittent.
+
+| Deploy | Probes | Refusals | Note |
+| --- | --- | --- | --- |
+| Run 240, 1.59.0, 12 Sep | 20 over 2 min | none | Straight through the practice's deploy and the trial's. Every answer served from the same Cloudflare edge (`-DFW`). |
+
+One thing the instrument cannot see from where it stands: the runner probes
+from a GitHub data centre, so it reaches whichever Cloudflare edge is nearest
+*it*. The practice reaches a different one. If the refusal is edge-local, a
+clean reading here does not mean a clean minute in Auckland. Probing from
+somewhere in New Zealand is what would settle that, and nothing in the
+pipeline can do it — it needs a machine there.
+
+A separate trap, found the same day: run the probe from inside a sandboxed
+environment and the *sandbox's* egress proxy answers 403 with
+`Host not in allowlist`, which looks exactly like the fault being chased. The
+probe records the body precisely so that impostor is legible. Read the body
+before believing a refusal.
+
 ### 1b. The sub-processor list nobody has written omits where the keys live
 
 **Found** 12 September 2026, in Fable's review of the draft policy suite.
