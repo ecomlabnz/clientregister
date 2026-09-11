@@ -94,6 +94,17 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.59.0', date: '12 September 2026',
+    notes: [
+      'Quotations expiring no longer appear on the calendar. Every other date there is one you '
+        + 'have to act on; a quotation lapsing is not. It still expires \u2014 it just does not '
+        + 'take up a day.',
+      'Every deployment now watches the register for two minutes afterwards and records what it '
+        + 'sees, so the brief refusals you have been getting are caught in the act rather than '
+        + 'guessed at.',
+    ],
+  },
+  {
     version: '1.58.0', date: '12 September 2026',
     notes: [
       'The practice caseload you can load to try the register is rebuilt: twenty matters \u2014 '
