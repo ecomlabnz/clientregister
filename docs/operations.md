@@ -48,11 +48,18 @@ secret. That is the switch: no secret, no job, no Worker.
    top-level configuration, does not find that practice's database, and fails
    before doing anything. Checking that by hand takes a second and needs no
    token: `npx wrangler d1 migrations list <database> --local --env <name>`.
-3. **Give it an address and put that into `wrangler.jsonc`** as that practice's
-   `APP_ORIGIN`. A subdomain of the practice's own domain, declared as a
-   `custom_domain` route in that environment — Wrangler makes the DNS record
-   and the certificate on deploy, so it is one line rather than three places to
-   keep in step. The `workers.dev` address keeps working alongside it.
+3. **Give it an address, once, and then leave it alone.** A subdomain of the
+   practice's own domain, attached to that Worker as a custom domain in the
+   Cloudflare dashboard. Put the address into `wrangler.jsonc` as that
+   practice's `APP_ORIGIN` — and **nowhere else**.
+
+   **Do not declare it as a `routes` entry.** A route in the config is
+   re-asserted on every deploy, and on a zone carrying more than one practice
+   that reconciliation briefly 403s the *other* practice — which is somebody
+   else's live register. It happened on 12 September 2026 and is fault 42.
+   `app.immigration.kiwi` has never been in that file, and never flickers.
+
+   The `workers.dev` address keeps working alongside whatever you attach.
    `APP_ORIGIN` builds links in the nightly automation output, so it must be
    that practice's own address — a summary linking into somebody else's
    register is the one mistake this arrangement exists to prevent. Done for the
