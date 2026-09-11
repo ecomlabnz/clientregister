@@ -252,7 +252,7 @@ describe('the name follows what it is made of', () => {
     });
     expect(res.status).toBe(303);
     const row = h.get<{ title: string; descriptor: string }>('SELECT title, descriptor FROM cases')!;
-    expect(row.title).toBe('Partner Resident Visa — Duc Manh BUI');
+    expect(row.title).toBe('Partner Resident Visa — BUI, Duc Manh');
     expect(row.descriptor, 'the description must survive unchanged')
       .toBe('Partner RV based on an existing partnership, second attempt after a refusal');
     expect(row.title === row.descriptor, 'named by its own description again').toBe(false);
@@ -270,7 +270,7 @@ describe('the name follows what it is made of', () => {
       descriptor: 'The description',
     });
     expect(h.get<{ title: string }>('SELECT title FROM cases')!.title)
-      .toBe('Accredited Employer Work Visa — Duc Manh BUI');
+      .toBe('Accredited Employer Work Visa — BUI, Duc Manh');
   });
 
   it('renames every matter when the client’s name is corrected', async () => {
@@ -279,9 +279,9 @@ describe('the name follows what it is made of', () => {
     // door.
     const h = seeded(clientsModule);
     h.db.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
-               VALUES ('k1','CASE-26-001','cl1','Partner Resident Visa — Duc Manh BUI',
+               VALUES ('k1','CASE-26-001','cl1','Partner Resident Visa — BUI, Duc Manh',
                        'The description','rv_partner_local','lodged','${USER.id}','${AT}','${AT}'),
-                      ('k2','CASE-26-002','cl1','Accredited Employer Work Visa — Duc Manh BUI',
+                      ('k2','CASE-26-002','cl1','Accredited Employer Work Visa — BUI, Duc Manh',
                        'Another description','wv_aewv_local','lodged','${USER.id}','${AT}','${AT}')`);
 
     await h.post('/clients/cl1', {
@@ -294,8 +294,8 @@ describe('the name follows what it is made of', () => {
     // The register composes the full name from the two halves, so the corrected
     // spelling arrives here in the form the client record now holds.
     expect(titles.map((t) => t.title)).toEqual([
-      'Partner Resident Visa — Duc Manh BUI (CORRECTED)',
-      'Accredited Employer Work Visa — Duc Manh BUI (CORRECTED)',
+      'Partner Resident Visa — BUI (CORRECTED), Duc Manh',
+      'Accredited Employer Work Visa — BUI (CORRECTED), Duc Manh',
     ]);
   });
 
@@ -304,7 +304,7 @@ describe('the name follows what it is made of', () => {
     // the kind of thing somebody spends an afternoon on in a year's time.
     const h = seeded(clientsModule);
     h.db.exec(`INSERT INTO cases (id,ref,client_id,title,descriptor,case_type,status,assigned_to,created_at,updated_at)
-               VALUES ('k1','CASE-26-001','cl1','Partner Resident Visa — Duc Manh BUI',
+               VALUES ('k1','CASE-26-001','cl1','Partner Resident Visa — BUI, Duc Manh',
                        'The description','rv_partner_local','lodged','${USER.id}','${AT}','${AT}')`);
     await h.post('/clients/cl1', {
       kind: 'individual', given_names: 'DUC MANH', family_name: 'BUI (CORRECTED)',

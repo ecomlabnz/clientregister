@@ -181,7 +181,7 @@ describe('the matter opened this way', () => {
     const h = seeded();
     await h.post('/assistant/intake/apply', applyForm());
     const row = h.get<{ title: string; descriptor: string }>('SELECT title, descriptor FROM cases')!;
-    expect(row.title).toBe('WV. Seasonal — Thi Ngoc Anh LE');
+    expect(row.title).toBe('WV. Seasonal — LE, Thi Ngoc Anh');
     expect(row.descriptor).toBe('Peak Seasonal Work Visa for a meat process worker');
     expect(row.title === row.descriptor).toBe(false);
   });

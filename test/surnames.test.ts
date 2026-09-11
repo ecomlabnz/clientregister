@@ -213,7 +213,7 @@ describe('a client record the assistant reuses', () => {
     const h = withOldRecord();
     await normaliseClientName(h.env as any, 'cl1', TYPES);
     expect(h.get<{ title: string }>(`SELECT title FROM cases WHERE id = 'k0'`)!.title)
-      .toBe('WV. AEWV — Thi Ngoc Anh LE');
+      .toBe('WV. AEWV — LE, Thi Ngoc Anh');
   });
 
   it('does nothing at all to a record already right', async () => {
@@ -249,7 +249,7 @@ describe('a client record the assistant reuses', () => {
     // And the new matter is named from the corrected spelling, not the old one.
     const opened = h.get<{ title: string }>(
       `SELECT title FROM cases WHERE ref <> 'CASE-26-900' ORDER BY created_at DESC`)!;
-    expect(opened.title).toBe('WV. AEWV — Thi Ngoc Anh LE');
+    expect(opened.title).toBe('WV. AEWV — LE, Thi Ngoc Anh');
     const note = h.get<{ body: string }>(
       `SELECT body FROM entries WHERE entity_type = 'client' AND body LIKE '%capitals%'`);
     expect(note?.body, 'a name changed with nothing on the file to say why').toContain('Thi Ngoc Anh LE');

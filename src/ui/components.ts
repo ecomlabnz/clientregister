@@ -793,6 +793,62 @@ export function select(opts: SelectOpts): Raw {
     </div>`;
 }
 
+/**
+ * A box you type into, with the whole list underneath it.
+ *
+ * **Asked for on 12 September 2026**, of the matter picker on a new quotation:
+ * *"it is just impossible to search through this! we need a better system."*
+ * Seventy open matters in one `<select>`. A `<select>` cannot be searched: a
+ * browser matches a keypress against the *first character* of the line, and
+ * every line there began with the visa type, so pressing N looked for a matter
+ * whose type started with N and found nothing.
+ *
+ * This is an ordinary text input with a `<datalist>` beside it. Type any part
+ * of a line — a surname, a reference, a kind of work — and the browser narrows
+ * the list to the lines containing it. Click the arrow and the whole list is
+ * still there.
+ *
+ * ## Why a datalist and not a widget
+ *
+ * The same reason the email recipient box uses one, decided on 10 September:
+ * **the register works with JavaScript switched off.** A datalist is HTML. The
+ * filtering is the browser's own, so there is no script to load, nothing to
+ * fail, and nothing for the Content Security Policy to have to allow.
+ *
+ * ## Why the whole line is the value
+ *
+ * A datalist option can carry a short `value` and a long `label`, and browsers
+ * disagree about which of the two they match what you type against. Firefox
+ * has matched on the value; Chrome has matched on both; neither is promised
+ * anywhere. Relying on that difference would mean shipping a search box that
+ * searches in one browser and not in another.
+ *
+ * So there is no label: the value *is* the line, and every browser filters on
+ * it. What that costs is that the form posts the line rather than the id, and
+ * the server has to turn it back into one — `matchOption` in `core/options.ts`,
+ * which is where the honesty about that lives.
+ */
+export function findBox(opts: SelectOpts & { placeholder?: string }): Raw {
+  const id = `f_${opts.name}`;
+  const list = `${opts.name}-choices`;
+  // The value shown is the chosen option's whole line, not its id — the box
+  // must display what the person picked, and it is what gets posted back.
+  const chosen = opts.options.find((o) => o.value === opts.value);
+  return html`
+    <div class="field">
+      <label for="${id}">${opts.label}${opts.required ? html`<span class="req"> *</span>` : ''}</label>
+      <input id="${id}" name="${opts.name}" type="text" list="${list}"
+             value="${chosen ? chosen.label : ''}"
+             ${opts.required ? raw('required') : ''}
+             autocomplete="off" spellcheck="false"
+             placeholder="${opts.placeholder ?? 'Type any part of a name or a reference'}">
+      <datalist id="${list}">
+        ${opts.options.map((o) => html`<option value="${o.label}"></option>`)}
+      </datalist>
+      ${opts.hint ? html`<p class="hint">${opts.hint}</p>` : ''}
+    </div>`;
+}
+
 export function optionsFrom<T extends string>(
   values: readonly T[],
   labels: Record<T, string>,

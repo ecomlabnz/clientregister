@@ -158,7 +158,7 @@ describe('opening the matter', () => {
     await apply(h);
     const kase = (rows(h, 'SELECT title, descriptor FROM cases')[0] as any);
     expect(kase.descriptor).toBe('Partnership information');
-    expect(kase.title).toBe('WV. AEWV — Minh Duc TRAN');
+    expect(kase.title).toBe('WV. AEWV — TRAN, Minh Duc');
     expect(kase.title === kase.descriptor, 'named by its own description again').toBe(false);
   });
 
@@ -208,7 +208,7 @@ describe('converting an inquiry to a matter', () => {
     await convert(h);
     const kase = (h.db.prepare('SELECT title, descriptor FROM cases').all() as any[])[0];
     expect(kase.descriptor).toBe('Partner of a New Zealand citizen, living together since 2024');
-    expect(kase.title).toBe('WV. AEWV — A TESTER');
+    expect(kase.title).toBe('WV. AEWV — TESTER, A');
     expect(kase.title === kase.descriptor, 'named by its own description again').toBe(false);
   });
 

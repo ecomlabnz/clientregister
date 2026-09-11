@@ -28,6 +28,7 @@
 
 import type { Env } from '../types';
 import { all, one, run } from './db';
+import { formalName } from './names';
 import { labelFor, type Term } from './vocabulary';
 
 /**
@@ -44,6 +45,10 @@ import { labelFor, type Term } from './vocabulary';
  * therefore grouping by kind of work, on every list in the register, with no
  * second column and no separate control. Anybody tempted to put the person
  * first is taking that away.
+ *
+ * **The name half reads "FAMILY, Given".** Not the display name — see
+ * `clientFileName` below for why, and for why this function is never handed a
+ * name a caller composed itself.
  */
 export function caseName(typeLabel: string, clientName: string | null | undefined): string {
   const type = (typeLabel || '').trim();
@@ -103,6 +108,52 @@ export function caseNameFrom(
 }
 
 /**
+ * The client's name as a matter carries it — "VUONG, Bao Long".
+ *
+ * **Asked for on 12 September 2026**, looking at the matter picker on a new
+ * quotation: *"can we make sure that this such places the surnames are before
+ * the names?"* Seventy open matters in one list, every one of them reading
+ * "Bao Long VUONG", so the list sorted by "Bao" and there was no way to run an
+ * eye down it looking for a surname — which is the only way anybody looks for
+ * a person in a list of seventy.
+ *
+ * `clients.full_name` stays what it is: "Given FAMILY", natural order, for
+ * correspondence. A **file** is labelled the other way round, which is what
+ * `formalName` has said since it was written — *"for alphabetical listings,
+ * file labels and matter names"*. A matter's name is a file label. It had
+ * simply never been wired to one.
+ *
+ * The type is untouched. Only the name half turns around.
+ *
+ * ## Why this reads the record rather than taking a name
+ *
+ * Every caller used to look up `full_name` for itself and hand the string
+ * over. This file's own history says where that ends: the matter name has had
+ * three writers twice — the New matter form, the assistant's intake, the
+ * inquiry conversion — and both times the third was missed and found later. A
+ * caller that can only pass an id cannot pass the wrong name.
+ *
+ * Returns null for no client, which `caseName` already handles.
+ */
+export async function clientFileName(
+  env: Env, clientId: string | null | undefined,
+): Promise<string | null> {
+  if (!clientId) return null;
+  const row = await one<{
+    kind: string; full_name: string; given_names: string | null; family_name: string | null;
+  }>(
+    env.DB,
+    'SELECT kind, full_name, given_names, family_name FROM clients WHERE id = ?',
+    clientId,
+  );
+  if (!row) return null;
+  // A company's registered name is one name. There is no surname to bring to
+  // the front, and turning "ACME PACKING LIMITED" around would invent one.
+  if (row.kind !== 'individual') return row.full_name;
+  return formalName({ givenNames: row.given_names, familyName: row.family_name }, row.full_name);
+}
+
+/**
  * Rewrite the names of every matter belonging to one client.
  *
  * Called when a client is renamed. Without it, correcting the spelling of
@@ -119,13 +170,18 @@ export function caseNameFrom(
  * Returns how many were renamed, so a caller can say so.
  */
 export async function renameMattersFor(
-  env: Env, clientId: string, clientName: string, types: Term[],
+  env: Env, clientId: string, types: Term[],
 ): Promise<number> {
+  // Read rather than passed in, for the reason given on `clientFileName`: a
+  // caller holding a name string is a second composer of a derived value.
+  // Callers change the client first and then call this, so the record here is
+  // already the corrected one.
+  const fileName = await clientFileName(env, clientId);
   const rows = await all<{ id: string; case_type: string | null; title: string }>(
     env.DB, 'SELECT id, case_type, title FROM cases WHERE client_id = ?', clientId);
   let changed = 0;
   for (const row of rows) {
-    const name = caseName(labelFor(types, row.case_type), clientName);
+    const name = caseName(labelFor(types, row.case_type), fileName);
     if (name === row.title) continue;
     await run(env.DB, 'UPDATE cases SET title = ?, updated_at = ? WHERE id = ?',
       name, new Date().toISOString(), row.id);
@@ -180,6 +236,6 @@ export async function normaliseClientName(
   );
   // A matter is named after the person, so the correction has to reach them or
   // the old spelling stays on the front of every one.
-  const matters = await renameMattersFor(env, clientId, fullName, types);
+  const matters = await renameMattersFor(env, clientId, types);
   return { was: client.full_name, now: fullName, matters };
 }

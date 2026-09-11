@@ -94,6 +94,18 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.55.0', date: '12 September 2026',
+    notes: [
+      'Surnames come first. A matter now reads \u201cRV. Partner \u2014 VUONG, Bao Long\u201d '
+        + 'rather than \u201cRV. Partner \u2014 Bao Long VUONG\u201d, so lists read down the '
+        + 'surname. The visa type still comes first. The client\u2019s own record is unchanged.',
+      'The matter and client boxes can be typed into. Type part of a surname, a reference or a '
+        + 'kind of work and the list narrows to what matches; the whole list is still there if '
+        + 'you would rather scroll.',
+      'If what you type fits two matters, it says so rather than choosing one for you.',
+    ],
+  },
+  {
     version: '1.54.0', date: '12 September 2026',
     notes: [
       'A date in a history can be just a month. Write 2019-03 where you only know the month, or '

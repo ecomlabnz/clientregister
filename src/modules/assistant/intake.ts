@@ -46,7 +46,7 @@ import { html, raw } from '../../ui/html';
 import { card, csrfField, emptyState, field, optionsFrom, pageHeader, select } from '../../ui/components';
 import { isAiEnabled } from '../../ai/provider';
 import { attachStagedTo, stageUpload, stagedFor } from '../../core/intakefiles';
-import { caseNameFrom, normaliseClientName } from '../../core/casename';
+import { caseNameFrom, clientFileName, normaliseClientName } from '../../core/casename';
 import { isAssignable } from '../../core/lookups';
 import type { IntakePerson, IntakeResult } from '../../ai/provider';
 import {
@@ -529,7 +529,6 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
     const existingId = f.optional('existing_client_id', { max: 80 });
     let clientId: string;
     let clientRef: string;
-    let clientName = '';
     // The client can be a company too — an accreditation matter is opened for
     // the employer — so which end of a link they are is read rather than
     // assumed.
@@ -540,7 +539,6 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       if (!row) return redirectWith(c, '/assistant/intake', 'That client no longer exists.', 'err');
       clientId = row.id;
       clientRef = row.ref;
-      clientName = row.full_name;
       clientKind = row.kind === 'organisation' ? 'organisation' : 'individual';
       await fillEmptyFields(c, f, 'a_', row.id);
       // Reusing a record is the moment to put its name into the house style.
@@ -551,7 +549,6 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       // spelling into its name.
       const tidied = await normaliseClientName(c.env, row.id, await caseTypes(c.env));
       if (tidied) {
-        clientName = tidied.now;
         await addEntry(c.env, {
           entityType: 'client', entityId: row.id, kind: 'system',
           body: `Surname put into capitals, as the practice records them: `
@@ -567,7 +564,6 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       if (!made) return redirectWith(c, '/assistant/intake', 'The client needs a name.', 'err');
       clientId = made.id;
       clientRef = made.ref;
-      clientName = made.fullName;
       clientKind = made.kind;
     }
 
@@ -581,6 +577,10 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
 
     const caseId = newId('cas');
     const caseRef = await nextYearlyRef(c.env.DB, 'case', 'CASE');
+    // Read after everything above has finished writing to the client — the
+    // house-style correction included — so the matter carries the corrected
+    // spelling rather than the one this route arrived with.
+    const fileName = await clientFileName(c.env, clientId);
     await run(
       c.env.DB,
       `INSERT INTO cases (id, ref, client_id, title, descriptor, case_type, status, priority, assigned_to,
@@ -594,7 +594,7 @@ export function registerIntakeRoutes(r: Hono<AppContext>): void {
       // which it was not: the New matter form was the other place, and when
       // that was corrected on 8 September this one was missed. A second writer
       // of a derived value is a second convention. See `core/casename.ts`.
-      caseId, caseRef, clientId, caseNameFrom(types, caseType, clientName), descriptor,
+      caseId, caseRef, clientId, caseNameFrom(types, caseType, fileName), descriptor,
       caseType, status,
       f.enum('priority', PRIORITIES, { fallback: 'normal' })!,
       assignedTo,

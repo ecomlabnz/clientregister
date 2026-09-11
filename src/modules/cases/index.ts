@@ -20,7 +20,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
-  actionButton, badge, csrfField, emptyState, errorList, field, flagBand, flagRaiser, foldedCard, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem, viewTabs,
+  actionButton, badge, csrfField, emptyState, errorList, field, findBox, flagBand, flagRaiser, foldedCard, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem, viewTabs,
   testDataBand,
 } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate, dateOrDateTime, instantForDate } from '../../ui/format';
@@ -54,7 +54,8 @@ import {
   VOCABULARY_SETTINGS, caseTypes, docCategories, isTerm, labelFor, noteKindLabel, noteKinds,
   termOptions, type Term,
 } from '../../core/vocabulary';
-import { caseNameFrom } from '../../core/casename';
+import { caseNameFrom, clientFileName } from '../../core/casename';
+import { readChoice, type OptionLike } from '../../core/options';
 import { readingCard, registerReadingRoutes } from './reading';
 import { driveConfigured } from '../../integrations/gdrive';
 import { invoicesSection } from '../invoices';
@@ -125,7 +126,7 @@ const CASE_DEFAULT_ORDER =
 function caseForm(
   c: any,
   values: Partial<CaseRow>,
-  clients: Array<{ value: string; label: string; formal?: string }>,
+  clients: Array<{ value: string; label: string }>,
   users: Array<{ value: string; label: string }>,
   types: Term[],
   errors?: Record<string, string>,
@@ -138,18 +139,15 @@ function caseForm(
       ${csrfField(csrf)}
       <div class="form-section">
         <h3>Matter</h3>
-        ${'' /* Rendered here rather than through `select` so each option can
-                 carry the client's formal name. The script uses it to suggest a
-                 title; without the script the dropdown is an ordinary dropdown
-                 and the title is typed, as it always was. */}
-        <div class="field">
-          <label for="f_client_id">Client<span class="req"> *</span></label>
-          <select id="f_client_id" name="client_id" required>
-            <option value="">Choose a client</option>
-            ${clients.map((cl) => html`<option value="${cl.value}"
-              ${cl.value === (values.client_id ?? '') ? raw('selected') : ''}>${cl.label}</option>`)}
-          </select>
-        </div>
+        ${'' /* Typed into, not scrolled through: 245 clients is not a list
+                 anybody finds anybody in. It was hand-rolled here rather than
+                 built by `select` so each option could carry the client's
+                 formal name for a script to suggest a title from — both the
+                 script and the title field are long gone, and the surname is
+                 now in front of the name for everybody. See `findBox`. */}
+        ${findBox({ label: 'Client', name: 'client_id', value: values.client_id ?? '',
+                    options: clients, required: true,
+                    placeholder: 'Type a surname or a client reference' })}
         ${'' /* One naming field, not two.
                  There used to be a "Matter title" here as well, pre-filled from
                  the client and the type as you chose them. Pre-filling was the
@@ -236,7 +234,7 @@ function caseForm(
     </form>`;
 }
 
-function readCaseForm(f: FormReader, types: Term[]) {
+function readCaseForm(f: FormReader, types: Term[], clients: OptionLike[]) {
   // Validated against the configured vocabulary rather than a compile-time
   // list: the practice owns the list, but only what is on it can be stored.
   const submittedType = f.text('case_type', { required: true, label: 'Case type', max: 60 });
@@ -245,7 +243,9 @@ function readCaseForm(f: FormReader, types: Term[]) {
   }
   const descriptor = f.text('descriptor', { required: true, label: 'What this matter is about', max: 160 });
   return {
-    client_id: f.text('client_id', { required: true, label: 'Client', max: 60 }),
+    // Resolved against the list the form offered, so a client who is not on
+    // it cannot be typed in. See `core/options.ts`.
+    client_id: readChoice(f, 'client_id', clients, { required: true, label: 'Client' }) ?? '',
     descriptor,
     // No `title`. It used to be set here to the description, which is how
     // every matter in the register ended up named by an 84-character sentence
@@ -612,10 +612,10 @@ export const casesModule: AppModule = {
     });
 
     r.post('/', requirePermission('register:write'), async (c) => {
-      const types = await caseTypes(c.env);
+      const [types, clientChoices] = await Promise.all([caseTypes(c.env), clientOptions(c.env)]);
       const user = c.get('user')!;
       const f = new FormReader(await c.req.formData());
-      const v = readCaseForm(f, types);
+      const v = readCaseForm(f, types, clientChoices);
       const status = f.enum('status', ['lead', 'engaged'] as const, { fallback: 'lead' })!;
 
       const client = v.client_id
@@ -644,13 +644,15 @@ export const casesModule: AppModule = {
       // because a date nobody typed is still a date the alerts page can watch.
       const decisionDue = v.decision_due_at
         ?? expectedDecisionDate(v.lodged_at, policy.expectedMonths);
+      // "FAMILY, Given", read from the record rather than composed here.
+      const fileName = await clientFileName(c.env, v.client_id);
       await run(
         c.env.DB,
         `INSERT INTO cases (id, ref, client_id, title, descriptor, case_type, status, priority, assigned_to,
             inz_application_number, lodged_at, decision_due_at, decided_at,
             next_action, next_action_due, summary, chase_inz, currency, created_at, updated_at, created_by)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NZD',?,?,?)`,
-        id, ref, v.client_id, caseNameFrom(types, v.case_type, client!.full_name),
+        id, ref, v.client_id, caseNameFrom(types, v.case_type, fileName),
         v.descriptor, v.case_type, status, v.priority, v.assigned_to,
         v.inz_application_number, v.lodged_at, decisionDue, v.decided_at,
         v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), nowIso(), user.id,
@@ -876,8 +878,9 @@ export const casesModule: AppModule = {
                   <summary>Add a party</summary>
                   <form method="post" action="/cases/${kase.id}/parties" class="row-form">
                     ${csrfField(csrf)}
-                    ${select({ label: 'Client', name: 'client_id', value: '', required: true,
-                               options: clients, includeBlank: 'Choose an existing client' })}
+                    ${findBox({ label: 'Client', name: 'client_id', value: '', options: clients,
+                                required: true,
+                                placeholder: 'Type a surname or a client reference' })}
                     ${'' /* The first person on a matter is the principal
                              applicant far more often than not; after that the
                              role is taken, so the sensible default is the next
@@ -1349,7 +1352,7 @@ export const casesModule: AppModule = {
       if (!existing) return c.notFound();
 
       const f = new FormReader(await c.req.formData());
-      const v = readCaseForm(f, types);
+      const v = readCaseForm(f, types, await clientOptions(c.env));
       if (v.assigned_to && !(await isAssignable(c.env, v.assigned_to))) {
         f.errors['assigned_to'] = 'That person cannot be given work. Choose an active user.';
       }
@@ -1362,8 +1365,8 @@ export const casesModule: AppModule = {
       // The name is composed from the type and the client, and the form can
       // change either — a matter moved to the right client, or corrected from
       // a visitor visa to a work visa, has to end up called what it now is.
-      const editClient = await one<{ full_name: string }>(
-        c.env.DB, 'SELECT full_name FROM clients WHERE id = ?', v.client_id);
+      // "FAMILY, Given", read from the record rather than composed here.
+      const editName = await clientFileName(c.env, v.client_id);
 
       const policy = await decisionPolicy(c.env);
       const decisionDue = v.decision_due_at
@@ -1374,7 +1377,7 @@ export const casesModule: AppModule = {
            inz_application_number=?, lodged_at=?, decision_due_at=?, decided_at=?,
            next_action=?, next_action_due=?, summary=?, chase_inz=?, updated_at=?
          WHERE id=?`,
-        v.client_id, caseNameFrom(types, v.case_type, editClient?.full_name ?? null),
+        v.client_id, caseNameFrom(types, v.case_type, editName),
         v.descriptor, v.case_type, v.priority, v.assigned_to,
         v.inz_application_number, v.lodged_at, decisionDue, v.decided_at,
         v.next_action, v.next_action_due, v.summary, v.chase_inz, nowIso(), id,
@@ -1584,11 +1587,13 @@ export const casesModule: AppModule = {
       if (!kase) return c.notFound();
 
       const f = new FormReader(await c.req.formData());
-      const clientId = f.text('client_id', { required: true, label: 'Client', max: 60 });
+      const clientId = readChoice(f, 'client_id', await clientOptions(c.env),
+        { required: true, label: 'Client' });
       const roleRaw = f.text('role', { required: true, label: 'Role', max: 40 });
       const notes = f.optional('notes', { max: 200 });
-      if (!f.valid || !isPartyRole(roleRaw)) {
-        return redirectWith(c, `/cases/${id}`, 'Choose a client and a role.', 'err');
+      if (!f.valid || !clientId || !isPartyRole(roleRaw)) {
+        return redirectWith(c, `/cases/${id}`,
+          f.errors['client_id'] ?? 'Choose a client and a role.', 'err');
       }
 
       const client = await one<{ full_name: string }>(c.env.DB, 'SELECT full_name FROM clients WHERE id = ?', clientId);

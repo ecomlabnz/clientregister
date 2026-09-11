@@ -7,6 +7,54 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.55.0 — 12 September 2026
+
+### Changed
+**Surnames come first.** *"can we make sure that this such places the surnames
+are before the names?"*
+
+A matter used to be called **RV. Partner — Bao Long VUONG**. It is now
+**RV. Partner — VUONG, Bao Long**. Same for quotations, and for every list of
+clients you pick from. Lists now read down the surname, the way a file drawer
+does — before this, a list of two hundred was sorted by whatever came first in
+the name, which is usually not the surname anybody is looking for.
+
+The visa type stays at the front. That was asked for in September and sorting
+by name still groups by kind of work.
+
+The client's own record still reads **Bao Long VUONG**, in the natural order,
+because that is the order a letter is addressed in. Two jobs, two orders.
+
+Companies are untouched. There is no surname in a registered name to bring
+forward.
+
+Migration 0092 renamed the 189 matters and the quotations already in the
+register. A quotation a client has already accepted keeps the name it was
+accepted under.
+
+### Added
+**Boxes you can type into instead of dropdowns you have to scroll.** *"it is
+just impossible to search through this! we need a better system."*
+
+The matter box on a new quotation held seventy lines. The client box holds two
+hundred and forty-five. Neither could be searched: pressing a key in a dropdown
+looks at the first letter of the line, and every line began with the visa type.
+
+Those boxes now take typing. Type part of a surname, a reference, or a kind of
+work, and the list narrows to what matches. Click the arrow and the whole list
+is still there.
+
+Where this now applies: new quotation (matter and client), edit quotation, new
+matter, edit matter, adding a party to a matter, new invoice, new inquiry, edit
+inquiry, and converting an inquiry. The matter box on an invoice was left as a
+dropdown — it only ever holds that one client's matters and is short already.
+
+**It refuses rather than guesses.** Type something that fits two matters and it
+says so instead of picking one. A quotation attached to the wrong file is not a
+mistake worth saving a keystroke for.
+
+No JavaScript is involved, so it still works with scripting switched off.
+
 ## 1.54.0 — 12 September 2026
 
 ### Added

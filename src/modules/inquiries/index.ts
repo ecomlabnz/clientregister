@@ -17,7 +17,7 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import {
-  actionButton, badge, card, csrfField, filingPicker, emptyState, errorList, field, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
+  actionButton, badge, card, csrfField, filingPicker, emptyState, errorList, field, findBox, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem,
   testDataBand,
 } from '../../ui/components';
 import { dateInputValue, dateOrDateTime, dateShort, dateTime, truncate } from '../../ui/format';
@@ -30,7 +30,8 @@ import { countryCodeFor, countryOptions } from '../../core/countries';
 import { setNationalityStatements } from '../../core/nationalities';
 import { clientOptions, isAssignable, userOptions } from '../../core/lookups';
 import { composeFullName, familyNameFor, givenNamesFor, plainAscii, splitFullName } from '../../core/names';
-import { caseNameFrom } from '../../core/casename';
+import { caseNameFrom, clientFileName } from '../../core/casename';
+import { readChoice } from '../../core/options';
 import { emailsForEntity, mailLinkFor, recordMailHref } from '../../mail/stored';
 import {
   CORRECTION_WINDOW_MINUTES, addEntry, correctable, listEntries,
@@ -300,7 +301,9 @@ export const inquiriesModule: AppModule = {
             ${select({ label: 'Source', name: 'source', value: 'phone', required: true, includeBlank: false,
                        options: optionsFrom(INQUIRY_SOURCES, INQUIRY_SOURCE_LABELS) })}
             ${field({ label: 'Received', name: 'received_at', type: 'date', value: nowIso().slice(0, 10) })}
-            ${select({ label: 'Existing client (if known)', name: 'client_id', value: '', options: clients, includeBlank: 'Not an existing client' })}
+            ${findBox({ label: 'Existing client (if known)', name: 'client_id', value: '',
+                        options: clients,
+                        placeholder: 'Leave empty if they are not in the register yet' })}
           </div>
           <div class="form-section">
             <h3>Who</h3>
@@ -325,7 +328,7 @@ export const inquiriesModule: AppModule = {
       const f = new FormReader(await c.req.formData());
       const source = f.enum('source', INQUIRY_SOURCES, { required: true, label: 'Source' });
       const receivedAt = f.date('received_at');
-      const clientId = f.optional('client_id', { max: 60 });
+      const clientId = readChoice(f, 'client_id', await clientOptions(c.env), { label: 'Client' });
       const contactName = f.optional('contact_name', { max: 200 });
       const contactEmail = f.email('contact_email');
       const contactPhone = f.optional('contact_phone', { max: 60 });
@@ -441,8 +444,9 @@ export const inquiriesModule: AppModule = {
               : html`
                 <form method="post" action="/inquiries/${inq.id}/convert" class="row-form">
                   ${csrfField(csrf)}
-                  ${select({ label: 'Client', name: 'client_id', value: inq.client_id ?? suggested?.id ?? '',
-                             options: clients, includeBlank: 'Create a new client from this inquiry' })}
+                  ${findBox({ label: 'Client', name: 'client_id',
+                              value: inq.client_id ?? suggested?.id ?? '', options: clients,
+                              placeholder: 'Leave empty to create a new client from this inquiry' })}
 
                   ${'' /* Everything from here to the matter title describes the
                            client this inquiry would create, and each box is the
@@ -571,7 +575,9 @@ export const inquiriesModule: AppModule = {
             ${select({ label: 'Source', name: 'source', value: inq.source, required: true, includeBlank: false,
                        options: optionsFrom(INQUIRY_SOURCES, INQUIRY_SOURCE_LABELS) })}
             ${field({ label: 'Received', name: 'received_at', type: 'date', value: dateInputValue(inq.received_at) })}
-            ${select({ label: 'Client', name: 'client_id', value: inq.client_id ?? '', options: clients, includeBlank: 'Not an existing client' })}
+            ${findBox({ label: 'Client', name: 'client_id', value: inq.client_id ?? '',
+                        options: clients,
+                        placeholder: 'Leave empty if they are not in the register' })}
             ${select({ label: 'Assigned to', name: 'assigned_to', value: inq.assigned_to ?? '', options: users, includeBlank: 'Unassigned' })}
           </div>
           <div class="form-section">
@@ -603,7 +609,7 @@ export const inquiriesModule: AppModule = {
       const f = new FormReader(await c.req.formData());
       const source = f.enum('source', INQUIRY_SOURCES, { required: true, label: 'Source' });
       const receivedAt = f.date('received_at');
-      const clientId = f.optional('client_id', { max: 60 });
+      const clientId = readChoice(f, 'client_id', await clientOptions(c.env), { label: 'Client' });
       const assignedTo = f.optional('assigned_to', { max: 60 });
       const contactName = f.optional('contact_name', { max: 200 });
       const contactEmail = f.email('contact_email');
@@ -733,7 +739,7 @@ export const inquiriesModule: AppModule = {
       if (inq.case_id) return redirectWith(c, `/inquiries/${id}`, 'This inquiry has already been converted.', 'err');
 
       const f = new FormReader(await c.req.formData());
-      const clientId = f.optional('client_id', { max: 60 });
+      const clientId = readChoice(f, 'client_id', await clientOptions(c.env), { label: 'Client' });
       const kind = f.enum('kind', ['individual', 'organisation'] as const, { fallback: 'individual' })!;
       const givenNames = f.optional('given_names', { max: 120 });
       const familyName = f.optional('family_name', { max: 120 });
@@ -793,9 +799,10 @@ export const inquiriesModule: AppModule = {
 
       // The name is composed from the type and the client, so the client's name
       // has to be read back — the branch above either found an existing record
-      // or made one, and only the second knows the name it wrote.
-      const clientName = (await one<{ full_name: string }>(
-        c.env.DB, 'SELECT full_name FROM clients WHERE id = ?', targetClientId))?.full_name ?? null;
+      // or made one, and only the second knows the name it wrote. Read through
+      // `clientFileName` so this route cannot disagree with the other two about
+      // how a matter carries a name, which is exactly what it did before.
+      const clientName = await clientFileName(c.env, targetClientId);
 
       const caseId = newId('cas');
       const caseRef = await nextYearlyRef(c.env.DB, 'case', 'CASE');

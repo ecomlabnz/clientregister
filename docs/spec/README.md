@@ -23,13 +23,13 @@ claim, not a fact.
 
 ## Read them in this order
 
-**1. [`mistakes.md`](mistakes.md).** Thirty-eight faults, each with the rule that
+**1. [`mistakes.md`](mistakes.md).** Thirty-nine faults, each with the rule that
 replaced it. The other documents tell you *what* to build; this one tells you
 what will go wrong while you build it. A rebuild that skips it will
 rediscover a primary-passport collision, a search that only works in one word
 order, and a page that breaks at 250 rows — all of which cost real time here.
 
-**2. [`invariants.md`](invariants.md).** The 129 rules the database enforces. This is
+**2. [`invariants.md`](invariants.md).** The 161 rules the database enforces. This is
 the heart of the design: *invariants belong in the database, as triggers and
 constraints, not in the route that happens to write the row.* A guarantee in a
 handler lasts until somebody adds a second handler — and this register is written
