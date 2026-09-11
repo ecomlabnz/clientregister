@@ -104,6 +104,22 @@
       "workers_dev": true,
       "observability": { "enabled": true },
 
+      // **Asked for on 12 September 2026:** *"lets create a subdomain.
+      // trial.immigration.kiwi"*
+      //
+      // `custom_domain` rather than a plain route: Wrangler creates the DNS
+      // record and orders the certificate itself, so the address is one line
+      // here rather than three places to keep in step. The zone is the
+      // practice's own, which is what makes that possible.
+      //
+      // A practice's own address matters more than tidiness. A trial on a
+      // `workers.dev` address is obviously somebody's experiment; a trial on a
+      // subdomain of the practice's domain is something you can put in front of
+      // a paying customer. The `workers.dev` address keeps working alongside it.
+      "routes": [
+        { "pattern": "trial.immigration.kiwi", "custom_domain": true }
+      ],
+
       "assets": {
         "directory": "./public",
         "binding": "ASSETS",
@@ -142,12 +158,12 @@
       "vars": {
         "APP_NAME": "Client Register",
         "APP_ENV": "trial",
-        // Printed by the first deploy, 12 September 2026. It builds links in
-        // the nightly automation output, so it is the trial's own address and
-        // never the practice's — a link in a trial's overnight summary that
-        // opened the practice's register would be the one mistake this whole
-        // arrangement exists to prevent.
-        "APP_ORIGIN": "https://clientregister-trial.ecomlabnz.workers.dev"
+        // The trial's own address, and never the practice's: this builds the
+        // links in the nightly automation summary, and a trial's summary
+        // opening the practice's register would be the one mistake this whole
+        // arrangement exists to prevent — arriving by e-mail rather than on a
+        // screen anybody was looking at.
+        "APP_ORIGIN": "https://trial.immigration.kiwi"
       },
 
       "triggers": {
