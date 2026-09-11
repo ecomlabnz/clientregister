@@ -82,6 +82,19 @@ describe.each(environments)('the %s environment', (name, env) => {
     expect(env.vars.APP_ENV).not.toBe(top.vars.APP_ENV);
   });
 
+  it('answers on an address of its own', () => {
+    // A practice reached at another practice's address is the same fault as a
+    // practice reading another practice's database, arriving one layer up.
+    const routes: any[] = env.routes ?? [];
+    for (const route of routes) {
+      expect(route.pattern, 'two practices on one address').not.toBe(
+        (top.routes ?? []).map((r: any) => r.pattern).find((p: string) => p === route.pattern));
+    }
+    if (routes.length) {
+      expect(env.vars.APP_ORIGIN).toContain(routes[0].pattern);
+    }
+  });
+
   it('links to itself, never to the practice’s register', () => {
     // `APP_ORIGIN` builds the links in the nightly automation summary. One
     // practice's summary linking into another's register is the single mistake
