@@ -56,6 +56,45 @@ anyone without an administrator's sign-in.
 **Not done yet:** it deletes a workflow the practice has not been asked about.
 Put to them 12 September; awaiting the answer.
 
+### 1a. The practice's register briefly refuses, and we do not know why
+
+**Found** 12 September 2026, reported twice by the practice.
+**Severity:** high — it is the live register, in use, and it is unexplained.
+**Status: OPEN. Two explanations offered, one fix applied, still happening.**
+
+`app.immigration.kiwi` returns a bare 403 for under a minute at a time and then
+clears itself. Chrome shows its own blank error page, which means the response
+carried no body — and every 403 the register itself can produce carries words
+(`403 — not permitted`, `Cross-origin request rejected`, `Invalid or missing
+CSRF token`). So it is being refused before it reaches the register.
+
+**What was tried, and did not work.** The trial's address was declared as a
+`custom_domain` route in `wrangler.jsonc`, which wrangler re-asserts on every
+deploy; both addresses are on one zone. That was a real fault and is fixed
+(fault 42) — but the refusals continued afterwards, so it was not the cause, or
+not the only one.
+
+**What is known:**
+- It started being noticed on the day a second Worker was first deployed to the
+  same account and zone.
+- It is brief and self-healing, which fits something being reconciled rather
+  than something being wrong.
+- The practice's register had deployed for weeks without it.
+
+**What has not been ruled out:** the deploy itself (assets are re-uploaded on
+every one), two Workers' cron triggers on one account, an account-level limit,
+or something outside Cloudflare entirely.
+
+**The fix, so far, is to stop guessing.** `scripts/probe.mjs` and the `watch`
+job in the deploy workflow now watch the register for two minutes across every
+deployment window, recording the status, the body, and the **`cf-ray`** of every
+answer — the identifier Cloudflare's own logs are searched by. Two explanations
+have already been offered and one was wrong; the next statement about this
+should rest on a captured failure rather than on reasoning.
+
+**What would close it:** a captured 403 with its `cf-ray`, looked up in
+Cloudflare's logs to see what refused it.
+
 ### 2. The backup is inside the same account it protects
 
 **Found** 12 September 2026, while building it.

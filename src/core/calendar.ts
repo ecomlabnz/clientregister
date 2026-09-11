@@ -269,22 +269,24 @@ export const CALENDAR_SOURCES: CalendarSource[] = [
         }));
     },
   },
-  {
-    id: 'quote_expiry', label: 'Quotes expiring', tone: 'grey',
-    async load(env, from, to) {
-      return (await all<any>(env.DB,
-        `SELECT q.id, q.ref, q.valid_until AS date, cl.full_name AS client_name
-           FROM quotes q LEFT JOIN clients cl ON cl.id = q.client_id
-          WHERE q.status = 'sent' AND q.valid_until IS NOT NULL
-            AND q.valid_until BETWEEN ? AND ?
-          ORDER BY q.valid_until LIMIT ${PER_SOURCE_LIMIT}`, from, to))
-        .map((r) => ({
-          date: r.date, source: 'quote_expiry', tone: 'grey' as const,
-          title: `Quote ${r.ref} expires`, detail: r.client_name ?? 'No client',
-          href: `/quotes/${r.id}`, ownerId: null, ownerName: null,
-        }));
-    },
-  },
+  // **A quotation expiring is not a date, and it is off the calendar.**
+  //
+  // Removed 12 September 2026, at the practice's instruction: *"we do not need
+  // quote expiry date in calendar, can be removed. if client does not acept -
+  // fine - they can get back to us and we will review there and then."*
+  //
+  // The reasoning is worth keeping because it is about what a calendar is for.
+  // Every other date on it is one somebody must act on: an application decided,
+  // a visa expiring, an invoice due, a deadline that closes. A quotation
+  // lapsing needs nothing done — the practice does not chase it, and when the
+  // client comes back the price is looked at again anyway.
+  //
+  // A calendar carrying dates nobody acts on trains people to ignore it, and
+  // then it fails on the date that mattered.
+  //
+  // The quotation's validity itself is untouched: it still stands, still
+  // expires overnight, and still shows on the quotation and in the quotes
+  // list. It is only off the calendar.
   {
     id: 'flag_expiry', label: 'Warnings lapsing', tone: 'grey',
     async load(env, from, to) {

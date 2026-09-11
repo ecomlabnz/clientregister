@@ -103,6 +103,48 @@ jobs:
         run: rm -f .secrets.json
 
   # ---------------------------------------------------------------------------
+  # Did the deploy break the register?
+  #
+  # **Asked for on 12 September 2026:** *"again - Access to app.immigration.kiwi
+  # was denied ... HTTP ERROR 403 - can we build some sort of detector?"*
+  #
+  # The practice's register had been returning a bare 403 for under a minute at
+  # a time, clearing itself, while somebody was working in it. Two explanations
+  # were offered. The first fix did not stop it. That is the point at which
+  # guessing stops and measuring starts.
+  #
+  # This watches the register for two minutes across the window a deployment
+  # occupies — **after the practice's own deploy and while the trial's is
+  # running**, which is where the evidence points and where nobody can watch by
+  # hand. Every answer is written down with its `cf-ray`, which is the one
+  # identifier Cloudflare's own logs can be searched by; without it a report is
+  # "it broke at some point".
+  #
+  # It does not gate anything: `continue-on-error`, because a register that is
+  # briefly refusing is not a reason to fail a deploy that has already happened.
+  # It is here to catch the thing in the act, and it goes red in the run so the
+  # deploy that caused it is the one carrying the evidence.
+  #
+  # Around the deploy rather than around the clock, deliberately: a prober on a
+  # five-minute schedule costs more in CI minutes than this fault costs in
+  # downtime. If the failures turn out not to cluster here, that is itself the
+  # finding, and it moves to a schedule.
+  # ---------------------------------------------------------------------------
+  watch:
+    runs-on: ubuntu-latest
+    needs: deploy
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Watch the practice's register through the deploy window
+        run: node scripts/probe.mjs https://app.immigration.kiwi/login 20 6000
+
+  # ---------------------------------------------------------------------------
   # The trial practice.
   #
   # **Asked for on 12 September 2026:** *"two deployed workers, existing one +

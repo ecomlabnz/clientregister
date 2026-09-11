@@ -7,6 +7,34 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.59.0 — 12 September 2026
+
+### Changed
+**Quotations expiring are off the calendar.** *"we do not need quote expiry date
+in calendar, can be removed. if client does not acept - fine - they can get back
+to us and we will review there and then."*
+
+Every other date on the calendar is one you have to act on — a decision due, a
+visa expiring, an invoice due, a deadline that closes. A quotation lapsing needs
+nothing done. A calendar carrying dates nobody acts on teaches you to ignore it,
+and then it fails on the date that mattered.
+
+Nothing else changes. The quotation still stands for its period, still expires
+overnight, and still shows its date on the quotation itself and in the quotes
+list.
+
+### Added
+**A watcher on the register, through every deployment.** You have seen the
+register refuse to load for under a minute and then come right. I offered an
+explanation, fixed it, and it happened again — so the explanation was wrong.
+
+Rather than guess a third time, every deployment now watches the register for
+two minutes and writes down every answer it gets, including the reference number
+Cloudflare's own records can be searched by. If it happens during a deployment,
+it will be caught in the act.
+
+It does not affect the register and cannot hold up a deploy. It only watches.
+
 ## 1.58.0 — 12 September 2026
 
 ### Changed
