@@ -803,18 +803,23 @@ export const casesModule: AppModule = {
               ${writable && nextStatuses.length > 0 ? html`
                 <form method="post" action="/cases/${kase.id}/status" class="row-form">
                   ${csrfField(csrf)}
-                  ${select({ label: 'Move to', name: 'status', value: '', required: true, includeBlank: 'Choose a status',
+                  ${'' /* Not required. A new date is not a new status — see the
+                           note above the handler. Leaving this alone and giving
+                           a date records the extension where the matter is. */}
+                  ${select({ label: 'Move to', name: 'status', value: '', includeBlank: 'Leave as it is',
                              options: nextStatuses.map((s) => ({ value: s, label: CASE_STATUS_LABELS[s] })) })}
                   ${field({ label: 'Note (recorded on the file)', name: 'note', maxlength: 500,
                             placeholder: 'e.g. Lodged online, receipt 12345' })}
                   ${nextStatuses.some(isAwaitingStatus)
                     ? field({ label: 'Response / decision due', name: 'decision_due_at', type: 'date',
                               value: dateInputValue(kase.decision_due_at),
-                              hint: 'A date still being waited for — an RFI or PPI response, or when '
-                                  + 'INZ is expected to decide. Not the date a decision arrived: the '
-                                  + 'register records that itself when you move to Approved or Declined.' })
+                              hint: 'A date still being waited for \u2014 an RFI or PPI response, or '
+                                  + 'when INZ is expected to decide. Change it on its own, leaving the '
+                                  + 'status alone, to record an extension. Not the date a decision '
+                                  + 'arrived: the register records that itself when you move to '
+                                  + 'Approved or Declined.' })
                     : ''}
-                  <button class="btn btn-primary" type="submit">Update status</button>
+                  <button class="btn btn-primary" type="submit">Save</button>
                 </form>` : ''}
               ${history.length > 0 ? html`
                 <details><summary>Status history</summary>
@@ -1395,10 +1400,70 @@ export const casesModule: AppModule = {
       if (!kase) return c.notFound();
 
       const f = new FormReader(await c.req.formData());
-      const status = f.enum('status', CASE_STATUSES, { required: true, label: 'Status' });
+      const status = f.enum('status', CASE_STATUSES, { label: 'Status' });
       const note = f.optional('note', { max: 500 });
       const decisionDue = f.date('decision_due_at');
-      if (!status) return redirectWith(c, `/cases/${id}`, 'Choose a status.', 'err');
+
+      /**
+       * A new date is not a new status.
+       *
+       * **Reported on 11 September 2026:** *"i just received an extension from
+       * INZ of time to file an australian PC for a client... and I need to
+       * record that - Due Date Extended - and enter the new date - but I
+       * cannot."*
+       *
+       * The practice reached for a new status, and it is worth saying why the
+       * register does not want one. A status is not a label: fifteen of them
+       * drive behaviour — which matters count as open, which carry a deadline
+       * that must not be missed, which are with INZ and so raise the
+       * no-acknowledgement and status-not-recorded alerts, and which set
+       * `decided_at` of their own accord. A sixteenth added from a settings
+       * page would belong to none of those lists and would be invisible to
+       * every alert, which is worse than not having it.
+       *
+       * And the matter here has not changed state at all. It is still Decision
+       * pending. What changed is the date, and the date was locked behind the
+       * status because "Move to" was required — so the only way to record an
+       * extension was to pretend the matter had moved somewhere it had not.
+       *
+       * So the status is now optional. Give a date on its own and the date is
+       * what changes.
+       */
+      if (!status) {
+        if (!decisionDue) {
+          return redirectWith(c, `/cases/${id}`,
+            'Choose a status, or give a new date for the response or decision.', 'err');
+        }
+        if (!isAwaitingStatus(kase.status)) {
+          return redirectWith(c, `/cases/${id}`,
+            `A matter that is ${CASE_STATUS_LABELS[kase.status]} is not waiting for anything, so `
+            + 'there is no date to move.', 'err');
+        }
+
+        const was = kase.decision_due_at;
+        await run(c.env.DB, 'UPDATE cases SET decision_due_at = ?, updated_at = ? WHERE id = ?',
+          decisionDue, nowIso(), id);
+        // On the file rather than in the status history, because the status
+        // did not change and a history of statuses that records something else
+        // stops being a history of statuses.
+        await addEntry(c.env, {
+          entityType: 'case', entityId: id, kind: 'system',
+          body: `Response or decision due: ${was ? dateShort(was) : 'not set'} \u2192 `
+            + `${dateShort(decisionDue)}${note ? ` \u2014 ${note}` : ''}`,
+          createdBy: user.id,
+        });
+        const movedPolicy = await decisionPolicy(c.env);
+        const movedMatter = await caseForSync(c.env, id);
+        // The chases hang off this date, so they move with it.
+        const movedChases = movedMatter
+          ? await syncCaseFollowUps(c.env, movedMatter, movedPolicy) : null;
+        await auditFrom(c, { action: 'case.decision_due_changed', entityType: 'case', entityId: id,
+          meta: { from: was, to: decisionDue } });
+        return redirectWith(c, `/cases/${id}`,
+          `Now due ${dateShort(decisionDue)}. The status is unchanged.`
+          + (movedChases?.created
+            ? ` ${movedChases.created} INZ follow-up${movedChases.created === 1 ? '' : 's'} rescheduled.` : ''));
+      }
 
       if (!canTransition(kase.status, status)) {
         return redirectWith(
