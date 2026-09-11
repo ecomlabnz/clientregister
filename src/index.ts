@@ -19,6 +19,7 @@ import { syncAllFollowUps } from './core/kb';
 import { runAutomations } from './core/automations';
 import { syncAllCaseFollowUps } from './core/decisions';
 import { sweepStaged } from './core/intakefiles';
+import { autoResetIfDue } from './core/testseed';
 
 const app = createApp();
 
@@ -95,6 +96,13 @@ async function housekeeping(env: Env): Promise<void> {
       trigger: 'schedule', userId: null, origin: env.APP_ORIGIN ?? '',
     });
 
+    // A trial database putting its practice caseload back, where one has been
+    // set up. `testdata.auto_reset_days` is 0 unless somebody sets it, and 0
+    // means never — which is what makes this safe to run on every register
+    // including the practice's own, where the records marked as test data are
+    // ones they marked by hand in order to rehearse with. See `core/testseed`.
+    const testReset = await autoResetIfDue(env);
+
     // Files staged by a reading nobody acted on. They are client documents
     // sitting in a bucket with nothing pointing at them; keeping them because a
     // page was closed is the quiet accumulation that makes a register
@@ -105,7 +113,7 @@ async function housekeeping(env: Env): Promise<void> {
       action: 'cron.housekeeping',
       actorLabel: 'system',
       meta: { mail, quotesExpired: expired.meta?.changes ?? 0, followUps, chases, automations,
-              staleFiles },
+              staleFiles, testReset },
     });
   } catch (err) {
     console.error('scheduled housekeeping failed', err);

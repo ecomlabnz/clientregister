@@ -290,3 +290,57 @@ users.
 
 **Suspected session compromise:** suspend the user in Admin → Users (revokes all
 their sessions), or clear the KV namespace to sign everybody out at once.
+
+## Letting somebody try the register
+
+**Asked for on 11 September 2026:** *"I need a user status that can ONLY see and
+play with the test data ... This is so that some users can try the system and
+learn."*
+
+The caseload half of that is built — Settings → Test data lays down twelve
+invented files, puts them back on demand, and can put them back on a timer. The
+**login that can only see them is not**, and this is the reasoning, so nobody
+re-opens it without a better answer.
+
+### Why a trial role inside this register would be unsafe
+
+A role is a list of what somebody may *do*. Holding a person inside the test
+data is a different thing: it is a condition on what they may *see*, and the
+only place to enforce that is the queries. There are over six hundred of them
+and 228 routes. Every list, every search, every count, every dropdown that
+offers a client would need "and only the test data" adding to it.
+
+That is precisely the fault the one-database-each decision of 3 September 2026
+was made to avoid, in the same words: *"the one somebody forgets does not
+produce a bug report — it shows one law firm another firm's client files."* A
+trial user is the same problem wearing different clothes. The failure is silent,
+and what leaks is a client's identity documents.
+
+The database cannot help here either. SQLite has no row-level security, and a
+trigger can refuse a write but cannot filter a read.
+
+### What to do instead
+
+**Give the person their own copy of the register.** A second Worker, a second D1
+database, a second address — the arrangement already chosen for a second
+practice, and already possible today.
+
+In that database:
+
+1. Sign in and create their account as normal.
+2. Settings → Test data → **Load the caseload**.
+3. Settings → Practice caseload → **Put the caseload back every 15 days**.
+
+There is then nothing to restrict, because there is nothing else in the
+database. Every query is already only about test data. Somebody can delete a
+client, accept a quotation, void an invoice — all the things you would never let
+them do here — and in fifteen days it is back as it was.
+
+This is also the honest answer to *"only see the test data"*: they see only test
+data because there is only test data.
+
+### What is still missing before doing this
+
+Nothing in the code. What is missing is the same thing missing everywhere else
+in this document: **there is still no automated backup**, and a second
+deployment is a second database nobody is backing up.

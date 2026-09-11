@@ -37,6 +37,20 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.51.0', date: '12 September 2026',
+    notes: [
+      'Settings \u2192 Test data can now load a whole invented caseload to learn on \u2014 twelve '
+        + 'clients with families, about thirty matters, quotations, passports and certificates.',
+      'It is deliberately messy: a declined application, a section 61 request, an expired police '
+        + 'certificate beside a current one, a passport renewed mid-application, a gap in a work '
+        + 'history. The awkward files are what the register is for.',
+      '\u201cPut it back as it was\u201d deletes everything marked as test data and lays the '
+        + 'caseload down again, so whatever somebody added while trying things is disregarded.',
+      'It can put itself back on a timer, under Settings \u2192 Practice caseload. That is set to '
+        + 'never on this register, and should stay there.',
+    ],
+  },
+  {
     version: '1.50.0', date: '12 September 2026',
     notes: [
       'A client now has Employment history, Education history and Travel history, under '

@@ -38,7 +38,7 @@ dashboard, and why a test holds them there.
 | 21 | `knowledge` | Knowledge base | `/knowledge` | 14 | Tools → Knowledge |
 | 22 | `assistant` | Assistant | `/assistant` | 5 | Tools → Assistant |
 | 23 | `workflows` | Workflows | `/workflows` | 4 | — |
-| 24 | `admin` | Settings | `/admin` | 24 | Settings |
+| 24 | `admin` | Settings | `/admin` | 25 | Settings |
 | 25 | `help` | Help | `/help` | 1 | Help |
 
 ## What each module owns
@@ -398,12 +398,13 @@ Settings: **AI Assistant** (2 keys)
 | GET | `/admin/test-data` |
 | POST | `/admin/test-data/delete` |
 | POST | `/admin/test-data/mark` |
+| POST | `/admin/test-data/seed` |
 | GET | `/admin/users` |
 | POST | `/admin/users` |
 | POST | `/admin/users/:id` |
 | POST | `/admin/users/:id/reset-password` |
 
-Settings: **Practice** (15 keys)
+Settings: **Practice** (15 keys), **Practice caseload** (1 keys)
 
 ### `help` — Help
 
