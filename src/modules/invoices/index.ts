@@ -28,8 +28,8 @@ import { can } from '../../core/rbac';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import {
-  actionButton, badge, card, collapsibleCard, csrfField, emptyState, field, optionsFrom, pageHeader,
-  select, stamp, statusTone, table,
+  actionButton, badge, card, collapsibleCard, csrfField, emptyState, field, findBox, optionsFrom,
+  pageHeader, select, stamp, statusTone, table,
   testDataBand,
 } from '../../ui/components';
 import { dateShort, money, printedAt } from '../../ui/format';
@@ -42,6 +42,7 @@ import { computeLine, formatQuantity, parseQuantityToMilli, pluraliseUnit } from
 import { practiceDetails } from '../../core/practice';
 import { caseTypes } from '../../core/vocabulary';
 import { clientOptions } from '../../core/lookups';
+import { readChoice } from '../../core/options';
 
 import { catalogue } from '../quotes';
 import {
@@ -158,9 +159,13 @@ export const invoicesModule: AppModule = {
           ${csrfField(csrf)}
           <div class="form-section">
             <h3>Who and what</h3>
-            ${select({ label: 'Client', name: 'client_id', required: true, value: presetClient,
-                       options: clients, includeBlank: 'Choose a client',
-                       hint: 'An invoice has to be addressed to somebody. A quote does not.' })}
+            ${'' /* Typed into rather than scrolled: 245 clients. The matter
+                     box below stays an ordinary dropdown — it holds only this
+                     client's matters and is short by construction. */}
+            ${findBox({ label: 'Client', name: 'client_id', required: true, value: presetClient,
+                        options: clients,
+                        placeholder: 'Type a surname or a client reference',
+                        hint: 'An invoice has to be addressed to somebody. A quote does not.' })}
             ${matters.length > 0
               ? select({ label: 'Matter', name: 'case_id', value: presetCase,
                          options: matters.map((m) => ({ value: m.id,
@@ -190,13 +195,15 @@ export const invoicesModule: AppModule = {
     r.post('/', requirePermission('quote:write'), async (c) => {
       const user = c.get('user')!;
       const f = new FormReader(await c.req.formData());
-      const clientId = f.text('client_id', { required: true, label: 'Client', max: 60 });
+      const clientId = readChoice(f, 'client_id', await clientOptions(c.env),
+        { required: true, label: 'Client' });
       const caseId = f.optional('case_id', { max: 60 });
       const description = f.text('description', { required: true, label: 'What this is for', max: 500 });
       const termDays = Number(f.optional('payment_terms_days', { max: 3 }) ?? '') || undefined;
 
-      if (Object.keys(f.errors).length > 0) {
-        return redirectWith(c, '/invoices/new', Object.values(f.errors)[0]!, 'err');
+      if (Object.keys(f.errors).length > 0 || !clientId) {
+        return redirectWith(c, '/invoices/new',
+          Object.values(f.errors)[0] ?? 'Choose a client.', 'err');
       }
 
       const made = await newInvoice(

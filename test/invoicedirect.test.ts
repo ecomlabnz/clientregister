@@ -104,8 +104,12 @@ describe('what it refuses', () => {
     const h = seeded();
     const res = await raise(h, { client_id: 'nobody', description: 'Advice' });
     expect(res.status).toBe(303);
+    // The wording changed on 12 September 2026 when the client box became one
+    // you type into: it now says what was typed and what to do about it,
+    // rather than restating the rule. The guarantee is the same one — refused,
+    // in words, with nothing written.
     expect(decodeURIComponent(res.headers.get('location') ?? ''))
-      .toContain('addressed to someone');
+      .toContain('No client matches');
     expect(h.count('SELECT COUNT(*) AS n FROM invoices')).toBe(0);
   });
 

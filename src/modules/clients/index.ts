@@ -2760,7 +2760,7 @@ export const clientsModule: AppModule = {
       // the register came to be called by its own description. See
       // `src/core/casename.ts`.
       if (existing.full_name !== v.full_name) {
-        const renamed = await renameMattersFor(c.env, id, v.full_name, await caseTypes(c.env));
+        const renamed = await renameMattersFor(c.env, id, await caseTypes(c.env));
         if (renamed) {
           await addEntry(c.env, {
             entityType: 'client', entityId: id, kind: 'system',

@@ -18,7 +18,8 @@ import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { emphasise, html, join, raw, type Raw } from '../../ui/html';
 import {
-  actionButton, badge, card, csrfField, emptyState, field, optionsFrom, pageHeader, select, stamp, statusTone, table,
+  actionButton, badge, card, csrfField, emptyState, field, findBox, optionsFrom, pageHeader, select,
+  stamp, statusTone, table,
   testDataBand,
 } from '../../ui/components';
 import { dateInputValue, dateLong, dateShort, money, printedAt } from '../../ui/format';
@@ -43,7 +44,8 @@ import {
 import { asInteger, readSettings, type SettingsGroup } from '../../core/settings';
 
 import { caseTypes, labelFor, type Term } from '../../core/vocabulary';
-import { quoteNameFrom } from '../../core/casename';
+import { clientFileName, quoteNameFrom } from '../../core/casename';
+import { matchOption, matchProblem, readChoice } from '../../core/options';
 import { practiceDetails } from '../../core/practice';
 import { shareTokenFor, shareUrl } from '../../core/quotelink';
 import { fallbackWarning, publicBase } from '../../core/publicurl';
@@ -713,12 +715,18 @@ export const quotesModule: AppModule = {
                    type first, so sorting by name groups by kind of work. */}
           <div class="form-section">
             <h3>Who and what</h3>
-            ${select({ label: 'Matter', name: 'case_id', value: presetCase, options: matters,
-                       includeBlank: 'No matter yet',
-                       hint: 'Choose one and the quotation takes its name, its type and its '
-                         + 'client from the matter \u2014 the other three boxes are then ignored.' })}
-            ${select({ label: 'Client', name: 'client_id', value: presetClient, options: clients,
-                       includeBlank: 'No client yet' })}
+            ${'' /* Typed into rather than scrolled through. Asked for on
+                     12 September 2026 of this exact dropdown: *"it is just
+                     impossible to search through this! we need a better
+                     system."* Seventy open matters, and a `<select>` cannot be
+                     searched. See `findBox` in `ui/components.ts`, and
+                     `core/options.ts` for what is done with what comes back. */}
+            ${findBox({ label: 'Matter', name: 'case_id', value: presetCase, options: matters,
+                        placeholder: 'Leave empty if there is no matter yet',
+                        hint: 'Type part of a name or a reference, or pick from the list. '
+                          + 'Choose a matter and the next three boxes are ignored.' })}
+            ${findBox({ label: 'Client', name: 'client_id', value: presetClient, options: clients,
+                        placeholder: 'Leave empty if there is no client yet' })}
             ${select({ label: 'Visa type', name: 'case_type', value: '',
                        options: types.map((t) => ({ value: t.key, label: t.label })),
                        includeBlank: '\u2014 choose \u2014',
@@ -768,8 +776,26 @@ export const quotesModule: AppModule = {
       const user = c.get('user')!;
       const qs = await quoteSettings(c.env);
       const f = new FormReader(await c.req.formData());
-      const clientId = f.optional('client_id', { max: 60 });
-      const caseId = f.optional('case_id', { max: 60 });
+      // The two pickers post the line that was read, not an id, so each is
+      // turned back into one here. Resolved against the same lists the form
+      // offered — so a closed matter cannot be attached to by typing its
+      // reference, which is the one thing being generous about the text could
+      // otherwise let through.
+      const [matterChoices, clientChoices] = await Promise.all([
+        openCaseOptions(c.env), clientOptions(c.env),
+      ]);
+      const typedCase = f.optional('case_id', { max: 200 });
+      const typedClient = f.optional('client_id', { max: 200 });
+      const caseMatch = matchOption(typedCase, matterChoices);
+      if (!caseMatch.found) {
+        return redirectWith(c, '/quotes/new', matchProblem(typedCase, 'matter', caseMatch.ambiguous), 'err');
+      }
+      const clientMatch = matchOption(typedClient, clientChoices);
+      if (!clientMatch.found) {
+        return redirectWith(c, '/quotes/new', matchProblem(typedClient, 'client', clientMatch.ambiguous), 'err');
+      }
+      const clientId = clientMatch.value;
+      const caseId = caseMatch.value;
       const inquiryId = f.optional('inquiry_id', { max: 60 });
       // The name is composed, never typed. Three ways in, one place that
       // decides — `core/casename.ts`, the same place a matter's name comes
@@ -803,13 +829,12 @@ export const quotesModule: AppModule = {
           'Choose a matter, or a visa type for the quotation to be named after.', 'err');
       }
       const types = await caseTypes(c.env);
-      const client = forClient
-        ? await one<{ full_name: string }>(
-            c.env.DB, 'SELECT full_name FROM clients WHERE id = ?', forClient)
-        : null;
+      // "FAMILY, Given" — the same label a matter carries, read from the
+      // client record rather than composed here. See `core/casename.ts`.
+      const clientFile = await clientFileName(c.env, forClient);
       const description = matter
         ? matter.title
-        : quoteNameFrom(types, caseType, descriptor, client?.full_name ?? null);
+        : quoteNameFrom(types, caseType, descriptor, clientFile);
 
       // The date is worked out and stored now. A quote that says "valid for
       // 7 days" makes the reader do arithmetic from a date they have to find
@@ -2303,7 +2328,9 @@ export const quotesModule: AppModule = {
           ${csrfField(csrf)}
           <div class="form-section">
             <h3>Who and what</h3>
-            ${select({ label: 'Client', name: 'client_id', value: q.client_id ?? '', options: clients, includeBlank: 'No client yet' })}
+            ${findBox({ label: 'Client', name: 'client_id', value: q.client_id ?? '',
+                        options: clients,
+                        placeholder: 'Leave empty if there is no client yet' })}
             ${field({ label: 'Description', name: 'description', value: q.description, required: true, maxlength: 500 })}
           </div>
           <div class="form-section">
@@ -2336,7 +2363,7 @@ export const quotesModule: AppModule = {
 
       const settings = await moneySettings(c.env);
       const f = new FormReader(await c.req.formData());
-      const clientId = f.optional('client_id', { max: 60 });
+      const clientId = readChoice(f, 'client_id', await clientOptions(c.env), { label: 'Client' });
       const description = f.text('description', { required: true, label: 'Description', max: 500 });
       const amount = f.money('amount', { required: true, label: 'Professional fee' });
       const treatment = f.enum('gst_treatment', GST_TREATMENTS, { fallback: settings.defaultTreatment })! as GstTreatment;

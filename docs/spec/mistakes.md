@@ -641,6 +641,38 @@ was spent looking for a push that had not happened.
 recalled. When a call is refused on the basis of one, check the identifier before
 checking the world.
 
+
+### 39. A dropdown is not searchable, and grows past the point of being usable
+
+**What happened.** The matter box on a new quotation held every open matter —
+seventy of them — in a `<select>`. The practice: *"it is just impossible to
+search through this!"* The client box beside it held two hundred and forty-five.
+
+A `<select>` cannot be searched. Pressing a key matches the **first character**
+of the option's text, and every line here began with the visa type, so pressing
+N looked for a matter whose type started with N. The list was also sorted by
+whatever came first in the client's name, which for most of this caseload is not
+the surname — so it could not usefully be scrolled either.
+
+Neither list was ever designed; both were fine at twenty rows and nobody looked
+again at two hundred.
+
+**The rule.** **A list that can outgrow a screen is typed into, not scrolled.**
+`findBox` in `ui/components.ts` — a text input with a `<datalist>`, which is
+plain HTML and needs no script — with `core/options.ts` turning what was typed
+back into a record, and **refusing rather than guessing** when what was typed
+fits more than one.
+
+Two things this cost, both of them written down where they happen rather than
+left to be found: the form now posts the visible line instead of an id, so the
+line has to be resolved server-side against the same list the form offered; and
+the field accepts the id as well, because a preset link carries one.
+
+**The related rule.** A label is sorted by the thing somebody looks for. Names
+in any label — matters, quotations, pickers — read `FAMILY, Given`; the client's
+own record still reads `Given FAMILY`, which is the order a letter is addressed
+in. Two jobs, two orders, one place composing each.
+
 ---
 
 ---
