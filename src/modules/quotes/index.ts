@@ -1295,6 +1295,33 @@ export const quotesModule: AppModule = {
       // open one — see the `mail` module for why that is `mail:send` — so the
       // query is not run for a reader who would be shown nothing.
       const canReadMail = can(c.get('user'), 'mail:send');
+
+      /*
+       * Who may see the client's link itself, as opposed to knowing there is
+       * one.
+       *
+       * **Asked for on 12 September 2026**, after a review found this: the link
+       * is not a convenience, it is the *authority*. `POST /q/:token/accept` is
+       * public and has to be — the client has no account — so the token is the
+       * whole of what proves a person may accept. Printing it in full on a page
+       * gated at `register:read` handed that authority to every role that may
+       * read a quotation, including "Read only", whose definition is that they
+       * change nothing. Demonstrated: a readonly user copied the link off this
+       * page and formed the contract in the client's name, with an acceptance
+       * the interface says cannot be undone.
+       *
+       * Every individual permission here was correct. What leaked was a
+       * capability shown *through* a correct gate — which is why the route/role
+       * matrix could not see it, and why the fix is here rather than on a gate.
+       *
+       * `quote:write` is the cut because it is the permission that may send the
+       * quotation in the first place. Somebody who could put the link in front
+       * of the client loses nothing by being able to read it back.
+       *
+       * What everybody else still sees: that a link exists and when it went
+       * out, which is the question this card is opened to answer.
+       */
+      const canSeeClientLink = can(c.get('user'), 'quote:write');
       const [entries, terms, lines, items, lineTypes, fees, qSettings, stages, parties, quoteInvoices, sentMail] = await Promise.all([
         listEntries(c.env, 'quote', id),
         practiceDetails(c.env),
@@ -1905,10 +1932,21 @@ export const quotesModule: AppModule = {
               ${card('The client\u2019s link', html`
                 ${'' /* The link carries the quotation, the letter of engagement
                          where there is one, and the acceptance form. It does not
-                         change once sent. */}
+                         change once sent — and it is the authority to accept,
+                         so it is shown only to somebody who may send one. See
+                         `canSeeClientLink` above. */}
+                ${canSeeClientLink
+                  ? html`
                 <p><a class="break-url small" href="/q/${q.share_token}" target="_blank"
                       rel="noopener">/q/${q.share_token}</a></p>
-                <p class="hint">Anybody holding this address can read the quotation.</p>`)}`
+                <p class="hint">Anybody holding this address can read the quotation
+                   \u2014 and accept it.</p>`
+                  : html`
+                <p>The client has their link.${q.sent_at
+                     ? html` Sent ${printedAt(q.sent_at)}.` : ''}</p>
+                <p class="hint">The address itself is shown to whoever may send a quotation.
+                   Holding it is what lets somebody accept, so it is not on this page for
+                   everyone who may read one.</p>`}`)}`
               : ''}
 
             ${card('Status', html`

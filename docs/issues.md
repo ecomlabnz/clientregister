@@ -353,11 +353,12 @@ dropped. Today they are four top-level middlewares and nothing else; anything
 else appearing there fails the build. Re-proved with the same two routes — the
 test now names them.
 
-### 13. A read-only user can form a contract with a link they are allowed to see
+### 13. A read-only user could form a contract with a link they were allowed to see — FIXED 12 September 2026
 
 **Found** 12 September 2026, in review of the route matrix — by looking past the
 gates at what the pages behind them hand out.
-**Severity: high, and OPEN. Nothing has been changed.**
+**Severity was: high.** Found by looking past the gates at what the pages behind
+them hand out.
 
 Every individual gate here is correct, which is exactly why the matrix cannot
 see it:
@@ -383,9 +384,34 @@ knowledge-base share links (`GET /knowledge/:id` prints a `/d/:token` for an
 already-shared article), which is confidentiality rather than contract, and is
 the same fix.
 
-**Not fixed today, deliberately.** It is a change to what a page shows to whom,
-nobody has asked for it, and the standing rule is that a change nobody asked for
-goes to the practice before it is built. It is in front of them now.
+**FIXED 12 September 2026 (1.61.0).** Put to the practice, who said *"proceed"*
+the same day.
+
+The address itself is now shown only to somebody holding `quote:write` — the
+permission that may send a quotation in the first place, so nobody loses a link
+they could already have put in front of the client. Everybody else is told that
+the client has their link and when it went out, which is what that panel is
+opened to answer.
+
+The knowledge-base link went the same way, cut at `register:write` rather than
+`quote:write`: nothing is formed through one, so the question there is
+confidentiality, not contract, and the permission that mints one is the right
+line.
+
+`test/sharelinks.test.ts` pins both, and pins them as a **rule about the bytes**
+rather than about the page: the token must not appear anywhere in what is sent
+to a role that may not share it — not hidden by CSS, not in an attribute, not in
+a comment. Mutation-tested: open either gate and three tests go red.
+
+**No link changed and none was revoked.** Every address already with a client
+still works. This was only ever about who can read one off a screen.
+
+**The rule worth keeping**, and the reason this one is worth reading twice: a
+route/role matrix checks who may open a page. It cannot check what the page
+*hands out* once opened. Both of the leaks here sat behind permissions that were
+individually correct. So when a page prints a token, a key or an address that is
+itself an authority, the question is not "who may read this page" — it is "who
+may hold this thing".
 
 ---
 
