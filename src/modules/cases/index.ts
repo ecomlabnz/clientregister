@@ -56,7 +56,7 @@ import {
 } from '../../core/vocabulary';
 import { caseNameFrom, clientFileName } from '../../core/casename';
 import { readChoice, type OptionLike } from '../../core/options';
-import { readingCard, registerReadingRoutes } from './reading';
+import { CASE_READING, readingCard, registerReadingRoutes } from '../../core/reading';
 import { driveConfigured } from '../../integrations/gdrive';
 import { invoicesSection } from '../invoices';
 
@@ -336,7 +336,7 @@ export const casesModule: AppModule = {
     // "Read a document into this matter", registered first for the same reason
     // `/assistant/intake` is: a parameterised route added above it would
     // swallow `/:id/read`.
-    registerReadingRoutes(r);
+    registerReadingRoutes(r, CASE_READING);
 
     // --- List ---------------------------------------------------------------
     r.get('/', requirePermission('register:read'), async (c) => {
@@ -1003,7 +1003,7 @@ export const casesModule: AppModule = {
                      gdrive?"* — the same card offers the practice's Google
                      Drive, where Drive is connected and not otherwise. */}
             ${aiAvailable && writable
-              ? readingCard({ caseId: kase.id, csrf, filesKept: docsEnabled,
+              ? readingCard({ host: CASE_READING, id: kase.id, csrf, filesKept: docsEnabled,
                               sources: readingSources, driveOn: driveConfigured(c.env) })
               : ''}
 

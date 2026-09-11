@@ -252,7 +252,20 @@ export function personForClient(
  */
 export function planReading(input: {
   reading: IntakeResult;
-  kase: CaseFacts;
+  /**
+   * The matter, or **null when the reading is onto a client's file directly**.
+   *
+   * **Asked for on 12 September 2026:** *"Read a document into this matter
+   * section in cases must also be available for clients as well - as we have a
+   * lot of info to add to clients. probably more than we have for cases."*
+   *
+   * A client has no matter, so there are no matter boxes to offer. What there
+   * must not be is a silent loss: a document read onto a client's file can
+   * still mention an application number or a lodgement date, and those do not
+   * disappear because there is nowhere to put them — they go into the note,
+   * below, with the rest of what has no box.
+   */
+  kase: CaseFacts | null;
   client: ClientFacts;
   heldNationalities: string[];
   visaTerms: Term[];
@@ -310,10 +323,24 @@ export function planReading(input: {
     next_action: reading.next_action,
     summary: reading.summary,
   };
-  const casePlacements = CASE_FILLABLE
-    .map(({ column, label }) => place('case', column, label,
-      kase[column as keyof CaseFacts] as string | null, caseProposed[column]))
-    .filter((p): p is Placement => p !== null);
+  const casePlacements = kase
+    ? CASE_FILLABLE
+      .map(({ column, label }) => place('case', column, label,
+        kase[column as keyof CaseFacts] as string | null, caseProposed[column]))
+      .filter((p): p is Placement => p !== null)
+    : [];
+
+  // Read onto a client's file, with no matter in the picture. Everything above
+  // still has to be accounted for — see the note on `kase`. Reported rather
+  // than offered, because the box it would go in does not exist here.
+  if (!kase) {
+    for (const { column, label } of CASE_FILLABLE) {
+      const said = caseProposed[column];
+      if (empty(said)) continue;
+      unplaceable.push(`${label}: ${shown(column, said)}. That belongs on a matter, and this `
+        + 'was read onto the client\u2019s file, so it has been left here rather than written.');
+    }
+  }
 
   // --- the client's boxes ---------------------------------------------------
   // Only where the document is about this client. Where it is not, nothing is
@@ -474,6 +501,13 @@ export interface ReadingSource {
   at: string;
   /** Who gave it the document to read, by name. */
   by: string;
+  /**
+   * What it was read into, in the words the note uses: `this matter`, or
+   * `this client\u2019s file`. A file note is append-only, so it has to say
+   * plainly where it was written and why — a note on a client that claimed to
+   * have been read into a matter would be wrong for ever.
+   */
+  into?: string;
 }
 
 /**
@@ -507,11 +541,12 @@ export function readingNote(
 
   const lines: string[] = [];
   const from = source.sources.length ? source.sources.join(', ') : 'text pasted in';
-  lines.push(`Read into this matter from ${from} on ${dateShort(source.at)}, by ${source.by}.`);
+  lines.push(`Read into ${source.into ?? 'this matter'} from ${from} on `
+    + `${dateShort(source.at)}, by ${source.by}.`);
   lines.push('');
   lines.push('This note records what that material said. It is not the register asserting '
-    + 'anything: nothing in it has been checked, and wherever this matter or this client '
-    + 'already held a value, the value they held was kept.');
+    + 'anything: nothing in it has been checked, and wherever the record already held a '
+    + 'value, the value it held was kept.');
 
   if (clean(reading.file_note)) {
     lines.push('', 'What it said, in full', '', clean(reading.file_note));
