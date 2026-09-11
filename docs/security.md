@@ -246,13 +246,27 @@ practice must always keep one active owner — the last one cannot be demoted.
 
 Stated plainly, so nobody assumes otherwise:
 
-- **No encryption of the register at rest beyond passport numbers.** D1 is
-  encrypted at rest by Cloudflare, but anyone with account access can read
-  client rows. Field-level sealing covers passport numbers only.
+- **No encryption of the register at rest by the application.** D1 is encrypted
+  at rest by Cloudflare, but **anyone with account access can read client rows**,
+  and the application cannot see them do it — the audit log records what happens
+  through the application, and a console query is not that.
+
+  *Corrected 12 September 2026.* This used to say field-level sealing covered
+  passport numbers. It has not since migration 0042: passport numbers are stored
+  as written, by the practice's decision of 30 August 2026, and no column uses
+  the sealing code. They stay out of bulk exports, which is a different control.
+
+  **This is the paragraph that matters once a second practice is here.** The
+  vendor holds the Cloudflare account, and the vendor is a competing immigration
+  practice. See [`compliance-review.md`](compliance-review.md).
 - **No IP allow-listing or Cloudflare Access in front of the app.** Adding
   Zero Trust Access is a good idea for a practice with a fixed office.
-- **No automated backups.** See [operations.md](operations.md) — set up
-  `d1 export` on a schedule.
+- **The nightly backup is inside the same account it protects.** *Corrected
+  12 September 2026* — this used to say there were no automated backups, which
+  stopped being true that morning. There is one: nightly, verified by reading
+  the bytes back, kept 30 archives, **documents excluded**, and **absent
+  entirely on a practice with no R2 bucket**. It answers a lost database, not a
+  lost account. See [operations.md](operations.md).
 - **No malware scanning of uploads.** Files are stored and served back as
   downloads; they are not inspected.
 - **No client portal.** Every account here is a staff account. There is no

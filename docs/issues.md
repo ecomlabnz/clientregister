@@ -95,6 +95,39 @@ should rest on a captured failure rather than on reasoning.
 **What would close it:** a captured 403 with its `cf-ray`, looked up in
 Cloudflare's logs to see what refused it.
 
+### 1b. The sub-processor list nobody has written omits where the keys live
+
+**Found** 12 September 2026, in Fable's review of the draft policy suite.
+**Severity:** medium now, high the day a customer's lawyer reads it.
+
+Any customer-facing document has to list who else touches their data. The draft
+suite listed four. The register actually reaches: **Cloudflare**, **Anthropic**
+(and/or Cloudflare Workers AI running Meta's Llama), **Resend** and/or
+**Google** for mail, **Google Drive**, **Meta** for WhatsApp ingest,
+**Telegram**, **MBIE's NZBN service** — and **GitHub, which holds every
+practice's secrets**, including mail credentials and API keys.
+
+A sub-processor list that omits where the keys live is not a sub-processor list.
+
+**The fix:** write it from `scripts/collect-secrets.mjs` and `src/integrations/`
+rather than from memory, and keep it beside them so it goes stale visibly.
+
+### 1c. Documents go offshore and nothing records a client agreeing to it
+
+**Found** 12 September 2026, same review.
+**Severity:** medium, and it is a decision before it is a defect.
+
+With the AI switched on, the register sends **the document itself** to Anthropic
+in the United States. With Gmail configured, mail and Drive go through Google.
+
+There is **no consent mechanism** — no flag on a client, a matter or a document.
+Whether a document is sent is decided by a member of staff pressing a button.
+The draft client documents said "where you consent", which describes something
+that does not exist.
+
+**The fix is a decision first:** disclose it in the terms alone, or per practice,
+or per client. Only the third needs code.
+
 ### 2. The backup is inside the same account it protects
 
 **Found** 12 September 2026, while building it.
