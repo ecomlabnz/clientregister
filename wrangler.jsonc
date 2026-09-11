@@ -142,11 +142,12 @@
       "vars": {
         "APP_NAME": "Client Register",
         "APP_ENV": "trial",
-        // Filled in once the address is known — the first deploy prints the
-        // workers.dev URL. Empty rather than guessed: it is used to build links
-        // in the nightly automation output, and a wrong address there is worse
-        // than none.
-        "APP_ORIGIN": ""
+        // Printed by the first deploy, 12 September 2026. It builds links in
+        // the nightly automation output, so it is the trial's own address and
+        // never the practice's — a link in a trial's overnight summary that
+        // opened the practice's register would be the one mistake this whole
+        // arrangement exists to prevent.
+        "APP_ORIGIN": "https://clientregister-trial.ecomlabnz.workers.dev"
       },
 
       "triggers": {
