@@ -260,6 +260,7 @@ brief \| Brief
 other \| Other` | One per line, written as “key \| Label”. The headings files are grouped under on a client or matter page, in this order. Relabelling is free; removing a key leaves existing files showing the raw key under Other. Blank lines and lines starting with # are ignored. |
 | `vocab.flag_kinds` | text | `safety \| Safety
 character \| Character or conviction
+border \| Border alert
 health \| Health
 immigration \| Immigration history
 contact \| How to make contact

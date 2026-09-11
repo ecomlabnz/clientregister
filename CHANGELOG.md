@@ -7,6 +7,30 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.54.0 — 12 September 2026
+
+### Added
+**A date in a history can be just a month.** *"can we allow filling in only the
+Month and year if the date is not available?"*
+
+Write `2019-03` where you only know the month, or `2019-03-15` where you know
+the day. Both in the same box. A month shows as **Mar 2019**, so nobody later
+reads a day the register was never told.
+
+This is the ordinary case rather than the exception — a person remembers leaving
+a job in March 2019, the forms ask MM/YYYY, a reference letter says *"June 2015
+to August 2018"*. Until now the guidance was to use the 1st, which is the
+register writing down a day nobody said.
+
+**The gaps still read correctly.** A period that started in March began at the
+start of it; one that ended in March ran to the end. So leaving a job in March
+and starting the next in April is not a gap, and is not drawn as one.
+
+### Fixed
+**A wrong date no longer half-saves a history.** The save wrote one row at a
+time, so a mistake on the fourth row landed after three had already been
+written. Nothing is written now unless every row is right.
+
 ## 1.53.1 — 12 September 2026
 
 ### Fixed

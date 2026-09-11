@@ -35,7 +35,7 @@ import { html, raw, type Raw } from '../../ui/html';
 import {
   collapsibleCard, csrfField, emptyState, field, select, actionButton,
 } from '../../ui/components';
-import { dateShort } from '../../ui/format';
+import { historyDate } from '../../ui/format';
 import { countryOptions, countryName } from '../../core/countries';
 import { FormReader } from '../../core/validate';
 import { requirePermission } from '../../core/auth';
@@ -83,7 +83,21 @@ function cell(
     </select>`;
   }
   if (col.kind === 'date') {
-    return html`<input type="date" name="${name}" value="${value}" aria-label="${col.label}">`;
+    // A text box rather than `type="date"`, because a date picker cannot offer
+    // a month. **Asked for on 12 September 2026:** *"can we allow filling in
+    // only the Month and year if the date is not available?"* — and in a
+    // history that is the ordinary case, not the exception.
+    //
+    // `pattern` makes the browser refuse a wrong shape before the form is sent,
+    // and the same rule is in `readHistoryRow` and in the database (0091), so
+    // the three cannot disagree. These are typed off a document rather than
+    // picked out of a calendar, which is why losing the picker costs little
+    // here and would cost a great deal on a visa expiry.
+    return html`<input name="${name}" value="${value}" size="11" maxlength="10"
+                       inputmode="numeric" placeholder="YYYY-MM-DD"
+                       pattern="[0-9]{4}-[0-9]{2}(-[0-9]{2})?"
+                       title="A day or a month: 2019-03-15, or 2019-03"
+                       aria-label="${col.label}">`;
   }
   return html`<input name="${name}" value="${value}" maxlength="${String(col.max ?? 200)}"
                      size="${String(col.size ?? 16)}" aria-label="${col.label}">`;
@@ -96,7 +110,7 @@ function readOnlyRow(def: HistoryDef, row: HistoryRow, vocab: HistoryVocab): Raw
     .map((c) => {
       const value = row[c.name] as string;
       if (c.kind === 'country') return countryName(value);
-      if (c.kind === 'date') return dateShort(value);
+      if (c.kind === 'date') return historyDate(value);
       if (c.kind === 'vocab') return labelFor(vocab[c.vocab!], value);
       return value;
     });
@@ -183,9 +197,12 @@ export function historyPanel(opts: {
             : c.kind === 'country'
               ? select({ label: c.label, name: c.name, value: '',
                          options: countryOptions(), includeBlank: 'Not recorded' })
-              : field({ label: c.label, name: c.name,
-                        type: c.kind === 'date' ? 'date' : 'text',
-                        maxlength: c.max ?? 200 }))}
+              : c.kind === 'date'
+                ? field({ label: c.label, name: c.name, maxlength: 10,
+                          placeholder: 'YYYY-MM-DD',
+                          hint: 'Or just the month: 2019-03.' })
+                : field({ label: c.label, name: c.name, type: 'text',
+                          maxlength: c.max ?? 200 }))}
           ${field({ label: 'Note', name: 'notes', maxlength: HISTORY_NOTE_MAX })}
           <button class="btn btn-primary" type="submit">Add it</button>
         </form>
@@ -232,8 +249,15 @@ export function registerHistoryRoutes(r: Hono<AppContext>): void {
 
     const f = new FormReader(await c.req.formData());
     const values = readHistoryRow(def, f);
+    // A date in the wrong shape is refused rather than dropped. Without this
+    // the row saved with that box empty, which is a quieter kind of wrong: the
+    // period loses one of its ends and nothing says so.
+    if (!f.valid) {
+      return redirectWith(c, `/clients/${id}?open=history-${def.key}#history-${def.key}`,
+        Object.values(f.errors)[0]!, 'err');
+    }
     if (Object.values(values).every((v) => v === null)) {
-      return redirectWith(c, `/clients/${id}#history-${def.key}`,
+      return redirectWith(c, `/clients/${id}?open=history-${def.key}#history-${def.key}`,
         'Fill in something first.', 'err');
     }
 
@@ -269,8 +293,14 @@ export function registerHistoryRoutes(r: Hono<AppContext>): void {
     try {
       saved = await saveHistory(c.env, def, id, f);
     } catch (err) {
-      return redirectWith(c, `/clients/${id}#history-${def.key}`,
+      return redirectWith(c, `/clients/${id}?open=history-${def.key}#history-${def.key}`,
         (err as Error).message || 'That could not be saved.', 'err');
+    }
+    // Same as the add: a date in the wrong shape is refused rather than
+    // silently emptying one end of a period.
+    if (!f.valid) {
+      return redirectWith(c, `/clients/${id}?open=history-${def.key}#history-${def.key}`,
+        Object.values(f.errors)[0]!, 'err');
     }
 
     if (saved.removed > 0) {

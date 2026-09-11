@@ -450,3 +450,178 @@ describe('the three new lists are an administrator’s', () => {
       .toThrow(/a word, not a sentence/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// A date that may be a month
+// ---------------------------------------------------------------------------
+
+/**
+ * **Asked for on 12 September 2026:** *"in the histories - can we allow filling
+ * in only the Month and year if the date is not available?"*
+ *
+ * Yes, and it is the ordinary case: a person remembers leaving a job in March
+ * 2019, an application form asks MM/YYYY, a reference letter says "June 2015 to
+ * August 2018". Migration 0089 said to use the 1st, which is the register
+ * writing down a day nobody said.
+ *
+ * The interesting half is the arithmetic. A month is not a point, so which end
+ * of it is meant depends on what the date *is*: a period that started in March
+ * began at the start of March; one that ended in March ran to the end of it.
+ * Reading both as the 1st would invent a month-long gap after every period that
+ * ends in a month — which is exactly the noise the practice has asked twice not
+ * to have.
+ */
+describe('a history date may be a day or a month', () => {
+  it('saves a month against a row', async () => {
+    const h = mount();
+    const res = await h.post('/clients/cl1/history/employment/add', {
+      kind: 'employed', employer: 'Lagos Meat Company',
+      started_on: '2018-02', ended_on: '2024-01',
+    });
+    expect(res.status).toBe(303);
+    const row = rowsOf(h, 'client_employment')[0]!;
+    expect(row.started_on).toBe('2018-02');
+    expect(row.ended_on).toBe('2024-01');
+  });
+
+  it('still saves a whole date', async () => {
+    const h = mount();
+    await h.post('/clients/cl1/history/employment/add', {
+      kind: 'employed', employer: 'Kaitiaki Foods', started_on: '2024-06-10',
+    });
+    expect(rowsOf(h, 'client_employment')[0]!.started_on).toBe('2024-06-10');
+  });
+
+  it('shows a month as a month, not as the first of it', async () => {
+    const h = mount();
+    await h.post('/clients/cl1/history/employment/add', {
+      kind: 'employed', employer: 'Lagos Meat Company', started_on: '2018-02',
+    });
+    const body = await (await h.request('/clients/cl1?open=history-employment')).text();
+    expect(body).toContain('2018-02');
+    expect(body).not.toContain('01 Feb 2018');
+  });
+
+  it('refuses anything that is neither', async () => {
+    const h = mount();
+    const res = await h.post('/clients/cl1/history/employment/add', {
+      kind: 'employed', employer: 'Somewhere', started_on: 'March 2018',
+    });
+    expect(res.status).not.toBe(500);
+    expect(rowsOf(h, 'client_employment')).toEqual([]);
+  });
+
+  it('and the database refuses it too, whatever the route', () => {
+    // The rule is the database's; the form check is so the message names the
+    // box. A bulk load or a reading of a document is the other way in.
+    const h = mount();
+    expect(() => h.db.prepare(
+      `INSERT INTO client_employment (id, client_id, started_on, created_at, updated_at)
+       VALUES ('e9','cl1','2019-3-1',?,?)`).run(AT, AT))
+      .toThrow(/a day or a month/);
+    expect(() => h.db.prepare(
+      `INSERT INTO client_travel (id, client_id, ended_on, created_at, updated_at)
+       VALUES ('t9','cl1','not a date',?,?)`).run(AT, AT))
+      .toThrow(/a day or a month/);
+  });
+
+  it('still refuses a period that ends before it starts, across the two shapes', () => {
+    // 0089's rule is a text comparison of two ISO strings, which is why it goes
+    // on working: '2018-01' < '2019-03-15'.
+    const h = mount();
+    expect(() => h.db.prepare(
+      `INSERT INTO client_employment (id, client_id, started_on, ended_on, created_at, updated_at)
+       VALUES ('e8','cl1','2019-03-15','2018-01',?,?)`).run(AT, AT))
+      .toThrow(/cannot end before it starts/);
+  });
+});
+
+describe('the gap between two months', () => {
+  it('reads a month end as its last day and a month start as its first', async () => {
+    const { historyDateAt } = await import('../src/core/histories');
+    expect(historyDateAt('2019-03', false)).toBe(Date.UTC(2019, 2, 1));
+    expect(historyDateAt('2019-03', true)).toBe(Date.UTC(2019, 2, 31));
+    // February, and a leap year, without knowing about either.
+    expect(historyDateAt('2019-02', true)).toBe(Date.UTC(2019, 1, 28));
+    expect(historyDateAt('2020-02', true)).toBe(Date.UTC(2020, 1, 29));
+  });
+
+  it('leaves a whole date alone', async () => {
+    const { historyDateAt } = await import('../src/core/histories');
+    expect(historyDateAt('2019-03-15', true)).toBe(Date.UTC(2019, 2, 15));
+    expect(historyDateAt('2019-03-15', false)).toBe(Date.UTC(2019, 2, 15));
+  });
+
+  it('does not invent a gap between two months that meet', async () => {
+    // Left in March, started in April. Reading both as the 1st would have made
+    // that a 31-day gap and drawn a line.
+    const { gapsIn } = await import('../src/core/histories');
+    const rows = [
+      { id: 'a', position: 1, notes: null, started_on: '2018-01', ended_on: '2019-03' },
+      { id: 'b', position: 2, notes: null, started_on: '2019-04', ended_on: null },
+    ] as never;
+    expect(gapsIn(rows).size).toBe(0);
+  });
+
+  it('still finds a real one', async () => {
+    const { gapsIn } = await import('../src/core/histories');
+    const rows = [
+      { id: 'a', position: 1, notes: null, started_on: '2018-01', ended_on: '2019-03' },
+      { id: 'b', position: 2, notes: null, started_on: '2019-09', ended_on: null },
+    ] as never;
+    const gaps = gapsIn(rows);
+    expect(gaps.size).toBe(1);
+    expect(gaps.get(1)).toBeGreaterThan(140);
+  });
+
+  it('handles one of each shape', async () => {
+    const { gapsIn } = await import('../src/core/histories');
+    const rows = [
+      { id: 'a', position: 1, notes: null, started_on: '2018-01-05', ended_on: '2019-03-31' },
+      { id: 'b', position: 2, notes: null, started_on: '2019-04', ended_on: null },
+    ] as never;
+    expect(gapsIn(rows).size).toBe(0);
+  });
+});
+
+describe('a bad date does not half-save a table', () => {
+  it('writes nothing when one row of several is wrong', async () => {
+    // The save is a row at a time, so a bad date on the fourth row would have
+    // been found after three were written — a half-saved table, with no way for
+    // the reader to tell which half.
+    const h = mount();
+    await h.post('/clients/cl1/history/employment/add',
+      { kind: 'employed', employer: 'First', started_on: '2018-01' });
+    await h.post('/clients/cl1/history/employment/add',
+      { kind: 'employed', employer: 'Second', started_on: '2019-01' });
+    const [a, b] = rowsOf(h, 'client_employment');
+
+    const res = await h.post('/clients/cl1/history/employment', {
+      [`kind_${a!.id}`]: 'employed', [`employer_${a!.id}`]: 'Changed first',
+      [`started_on_${a!.id}`]: '2018-01',
+      [`kind_${b!.id}`]: 'employed', [`employer_${b!.id}`]: 'Changed second',
+      [`started_on_${b!.id}`]: 'nonsense',
+    });
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toContain('err=');
+
+    const after = rowsOf(h, 'client_employment');
+    expect(after[0]!.employer, 'the good row must not have been written either').toBe('First');
+    expect(after[1]!.employer).toBe('Second');
+  });
+
+  it('saves both when both are right', async () => {
+    const h = mount();
+    await h.post('/clients/cl1/history/employment/add',
+      { kind: 'employed', employer: 'First', started_on: '2018-01' });
+    const [a] = rowsOf(h, 'client_employment');
+    const res = await h.post('/clients/cl1/history/employment', {
+      [`kind_${a!.id}`]: 'employed', [`employer_${a!.id}`]: 'Changed first',
+      [`started_on_${a!.id}`]: '2018-01-15',
+    });
+    expect(res.status).toBe(303);
+    const after = rowsOf(h, 'client_employment')[0]!;
+    expect(after.employer).toBe('Changed first');
+    expect(after.started_on).toBe('2018-01-15');
+  });
+});

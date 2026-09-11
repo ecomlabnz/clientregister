@@ -16,6 +16,25 @@ export function dateShort(value: string | null | undefined): string {
   }).format(d);
 }
 
+/**
+ * A date that may be a month: `2019-03-15` or `2019-03`.
+ *
+ * Used by the histories, where the day is often genuinely not known — see
+ * `core/histories.ts`. A month renders as "Mar 2019" rather than as a day
+ * somebody would then read as recorded.
+ */
+export function historyDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  if (value.length === 7) {
+    const d = new Date(`${value}-01T00:00:00Z`);
+    if (Number.isNaN(d.getTime())) return '—';
+    return new Intl.DateTimeFormat('en-NZ', {
+      month: 'short', year: 'numeric', timeZone: TZ,
+    }).format(d);
+  }
+  return dateShort(value);
+}
+
 export function dateTime(value: string | null | undefined): string {
   if (!value) return '—';
   const d = new Date(value);
