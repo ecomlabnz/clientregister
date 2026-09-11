@@ -123,6 +123,7 @@ because the fault was always intermittent.
 | --- | --- | --- | --- |
 | Run 240, 1.59.0, 12 Sep | 20 over 2 min | none | Straight through the practice's deploy and the trial's. Every answer from one Cloudflare edge (`-DFW`). |
 | Run 241, 1.60.1, 12 Sep | 20 over 2 min | none | Again through both deploys. Answers came from **four** edges this time — `EWR`, `IAD`, `CDG`, and others. |
+| Run 242, 1.62.0, 12 Sep | 20 over 2 min | none | Again through both deploys. Edges `EWR` and `IAD`. |
 
 **A correction to the line written after the first reading.** That note said the
 runner reaches "whichever Cloudflare edge is nearest it", singular, on the
