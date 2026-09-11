@@ -261,7 +261,7 @@ database before anything real was touched.
 
 ## Findings from the route × role sweep (2026-09-12)
 
-### 10. Any signed-in person could mint an upload token — FIXED (1.57.1)
+### 10. Any signed-in person could mint an upload token — FIXED (1.60.1)
 
 `POST /account/upload-tokens` and `GET /account/shortcut` sat behind
 `requireAuth` and nothing else, because they live among the account pages —
@@ -293,7 +293,7 @@ the honest way: an ungated route was added to a module and the test named it;
 the permission check inside `requirePermission` was short-circuited and the
 per-role request sweep went red on `POST /admin/backup → 200`.
 
-### 11. Every route now has to say which permission it needs — FIXED (1.57.1)
+### 11. Every route now has to say which permission it needs — FIXED (1.60.1)
 
 Not a fault so much as the absence of the check that would have caught number
 10. The register mounts 233 routes across 5 roles, and three tests in the whole
@@ -315,11 +315,15 @@ second grep over the source — and asserts:
 - the role → permission table is pinned in the test, so changing who can see a
   client file takes a deliberate edit in two places;
 - and then, per role, a real signed-in request through the real middleware for
-  each of the 285 route/role combinations that should be refused — each of
-  which must come back 403 *and* the permission page, so a 403 from the
-  cross-site check cannot read as a pass;
-- plus 213 requests with no session at all, each of which must be sent to sign
-  in.
+  **every** route/role combination that should be refused — each of which must
+  come back 403 *and* the permission page, so a 403 from the cross-site check
+  cannot read as a pass;
+- plus one request with no session at all for every route outside the public
+  list, each of which must be sent to sign in.
+
+No count is quoted here on purpose. The numbers move every time a route is
+added, nothing in the code owns them, and a number written into prose is a fact
+with no owner — it was already wrong within an hour of being written.
 
 `requirePermission` now attaches its permission to the middleware it returns
 (`PermissionGate` in `src/core/auth.ts`). Without that, a gate and an ungated

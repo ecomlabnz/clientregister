@@ -179,18 +179,28 @@ up (`docs/operations.md`), and there is a button for it. What is still missing
 is that the register does not **tell** anybody: no alert, no line in the nightly
 summary, nothing on the dashboard. A backup that stops is meant to be noisy.
 
-### 4. Every page is not checked against every role
+### 4. Every page is not checked against every role — CLOSED 12 September 2026
 
 **Found** 11 September 2026, in the security review.
-**Severity:** high — this is the most likely way a real leak happens.
+**Severity was:** high — this is the most likely way a real leak happens.
 
-233 routes, 5 roles, and `test/security_access.test.ts` holds **3 tests**. The
+233 routes, 5 roles, and `test/security_access.test.ts` held **3 tests**. The
 failure it would catch is not an attack: it is a route added without its
 permission check, which looks like working software.
 
-**The fix:** generate the matrix from the route table and assert an expected
-allow or deny for every cell, so a new route with no decision fails the build.
-Sized at half a day. Not started.
+**Closed by `test/routeroles.test.ts`** (1.60.1). It reads the routes out of the
+built application rather than grepping the source, insists every one names the
+permission it needs or appears on a written allow-list with a reason, and then
+signs in as each role and proves that every combination which should be refused
+is. An ungated route now fails the build.
+
+**What it found on its first run** is issue 10 below — a real hole, now fixed.
+
+**What it does not prove**, said plainly because the guarantee is easy to
+overstate: it proves the *refusals*. Which routes a role **may** reach is
+derived from the declared gates rather than exercised, because running 233
+handlers means sending mail and writing backups. And a gate that is correct can
+still hand out a capability through the page behind it — see issue 13.
 
 ### 5. Nothing scans the code itself
 
@@ -277,6 +287,101 @@ is being written anyway, not on its own.
 
 ---
 
+### 10. A Read only user could mint an upload token, and keep it — FIXED 12 September 2026
+
+**Found** 12 September 2026, by `test/routeroles.test.ts` on its first run.
+**Severity was:** high — a write into the practice's register by a role defined
+as changing nothing.
+
+An upload token is the credential an Apple shortcut carries when it sends a file
+in. `POST /account/upload-tokens` and `GET /account/shortcut` sat behind
+`requireAuth` and nothing else, because they live among the account pages —
+password, theme, devices — where a role has nothing to say. But a token is not
+about your account: it writes into the practice's inbox. So a `readonly` user
+could mint one and then write to the register from a device carrying no session.
+
+**Fixed in two places, and the second is the one that mattered.** Minting now
+requires `ingest:triage`. That alone was **not enough**, and the review of the
+fix is what caught it: `verifyUploadToken` read the holder's `status` and never
+their `role`, so a token already on a laptop kept working after a demotion — and
+because revoking is scoped to the token's own owner, **the practice had no way
+to take it back** short of suspending the whole account. The role is now checked
+where the credential is *used*, so a demotion stops the token at the next
+request with nothing to revoke and nobody to remember.
+
+**The rule that came out of it:** gating the route that *creates* a credential
+does not gate the credential. A bearer token outlives the decision that allowed
+it, so the check belongs where it is spent.
+
+**Revoking stays open to everyone, on purpose.** Taking authority away must
+never be the thing somebody is locked out of, and the statement is scoped to the
+token's owner, so it can only ever destroy your own.
+
+### 11. A dead `GET /search` the dashboard registers and cannot answer
+
+**Found** 12 September 2026, by the route matrix.
+**Severity:** none today — dead code, not an exposure.
+
+`src/modules/dashboard/index.ts` and `src/modules/search/index.ts` both register
+`GET /search`. Search is mounted first and answers; the dashboard's copy can
+never run. Both demand `register:read`, so nothing is reachable that should not
+be.
+
+**What would close it:** delete the dashboard's copy. Left alone deliberately —
+it belongs in a change about the dashboard, not inside a release about
+permissions.
+
+### 12. The route matrix stepped over wildcard routes — FIXED 12 September 2026
+
+**Found** 12 September 2026, in review of the matrix itself.
+**Severity was:** medium — a hole in the one test that exists to find holes.
+
+The enumeration filtered out anything registered with `.all()` or on a wildcard
+path. Proved by adding `r.get('/leak/*', …)` and `r.all('/leak2', …)` to a
+module: the matrix still passed, and both answered a signed-in `readonly` user
+with 200.
+
+**Fixed:** the set-aside registrations are now asserted by name rather than
+dropped. Today they are four top-level middlewares and nothing else; anything
+else appearing there fails the build. Re-proved with the same two routes — the
+test now names them.
+
+### 13. A read-only user can form a contract with a link they are allowed to see
+
+**Found** 12 September 2026, in review of the route matrix — by looking past the
+gates at what the pages behind them hand out.
+**Severity: high, and OPEN. Nothing has been changed.**
+
+Every individual gate here is correct, which is exactly why the matrix cannot
+see it:
+
+- `GET /quotes/:id` requires `register:read`, which `readonly` and `assistant`
+  both hold, and the page prints the client's acceptance link in full.
+- `POST /q/:token/accept` is public, and rightly — the client has no account.
+  **The token is the whole authority.**
+
+So somebody whose role is "changes nothing" can read the link off a page they
+are entitled to read, and use it to accept a quotation in the client's name.
+Demonstrated: `accepted_at` set, `status` `accepted`, a name of the tester's
+choosing recorded, letters queued to both the client and the practice. The
+interface says an acceptance cannot be undone.
+
+This is not a broken gate. It is a **capability shown through a correct gate**,
+and it is the failure mode a route/role matrix is structurally blind to.
+
+**What would close it:** stop printing the raw acceptance link to roles without
+`quote:write` — show that a link exists and when it was sent, and put the link
+itself behind the permission that may send one. The same shape exists for
+knowledge-base share links (`GET /knowledge/:id` prints a `/d/:token` for an
+already-shared article), which is confidentiality rather than contract, and is
+the same fix.
+
+**Not fixed today, deliberately.** It is a change to what a page shows to whom,
+nobody has asked for it, and the standing rule is that a change nobody asked for
+goes to the practice before it is built. It is in front of them now.
+
+---
+
 ## Asked for, not yet built
 
 Not faults — work the practice has asked for that has not landed.
@@ -284,7 +389,7 @@ Not faults — work the practice has asked for that has not landed.
 | | Asked | Status |
 |---|---|---|
 | A seeded caseload for the trial: 20 matters, 5 simple, 10 complicated, 5 unusual, people from different countries | 12 Sep | **done**, 1.58.0 |
-| A preview button for the quotation and the letter of engagement in settings | 12 Sep | not started |
+| A preview button for the quotation and the letter of engagement in settings | 12 Sep | **done**, 1.60.0 |
 | Email and the AI switched on for the trial | — | off by choice; say the word |
 
 ---

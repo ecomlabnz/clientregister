@@ -58,10 +58,11 @@
  * itself is never logged, never audited and never put in an error message.
  */
 
-import type { Env } from '../types';
+import type { Env, Role } from '../types';
 import { all, nowIso, one, run } from './db';
 import { newId, randomToken } from './ids';
 import { hashPassword, PASSWORD_HASH_PARAMS, verifyPassword } from './crypto';
+import { can, isRole } from './rbac';
 
 /**
  * `ru_` for "register upload". A prefix on a credential is worth having: it
@@ -219,10 +220,12 @@ export async function verifyUploadToken(env: Env, presented: string): Promise<Up
     ? await one<{
         id: string; user_id: string; secret_hash: string; label: string; revoked_at: string | null;
         user_name: string | null; user_email: string | null; user_status: string | null;
+        user_role: string | null;
       }>(
         env.DB,
         `SELECT t.id, t.user_id, t.secret_hash, t.label, t.revoked_at,
-                u.name AS user_name, u.email AS user_email, u.status AS user_status
+                u.name AS user_name, u.email AS user_email, u.status AS user_status,
+                u.role AS user_role
            FROM upload_tokens t JOIN users u ON u.id = t.user_id
           WHERE t.selector = ?`,
         parts.selector)
@@ -235,6 +238,26 @@ export async function verifyUploadToken(env: Env, presented: string): Promise<Up
   if (!parts || !row || !matches) return { ok: false };
   if (row.revoked_at) return { ok: false };
   if (row.user_status !== 'active') return { ok: false };
+
+  /*
+   * The holder must *still* be somebody who may work the inbox.
+   *
+   * Minting one needs `ingest:triage`, but a token already in a pocket outlives
+   * the decision that allowed it. Without this line, moving somebody to "Read
+   * only" leaves a working write credential on their laptop, and the practice
+   * has no way to take it back: revoking is scoped to the token's own owner, so
+   * nobody else can reach it, and the only lever left is suspending the whole
+   * account.
+   *
+   * So the role is checked where the credential is *used*, not only where it is
+   * made. A demotion stops the token at the next request, with nothing to
+   * revoke and nobody to remember to do it — which is the difference between a
+   * rule and an intention. Found in review, 12 September 2026.
+   */
+  const role: string = row.user_role ?? '';
+  if (!isRole(role) || !can({ role: role as Role, status: 'active' }, 'ingest:triage')) {
+    return { ok: false };
+  }
 
   return {
     ok: true,

@@ -787,6 +787,46 @@ whatever the practice is using while the work is going on.
 
 ---
 
+### 43. Gating the route that makes a credential does not gate the credential
+
+**What happened.** `POST /account/upload-tokens` — the button that mints the
+bearer token an Apple shortcut carries — sat behind `requireAuth` and nothing
+else, because it lives among the account pages, where a role has nothing to say
+about your own password or your own theme. So a `readonly` user, whose entire
+definition is that they change nothing, could mint one and then write files into
+the practice's inbox from a device carrying no session. Found by the route/role
+matrix on its first run, after being live for a day.
+
+The first fix put `ingest:triage` on the two routes. It read as complete, and it
+was not. `verifyUploadToken` checked the holder's `status` and never their
+`role`, so a token already on somebody's laptop kept working after they were
+moved to Read only — and because revoking is scoped to the token's own owner,
+**nobody in the practice could take it back** short of suspending the whole
+account. The release note that shipped with the first fix said "Nobody has to do
+anything", which was exactly wrong in the one case that mattered.
+
+That second half was found by having the fix reviewed by somebody who had not
+written it, with the instruction to attack it rather than read it.
+
+**The rule.** **A bearer credential outlives the decision that allowed it, so
+the permission is checked where it is spent, not only where it is issued.** A
+gate on the minting route governs one moment; the token then lives on a laptop
+for months, through demotions and role changes nobody re-runs it against. The
+check belongs in the verifier, where every use passes through it.
+
+The corollary, and the reason this is not only about tokens: **when you gate a
+route that creates something, ask what the something can still do after the
+gate stops applying to its holder.**
+
+**The third thing, which is about reviewing rather than about tokens.** Both
+halves of this were found by tests and reviews aimed *at work that had just been
+declared finished* — the matrix found the original hole, and the review of the
+matrix's own fix found that the fix was half a fix. A change that closes a
+security hole is exactly the change most likely to be read charitably, by
+whoever wrote it, an hour after writing it.
+
+---
+
 ---
 
 ## Working practices that caught things
