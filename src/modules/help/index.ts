@@ -94,6 +94,15 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.52.1', date: '12 September 2026',
+    notes: [
+      'Saving a client no longer loses what you typed. A visa expiry before the visa start date '
+        + 'now says so against the box, instead of showing an error page.',
+      'Any other rule the register enforces comes back the same way \u2014 a plain sentence on the '
+        + 'form, with your typing still there.',
+    ],
+  },
+  {
     version: '1.52.0', date: '12 September 2026',
     notes: [
       'Help is in tabs, and each section is a heading you open. It was one page of about '

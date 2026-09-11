@@ -7,6 +7,30 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.52.1 — 12 September 2026
+
+### Fixed
+**Saving a client no longer loses what you typed.** Reported the same day,
+filling in a client's details: *"this is what appeared when i pressed save -
+annoying."*
+
+The database refused the save, and it was right to: the visa expiry on file was
+before the visa start date being typed, and a visa cannot expire before it was
+granted. What was wrong was everything after — an error page, a reference
+number, and a form's worth of typing gone.
+
+Now the two dates are checked before the save. You get **A visa cannot expire
+before it was granted** against the expiry box, with everything else you typed
+still in front of you, and the one date to change beside the message.
+
+**And a net under the whole form.** Any other rule the database enforces now
+comes back as a plain sentence on the form rather than an error page. The rules
+still live in the database, which is the point of them — this is so that the
+next rule added there costs somebody a sentence rather than an afternoon.
+
+A real fault is still a real fault: it still gets the error page and the
+reference number, because that is what a reference number is for.
+
 ## 1.52.0 — 12 September 2026
 
 ### Changed

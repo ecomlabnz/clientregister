@@ -577,6 +577,36 @@ function clientForm(
  * CCCD, an Indian Aadhaar or a typing slip depending entirely on who issued
  * them. A country with no number says even less.
  */
+/**
+ * A refusal the database made, in words a person can act on.
+ *
+ * **Reported 12 September 2026**, saving a client with the two visa dates the
+ * wrong way round: *"this is what appeared when i pressed save - annoying."*
+ * The database was right to refuse it. What was wrong was everything after:
+ * the refusal came back as *Something went wrong*, a reference number, and a
+ * lost form.
+ *
+ * Every rule the form can break is checked before the write as well, so this is
+ * the net rather than the floor. It exists because the rules live in the
+ * database — which is the point of them — and the database grows rules that a
+ * form written a year earlier does not know about. The one that gets added
+ * without a matching check here should cost somebody a sentence, not an
+ * afternoon's typing.
+ *
+ * D1 wraps a trigger's words as `D1_ERROR: <message>: SQLITE_CONSTRAINT ...`,
+ * so the message is cut back out of it. Anything that is not a constraint is
+ * rethrown: a refusal is a thing to say, and a fault is a thing to log.
+ */
+export function refusalMessage(err: unknown): string | null {
+  const raw = err instanceof Error ? err.message : String(err);
+  if (!/SQLITE_CONSTRAINT/.test(raw)) return null;
+  const said = /^D1_ERROR:\s*(.+?):\s*SQLITE_CONSTRAINT/.exec(raw)?.[1]?.trim();
+  if (!said) return 'The register would not accept that. Check the dates and try again.';
+  // The database writes its refusals in lower case, mid-sentence. On a screen
+  // it is the whole sentence.
+  return `${said.charAt(0).toUpperCase()}${said.slice(1)}.`;
+}
+
 function nationalIdentity(f: FormReader): {
   national_id_number: string | null; national_id_country: string | null;
 } {
@@ -645,6 +675,23 @@ function readClientForm(f: FormReader, vocab: ClientVocabularies) {
     f.errors['nzbn'] = 'An NZBN is 13 digits, starting 9429.';
   }
 
+  // The two visa dates, in the order they have to be in.
+  //
+  // **Reported 12 September 2026**, filling in a client's details: *"this is
+  // what appeared when i pressed save - annoying."* The database refused it, as
+  // it has since migration 0081 and should, but the refusal reached the person
+  // as *Something went wrong* and took everything they had typed with it.
+  //
+  // The rule stays in the database, where a rule belongs. This is here so it is
+  // said against the right box, before the write, with the rest of the form
+  // still in front of them — exactly as the INZ client number above and the
+  // national identity number below already are.
+  const visaStart = f.date('current_visa_start');
+  const visaExpiry = f.date('current_visa_expiry');
+  if (visaStart && visaExpiry && visaExpiry < visaStart) {
+    f.errors['current_visa_expiry'] = 'A visa cannot expire before it was granted.';
+  }
+
   return {
     kind,
     given_names: givenNames,
@@ -680,8 +727,8 @@ function readClientForm(f: FormReader, vocab: ClientVocabularies) {
     english_test_score: f.optional('english_test_score', { max: 40 }),
     english_test_date: f.date('english_test_date'),
     current_visa_type: f.optional('current_visa_type', { max: 120 }),
-    current_visa_start: f.date('current_visa_start'),
-    current_visa_expiry: f.date('current_visa_expiry'),
+    current_visa_start: visaStart,
+    current_visa_expiry: visaExpiry,
     current_visa_expiry_rule: f.optional('current_visa_expiry_rule', { max: 200 }),
     current_visa_conditions: f.optional('current_visa_conditions', { max: 2000 }),
     current_visa_stay_limit: f.optional('current_visa_stay_limit', { max: 300 }),
@@ -1290,6 +1337,10 @@ export const clientsModule: AppModule = {
       // primary row in client_passports, filled in below by the same code that
       // maintains them everywhere else — so there is one place that can get it
       // wrong rather than three.
+      //
+      // Wrapped for the same reason the edit is: a refusal from the database
+      // belongs on the form, not on an error page. See `refusalMessage`.
+      try {
       await run(
         c.env.DB,
         `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name, preferred_name,
@@ -1317,6 +1368,15 @@ export const clientsModule: AppModule = {
         v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), nowIso(), user.id,
       );
+      } catch (err) {
+        const said = refusalMessage(err);
+        if (!said) throw err;
+        const [users, organisations] = await Promise.all([
+          userOptions(c.env), organisationOptions(c.env)]);
+        return page(c, { title: 'New client', active: '/clients', status: 400 }, html`
+          ${pageHeader('New client')}${clientForm(c, v as ClientFormValues, users, organisations,
+            vocab, { ...f.errors, _form: said })}`);
+      }
       // Written straight after the row rather than in the same batch, because
       // the row has to exist for the foreign key to hold. Failing here leaves a
       // client with no nationality, which is the state every client without one
@@ -2461,6 +2521,9 @@ export const clientsModule: AppModule = {
         return redirectWith(c, `/clients/${id}/edit`,
           'Either enter a new passport number or tick to remove the one on file — not both.', 'err');
       }
+      // The database has the last word, and its refusal is shown on the form
+      // rather than as a 500. See `refusalMessage`.
+      try {
       await run(
         c.env.DB,
         `UPDATE clients SET kind=?, full_name=?, given_names=?, family_name=?, preferred_name=?,
@@ -2488,6 +2551,16 @@ export const clientsModule: AppModule = {
         nowIso(), id,
       );
       await c.env.DB.batch(setNationalityStatements(c.env, id, v.nationalities));
+      } catch (err) {
+        const said = refusalMessage(err);
+        if (!said) throw err;
+        const [users, organisations] = await Promise.all([
+          userOptions(c.env), organisationOptions(c.env)]);
+        return page(c, { title: 'Edit client', active: '/clients', status: 400 }, html`
+          ${pageHeader(`Edit ${existing.full_name}`)}
+          ${clientForm(c, { ...existing, ...v } as ClientFormValues, users, organisations, vocab,
+            { ...f.errors, _form: said })}`);
+      }
 
       // A matter is named after the person it is for, so correcting a spelling
       // here has to reach the matters as well. Without this the old spelling
