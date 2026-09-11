@@ -15,7 +15,7 @@ register.
 | Tests | **2,618** in 158 files, up from 2,541 |
 | Registers running | **2** — the practice's, and a trial |
 | Faults found and fixed | **4**, one of them affecting the live register |
-| Still open at the end of the day | the demonstration-data workflow, and the seeded caseload |
+| Still open at the end of the day | who may see a client acceptance link |
 
 ---
 
@@ -262,6 +262,23 @@ Written up as issue 13 in `docs/issues.md`, now closed.
 
 ---
 
+## 10. The one-click button that could fill your live register — removed
+
+There was a **Demonstration data** button in the project's Actions list, built
+in August when your register was still empty. Pressing *load* wrote twenty
+invented clients straight into your live register. It had no confirmation step,
+and anyone with access to the project could press it.
+
+You said: *"yes, remove it, no need for the test data to be loaded into the
+live register."* So it is gone — the button, the script behind it and the test
+that kept the script working.
+
+**Nothing changes in the register itself.** The Test data page (Admin → Test
+data) is still there and still does this job properly: it marks every row as
+test data, shows you the list before it deletes anything, and only an
+administrator can open it. That page is why the old button was no longer worth
+its risk.
+
 ---
 
 ## Four things I got wrong, and what changed because of them
@@ -311,3 +328,12 @@ Both of the things that were waiting on you were answered on 12 September and
 are done: the acceptance link (section 9) and the demonstration-data workflow,
 which you asked to be removed — *"no need for the test data to be loaded into
 the live register."*
+
+One thing I have not done, and it is on me: **the trial register is still
+empty.** The twenty matters exist in the code and shipped, but putting them into
+a register is a press of the Seed button on Settings → Test data, inside that
+register — deliberately, because loading invented clients into a database is
+not something a deploy should do on its own. That is the same reason the old
+workflow was deleted today. I cannot press it; I have no account on the trial.
+It takes about ten seconds and it is the last step before the trial is ready to
+show anybody.

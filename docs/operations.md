@@ -292,23 +292,30 @@ On the Paid plan, raise the password work factor to the OWASP figure by setting
 `PBKDF2_ROUNDS` to `6` in `src/core/crypto.ts` and deploying. Existing users are
 re-hashed transparently the next time they sign in.
 
-## Demonstration data
+## A caseload to practise on
 
-The register can be loaded with a fabricated caseload — 20 clients and 15 cases
-covering families, employers and deadline-driven matters — to see how it
-behaves with something in it.
+The register can be loaded with a fabricated caseload — twelve clients, their
+matters, quotations and invoices — so somebody learning it has something to
+look at.
 
-Run the **Demonstration data** workflow from the Actions tab and choose `load`
-or `remove`. Dates are generated relative to the day it runs, so the deadlines
-and expiries are always meaningful.
+**Admin → Test data** lays it down and takes it away again, from inside the
+register. Every row is written already marked as test data, the page lists what
+it would delete before deleting it, and only an administrator can reach it. The
+files carry the awkward shapes on purpose — a decline and its reconsideration, a
+section 61, an expired certificate beside a current one, an invoice part paid —
+because a caseload of clean grants teaches nobody anything.
 
-It is marked three ways, because it sits in the same tables as real client
-files: every identifier begins `demo_`, every client note starts `[TEST DATA]`,
-and every case carries a red **Test data** tag. Admin also offers one-click
-removal, constrained to that prefix so it cannot reach a real record.
+There used to be a **Demonstration data** workflow in the Actions tab that
+wrote invented clients straight into the practice's live register with one
+click, using the same credentials as a deploy. It was **deleted on 12 September
+2026** — the practice decided it was no longer needed now the Test data page
+does the same job from inside the register. Nothing replaces it in the pipeline:
+test data is laid down by a person signed in as an administrator, not by CI.
 
-`scripts/seed-demo.mjs` prints SQL to stdout and touches no database itself, so
-the output can be read before it is applied.
+A register that was seeded by that old workflow may still hold rows whose
+identifier begins `demo_`. Admin → Maintenance offers one-click removal of
+those, constrained to that prefix so it cannot reach a real record, and the
+card only appears when there are any.
 
 ## Backups
 
