@@ -2602,20 +2602,46 @@ body.site { background: var(--bg); }
 /* Above everything on the record, and only there when there is something to
    say. No severity scale and no icons: one band, loud, and absent otherwise —
    a warning that appears on every file teaches people to look past it.
-   Amber rather than red, because red on this page means a deadline missed and
-   two urgent colours compete instead of ranking. */
+
+   **Made louder on 12 September 2026:** *"the background colour of the warning
+   is not appropriate - it needs to be reddish - bright reddish at least on the
+   edges fading out as it goes into the box - bright - so the eye catches it."*
+
+   A flat amber wash on a pink page was the same weight as a card heading. So:
+   a thick red edge, and the red bled inwards as a gradient that fades to the
+   amber ground rather than staying a stripe. The eye is caught by the edge; the
+   words are still read on a pale background.
+
+   The amber ground stays under the red. Red alone on this page means a deadline
+   missed, and a warning is a different thing from a date — the gradient ranks
+   them instead of making them compete. `--red-bg` is the fade target on both
+   sides so the band reads as one object rather than two edges.
+
+   `color-mix` keeps it theme-independent: the red is whatever the running theme
+   calls red, softened by a fixed amount, so this works on all seven themes and
+   in dark mode without a second set of values. */
 .flags {
   display: flex; flex-direction: column; gap: 8px;
-  margin: 0 0 16px; padding: 12px 14px;
-  background: var(--amber-bg); border: 1px solid var(--amber);
-  border-left: 4px solid var(--amber); border-radius: 6px;
+  margin: 0 0 16px; padding: 12px 16px;
+  background:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--red) 38%, var(--amber-bg)) 0%,
+      color-mix(in srgb, var(--red) 10%, var(--amber-bg)) 14%,
+      var(--amber-bg) 38%,
+      var(--amber-bg) 62%,
+      color-mix(in srgb, var(--red) 10%, var(--amber-bg)) 86%,
+      color-mix(in srgb, var(--red) 38%, var(--amber-bg)) 100%);
+  border: 1px solid var(--red);
+  border-left: 6px solid var(--red); border-right: 6px solid var(--red);
+  border-radius: 6px;
 }
 .flag { display: flex; flex-direction: column; gap: 3px; }
 .flag + .flag { padding-top: 8px; border-top: 1px solid var(--amber); }
 .flag-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
 .flag-kind {
   font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.06em; color: var(--amber); white-space: nowrap;
+  letter-spacing: 0.06em; color: var(--red); white-space: nowrap;
 }
 .flag-body { color: var(--text); font-weight: 500; }
 .flag-meta {

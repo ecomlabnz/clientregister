@@ -86,9 +86,37 @@ describe('how long a warning stands', () => {
     expect(expiryFor('365', from)).toBe('2027-09-01');
   });
 
-  it('offers standing first, because that is what a warning usually is', () => {
-    expect(FLAG_LIVES[0]!.value).toBe('standing');
+  it('offers permanent first, because that is what a warning usually is', () => {
+    // Renamed from `standing` on 12 September 2026. Both mean no expiry, which
+    // is what the register actually reads; "until it is taken down" read like a
+    // temporary state and was not what somebody would pick for a character
+    // concern that must be in front of whoever handles the next application.
+    expect(FLAG_LIVES[0]!.value).toBe('permanent');
     expect(FLAG_LIVES[0]!.days).toBeNull();
+  });
+
+  it('still accepts the old name, so a stale form does not gain an expiry', () => {
+    // A bookmarked page or a half-finished submit must not land as a warning
+    // that quietly lapses.
+    expect(expiryFor('standing')).toBeNull();
+  });
+
+  it('offers the longer lives the practice asked for', () => {
+    const byValue = Object.fromEntries(FLAG_LIVES.map((l) => [l.value, l.days]));
+    expect(byValue['548']).toBe(548);
+    expect(byValue['730']).toBe(730);
+    expect(byValue['1095']).toBe(1095);
+  });
+
+  it('takes a date when the life is “until a date I choose”', () => {
+    expect(expiryFor('until', new Date('2026-09-12'), '2029-01-31')).toBe('2029-01-31');
+    // And no date means no expiry, rather than a silent one.
+    expect(expiryFor('until', new Date('2026-09-12'), null)).toBeNull();
+  });
+
+  it('ignores a date typed against a fixed-length life', () => {
+    // Otherwise a leftover value in the box would override the choice made.
+    expect(expiryFor('30', new Date('2026-09-12'), '2029-01-31')).toBe('2026-10-12');
   });
 
   it('stops showing once its date has passed, without anybody taking it down', () => {

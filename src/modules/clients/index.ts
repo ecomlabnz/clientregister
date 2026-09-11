@@ -156,6 +156,33 @@ function block(id: string, open: Set<string>, title: string, body: Raw): Raw {
   return html`<div id="${id}">${foldingCard(title, body, undefined, { open: open.has(id) })}</div>`;
 }
 
+/**
+ * How long an English test result is accepted for, in months.
+ *
+ * Two years is the ordinary rule and the one the form has always stated in its
+ * own hint. **Asked for on 12 September 2026:** *"the side panels should also
+ * calculate the english cert duration - it is valid for 2 years from the issue
+ * date."*
+ *
+ * Worked out on the page rather than stored, and deliberately: it is a function
+ * of the test date and nothing else, so a stored copy would be a second owner
+ * of a fact that already has one, and it would be the copy that went stale. One
+ * fact, one owner.
+ *
+ * Nothing alerts on it. It is arithmetic put in front of somebody who would
+ * otherwise do it in their head, which is the same reason the age sits beside
+ * the date of birth.
+ */
+const ENGLISH_TEST_MONTHS = 24;
+
+function englishExpiry(taken: string | null): string | null {
+  if (!taken) return null;
+  const d = new Date(`${taken}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCMonth(d.getUTCMonth() + ENGLISH_TEST_MONTHS);
+  return d.toISOString().slice(0, 10);
+}
+
 function expiryInline(value: string, warnDays = 90): Raw {
   const due = Date.parse(value);
   const soon = !Number.isNaN(due) && due - Date.now() < warnDays * 86_400_000;
@@ -1968,48 +1995,147 @@ export const clientsModule: AppModule = {
                       ? actionButton(`/clients/${client.id}/primary-contact`, csrf, 'Clear primary contact',
                           { className: 'btn btn-small btn-link-danger', fields: { contact_id: '' } })
                       : ''}`)}`
-              : card('Identity and compliance', html`
+              : foldingCard('Key details', html`
+                  ${'' /* One card, grouped, with the name at the top.
+                           **Asked for on 12 September 2026:** *"the set of panes to the
+                           right and the data is not optimal under a client's profile. I
+                           can see that under a particular case - Key Details - is better
+                           organised ... maybe they should all appear under Key Details?
+                           but with the name up top? say Name, Contacts, Passport details,
+                           Certificate, English, and the rest."*
+
+                           The old split was Identity and compliance beside Contact, and
+                           it did not survive being looked at: the given names and family
+                           name sat under *Contact*, which they are not, and "Works for"
+                           sat under *Identity*, which it is not either. Eighteen rows in
+                           one undifferentiated list is a list nobody reads to the end of.
+
+                           Grouped in the practice's own order, with one change said out
+                           loud: **Immigration comes third**, before the passport. A visa
+                           expiry is the single most-looked-at fact on a client and it was
+                           fourteen rows down. Everything else follows the order asked
+                           for. */}
+                  <p class="subhead">Name</p>
                   <dl class="kv">
-                    ${employer ? html`
-                      <dt>Works for</dt><dd><a href="/clients/${employer.id}">${employer.full_name}</a>
-                        ${client.organisation_role ? html`<div class="muted small">${client.organisation_role}</div>` : ''}
-                        ${employer.primary_contact_id === client.id ? badge('Primary contact', 'green') : ''}</dd>` : ''}
-                    ${'' /* The number quoted on everything sent to INZ about
-                             this person, so it leads — which is what the note
-                             below it always claimed and the order never was.
-                             Shown even when empty: a blank here is the
-                             practice's own standing instruction unmet. */}
+                    <dt>Full name</dt><dd><strong>${client.full_name}</strong></dd>
+                    <dt>Given names</dt><dd>${client.given_names ?? '—'}</dd>
+                    <dt>Family name</dt><dd>${client.family_name ?? '—'}</dd>
+                    <dt>Preferred</dt><dd>${client.preferred_name ?? '—'}</dd>
+                    <dt>Title</dt><dd>${client.title
+                      ? labelFor(titleTerms, client.title) : html`<span class="muted">—</span>`}</dd>
+                    ${'' /* Shown even when empty, like the INZ number below: a blank
+                             here is a box somebody will have to fill before a form can be
+                             lodged, and a row that disappears when empty is a gap nobody
+                             sees. */}
+                    <dt>Other names used</dt><dd>${client.other_names
+                      ? html`${client.other_names}` : html`<span class="muted">—</span>`}</dd>
+                  </dl>
+
+                  <p class="subhead">Contact</p>
+                  <dl class="kv">
+                    <dt>Phone</dt><dd>${client.phone
+                      ? html`<a href="tel:${client.phone}">${client.phone}</a>` : '—'}</dd>
+                    <dt>Email</dt><dd>${client.email
+                      ? html`<a href="mailto:${client.email}">${client.email}</a>` : '—'}</dd>
+                    <dt>WhatsApp</dt><dd>${client.whatsapp
+                      ? html`<a href="tel:${client.whatsapp}">${client.whatsapp}</a>` : '—'}</dd>
+                    <dt>Telegram</dt><dd>${client.telegram_username ?? client.telegram_user_id ?? '—'}</dd>
+                    <dt>Address</dt><dd>${client.address ?? '—'}</dd>
+                  </dl>
+
+                  <p class="subhead">Immigration</p>
+                  <dl class="kv">
+                    ${'' /* The number quoted on everything sent to INZ about this person,
+                             so it leads. */}
                     <dt>INZ client no.</dt><dd>${client.inz_client_number
                       ? html`<code>${client.inz_client_number}</code>`
                       : html`${badge('not recorded', 'amber')}`}</dd>
-                    ${'' /* The flat facts every application form asks for
-                             (0084). They sit with the rest of the identity
-                             because that is what they are, and each is shown
-                             even when empty for the same reason the INZ number
-                             is: a blank here is a box somebody will have to
-                             fill before a form can be lodged, and a row that
-                             disappears when empty is a gap nobody sees. */}
-                    <dt>Title</dt><dd>${client.title
-                      ? labelFor(titleTerms, client.title) : html`<span class="muted">—</span>`}</dd>
-                    <dt>Other names used</dt><dd>${client.other_names
-                      ? html`${client.other_names}` : html`<span class="muted">—</span>`}</dd>
-                    ${'' /* Plural, because a person may be. Listed in the
-                             order the practice entered them: the first is the
-                             passport an application is likely to be made on. */}
+                    ${'' /* The grant, not only its end. Almost every question about a
+                             temporary visa turns on the period — maximum continuous stay
+                             counts from the start. */}
+                    <dt>Current visa</dt><dd>${labelFor(visaTerms, client.current_visa_type) || '—'}${
+                      client.current_visa_start
+                        ? html`<div class="muted small">Granted ${dateShort(client.current_visa_start)}</div>`
+                        : ''}</dd>
+                    <dt>Visa expiry</dt><dd>${!client.current_visa_expiry && client.current_visa_expiry_rule
+                      ? html`${badge('not yet fixed', 'amber')}
+                             <div class="muted small">${client.current_visa_expiry_rule}</div>`
+                      : expiryCell(client.current_visa_expiry)}</dd>
+                    ${'' /* Shown only when there is something to show: a row reading
+                             "Stay limit —" on every client is a line that makes a page
+                             long without saying anything. */}
+                    ${client.current_visa_stay_limit
+                      ? html`<dt>Stay limit</dt><dd>${client.current_visa_stay_limit}</dd>` : ''}
+                    ${client.current_visa_conditions
+                      ? html`<dt>Conditions</dt>
+                             <dd class="prewrap">${client.current_visa_conditions}</dd>` : ''}
+                  </dl>
+
+                  <p class="subhead">Passport</p>
+                  <dl class="kv">
+                    <dt>Passport</dt><dd>${passports.length === 0
+                      ? html`<span class="muted">—</span>`
+                      : html`${countryName(client.passport_country) || 'Primary'}${
+                          client.passport_expiry ? html` · ${expiryCell(client.passport_expiry, 180)}` : ''}
+                             ${passports.length > 1
+                               ? html`<div class="muted small"><a href="?open=passports#passports">${passports.length} passports on file</a></div>`
+                               : html`<div class="muted small"><a href="?open=passports#passports">Details</a></div>`}`}</dd>
+                    ${'' /* Beside the passport, because it is the other identity document
+                             a client hands over, and never without its issuing country —
+                             which the database guarantees, so this cannot print half of
+                             one. */}
+                    <dt>National ID</dt><dd>${client.national_id_number
+                      ? html`<code>${client.national_id_number}</code>
+                             <div class="muted small">${countryName(client.national_id_country)}</div>`
+                      : html`<span class="muted">—</span>`}</dd>
+                  </dl>
+
+                  <p class="subhead">Certificates</p>
+                  <dl class="kv">
+                    <dt>Police cert.</dt><dd>${client.police_certificate_country
+                      ? html`${countryName(client.police_certificate_country)}<br>` : ''}${expiryCell(client.police_certificate_expiry)}
+                      ${certificateDateUnverified(certificates, 'police', client.police_certificate_expiry)
+                        ? badge('unverified date', 'amber') : ''}</dd>
+                    <dt>Medical</dt><dd>${expiryCell(client.medical_certificate_expiry)}
+                      ${certificateDateUnverified(certificates, 'medical', client.medical_certificate_expiry)
+                        ? badge('unverified date', 'amber') : ''}</dd>
+                    <dt>Chest x-ray</dt><dd>${expiryCell(client.chest_xray_expiry)}</dd>
+                  </dl>
+
+                  <p class="subhead">English</p>
+                  <dl class="kv">
+                    <dt>Test</dt><dd>${client.english_test_type
+                      ? html`${labelFor(englishTestTerms, client.english_test_type)}${
+                          client.english_test_score ? html` · <strong>${client.english_test_score}</strong>` : ''}
+                          ${client.english_test_date
+                            ? html`<div class="muted small">Taken ${dateShort(client.english_test_date)}</div>` : ''}`
+                      : html`<span class="muted">—</span>`}</dd>
+                    ${'' /* Worked out, not stored: it is the test date plus two years and
+                             nothing else. See `englishExpiry`. */}
+                    ${englishExpiry(client.english_test_date) ? html`
+                      <dt>Accepted until</dt>
+                      <dd>${expiryCell(englishExpiry(client.english_test_date))}
+                        <div class="muted small">Two years from the test date.</div></dd>` : ''}
+                  </dl>
+
+                  <p class="subhead">Personal</p>
+                  <dl class="kv">
+                    ${'' /* Plural, because a person may be. Listed in the order the
+                             practice entered them: the first is the passport an
+                             application is likely to be made on. */}
                     <dt>${clientNationalities.length > 1 ? 'Nationalities' : 'Nationality'}</dt>
                     <dd>${clientNationalities.map(countryName).join(' · ') || '—'}</dd>
-                    ${'' /* The age, not just the birthday. Half the thresholds
-                             in the instructions are ages — a dependent child
-                             under 25, a parent for the Parent Category — and
-                             working one out from a date in the head, on a page
-                             being read for something else, is where a mistake
-                             gets made. */}
+                    ${'' /* The age, not just the birthday. Half the thresholds in the
+                             instructions are ages — a dependent child under 25, a parent
+                             for the Parent Category — and working one out from a date in
+                             the head, on a page being read for something else, is where a
+                             mistake gets made. */}
                     <dt>Date of birth</dt><dd>${dateShort(client.date_of_birth)}${
                       ageYears(client.date_of_birth) === null
                         ? ''
                         : html` <span class="muted">· ${ageYears(client.date_of_birth)}</span>`}</dd>
-                    ${'' /* Town, region, country — read outwards, the way it is
-                             said aloud and the way it is written on the form. */}
+                    ${'' /* Town, region, country — read outwards, the way it is said
+                             aloud and the way it is written on the form. */}
                     <dt>Place of birth</dt><dd>${(() => {
                       const parts = [client.birth_town, client.birth_region,
                                      countryName(client.birth_country) || null].filter(Boolean);
@@ -2021,65 +2147,25 @@ export const clientsModule: AppModule = {
                     <dt>Relationship status</dt><dd>${client.relationship_status
                       ? labelFor(relationshipTerms, client.relationship_status)
                       : html`<span class="muted">—</span>`}</dd>
-                    <dt>Passport</dt><dd>${passports.length === 0
-                      ? html`<span class="muted">—</span>`
-                      : html`${countryName(client.passport_country) || 'Primary'}${
-                          client.passport_expiry ? html` · ${expiryCell(client.passport_expiry, 180)}` : ''}
-                             ${passports.length > 1
-                               ? html`<div class="muted small"><a href="?open=passports#passports">${passports.length} passports on file</a></div>`
-                               : html`<div class="muted small"><a href="?open=passports#passports">Details</a></div>`}`}</dd>
-                    ${'' /* Beside the passport, because it is the other
-                             identity document a client hands over, and never
-                             without its issuing country — which the database
-                             guarantees, so this cannot print half of one. */}
-                    <dt>National ID</dt><dd>${client.national_id_number
-                      ? html`<code>${client.national_id_number}</code>
-                             <div class="muted small">${countryName(client.national_id_country)}</div>`
-                      : html`<span class="muted">—</span>`}</dd>
-                    ${'' /* The grant, not only its end. The period is what
-                             almost every question about a temporary visa turns
-                             on — maximum continuous stay counts from the start
-                             — and until 10 September 2026 the register held
-                             only the expiry. Drawn on one line with the expiry
-                             where both are known, because they are one fact. */}
-                    <dt>Current visa</dt><dd>${labelFor(visaTerms, client.current_visa_type) || '—'}${
-                      client.current_visa_start
-                        ? html`<div class="muted small">Granted ${dateShort(client.current_visa_start)}</div>`
-                        : ''}</dd>
-                    <dt>Visa expiry</dt><dd>${!client.current_visa_expiry && client.current_visa_expiry_rule
-                      ? html`${badge('not yet fixed', 'amber')}
-                             <div class="muted small">${client.current_visa_expiry_rule}</div>`
-                      : expiryCell(client.current_visa_expiry)}</dd>
-                    ${'' /* Shown only when there is something to show. A row
-                             reading "Stay limit —" on every client who has no
-                             stay limit is the kind of line that makes a page
-                             long without saying anything. */}
-                    ${client.current_visa_stay_limit
-                      ? html`<dt>Stay limit</dt><dd>${client.current_visa_stay_limit}</dd>` : ''}
-                    ${client.current_visa_conditions
-                      ? html`<dt>Conditions</dt>
-                             <dd class="prewrap">${client.current_visa_conditions}</dd>` : ''}
-                    <dt>Police cert.</dt><dd>${client.police_certificate_country
-                      ? html`${countryName(client.police_certificate_country)}<br>` : ''}${expiryCell(client.police_certificate_expiry)}
-                      ${certificateDateUnverified(certificates, 'police', client.police_certificate_expiry)
-                        ? badge('unverified date', 'amber') : ''}</dd>
-                    <dt>Medical</dt><dd>${expiryCell(client.medical_certificate_expiry)}
-                      ${certificateDateUnverified(certificates, 'medical', client.medical_certificate_expiry)
-                        ? badge('unverified date', 'amber') : ''}</dd>
-                    <dt>Chest x-ray</dt><dd>${expiryCell(client.chest_xray_expiry)}</dd>
-                    <dt>English</dt><dd>${client.english_test_type
-                      ? html`${labelFor(englishTestTerms, client.english_test_type)}${
-                          client.english_test_score ? html` · <strong>${client.english_test_score}</strong>` : ''}
-                          ${client.english_test_date
-                            ? html`<div class="muted small">Taken ${dateShort(client.english_test_date)}</div>` : ''}`
-                      : html`<span class="muted">—</span>`}</dd>
-                  </dl>`)}
+                  </dl>
+
+                  ${employer ? html`
+                    <p class="subhead">Employment</p>
+                    <dl class="kv">
+                      <dt>Works for</dt><dd><a href="/clients/${employer.id}">${employer.full_name}</a>
+                        ${client.organisation_role ? html`<div class="muted small">${client.organisation_role}</div>` : ''}
+                        ${employer.primary_contact_id === client.id ? badge('Primary contact', 'green') : ''}</dd>
+                    </dl>` : ''}`)}
 
 
             ${'' /* Correspondence, read from where it lives rather than copied
                      onto a timeline. A message with two owners disagrees with
                      itself the first time one of them is edited. */}
-            ${card('Contact', html`
+            ${'' /* An organisation keeps a Contact card of its own. A person's
+                    contact details moved into Key details on 12 September 2026, with
+                    the given names and family name that had been sitting in this box
+                    and are not contact details at all. */}
+            ${isOrg ? card('Contact', html`
               <dl class="kv">
                 <dt>Phone</dt><dd>${client.phone
                   ? html`<a href="tel:${client.phone}">${client.phone}</a>` : '—'}</dd>
@@ -2088,11 +2174,7 @@ export const clientsModule: AppModule = {
                   ? html`<a href="tel:${client.whatsapp}">${client.whatsapp}</a>` : '—'}</dd>
                 <dt>Telegram</dt><dd>${client.telegram_username ?? client.telegram_user_id ?? '—'}</dd>
                 <dt>Address</dt><dd>${client.address ?? '—'}</dd>
-                ${isOrg ? '' : html`
-                  <dt>Given names</dt><dd>${client.given_names ?? '—'}</dd>
-                  <dt>Family name</dt><dd>${client.family_name ?? '—'}</dd>
-                  <dt>Preferred</dt><dd>${client.preferred_name ?? '—'}</dd>`}
-              </dl>`)}
+              </dl>`) : ''}
 
             ${'' /* Fees are recorded per matter, which is right, but "what does
                      this person owe us" is a question about the person. This

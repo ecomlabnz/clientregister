@@ -56,15 +56,55 @@ export interface Flag {
  * usually is. The rest are the seasons the practice actually named — a client
  * overseas, a refuge, a period of grace.
  */
+/**
+ * How long a warning stands.
+ *
+ * **Widened on 12 September 2026:** *"there must be more options for the
+ * warning duration, say 1.5 years, 2 years, 3 years or select a date and
+ * permanent? possible? For this particular client - there is a character
+ * concern and a character waiver must always be made - regardless."*
+ *
+ * The last sentence is the one that matters. A character concern is not a fact
+ * that ages out — it has to be in front of whoever handles the next
+ * application, and the one after that. `permanent` is that: no expiry, and no
+ * date to quietly arrive.
+ *
+ * It replaces `standing`, which meant the same thing in words nobody would pick
+ * for it — "until it is taken down" reads like a temporary state. Warnings
+ * already raised are unaffected: both store no expiry date, which is what the
+ * register actually reads. `standing` is still accepted on the way in so an old
+ * form, a bookmarked page or a half-finished submit does not land as an expiry
+ * nobody chose.
+ *
+ * `until` takes its date from the form rather than from a count of days, which
+ * is the other half of the request.
+ */
 export const FLAG_LIVES: Array<{ value: string; label: string; days: number | null }> = [
-  { value: 'standing', label: 'Until it is taken down', days: null },
+  { value: 'permanent', label: 'Permanent — until it is taken down', days: null },
   { value: '30', label: 'For 30 days', days: 30 },
   { value: '90', label: 'For 3 months', days: 90 },
   { value: '180', label: 'For 6 months', days: 180 },
   { value: '365', label: 'For a year', days: 365 },
+  { value: '548', label: 'For 18 months', days: 548 },
+  { value: '730', label: 'For 2 years', days: 730 },
+  { value: '1095', label: 'For 3 years', days: 1095 },
+  { value: 'until', label: 'Until a date I choose', days: null },
 ];
 
-export function expiryFor(life: string | null | undefined, from = new Date()): string | null {
+/** The value that means "give me a date box". */
+export const FLAG_LIFE_UNTIL = 'until';
+
+/**
+ * When a warning lapses, or null for one that does not.
+ *
+ * `until` is the only life that reads the second argument. Everything else is a
+ * count of days from now, or no expiry at all — so a date typed against a
+ * fixed-length life is ignored rather than silently overriding it.
+ */
+export function expiryFor(
+  life: string | null | undefined, from = new Date(), chosenDate?: string | null,
+): string | null {
+  if (life === FLAG_LIFE_UNTIL) return chosenDate || null;
   const chosen = FLAG_LIVES.find((l) => l.value === life);
   if (!chosen?.days) return null;
   const d = new Date(from.getTime() + chosen.days * 86_400_000);
@@ -134,6 +174,8 @@ export async function raiseFlag(
   input: {
     entityType: 'client' | 'case'; entityId: string; kind: string; body: string;
     life: string | null; byUserId: string;
+    /** Only read when `life` is `until`. */
+    expiresOn?: string | null;
     /** The matter it was read off, when one is being cited. */
     sourceCaseId?: string | null;
   },
@@ -146,7 +188,7 @@ export async function raiseFlag(
                         expires_on, updated_at, source_case_id)
      VALUES (?,?,?,?,?,?,?,?,?,?)`,
     id, input.entityType, input.entityId, input.kind, input.body.trim(), at, input.byUserId,
-    expiryFor(input.life), at, input.sourceCaseId ?? null,
+    expiryFor(input.life, new Date(), input.expiresOn), at, input.sourceCaseId ?? null,
   );
   return id;
 }
@@ -161,12 +203,14 @@ export async function raiseFlag(
  */
 export async function editFlag(
   env: Env,
-  input: { id: string; kind: string; body: string; life: string | null },
+  input: { id: string; kind: string; body: string; life: string | null;
+           expiresOn?: string | null },
 ): Promise<void> {
   await run(
     env.DB,
     `UPDATE flags SET kind = ?, body = ?, expires_on = ?, updated_at = ? WHERE id = ?`,
-    input.kind, input.body.trim(), expiryFor(input.life), nowIso(), input.id,
+    input.kind, input.body.trim(), expiryFor(input.life, new Date(), input.expiresOn),
+    nowIso(), input.id,
   );
 }
 
