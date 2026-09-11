@@ -7,6 +7,40 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.61.0 — 12 September 2026
+
+### Fixed
+**The client's acceptance link is shown only to somebody who may send a
+quotation.**
+
+When you email a quotation, the client gets a link. That link is the whole of
+what proves they may accept — it has to be, because they have no account with
+you and nothing else to sign in with. Anyone holding the address can accept the
+quotation in their name.
+
+Until today that address was printed in full on the quotation page, which
+everybody who may read a quotation can open — including somebody on "Read only",
+whose whole point is that they change nothing. So a person who is not allowed to
+send you a quotation could copy the link off the screen and form the contract in
+your client's name, with an acceptance the register says cannot be undone.
+
+Nothing was broken about the permissions. The page is one those people are meant
+to be able to read. What was wrong was printing the key on it.
+
+Now: the address itself is shown to whoever may send a quotation — the owner, an
+administrator and a specialist. Everybody else still sees **that** the client has
+their link and **when** it went out, which is what that part of the page is read
+for.
+
+**The same for a knowledge-base article shared with a client.** The share address
+is shown to whoever may create one. Read only is told the article is shared and
+when, without the address. Nothing can be accepted or agreed through one of
+those, so this is about keeping your material where you put it, not about a
+contract.
+
+**Nothing to do, and no link changed.** Every link that has gone out still works
+exactly as before. This is only about who can read one off a screen.
+
 ## 1.60.1 — 12 September 2026
 
 ### Fixed

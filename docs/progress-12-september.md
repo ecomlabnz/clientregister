@@ -231,7 +231,7 @@ No other token was touched and none were cancelled.
 
 ---
 
-## 9. One thing found that I have not changed, because you should decide
+## 9. The client's acceptance link is no longer printed for everyone
 
 Somebody on **Read only** — or an assistant — can open a quotation, read the
 client's acceptance link off the page, and use it to accept the quotation in the
@@ -242,12 +242,23 @@ Every individual permission here is correct, which is why the new test cannot
 see it. The page is one those roles are entitled to read. The *link on it* is
 the whole authority — it has to be, because the client has no account.
 
-The fix is small: show that a link exists and when it went out, but put the link
-itself behind the permission that may send one. It is a change to what a page
-shows to whom, nobody asked for it, and the standing rule is that a change
-nobody asked for goes to you before it is built. So it is in front of you.
+Put to you, and you said **proceed**. Shipped the same day as 1.61.0.
 
-It is written up in full as issue 13 in `docs/issues.md`.
+The address is now shown to whoever may send a quotation — you, an administrator
+or a specialist. Everybody else is told the client has their link and when it
+went out, which is what that panel is read for. The knowledge-base share address
+went the same way, shown to whoever may create one.
+
+**No link changed and none was cancelled.** Every address already with a client
+still works. This was only about who can read one off a screen.
+
+**The rule worth keeping.** A test that checks who may open a page cannot check
+what the page hands out once it is open. Both leaks here sat behind permissions
+that were individually correct. When a page prints a token or an address that is
+itself an authority, the question is not "who may read this page" — it is "who
+may hold this thing".
+
+Written up as issue 13 in `docs/issues.md`, now closed.
 
 ---
 
@@ -296,9 +307,7 @@ permission is checked where it is spent, not only where it is issued.**
 
 ## What is waiting on you
 
-1. **The client acceptance link, and who may see it** — section 9 above. A
-   small change to what a quotation page shows to Read only and to an
-   assistant. Your call; nothing has been changed.
-2. **The demonstration-data workflow** from August, which can still load
-   invented clients into your live register with one click. It should go; the
-   Test Data page inside the register replaced it.
+Both of the things that were waiting on you were answered on 12 September and
+are done: the acceptance link (section 9) and the demonstration-data workflow,
+which you asked to be removed — *"no need for the test data to be loaded into
+the live register."*

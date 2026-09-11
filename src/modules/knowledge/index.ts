@@ -506,15 +506,27 @@ export const knowledgeModule: AppModule = {
             ${card('Share with a client', article.share_token
               ? html`
                 <p class="small">Anybody with this address can read the article. No sign-in.</p>
+                ${'' /* The address is shown to whoever may create one.
+                
+                         The same reasoning as the client's link on a quotation,
+                         and found in the same review on 12 September 2026: the
+                         token *is* the authority, so printing it to a role that
+                         may not share hands that role the sharing. Nothing is
+                         formed here — this is confidentiality, not contract —
+                         which is why the cut is `register:write`, the
+                         permission that mints one, rather than something
+                         narrower. "Read only" is told the article is shared and
+                         when, which is what this card is read for. */}
+                ${writable ? html`
                 ${'' /* Selectable in one gesture on a phone, which is where it
                          is copied from. `readonly`, not `disabled`: a disabled
                          input cannot be selected at all. */}
                 <label class="sr-only" for="share_link">Link</label>
                 <input id="share_link" class="share-link" type="text" readonly
-                       value="${shareLink}" onfocus="this.select()">
+                       value="${shareLink}" onfocus="this.select()">` : ''}
                 <p class="muted small">Shared ${dateTime(article.shared_at)}${
                   sharer ? ` by ${sharer.name}` : ''}.</p>
-                ${addressWarning ? html`<p class="warn small">${addressWarning}</p>` : ''}
+                ${writable && addressWarning ? html`<p class="warn small">${addressWarning}</p>` : ''}
                 ${writable ? actionButton(`/knowledge/${article.id}/unshare`, session.csrf,
                     'Stop sharing',
                     { className: 'btn btn-small btn-link-danger',

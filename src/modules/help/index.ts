@@ -94,6 +94,20 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.61.0', date: '12 September 2026',
+    notes: [
+      'The link you send a client with a quotation is now shown only to whoever may send one '
+        + '\u2014 you, an administrator, or a specialist. Anybody holding that link can accept '
+        + 'the quotation in your client\u2019s name, so it should not have been printed on a '
+        + 'page that Read only can open.',
+      'Everybody else still sees that the client has their link and when it went out. That is '
+        + 'what the panel is there to tell you.',
+      'Same for a knowledge-base article shared with a client: the address is shown to whoever '
+        + 'may create one.',
+      'Nothing to do, and no link changed. Every link already sent still works.',
+    ],
+  },
+  {
     version: '1.60.1', date: '12 September 2026',
     notes: [
       'Only the people who work the inbox can make an upload token now \u2014 the owner, an '
