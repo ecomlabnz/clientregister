@@ -7,6 +7,36 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.60.1 — 12 September 2026
+
+### Fixed
+**Only the people who work the inbox can make an upload token.**
+
+An upload token is the credential an Apple shortcut carries when it sends a
+file into the register. Until today anyone who could sign in could make one —
+including someone on "Read only", whose whole point is that they change
+nothing. A token is a way of putting files into the practice's inbox, so that
+was a way of writing to the register that their role should not have had.
+
+Making one now needs the same permission as working the inbox: owner,
+administrator, specialist and assistant. Read only sees the page and is told
+why the button is not there.
+
+**Revoking a token is unchanged and deliberately not restricted.** Somebody
+moved to "Read only" may still have a token on a laptop, and the screen where
+they cancel it has to keep working.
+
+Nobody has to do anything. Existing tokens keep working; nothing was revoked.
+
+### Added
+**A test that checks every route against every role.** The register has 233
+routes and five roles, and until now three tests checked that a route refused
+the wrong person. A route added without its permission check was invisible
+until somebody with the wrong role opened it. The new test reads the routes out
+of the running application, insists every one of them names the permission it
+needs, and then signs in as each of the five roles in turn and proves the 285
+combinations that should be refused really are.
+
 ## 1.60.0 — 12 September 2026
 
 ### Added

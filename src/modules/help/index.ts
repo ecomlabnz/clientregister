@@ -94,6 +94,20 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.60.1', date: '12 September 2026',
+    notes: [
+      'Only the people who work the inbox can make an upload token now \u2014 the owner, an '
+        + 'administrator, a specialist or an assistant. A token is how a file gets sent in from '
+        + 'a Mac or a phone, so somebody on Read only should never have been able to make one.',
+      'Revoking a token is unchanged, and on purpose: if you are moved to Read only and still '
+        + 'have a token on a laptop, the screen where you cancel it keeps working.',
+      'Nothing to do. Tokens already made still work; none were cancelled.',
+      'Behind the scenes: a new test checks all 233 pages of the register against all five '
+        + 'roles, so a page added without its permission check now fails the build instead of '
+        + 'being found by somebody opening it.',
+    ],
+  },
+  {
     version: '1.60.0', date: '12 September 2026',
     notes: [
       'A Preview button on Settings \u2192 Quotes and on Settings \u2192 Letter of engagement. '

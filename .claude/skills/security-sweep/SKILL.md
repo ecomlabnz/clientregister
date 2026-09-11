@@ -36,6 +36,7 @@ npx tsc --noEmit           # types must be clean too
 | Transport & CSRF | `test/security_headers.test.ts` | Every response header and CSP directive; the cross-site request checks (origin, `sec-fetch-site`, session token) and the webhook exemption. |
 | Email sanitiser | `test/security_sanitiser.test.ts` | A corpus of XSS/mXSS payloads run through one invariant: the output is inert (no script, event handler, dangerous scheme, or foreign-content element). Plus `safeUrl`'s scheme allow-list. |
 | Route access control | `test/security_access.test.ts` | Handlers exercised through the real Hono route over an in-memory DB: the permission each declares, and that the audit log records only what actually happened. |
+| Route × role matrix | `test/routeroles.test.ts` | Every route the application mounts, read out of the built router, against all five roles. Insists each route names a permission (or is a named public/signed-in-only exception with a reason), then signs in as each role and proves every refusal really is a 403. |
 
 The load-bearing design facts these defend (know them before changing them):
 
@@ -83,7 +84,12 @@ route, check the audit log and the rows).
 - **A new destructive or privileged route** → add a test in
   `security_access.test.ts` using `mountModule`: one case that a role lacking the
   permission gets 403, one that the invariant holds and the audit log stays
-  honest.
+  honest. `routeroles.test.ts` already insists the route *declares* a permission
+  and proves every role that lacks it is refused, so what belongs in
+  `security_access` is what the handler does once somebody permitted reaches it.
+- **A route that is genuinely meant to be public** → add it to `PUBLIC` (or
+  `SIGNED_IN_ONLY`) in `routeroles.test.ts` with one line saying why. The test
+  refuses an exception with no reason written next to it.
 
 ## The periodic pass ("from time to time")
 

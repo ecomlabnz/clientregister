@@ -259,6 +259,100 @@ database before anything real was touched.
 
 ---
 
+## Findings from the route × role sweep (2026-09-12)
+
+### 10. Any signed-in person could mint an upload token — FIXED (1.57.1)
+
+`POST /account/upload-tokens` and `GET /account/shortcut` sat behind
+`requireAuth` and nothing else, because they live among the account pages —
+password, theme, preferences, devices — where a role has nothing to say. But an
+upload token is not about your account. It is a bearer credential that writes
+into the practice's inbox: the holder creates an `ingest_messages` row on the
+`api` channel and stages files against it (`src/modules/shortcut/index.ts`).
+
+So a **`readonly`** user — the role whose entire definition is "Can look at the
+register and documents, and change nothing" — could make one and then write to
+the register with it, from a device, with no session. Nothing else in the
+account pages does anything of the kind.
+
+**Fix:** both routes now carry `requirePermission('ingest:triage')` — the
+permission that means *work the inbox*, which is where everything a token sends
+lands. That is owner, administrator, specialist and assistant, and not read
+only. The "Sending files in" tab stays visible to everyone and still lists
+their tokens; what a person without the permission no longer sees is the form
+that makes one, and the page is explicit about why.
+
+**Revoking is deliberately left ungated.** Taking authority away must never be
+the thing somebody is locked out of: a person moved to `readonly` may still
+have a token on a laptop, and the screen where they cancel it has to keep
+working. `revokeUploadToken` is scoped to the token's owner in the statement,
+so it can only ever destroy your own.
+
+**Guard:** `test/routeroles.test.ts` — the whole route × role matrix. Proven
+the honest way: an ungated route was added to a module and the test named it;
+the permission check inside `requirePermission` was short-circuited and the
+per-role request sweep went red on `POST /admin/backup → 200`.
+
+### 11. Every route now has to say which permission it needs — FIXED (1.57.1)
+
+Not a fault so much as the absence of the check that would have caught number
+10. The register mounts 233 routes across 5 roles, and three tests in the whole
+suite checked that a route refused the wrong role. A route added with no
+permission gate, or given the wrong one, type-checked, passed CI, and was found
+by somebody with the wrong role opening it.
+
+`test/routeroles.test.ts` reads the routes out of the **built router** — the
+same approach `scripts/spec.mjs` already uses for the specification, not a
+second grep over the source — and asserts:
+
+- every route has a `requirePermission` in front of it, or is one of 20 named
+  public routes or 10 named signed-in-only ones, each with a written reason;
+- no allow-list entry is stale, and nothing listed as public has quietly
+  acquired a sign-in;
+- everything not public is behind `requireAuth`;
+- no `POST` is gated only on a permission that grants no power to change
+  anything;
+- the role → permission table is pinned in the test, so changing who can see a
+  client file takes a deliberate edit in two places;
+- and then, per role, a real signed-in request through the real middleware for
+  each of the 285 route/role combinations that should be refused — each of
+  which must come back 403 *and* the permission page, so a 403 from the
+  cross-site check cannot read as a pass;
+- plus 213 requests with no session at all, each of which must be sent to sign
+  in.
+
+`requirePermission` now attaches its permission to the middleware it returns
+(`PermissionGate` in `src/core/auth.ts`). Without that, a gate and an ungated
+route are the same anonymous closure and the check cannot be written at all.
+
+**Two things it does not cover, said plainly:**
+
+- It proves the *refusals*. The routes a role **may** reach are derived from
+  the declared gates rather than exercised, because running 233 handlers means
+  running everything they do — sending mail, writing backups.
+- `GET /` and `GET /search` are each answered by two handlers (the website then
+  the dashboard; the search module then the dashboard's copy). They are exempt
+  from the request sweep, because a role check on them would be a check on
+  whichever handler happened to answer first. Their gates are still asserted.
+
+### 12. The dashboard registers a `GET /search` that can never run — OPEN
+
+`src/modules/dashboard/index.ts` registers `GET /search`, and so does
+`src/modules/search/index.ts`. The search module is mounted first
+(`src/registry.ts`), its handler answers, and the dashboard's copy is
+unreachable — dead code that looks live. Both demand `register:read`, so
+nothing is exposed by it; it is a correctness and maintenance fault, not a
+security one, which is why it is recorded rather than fixed in a release about
+something else.
+
+**What would close it:** delete the `/search` route and `'/search'` from
+`basePaths` in the dashboard module, leaving search to the search module. A
+test asserting that no two handlers answer the same method and path would stop
+it recurring — and would have to make an exception for `GET /`, where two
+handlers on one path is the design.
+
+---
+
 ## Open findings — known, accepted, and what would close them
 
 ### 5. Migration 0037's forward guard does not watch `meta_json` — ACCEPTED

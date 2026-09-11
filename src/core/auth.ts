@@ -71,8 +71,25 @@ export async function requireAuth(c: Context<AppContext>, next: Next): Promise<R
   return next();
 }
 
-export function requirePermission(permission: Permission) {
-  return async (c: Context<AppContext>, next: Next): Promise<Response | void> => {
+/**
+ * The gate a route puts in front of itself, carrying the permission it asks
+ * for where a reader — or a test — can see it.
+ *
+ * The permission is attached to the middleware function rather than only
+ * closed over, because a closure says nothing about itself. `test/routeroles`
+ * walks the built router and asks every route which gate stands in front of
+ * it; without this property, a gate and an ungated route are the same
+ * anonymous function, and the one check that would catch a route added with no
+ * permission at all cannot be written.
+ */
+export interface PermissionGate {
+  (c: Context<AppContext>, next: Next): Promise<Response | void>;
+  /** The permission this gate demands. Read by the route × role matrix test. */
+  readonly permission: Permission;
+}
+
+export function requirePermission(permission: Permission): PermissionGate {
+  const gate = async (c: Context<AppContext>, next: Next): Promise<Response | void> => {
     if (!can(c.get('user'), permission)) {
       return c.html(
         '<h1>403 — not permitted</h1><p>Your role does not allow this action.</p><p><a href="/">Back</a></p>',
@@ -81,6 +98,7 @@ export function requirePermission(permission: Permission) {
     }
     return next();
   };
+  return Object.assign(gate, { permission });
 }
 
 export type LoginResult =
