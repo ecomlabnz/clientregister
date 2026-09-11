@@ -94,6 +94,18 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.58.0', date: '12 September 2026',
+    notes: [
+      'The practice caseload you can load to try the register is rebuilt: twenty matters \u2014 '
+        + 'five simply done, ten that are real work, and five unusual ones including a section 61 '
+        + 'request, a reconsideration and a deportation liability response.',
+      'Sixteen people from fourteen countries, and the twenty matters sit on eleven files rather '
+        + 'than twenty, so the files have a history on them.',
+      'Fixed: six kinds of matter in that caseload were showing a code instead of a name, because '
+        + 'they used types that are not in your own list. Only the try-it caseload was affected.',
+    ],
+  },
+  {
     version: '1.57.0', date: '12 September 2026',
     notes: [
       'The register now backs itself up every night, on its own. It writes a copy of everything '

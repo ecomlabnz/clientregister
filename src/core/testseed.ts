@@ -106,6 +106,65 @@ interface SeedQuote {
 
 const PEOPLE: SeedPerson[] = [
   {
+    key: 'perera', name: 'Nuwan PERERA', given: 'Nuwan', family: 'PERERA',
+    email: 'nuwan.perera@example.test', phone: '+64 21 555 0210',
+    nationality: 'LK', dob: '1988-11-04', inzClient: '30554120', status: 'active',
+    visa: { type: 'resident', start: '2024-06-01', conditions: 'Section 49(1) travel conditions.' },
+    passports: [
+      { country: 'LK', number: 'N7781204', issued: '2016-02-11', expires: '2026-02-10',
+        status: 'replaced' },
+      { country: 'LK', number: 'N9930571', issued: '2026-01-20', expires: '2036-01-19' },
+    ],
+  },
+  {
+    key: 'vakatawa', name: 'Ilisapeci VAKATAWA', given: 'Ilisapeci', family: 'VAKATAWA',
+    email: 'ilisapeci.vakatawa@example.test', phone: '+64 27 555 0211',
+    nationality: 'FJ', dob: '1999-03-22', status: 'active',
+    visa: { type: 'working_holiday', start: '2026-01-15', expiry: '2027-01-14',
+            conditions: 'May not work for the same employer for more than 6 months.' },
+    passports: [{ country: 'FJ', number: 'FJ0441882', issued: '2022-08-08', expires: '2032-08-07' }],
+    employment: [
+      { kind: 'employee', employer: 'Southern Orchards', role: 'Fruit picker',
+        country: 'NZ', from: '2026-02' },
+    ],
+  },
+  {
+    key: 'kovalenko', name: 'Oksana KOVALENKO', given: 'Oksana', family: 'KOVALENKO',
+    email: 'oksana.kovalenko@example.test', phone: '+64 22 555 0212',
+    nationality: 'UA', dob: '1993-09-30', inzClient: '30554121', status: 'active',
+    visa: { type: 'work', start: '2025-11-03', expiry: '2026-11-02' },
+    passports: [{ country: 'UA', number: 'FE440921', issued: '2019-05-14', expires: '2029-05-13' }],
+    certificates: [{ kind: 'police', country: 'UA', issued: '2025-08-19' }],
+    flag: { kind: 'general',
+            body: 'Cannot obtain a current police certificate from her home district. '
+              + 'Explanation and supporting evidence on file.' },
+  },
+  {
+    key: 'dlamini', name: 'Thandeka DLAMINI', given: 'Thandeka', family: 'DLAMINI',
+    email: 'thandeka.dlamini@example.test', phone: '+64 21 555 0213',
+    nationality: 'ZA', dob: '1990-01-17', inzClient: '30554122', status: 'active',
+    visa: { type: 'work', start: '2025-04-02', expiry: '2028-04-01' },
+    passports: [{ country: 'ZA', number: 'A09912447', issued: '2021-07-01', expires: '2031-06-30' }],
+    education: [
+      { institution: 'University of Pretoria', qualification: 'BSc Quantity Surveying',
+        level: 'bachelor', country: 'ZA', from: '2008-02', to: '2011-11' },
+    ],
+    employment: [
+      { kind: 'employee', employer: 'Kauri Construction', role: 'Quantity surveyor',
+        country: 'NZ', from: '2025-04' },
+    ],
+  },
+  {
+    key: 'mendoza', name: 'Camilo MENDOZA', given: 'Camilo', family: 'MENDOZA',
+    email: 'camilo.mendoza@example.test', phone: '+64 27 555 0214',
+    nationality: 'CO', dob: '1985-06-12', status: 'active',
+    passports: [{ country: 'CO', number: 'AV771200', issued: '2018-03-05', expires: '2028-03-04' }],
+    flag: { kind: 'character',
+            body: 'Conviction disclosed at the first meeting. Character waiver will be '
+              + 'required for any application.' },
+  },
+
+  {
     key: 'okafor', name: 'Chidinma OKAFOR', given: 'Chidinma', family: 'OKAFOR',
     email: 'chidinma.okafor@example.test', phone: '+64 21 555 0101',
     nationality: 'NG', dob: '1991-04-12', inzClient: '30554101', status: 'active',
@@ -313,141 +372,163 @@ const PEOPLE: SeedPerson[] = [
 // The matters
 // ---------------------------------------------------------------------------
 
+/**
+ * Twenty matters, in a deliberate mix.
+ *
+ * **Asked for on 12 September 2026:** *"give it 20 cases, varied, with people
+ * from different countries, make 5 simple ones and 10 complicated and 5 unusual
+ * applications."* This caseload is what somebody trying the register is shown,
+ * so it has to look like a practice rather than like a demonstration: a few
+ * things that are just done, a lot of things that are hard, and a handful that
+ * are strange. That is the shape of the work.
+ *
+ * Grouped and labelled below so the mix stays right when somebody edits it.
+ *
+ * **The twenty sit on eleven files, not twenty.** Eight of those files carry
+ * more than one matter and one carries three, because a client's file with a
+ * single matter on it shows none of what a register is for — the history, the
+ * matter that was declined before the one that was granted, the visa that ran
+ * out while something else was being decided.
+ *
+ * **Every case type here is a key the practice's own vocabulary carries.** It
+ * was not, until today: six of the twelve types the old caseload used —
+ * `advice_general`, `other_s61`, `rv_skilled`, `sv_dependent_child`,
+ * `emp_accreditation` and `other_other` — are not in `core/vocabulary.ts`, so
+ * those matters displayed a raw key where every other matter shows a label. On
+ * a register whose whole purpose here is to be looked at by somebody deciding
+ * whether to buy it, that was the first thing they would have seen.
+ * `test/testseed.test.ts` now reads the vocabulary and refuses a type it does
+ * not carry.
+ */
 const CASES: SeedCase[] = [
-  { of: 'okafor', title: 'AEWV renewal, Halal Butcher with current employer',
+  // --- Five that are simply done ------------------------------------------
+  // One applicant, one visa, nothing in the way. A practice's bread and butter,
+  // and the register should not make them feel heavy.
+  { of: 'nguyen', title: 'Further student visa',
+    type: 'sv_student', status: 'approved', lodged: '2026-01-08',
+    decided: '2026-02-02', outcome: 'approved',
+    summary: 'Second year of the diploma. Offer of place and fees receipt held.' },
+  { of: 'perera', title: 'Transfer of a resident visa to a new passport',
+    type: 'trnsf_transfer_to_new_passport', status: 'approved', lodged: '2026-01-28',
+    decided: '2026-02-06', outcome: 'approved',
+    summary: 'Old passport expired. Same person, same visa, new label.' },
+  { of: 'okafor', title: 'Dependent child student visa',
+    type: 'sv_dep_child', status: 'approved', lodged: '2026-03-02',
+    decided: '2026-04-18', outcome: 'approved',
+    parties: [{ who: 'okafor_child', role: 'principal_applicant' }] },
+  { of: 'tuilagi', title: 'Visitor visa, once the section 61 request was granted',
+    type: 'vv_general', status: 'approved', lodged: '2026-05-06',
+    decided: '2026-05-20', outcome: 'approved',
+    summary: 'The straightforward half of a matter that was anything but.' },
+  { of: 'hoang', title: 'Post study work visa',
+    type: 'wv_post_study', status: 'approved', lodged: '2025-11-10',
+    decided: '2025-12-04', outcome: 'approved',
+    summary: 'Three years, open conditions, on the qualification completed here.' },
+
+  // --- Ten that are work ---------------------------------------------------
+  // More than one person, or more than one moving part, or waiting on somebody
+  // else. This is where a register earns its keep. One of them is declined and
+  // running out of appeal time, because a caseload with nothing declined in it
+  // is not a caseload anybody will recognise.
+  { of: 'okafor', title: 'AEWV renewal, halal butcher with the current employer',
     type: 'wv_aewv', status: 'lodged', lodged: '2026-08-14', due: '2026-10-30',
     inzApp: '73991204', priority: 'high',
     nextAction: 'Chase INZ if nothing by the due date', nextActionDue: '2026-10-31',
     summary: 'Renewal on the same accredited employer. Job check current.',
     parties: [{ who: 'okafor_partner', role: 'partner' }],
     notes: ['Job check reference confirmed by the employer.',
-            'Second Nigerian police certificate obtained and submitted with the application.'],
+            'Second police certificate obtained and submitted with the application.'],
     tasks: [{ title: 'Diarise INZ decision due date', due: '2026-10-30' }] },
-  { of: 'okafor', title: 'Partner of a Worker Work Visa for Adaeze',
+  { of: 'okafor', title: 'Partner of a worker work visa, filed alongside',
     type: 'wv_partner', status: 'lodged', lodged: '2026-08-14', due: '2026-10-30',
     parties: [{ who: 'okafor_partner', role: 'principal_applicant' }],
-    summary: 'Filed alongside the principal renewal.' },
-  { of: 'okafor', title: 'Dependent Child Student Visa for Kelechi',
-    type: 'sv_dependent_child', status: 'approved', lodged: '2026-03-02',
-    decided: '2026-04-18', outcome: 'approved',
-    parties: [{ who: 'okafor_child', role: 'principal_applicant' }] },
-  { of: 'okafor', title: 'Advice on the residence pathway',
-    type: 'advice_general', status: 'open',
-    nextAction: 'Confirm whether the role is on the Green List',
-    nextActionDue: '2026-09-30' },
-
-  { of: 'silva', title: 'Visitor Visa extension',
-    type: 'vv_general', status: 'awaiting_information', lodged: '2026-07-01',
-    due: '2026-08-30', inzApp: '73991301',
-    nextAction: 'Respond to the RFI about funds', nextActionDue: '2026-08-20',
-    summary: 'RFI received asking for evidence of maintenance funds.',
-    notes: ['RFI received 2 August. Response due 20 August.',
-            'Passport renewed since lodging — new number to be advised to INZ.'],
-    tasks: [{ title: 'Advise INZ of the new passport number', due: '2026-08-18' }] },
-  { of: 'silva', title: 'Advice: can the visitor visa be converted onshore?',
-    type: 'advice_general', status: 'closed', decided: '2026-06-20', outcome: 'advice_given' },
-  { of: 'silva', title: 'AEWV, cabinetmaker — employer to be accredited',
-    type: 'wv_aewv', status: 'open',
-    nextAction: 'Employer accreditation must be confirmed first',
-    nextActionDue: '2026-10-15' },
-
-  { of: 'nguyen', title: 'Student Visa, further study at Wintec',
-    type: 'sv_student', status: 'approved', lodged: '2026-01-08',
-    decided: '2026-02-04', outcome: 'approved', inzApp: '73991402' },
-  { of: 'nguyen', title: 'Post Study Work Visa',
-    type: 'wv_post_study', status: 'open',
-    nextAction: 'Apply once the diploma is completed', nextActionDue: '2026-12-01' },
-  { of: 'nguyen', title: 'Variation of conditions — extra work hours',
-    type: 'other_other', status: 'declined', lodged: '2026-04-12',
-    decided: '2026-05-09', outcome: 'declined',
-    summary: 'Declined: the course does not carry an entitlement to extra hours.',
-    notes: ['Declined 9 May. Reconsideration considered and not pursued.'] },
-
-  { of: 'ramasamy', title: 'Residence from Work, Green List Tier 2',
-    type: 'rv_skilled', status: 'lodged', lodged: '2026-05-30', due: '2026-11-30',
-    inzApp: '73991501', priority: 'high',
+    summary: 'Stands or falls with the principal renewal above.' },
+  { of: 'ramasamy', title: 'Residence from work, principal and partner',
+    type: 'rv_general', status: 'lodged', lodged: '2026-06-20', due: '2027-02-20',
+    inzApp: '74110882', priority: 'high',
     parties: [{ who: 'ramasamy_partner', role: 'partner' }],
-    summary: 'Two years in the role completed. Partner included.',
-    notes: ['Both police certificates current at lodgement.',
-            'Medical submitted with the application, so good for 36 months from issue.'],
-    tasks: [{ title: 'Diarise the 24-month work requirement evidence', due: '2026-09-20' }] },
-  { of: 'ramasamy', title: 'AEWV renewal, held as a fallback',
-    type: 'wv_aewv', status: 'on_hold',
-    summary: 'Only if residence is not decided before the AEWV expires.',
-    nextAction: 'Review in October', nextActionDue: '2026-10-01' },
-  { of: 'ramasamy', title: 'Advice on including a dependent parent',
-    type: 'advice_general', status: 'closed', decided: '2026-04-02', outcome: 'advice_given' },
+    summary: 'Two applicants, one application. Waiting on a decision.',
+    tasks: [{ title: 'Six month check with INZ', due: '2026-12-20' }] },
+  { of: 'ramasamy', title: 'The AEWV the residence application rests on',
+    type: 'wv_aewv', status: 'approved', lodged: '2024-09-02',
+    decided: '2024-10-28', outcome: 'approved',
+    summary: 'Two years on an accredited employer, which is what makes the '
+      + 'residence application possible.' },
+  { of: 'harbour', title: 'Employer accreditation renewal',
+    type: 'emp_accreditation_renewal', status: 'approved', lodged: '2026-01-19',
+    decided: '2026-02-24', outcome: 'approved',
+    summary: 'Renewed for twenty-four months. Evidence of the wage review held.' },
+  { of: 'harbour', title: 'Job check, warehouse supervisor',
+    type: 'emp_job_check', status: 'on_hold', lodged: '2026-08-01',
+    nextAction: 'Advertising evidence still to come from the employer',
+    nextActionDue: '2026-09-20',
+    summary: 'Third job check this year. Held until the employer produces the '
+      + 'advertising and the market rate evidence.' },
+  { of: 'santos', title: 'Straight to residence, with a medical waiver sought',
+    type: 'rv_green_list_str', status: 'awaiting_information', lodged: '2026-07-15',
+    inzApp: '74203311', priority: 'urgent',
+    nextAction: 'Specialist report for the medical waiver', nextActionDue: '2026-09-29',
+    summary: 'Green list role. The medical assessor has raised a condition and a '
+      + 'waiver is being sought with a specialist report.',
+    notes: ['Medical assessor referred the case on 2 August.',
+            'Specialist appointment booked; report expected late September.'] },
+  { of: 'santos', title: 'The AEWV that came first',
+    type: 'wv_aewv', status: 'approved', lodged: '2025-03-11',
+    decided: '2025-04-22', outcome: 'approved',
+    summary: 'Same employer, same role. On file because the residence application '
+      + 'depends on it.' },
+  { of: 'kovalenko', title: 'Partnership residence on limited evidence',
+    type: 'rv_partnership', status: 'declined', lodged: '2026-02-09',
+    decided: '2026-07-21', outcome: 'declined', priority: 'high',
+    nextAction: 'Advise on an appeal to the Tribunal before the deadline',
+    nextActionDue: '2026-09-28',
+    summary: 'Eighteen months together, little of it documented, and the tenancy '
+      + 'in one name only. Declined on living together in a partnership that is '
+      + 'genuine and stable.',
+    notes: ['Cannot obtain a police certificate from her home district; '
+            + 'explanation and supporting evidence were filed.',
+            'Declined 21 July. The appeal period runs from the date of the decision.'] },
+  { of: 'kovalenko', title: 'Variation of conditions to change employer',
+    type: 'voc_variation_work', status: 'approved', lodged: '2026-08-04',
+    decided: '2026-08-26', outcome: 'approved',
+    summary: 'Keeps her lawfully working while the residence decision is dealt with.' },
 
-  { of: 'chen', title: 'Employer accreditation renewal',
-    type: 'emp_accreditation', status: 'approved', lodged: '2026-02-11',
-    decided: '2026-03-20', outcome: 'approved',
-    parties: [{ who: 'harbour', role: 'employer' }] },
-  { of: 'chen', title: 'Job check, warehouse supervisor',
-    type: 'emp_job_check', status: 'lodged', lodged: '2026-08-01', due: '2026-09-15',
-    parties: [{ who: 'harbour', role: 'employer' }],
-    nextAction: 'Chase the job check decision', nextActionDue: '2026-09-16' },
-  { of: 'chen', title: 'Advice on a second business acquisition',
-    type: 'advice_general', status: 'open',
-    nextAction: 'Waiting on the accountant', nextActionDue: '2026-09-25' },
-
-  { of: 'tuilagi', title: 'Section 61 request',
-    type: 'other_s61', status: 'lodged', lodged: '2026-04-02', priority: 'urgent',
-    summary: 'Unlawful since 12 March 2026. Request lodged with a full explanation.',
-    notes: ['Became unlawful when the AEWV expired unrenewed after the employer folded.',
-            'Employer confirmed the business closed without notice.'],
-    tasks: [{ title: 'Follow up the section 61 request', due: '2026-09-15' }] },
-  { of: 'tuilagi', title: 'AEWV with a new employer, if section 61 succeeds',
-    type: 'wv_aewv', status: 'on_hold' },
-  { of: 'tuilagi', title: 'Advice on voluntary departure',
-    type: 'advice_general', status: 'closed', decided: '2026-04-01', outcome: 'advice_given' },
-
-  { of: 'abadi', title: 'Refugee family support category, registration',
-    type: 'other_other', status: 'awaiting_information',
-    nextAction: 'Waiting on documents from the sponsor', nextActionDue: '2026-09-30' },
-  { of: 'abadi', title: 'Work visa variation of conditions',
-    type: 'other_other', status: 'approved', lodged: '2026-06-01',
-    decided: '2026-06-28', outcome: 'approved' },
-  { of: 'abadi', title: 'Advice on travel while an application is on foot',
-    type: 'advice_general', status: 'closed', decided: '2026-05-12', outcome: 'advice_given' },
-
-  { of: 'santos', title: 'Straight to Residence, Registered Nurse',
-    type: 'rv_skilled', status: 'lodged', lodged: '2026-07-22', due: '2027-01-22',
-    inzApp: '73991602', priority: 'high',
-    summary: 'Green List Tier 1. Registration with the Nursing Council current.',
-    tasks: [{ title: 'Confirm the APC is current at decision time', due: '2026-11-30' }] },
-  { of: 'santos', title: 'AEWV, held while residence is decided',
-    type: 'wv_aewv', status: 'on_hold' },
-  { of: 'santos', title: 'Advice on bringing a parent to visit',
-    type: 'advice_general', status: 'open',
-    nextAction: 'Draft the invitation letter', nextActionDue: '2026-09-18' },
-
-  { of: 'petrov', title: 'Initial assessment, skilled migrant options',
-    type: 'advice_general', status: 'open',
-    nextAction: 'Points assessment once qualifications are assessed',
-    nextActionDue: '2026-09-22' },
-  { of: 'petrov', title: 'Qualification assessment with NZQA',
-    type: 'other_other', status: 'awaiting_information' },
-
-  { of: 'mwangi', title: 'Visitor Visa, first application',
-    type: 'vv_general', status: 'open',
-    nextAction: 'Take instructions on the purpose of the visit',
-    nextActionDue: '2026-09-19' },
-  { of: 'mwangi', title: 'Advice on study options',
-    type: 'advice_general', status: 'open' },
-
-  { of: 'hoang', title: 'Accredited Employer Work Visa on graduation',
-    type: 'wv_aewv', status: 'open',
-    nextAction: 'Employer to complete the job check', nextActionDue: '2026-10-05' },
-  { of: 'hoang', title: 'Advice on the residence points table',
-    type: 'advice_general', status: 'closed', decided: '2026-02-20', outcome: 'advice_given' },
-  { of: 'hoang', title: 'Post Study Work Visa',
-    type: 'wv_post_study', status: 'approved', lodged: '2025-12-01',
-    decided: '2026-01-12', outcome: 'approved' },
+  // --- Five that are unusual -----------------------------------------------
+  // The ones a practice is actually chosen for. They are here because a
+  // register that only handles the ordinary is no use on the day that matters.
+  { of: 'tuilagi', title: 'Section 61 request after an overstay',
+    type: 'rq_section_61_request', status: 'approved', lodged: '2026-03-28',
+    decided: '2026-05-02', outcome: 'approved',
+    summary: 'Unlawful for eleven months after a visa lapsed unnoticed. Request '
+      + 'granted, and the visitor visa above followed.',
+    notes: ['Full explanation of the overstay and the family circumstances filed.'] },
+  { of: 'petrov', title: 'Visitor visa, declined on bona fides',
+    type: 'vv_general', status: 'declined', lodged: '2026-06-30',
+    decided: '2026-08-18', outcome: 'declined',
+    summary: 'Declined on whether she intended a genuine visit. The reconsideration '
+      + 'below is of this decision.' },
+  { of: 'petrov', title: 'Reconsideration of the declined visitor visa',
+    type: 'rq_reconsideration_temporary_visa_decline', status: 'lodged',
+    lodged: '2026-08-25', due: '2026-09-24', priority: 'urgent',
+    nextAction: 'The statutory period runs out — confirm INZ has it',
+    nextActionDue: '2026-09-24',
+    summary: 'Fresh evidence of ties and of funds filed within the period.' },
+  { of: 'mendoza', title: 'Ministerial intervention after a decline',
+    type: 'rq_ministerial_intervention', status: 'open', priority: 'high',
+    nextAction: 'Submissions to be settled with the client',
+    nextActionDue: '2026-10-08',
+    summary: 'Appeal rights exhausted. Character is the obstacle and a waiver was '
+      + 'refused.',
+    notes: ['Client understands there is no right of appeal from this decision.'] },
+  { of: 'hoang', title: 'Response to a deportation liability notice',
+    type: 'reply_deportation_liability_response', status: 'lodged',
+    lodged: '2026-09-01', due: '2026-09-15', priority: 'urgent',
+    nextAction: 'Fourteen day deadline — confirm INZ has the submissions',
+    nextActionDue: '2026-09-15',
+    summary: 'Liability arose from a condition breach on the visa above. '
+      + 'Submissions filed within the fourteen days.',
+    tasks: [{ title: 'Confirm receipt of the submissions', due: '2026-09-12' }] },
 ];
-
-// ---------------------------------------------------------------------------
-// The quotations
-// ---------------------------------------------------------------------------
 
 const QUOTES: SeedQuote[] = [
   { of: 'okafor', description: 'AEWV renewal and partner work visa', amount: 320000, gst: 48000,

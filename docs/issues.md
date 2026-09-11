@@ -152,6 +152,24 @@ Every workflow run warns that `actions/checkout@v4`, `actions/setup-node@v4` and
 **The fix:** move to the next major version of each action. Ten minutes, and
 worth doing before it becomes an emergency rather than after.
 
+### 10. *(Fixed 12 September 2026)* Six kinds of matter showed a code, not a name
+
+**Found** 12 September 2026, while rebuilding the try-it caseload.
+**Severity when found:** medium — it was the first thing a prospective customer
+would have seen.
+
+Six of the twelve case types the seeded caseload used — `advice_general`,
+`other_s61`, `rv_skilled`, `sv_dependent_child`, `emp_accreditation`,
+`other_other` — are not keys in `core/vocabulary.ts`. A matter carrying one
+displays the raw key where every other matter displays a label.
+
+Only the caseload loaded from the Test Data page was affected; no real matter
+used any of them.
+
+**Fixed:** every type in the new caseload is a key the vocabulary carries, and
+`test/testseed.test.ts` now reads the vocabulary itself and refuses a type that
+is not in it.
+
 ### 9. A dead counter row in the practice's register
 
 **Found** 12 September 2026, while checking issue 1.
@@ -173,7 +191,7 @@ Not faults — work the practice has asked for that has not landed.
 
 | | Asked | Status |
 |---|---|---|
-| A seeded caseload for the trial: 20 matters, 5 simple, 10 complicated, 5 unusual, people from different countries | 12 Sep | not started |
+| A seeded caseload for the trial: 20 matters, 5 simple, 10 complicated, 5 unusual, people from different countries | 12 Sep | **done**, 1.58.0 |
 | A preview button for the quotation and the letter of engagement in settings | 12 Sep | not started |
 | Email and the AI switched on for the trial | — | off by choice; say the word |
 

@@ -7,6 +7,42 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.58.0 — 12 September 2026
+
+### Changed
+**The practice caseload you can load to try the register is rebuilt.** *"give it
+20 cases, varied, with people from different countries, make 5 simple ones and
+10 complicated and 5 unusual applications."*
+
+Twenty matters now, in that mix:
+
+- **Five that are simply done** — a further student visa, a passport transfer, a
+  dependent child, a visitor visa, a post study work visa.
+- **Ten that are work** — an AEWV renewal with the partner filed alongside,
+  residence from work for a couple, an accreditation renewal, a job check held
+  up waiting on the employer, a residence application stuck on a medical waiver,
+  and a partnership residence that was **declined** with the appeal clock
+  running.
+- **Five that are unusual** — a section 61 request after an overstay, a visitor
+  visa declined on bona fides and the reconsideration of it, a ministerial
+  intervention with no appeal rights left, and a response to a deportation
+  liability notice with a fourteen day deadline.
+
+Sixteen people, fourteen nationalities, and the twenty matters sit on **eleven
+files rather than twenty** — eight of those files carry more than one matter and
+one carries three. A file with a single matter on it shows none of what the
+register is actually for.
+
+### Fixed
+**Six kinds of matter were showing a code instead of a name.** The old caseload
+used case types that are not in your own list — so those matters read
+`advice_general` or `rv_skilled` on screen, where every other matter reads
+"OT. Advice Only" or "RV. SMC". Every type in the new caseload is one your list
+carries, and the tests now read your list and refuse anything that is not on it.
+
+It only ever affected the caseload you load to try the register. No real matter
+was affected.
+
 ## 1.57.0 — 12 September 2026
 
 ### Added
