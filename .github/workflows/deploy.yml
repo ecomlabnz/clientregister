@@ -166,13 +166,19 @@ jobs:
       # and audited by the job this one needs. Running them twice would only
       # make the trial slower to reach.
 
+      # `--env trial` is not decoration. Without it Wrangler looks the database
+      # up in the **top-level** config, where the trial's is not — it is inside
+      # `env.trial` — and the run fails with "Couldn't find a D1 DB with the
+      # name or binding 'clientregister-trial-db' in your wrangler.jsonc file."
+      # Which is what happened the first time a trial was configured, on
+      # 12 September 2026.
       - name: Apply D1 migrations
         if: steps.gate.outputs.on == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 migrations apply clientregister-trial-db --remote
+          command: d1 migrations apply clientregister-trial-db --remote --env trial
 
       - name: Deploy Worker
         if: steps.gate.outputs.on == 'true'

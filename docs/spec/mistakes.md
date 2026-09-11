@@ -706,6 +706,46 @@ because the thing it guards is the thing that deploys. What can be checked
 locally is checked: `test/tenancy.test.ts` now refuses any job-level `if` that
 mentions `secrets.`, and refuses a step in that job without a gate.
 
+
+### 41. A command reads the top-level configuration unless told which environment
+
+**What happened.** The trial practice was switched on, and its deploy failed at
+the first step:
+
+```
+Couldn't find a D1 DB with the name or binding 'clientregister-trial-db'
+in your wrangler.jsonc file.
+```
+
+It is in that file. It is inside `env.trial`, and
+
+```
+wrangler d1 migrations apply clientregister-trial-db --remote
+```
+
+looks in the **top level** and nowhere else. `--env trial` was on the deploy
+command and on the secret upload, and missing from the one command that runs
+first.
+
+The test asserted the workflow contained `d1 migrations apply <name> --remote`.
+It did. Written the day before, one hour after fault 40 said what that kind of
+test is worth.
+
+**The rule.** **Every Wrangler command for a practice other than the first
+carries `--env <name>`** — migrations, deploy, secrets, all of them. Not only
+the ones that obviously touch bindings: the lookup happens before the command
+does anything, so the first command is where it bites.
+
+Guarded by asserting the environment name is on the migration command for every
+environment declared in `wrangler.jsonc`, rather than that some string is
+present — and the guard was then broken on purpose to watch the test fail,
+which is the step that separates it from the one it replaced.
+
+**The reproduction is local and takes a second**, which is the part worth
+keeping: `wrangler d1 migrations list <name> --local` fails exactly as the
+deploy did, and with `--env trial` lists all 92 migrations. No API token, no
+push, no waiting for a run.
+
 ---
 
 ---

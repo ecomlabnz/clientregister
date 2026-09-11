@@ -42,6 +42,12 @@ secret. That is the switch: no secret, no job, no Worker.
    `clientregister-trial-db` and deploys `clientregister-trial`, after the
    practice's own register has finished. The run prints the `workers.dev`
    address.
+
+   Every Wrangler command for a practice other than the first carries
+   `--env <name>` — migrations included. Without it the command reads the
+   top-level configuration, does not find that practice's database, and fails
+   before doing anything. Checking that by hand takes a second and needs no
+   token: `npx wrangler d1 migrations list <database> --local --env <name>`.
 3. **Put that address into `wrangler.jsonc`** as the trial's `APP_ORIGIN`. It
    is deliberately empty until then: it builds links in the nightly automation
    output, and a wrong address there is worse than none.
