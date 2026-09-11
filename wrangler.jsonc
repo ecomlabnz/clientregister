@@ -155,13 +155,17 @@
 
       "ai": { "binding": "AI" },
 
-      // No R2 bucket yet, deliberately. R2 honours a location hint only on the
-      // first creation of a name — see the note on the bucket above — and a
-      // bucket created from this account's API rather than from a browser in
-      // New Zealand would be pinned to the wrong side of the world for good.
-      // So it is created by hand, from the dashboard, in New Zealand, and added
-      // here afterwards. Until then the register reports document storage as
-      // not enabled, which it handles on every page that uses it.
+      // Created 12 September 2026 by `Create a practice's storage`, with
+      // `--location oc`, and confirmed afterwards to have landed in Oceania —
+      // from a GitHub runner in the United States, which is the whole point of
+      // saying the location rather than letting "automatic" choose it.
+      //
+      // Binding it is what gives the trial two things at once: somewhere to
+      // keep documents, and somewhere for the nightly backup to be written.
+      // Until this line existed it had neither, and its Exports page said so.
+      "r2_buckets": [
+        { "binding": "DOCS", "bucket_name": "clientregister-trial-files" }
+      ],
 
       "vars": {
         "APP_NAME": "Client Register",
