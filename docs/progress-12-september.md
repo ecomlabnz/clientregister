@@ -322,6 +322,20 @@ permission is checked where it is spent, not only where it is issued.**
 
 ---
 
+## 11. And the last piece of it
+
+The card on Settings → Maintenance that removed demonstration data went with the
+workflow, in 1.62.0. It only ever appeared when such rows were in the register,
+so before deleting it both registers were read: yours holds **245 clients and
+199 matters, every one of them real** and not one demonstration row; the trial
+holds nothing at all. A card that can never appear is a thing to delete rather
+than carry.
+
+Nothing was deleted from your register, and Settings → Test data — your own way
+of laying down a caseload to practise on — is untouched and is now the only one.
+
+---
+
 ## What is waiting on you
 
 Both of the things that were waiting on you were answered on 12 September and

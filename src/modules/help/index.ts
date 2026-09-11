@@ -94,6 +94,19 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.62.0', date: '12 September 2026',
+    notes: [
+      'The old button in the build pipeline that could write invented clients straight into your '
+        + 'live register is gone. Settings \u2192 Test data replaced it weeks ago, and that one '
+        + 'marks every row it creates and can take them out again.',
+      'The \u201cRemove all demonstration data\u201d card on Settings \u2192 Maintenance went '
+        + 'with it. It only ever appeared when such rows existed, and there are none in either '
+        + 'register.',
+      'Nothing to do. Nothing was deleted from your register, and Settings \u2192 Test data is '
+        + 'unchanged.',
+    ],
+  },
+  {
     version: '1.61.0', date: '12 September 2026',
     notes: [
       'The link you send a client with a quotation is now shown only to whoever may send one '

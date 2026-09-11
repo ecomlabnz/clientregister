@@ -312,10 +312,17 @@ click, using the same credentials as a deploy. It was **deleted on 12 September
 does the same job from inside the register. Nothing replaces it in the pipeline:
 test data is laid down by a person signed in as an administrator, not by CI.
 
-A register that was seeded by that old workflow may still hold rows whose
-identifier begins `demo_`. Admin → Maintenance offers one-click removal of
-those, constrained to that prefix so it cannot reach a real record, and the
-card only appears when there are any.
+The card on Admin → Maintenance that removed those rows went too, in 1.62.0.
+It only ever appeared when rows whose identifier began `demo_` were present, and
+both registers were checked before it was deleted: the practice's holds 245
+clients and 199 matters and not one such row; the trial holds nothing at all.
+A card that can never appear is a thing to delete, not to carry.
+
+**If a register ever does turn up with `demo_` rows** — a copy restored from an
+old backup, say — they are removed with a `DELETE` against that prefix. The
+statements are in the history of `scripts/seed-demo-remove.sql`, deleted in the
+same change. That is a deliberate trade: the button was standing code paid for
+every day against an event that has not happened and now cannot.
 
 ## Backups
 

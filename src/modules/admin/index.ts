@@ -232,12 +232,10 @@ export const adminModule: AppModule = {
     r.get('/', requirePermission('admin:settings'), async (c) => {
       const env = c.env;
       const tab = c.req.query('tab') ?? 'overview';
-      const [users, pendingIngest, queuedMail, demoCount, aiModel] = await Promise.all([
+      const [users, pendingIngest, queuedMail, aiModel] = await Promise.all([
         count(env.DB, 'SELECT COUNT(*) AS n FROM users'),
         count(env.DB, `SELECT COUNT(*) AS n FROM ingest_messages WHERE status = 'pending'`),
         count(env.DB, `SELECT COUNT(*) AS n FROM outbound_emails WHERE status = 'queued'`),
-        count(env.DB, `SELECT (SELECT COUNT(*) FROM clients WHERE id LIKE 'demo\\_%' ESCAPE '\\')
-                            + (SELECT COUNT(*) FROM cases WHERE id LIKE 'demo\\_%' ESCAPE '\\') AS n`),
         currentModel(env),
       ]);
 
@@ -317,19 +315,6 @@ export const adminModule: AppModule = {
                 <td class="small">${(m.basePaths ?? []).map((p) => html`<code>${p}</code> `)}</td></tr>`))}`) : ''}
 
         ${tab === 'maintenance' ? html`
-        ${demoCount > 0 ? card('Demonstration data', html`
-          ${'' /* Marked three ways so none of it can be mistaken for a real file: every
-                   identifier begins `demo_`, every client note starts [TEST DATA], and every
-                   case carries the red Test data tag. */}
-          <p>This register contains <strong>${demoCount}</strong> fabricated client and case
-             records — <a href="/cases?tag=Test+data&scope=all">see them all</a>.</p>
-          <form method="post" action="/admin/demo-data/remove"
-                data-confirm="Delete all ${demoCount} demonstration records? Real records are untouched.">
-            ${csrfField(c.get('session')!.csrf)}
-            <button class="btn btn-danger" type="submit">Remove all demonstration data</button>
-          </form>
-          <p class="hint">Only rows whose identifier begins <code>demo_</code> are removed.</p>`) : ''}
-
         ${inboxCredentials(c.env) ? card('Forwarded mail', html`
           <p>Reading <strong>${c.env.GMAIL_INBOX_ADDRESS ?? 'the authorised mailbox'}</strong>
              every five minutes.</p>
@@ -350,56 +335,6 @@ export const adminModule: AppModule = {
           </form>
           ${'' /* Mail queues rather than failing when no transport is configured, so nothing
                    is lost while one is being set up. */}`)}` : ''}`);
-    });
-
-    /**
-     * Remove the demonstration data.
-     *
-     * Every statement is constrained to identifiers beginning `demo_`, which is
-     * the only thing that makes this safe to expose as a button: it cannot
-     * reach a real record however it is called.
-     */
-    r.post('/demo-data/remove', requirePermission('admin:settings'), async (c) => {
-      const like = `demo\\_%`;
-      /*
-       * Two shapes of demo row, and both must go. Rows created AS the
-       * demonstration data carry an id beginning `demo_`. But rows created
-       * later THROUGH the application against a demo record — the note written
-       * when a demo task was completed, a status change, an AI run over a demo
-       * file — carry real ids and only *reference* `demo_…`. The first version
-       * of this clear matched on own-id alone and left that second shape
-       * behind on the live register (migration 0043 swept it up). So every
-       * table that can accumulate work against a matter or client is cleared
-       * by its references too.
-       */
-      const tables = [
-        'DELETE FROM case_tags WHERE case_id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM tags WHERE id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM case_followups WHERE case_id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM case_parties WHERE id LIKE ? ESCAPE \'\\\' OR case_id LIKE ? ESCAPE \'\\\' OR client_id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM quotes WHERE id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM tasks WHERE id LIKE ? ESCAPE \'\\\' OR entity_id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM entries WHERE id LIKE ? ESCAPE \'\\\' OR entity_id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM ai_runs WHERE id LIKE ? ESCAPE \'\\\' OR entity_id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM case_status_history WHERE id LIKE ? ESCAPE \'\\\' OR case_id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM cases WHERE id LIKE ? ESCAPE \'\\\'',
-        'DELETE FROM clients WHERE id LIKE ? ESCAPE \'\\\'',
-      ];
-      await c.env.DB.batch(tables.map((sql) =>
-        c.env.DB.prepare(sql).bind(...Array<string>(sql.split('?').length - 1).fill(like))));
-
-      // Hand the next real record a reference that is not already in use.
-      await c.env.DB.batch([
-        c.env.DB.prepare(`UPDATE counters SET value =
-          (SELECT COALESCE(MAX(CAST(SUBSTR(ref, 4) AS INTEGER)), 0) FROM clients) WHERE name = 'client'`),
-        c.env.DB.prepare(`UPDATE counters SET value =
-          (SELECT COALESCE(MAX(CAST(SUBSTR(ref, 6) AS INTEGER)), 0) FROM cases) WHERE name = 'case'`),
-        c.env.DB.prepare(`UPDATE counters SET value =
-          (SELECT COALESCE(MAX(CAST(SUBSTR(ref, 3) AS INTEGER)), 0) FROM quotes) WHERE name = 'quote'`),
-      ]);
-
-      await auditFrom(c, { action: 'admin.demo_data_removed' });
-      return redirectWith(c, '/admin', 'Demonstration data removed. Real records are untouched.');
     });
 
     /**
