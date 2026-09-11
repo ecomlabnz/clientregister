@@ -184,7 +184,27 @@ export interface BackupSummary {
  * can write an audit row saying what was taken rather than that something was.
  */
 export async function makeBackup(
-  env: Env, opts: { version: string; takenBy: string },
+  env: Env,
+  opts: {
+    version: string;
+    takenBy: string;
+    /**
+     * Whether the documents themselves go in. Default true — a backup missing
+     * them cannot restore the register, which is the one job it has.
+     *
+     * **The nightly backup sets it false, deliberately.** Two reasons, and the
+     * second is the one that matters. The documents already live in R2, and the
+     * nightly archive is written to R2: copying them from a bucket into a file
+     * in the same bucket buys nothing against the failure it is guarding — a
+     * database lost or corrupted. And the whole archive is built in memory
+     * inside a Worker, so an archive that grows with every document uploaded is
+     * a backup that works every night until the night it quietly stops.
+     *
+     * The manual button keeps them. That one is for taking the register away
+     * with you, and there it is the whole point. See `core/autobackup.ts`.
+     */
+    includeFiles?: boolean;
+  },
 ): Promise<{ zip: Uint8Array; summary: BackupSummary }> {
   const takenAt = new Date();
   const stamp = takenAt.toISOString();
@@ -258,7 +278,7 @@ export async function makeBackup(
   // The files themselves. A row naming a file the archive does not hold is a
   // reference to nothing, which is the failure a backup exists to prevent.
   let fileBytes = 0;
-  const keys = await all<{ r2_key: string }>(
+  const keys = opts.includeFiles === false ? [] : await all<{ r2_key: string }>(
     env.DB,
     `SELECT r2_key FROM documents WHERE r2_key NOT LIKE 'link:%'
       UNION SELECT r2_key FROM kb_documents`,
@@ -283,6 +303,7 @@ export async function makeBackup(
       files: entries.filter((e) => e.name.startsWith('files/')).length,
       file_bytes: fileBytes,
       contains_passport_numbers: true,
+      contains_documents: opts.includeFiles !== false,
     }, null, 1),
   });
 

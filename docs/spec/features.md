@@ -409,7 +409,7 @@ Settings: **AI Assistant** (2 keys)
 | POST | `/admin/users/:id` |
 | POST | `/admin/users/:id/reset-password` |
 
-Settings: **Practice** (15 keys), **Practice caseload** (1 keys)
+Settings: **Practice** (15 keys), **Nightly backup** (2 keys), **Practice caseload** (1 keys)
 
 ### `help` — Help
 

@@ -207,10 +207,13 @@ half the practices on the new code. At that point:
 Not blockers for a trial with invented data. All blockers before real client
 files belonging to somebody else are held here.
 
-1. **There is still no automated backup.** It is the largest single risk in
-   this register today and it grows by one practice. Holding another firm's
-   client files with no backup is a different kind of promise from holding your
-   own.
+1. **The backup.** Shipped 12 September 2026: nightly, verified, kept for 30
+   days. Two things about it still bear on this document. It is written inside
+   the same Cloudflare account, so it answers a lost database and not a lost
+   account. And **a practice with no R2 bucket has no automatic backup at all**
+   — which is the trial's position today, and would be any new practice's on the
+   day it is set up. Creating the bucket is part of setting one up, not an
+   optional extra.
 2. **Support access.** When a practice says "it is broken", somebody has to
    look — and looking means reading their clients' files. Decide what that
    access is, that it is logged, and what the practice is told about it, before

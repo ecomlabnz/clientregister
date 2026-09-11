@@ -158,10 +158,15 @@ inside the application, because every query is *supposed* to return everything.
 **Still true, and still the order of work:** the shape and running routines of
 the app settle first. A second practice is still set up by hand, and that will
 not scale past about ten. The automation is worth building once somebody has
-paid — and **before another firm's files are held here at all, the backup is.**
+paid. **The backup landed on 12 September 2026** — nightly, into R2, verified by
+reading the bytes back, with the date on Settings → Exports and backups. What is
+still true is that it is written inside the same Cloudflare account: it answers a
+lost database, not a lost account. A trial with no R2 bucket has no automatic
+backup at all and says so.
 
-One thing to do before another practice's files are held here at all: **there is
-still no automated backup.** See `docs/operations.md`.
+The automatic backup that used to be named here as the last thing outstanding
+shipped on 12 September 2026. What remains of it — a copy outside the Cloudflare
+account, and a bucket for the trial — is in `docs/operations.md`.
 
 ## The other standing decisions
 

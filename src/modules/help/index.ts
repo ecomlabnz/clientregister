@@ -94,6 +94,20 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.57.0', date: '12 September 2026',
+    notes: [
+      'The register now backs itself up every night, on its own. It writes a copy of everything '
+        + 'and then reads it back to check it is really there.',
+      'Settings \u2192 Exports and backups shows the date of the last one. No backup for two '
+        + 'nights and there is a red band. That is the page to look at if you ever wonder.',
+      'It protects you from a lost or damaged database. It does not protect you from losing the '
+        + 'Cloudflare account, because the copy is kept inside it \u2014 so press the full backup '
+        + 'button now and then and keep that file somewhere else.',
+      'Two settings under Settings \u2192 Nightly backup: whether it runs, and how many to keep. '
+        + 'The newest is never deleted, whatever you set.',
+    ],
+  },
+  {
     version: '1.56.0', date: '12 September 2026',
     notes: [
       'Read a document into a client\u2019s file, not only into a matter. The same card, above '

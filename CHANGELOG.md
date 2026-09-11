@@ -7,6 +7,46 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.57.0 — 12 September 2026
+
+### Added
+**The register backs itself up every night.** *"lets build auto back up on the
+main."*
+
+Until today the only backup was the button you had to remember to press. A
+backup that depends on somebody remembering is a backup that exists until the
+week they are busy — which is the week they need it.
+
+From tonight it happens on its own, at 7pm, as part of the run that already
+expires quotes and sets your reminders. It writes a copy of the whole register
+into storage, **reads it back to check it is really there**, and keeps the last
+30. The newest is never deleted, whatever the setting says.
+
+**Go to Settings → Exports and backups to see whether it is working.** It shows
+a date, not a tick. No backup for two nights and there is a red band. That is
+the page to look at if you ever wonder.
+
+**What it protects you from:** rows deleted by mistake, a bad change, the
+database itself lost. That is the likely bad day.
+
+**What it does not:** losing the Cloudflare account, because the copy is kept
+inside it. For that, press the button on the same page now and then and keep
+that file somewhere else — that one is the whole register including the
+documents.
+
+The nightly one leaves the documents out on purpose. They already sit in the
+same storage the backup is written to, so copying them there again protects
+nothing — and an archive that grows with every document uploaded is one that
+works every night until the night it quietly stops.
+
+**Two settings**, under Settings → Nightly backup: whether it runs, and how many
+to keep.
+
+### Note
+**The trial register has no automatic backup yet**, and its Exports page says
+so in those words. It has no file storage, and that is what a backup is written
+to. Creating it is the step that turns its backups on.
+
 ## 1.56.0 — 12 September 2026
 
 ### Added

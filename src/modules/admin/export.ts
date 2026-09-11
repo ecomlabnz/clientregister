@@ -26,6 +26,8 @@ import { auditFrom } from '../../core/audit';
 import { all } from '../../core/db';
 import { exportFilename, toCsv } from '../../core/csv';
 import { backupFilename, makeBackup } from '../../core/backup';
+import { backupState } from '../../core/autobackup';
+import { dateShort } from '../../ui/format';
 import { can } from '../../core/rbac';
 import { APP_VERSION } from '../../version';
 import { page } from '../../ui/layout';
@@ -253,6 +255,7 @@ const MAX_ROWS = 20_000;
 export function registerExportRoutes(r: Hono<AppContext>): void {
   r.get('/export', requirePermission('admin:settings'), async (c) => {
     const counts = await countEach(c.env);
+    const backup = await backupState(c.env);
     return page(c, { title: 'Export', active: '/admin' }, html`
       ${pageHeader('Export', 'Your records, as files you can open anywhere.')}
       ${adminTabs('export')}
@@ -273,6 +276,45 @@ export function registerExportRoutes(r: Hono<AppContext>): void {
             <td class="small muted">${set.description}</td>
             <td><a class="btn btn-secondary btn-small" href="${`/admin/export/${set.key}.csv`}">Download</a></td>
           </tr>`), { fixed: true })}`)}
+
+      ${'' /* **Whether the nightly backup is actually happening.**
+               A backup that stops is worse than none, because it is believed
+               in — so this is drawn before the button rather than after it, and
+               says the date rather than "enabled". Asked for on 12 September
+               2026; see `core/autobackup.ts`. */}
+      ${can(c.get('user')!, 'backup:take') ? card('Every night, by itself', html`
+        ${!backup.possible ? html`
+          <div class="alert alert-warn">
+            <p><strong>There is nowhere to write one.</strong> This register has no document
+               store, so nothing is being backed up automatically. Everything else works;
+               this does not.</p>
+          </div>`
+          : !backup.enabled ? html`
+          <div class="alert alert-warn">
+            <p><strong>Nightly backups are switched off.</strong> Turn them on under
+               Settings → Nightly backup.</p>
+          </div>`
+          : backup.stale ? html`
+          <div class="alert alert-error">
+            <p><strong>${backup.lastAt
+              ? `The last backup was ${dateShort(backup.lastAt)}.`
+              : 'No backup has been taken yet.'}</strong>
+               One is due every night. If this does not clear by tomorrow morning, something
+               is wrong and the register is running without a copy.</p>
+          </div>`
+          : html`
+          <div class="alert">
+            <p><strong>Last backup: ${dateShort(backup.lastAt!)}.</strong>
+               ${backup.lastBytes ? `${Math.max(1, Math.round(backup.lastBytes / 1024))} KB.` : ''}
+               Taken automatically, every night.</p>
+          </div>`}
+        <p class="small">It holds every table and every column, including passport numbers — the
+           whole register except the documents themselves, which are already in the same store it
+           is written to. It is kept for 30 nights by default, and the newest is never removed.</p>
+        <p class="hint">This protects against the database: rows deleted by mistake, a bad change,
+           the database itself gone. It does <strong>not</strong> protect against losing the
+           Cloudflare account, because it is written inside it. For that, take one of the copies
+           below and keep it somewhere else.</p>`) : ''}
 
       ${can(c.get('user')!, 'backup:take') ? card('A copy of everything', html`
         <p class="small">The exports above are for reading somewhere else. This is the other thing:

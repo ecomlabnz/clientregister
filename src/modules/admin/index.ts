@@ -170,6 +170,34 @@ export function adminTabs(current: string): Raw {
  * the register on sets it to 15; the practice's own leaves it alone and the
  * nightly check does nothing for ever.
  */
+/**
+ * The nightly backup.
+ *
+ * **Asked for on 12 September 2026:** *"lets build auto back up on the main and
+ * see how it is going to be deployed on the trial."* See `core/autobackup.ts`
+ * for what it protects against and what it does not.
+ *
+ * Both settings exist so a practice can turn it down, never off by accident:
+ * the default is on, and `keep` never removes the newest archive whatever it
+ * is set to.
+ */
+export const BACKUP_SETTINGS: SettingsGroup = {
+  id: 'backup',
+  title: 'Nightly backup',
+  description: 'A copy of the whole register, written every night without anybody '
+    + 'pressing anything.',
+  order: 85,
+  settings: [
+    { key: 'backup.nightly', type: 'boolean',
+      label: 'Take a backup every night', default: '1',
+      help: 'On unless you have a reason. A register with this off has only the copy '
+        + 'Cloudflare keeps, which is not one you hold.' },
+    { key: 'backup.keep', type: 'integer',
+      label: 'How many nightly backups to keep', default: '30', min: 1, max: 365,
+      help: 'Older ones are removed. The newest is never removed, whatever this says.' },
+  ],
+};
+
 export const TEST_DATA_SETTINGS: SettingsGroup = {
   id: 'testdata',
   title: 'Practice caseload',
@@ -188,7 +216,7 @@ export const adminModule: AppModule = {
   name: 'admin',
   title: 'Settings',
   basePaths: ['/admin'],
-  settings: [PRACTICE_SETTINGS, TEST_DATA_SETTINGS],
+  settings: [PRACTICE_SETTINGS, BACKUP_SETTINGS, TEST_DATA_SETTINGS],
   nav: [{ href: '/admin', label: 'Settings', permission: 'admin:settings', order: 10, corner: true }],
 
   register(app) {
