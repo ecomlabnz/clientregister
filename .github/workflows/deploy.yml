@@ -114,9 +114,18 @@ jobs:
   #  * **`needs: deploy`.** The practice's own register goes out first and
   #    alone. A trial that fails to deploy cannot hold up, block or roll back
   #    the register that is in daily use.
-  #  * **Gated on `TRIAL_SETUP_TOKEN`.** No such secret, no trial, no job — so
-  #    this is inert until somebody deliberately turns it on, and turning it off
-  #    again is deleting one secret.
+  #  * **Gated on `TRIAL_SETUP_TOKEN`.** No such secret and every step below is
+  #    skipped, so this is inert until somebody deliberately turns it on, and
+  #    turning it off again is deleting one secret.
+  #
+  #    The gate is a step rather than the job's own `if:`, and that is not a
+  #    style choice — **the `secrets` context is not available in a job-level
+  #    `if`**, and a workflow that uses it there is rejected whole, before any
+  #    job runs. Which is how it was first written here, and it cost the
+  #    deployment of one commit on 12 September 2026: no jobs ran at all, so the
+  #    practice's own register did not deploy either. Hence also the very first
+  #    step: it needs no secret and no network, so a workflow that parses always
+  #    produces a job that started.
   #  * **Its own everything.** Its own database, its own sessions, its own
   #    secrets, mapped from `TRIAL_`-prefixed repository secrets onto the names
   #    the Worker reads. Nothing is shared with the practice's Worker but the
@@ -125,17 +134,32 @@ jobs:
   deploy-trial:
     runs-on: ubuntu-latest
     needs: deploy
-    if: ${{ secrets.TRIAL_SETUP_TOKEN != '' }}
     environment: trial
     steps:
+      - name: Is a trial register configured?
+        id: gate
+        env:
+          TRIAL_SETUP_TOKEN: ${{ secrets.TRIAL_SETUP_TOKEN }}
+        run: |
+          if [ -n "$TRIAL_SETUP_TOKEN" ]; then
+            echo "on=true" >> "$GITHUB_OUTPUT"
+            echo "A trial register is configured; deploying it."
+          else
+            echo "No TRIAL_SETUP_TOKEN, so there is no trial register to deploy."
+            echo "See docs/operations.md to turn one on."
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.gate.outputs.on == 'true'
 
       - uses: actions/setup-node@v4
+        if: steps.gate.outputs.on == 'true'
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
+        if: steps.gate.outputs.on == 'true'
         run: npm ci
 
       # Not re-run here: the same commit has already been typechecked, tested
@@ -143,6 +167,7 @@ jobs:
       # make the trial slower to reach.
 
       - name: Apply D1 migrations
+        if: steps.gate.outputs.on == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -150,6 +175,7 @@ jobs:
           command: d1 migrations apply clientregister-trial-db --remote
 
       - name: Deploy Worker
+        if: steps.gate.outputs.on == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -161,6 +187,7 @@ jobs:
       # token and gain mail, Drive and the AI later.
       - name: Collect configured secrets
         id: collect
+        if: steps.gate.outputs.on == 'true'
         env:
           SETUP_TOKEN: ${{ secrets.TRIAL_SETUP_TOKEN }}
           MAIL_PROVIDER: ${{ secrets.TRIAL_MAIL_PROVIDER }}

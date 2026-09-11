@@ -673,6 +673,39 @@ in any label — matters, quotations, pickers — read `FAMILY, Given`; the clie
 own record still reads `Given FAMILY`, which is the order a letter is addressed
 in. Two jobs, two orders, one place composing each.
 
+
+### 40. A workflow that cannot be parsed runs nothing, including the parts that were fine
+
+**What happened.** A second deploy job was added for a trial practice, gated so
+it would do nothing until somebody configured one:
+
+```yaml
+  deploy-trial:
+    if: ${{ secrets.TRIAL_SETUP_TOKEN != '' }}
+```
+
+**The `secrets` context is not available in a job-level `if`.** GitHub rejected
+the whole workflow file rather than that one job, so the run finished in under a
+second having started **no jobs at all** — including the practice's own deploy,
+which had nothing to do with the change. The commit did not deploy. It happened
+to carry no application code, which is luck rather than design.
+
+The gate was tested. The test asserted the literal line was in the file, which
+it was.
+
+**The rule.** **A gate goes in a step, not in a job's `if:`**, where `secrets`
+is available and where a mistake costs one step. And the first step of any
+gated job needs no secret and no network, so a workflow that parses always
+produces a job that visibly started.
+
+More generally: **a workflow file is executed by something that is not in this
+repository and cannot be run here.** A test that the file *contains* a line
+proves the line was typed and nothing else — the same fault as every other
+source-reading test in this list, arriving where it is hardest to notice,
+because the thing it guards is the thing that deploys. What can be checked
+locally is checked: `test/tenancy.test.ts` now refuses any job-level `if` that
+mentions `secrets.`, and refuses a step in that job without a gate.
+
 ---
 
 ---
