@@ -100,6 +100,17 @@ describe('every configured database is migrated by the deploy', () => {
   });
 
   it('does not deploy a second register unless one is deliberately configured', () => {
-    expect(workflow).toContain("if: ${{ secrets.TRIAL_SETUP_TOKEN != '' }}");
+    expect(workflow).toContain('TRIAL_SETUP_TOKEN: ${{ secrets.TRIAL_SETUP_TOKEN }}');
+    expect(workflow).toContain("if: steps.gate.outputs.on == 'true'");
+  });
+
+  it('does not gate a job on a secret, which is a workflow that never runs', () => {
+    // The `secrets` context is not available in a job-level `if`, and a
+    // workflow using it there is rejected whole — no jobs at all, including
+    // the practice's own deploy. That is what happened on 12 September 2026.
+    const jobIfs = [...workflow.matchAll(/^ {4}if: (.+)$/gm)].map((m) => m[1]!);
+    for (const condition of jobIfs) {
+      expect(condition, 'a job-level if may not read secrets').not.toContain('secrets.');
+    }
   });
 });
