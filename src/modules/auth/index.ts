@@ -18,7 +18,7 @@ import {
   clearSessionCookie, createSession, destroySessionBySid, revokeAllSessions,
   saveSession, sessionTokenFrom, setSessionCookie, sessionLabel,
 } from '../../core/session';
-import { authenticate, requireAuth, validatePassword } from '../../core/auth';
+import { authenticate, requireAuth, requirePermission, validatePassword } from '../../core/auth';
 import {
   SHORTCUT_PATH, createUploadToken, revokeUploadToken, uploadTokensFor,
 } from '../../core/uploadtokens';
@@ -36,7 +36,7 @@ import {
   badge, card, csrfField, errorList, field, pageHeader, select, stamp, table,
 } from '../../ui/components';
 import { dateTime } from '../../ui/format';
-import { ROLE_LABELS } from '../../core/rbac';
+import { ROLE_LABELS, can } from '../../core/rbac';
 import type { ColourMode, Theme } from '../../ui/theme';
 import {
   COLOUR_MODES, COLOUR_MODE_LABELS, THEMES, THEME_INFO, colourModeOf, isColourMode, isTheme, themeOf,
@@ -365,6 +365,28 @@ export const authModule: AppModule = {
       const prefs = await preferencesFor(c.env, user.id);
       // Tabs, because the account page had grown past a screen: two-factor,
       // password, appearance, preferences and every active session.
+      /*
+       * An upload token is a write credential, so the tab that makes one is
+       * not for everybody.
+       *
+       * Found on 12 September 2026 by the route × role matrix in
+       * `test/routeroles.test.ts`: the account pages sit behind `requireAuth`
+       * and nothing else, which is right for a password or a theme — they are
+       * yours — but an upload token is not about your account at all. It puts
+       * files into the practice's inbox. A "Read only" person, whose whole
+       * definition is that they change nothing, could mint one and write into
+       * the register with it.
+       *
+       * `ingest:triage` is the permission that means "work the inbox", which
+       * is where everything a token sends lands, so it is the cut: owner,
+       * administrator, specialist and assistant, not read only.
+       *
+       * The tab itself stays visible to everybody, and so does the list of
+       * tokens with its Revoke buttons. Somebody moved to "Read only" still
+       * has a token on a laptop, and the screen where they cancel it must not
+       * disappear with the permission. What goes is the form that makes one.
+       */
+      const canSendFilesIn = can(user, 'ingest:triage');
       const tab = c.req.query('tab') ?? 'security';
       const tabs = [
         { id: 'security', label: 'Security' },
@@ -482,11 +504,17 @@ export const authModule: AppModule = {
                  posts it into the inbox. The token stands in for a password because a
                  shortcut cannot sign in; it can only put things in the inbox, and revoking it
                  stops the shortcut on a lost device. The security line below stays on screen. */}
-        ${card('Sending a file in from your Mac or your phone', html`
+        ${card('Sending a file in from your Mac or your phone', canSendFilesIn
+          ? html`
           <p><strong>Treat an upload token like a password: anyone holding it can send files
              into the register.</strong></p>
           <p><a class="btn btn-primary" href="/account/shortcut">How to build the shortcut,
-             step by step</a></p>`)}
+             step by step</a></p>`
+          : html`
+          <p>Sending files in puts them in the practice's inbox, so it belongs to the people
+             who work the inbox. Your role does not, so you cannot make an upload token.</p>
+          <p class="hint">If you have a token on a device already, it still works until you
+             revoke it below.</p>`)}
 
         ${card('Your upload tokens', html`
           ${tokens.length
@@ -507,6 +535,7 @@ export const authModule: AppModule = {
                 </tr>`))
             : html`<p class="muted">No upload token yet. Make one to build your first shortcut.</p>`}
 
+          ${canSendFilesIn ? html`
           <form method="post" action="/account/upload-tokens" class="mt">
             ${csrfField(session.csrf)}
             ${field({ label: 'What is it for', name: 'label', required: true, maxlength: 80,
@@ -516,11 +545,11 @@ export const authModule: AppModule = {
           </form>
           ${'' /* The register keeps only a hash of the token, so a lost one cannot be shown
                    again — it has to be revoked and replaced. */}
-          <p class="hint">The token is shown once, on the next screen, and never again.</p>`)}
+          <p class="hint">The token is shown once, on the next screen, and never again.</p>` : ''}`)}
 
-        ${card('Where the shortcut sends to', html`
+        ${canSendFilesIn ? card('Where the shortcut sends to', html`
           <p class="key-block"><code>${uploadUrl}</code></p>
-          <p class="hint">Paste this into the shortcut's <em>Get Contents of URL</em> action.</p>`)}` : ''}
+          <p class="hint">Paste this into the shortcut's <em>Get Contents of URL</em> action.</p>`) : ''}` : ''}
 
         ${'' /* Choosing is the whole action: press a palette and the next page
                  is drawn in it. There is no Save, because there was never a
@@ -766,7 +795,7 @@ export const authModule: AppModule = {
      * form anywhere — the database holds a PBKDF2 hash, and migration 0087 has a
      * trigger that refuses a row whose secret is not one.
      */
-    r.post('/account/upload-tokens', async (c) => {
+    r.post('/account/upload-tokens', requirePermission('ingest:triage'), async (c) => {
       const user = c.get('user')!;
       const f = new FormReader(await c.req.formData());
       const label = f.text('label', { required: true, label: 'What it is for', max: 80 });
@@ -796,6 +825,13 @@ export const authModule: AppModule = {
              <a class="btn btn-secondary" href="/account?tab=shortcut">I have copied it</a></p>`)}`);
     });
 
+    /*
+     * Revoking is deliberately *not* behind `ingest:triage`, where making one
+     * is. Taking authority away must never be the thing somebody is locked out
+     * of: a person moved to "Read only" still has a token on a laptop, and the
+     * screen where they cancel it has to keep working. The statement is scoped
+     * to the owner of the token, so this can only ever destroy your own.
+     */
     r.post('/account/upload-tokens/revoke', async (c) => {
       const user = c.get('user')!;
       const f = new FormReader(await c.req.formData());
@@ -820,7 +856,7 @@ export const authModule: AppModule = {
      * repository — and a test holds the two together, so neither can quietly
      * lose a step the other still has.
      */
-    r.get('/account/shortcut', async (c) => {
+    r.get('/account/shortcut', requirePermission('ingest:triage'), async (c) => {
       const user = c.get('user')!;
       const base = (await publicBase(c.env, new URL(c.req.url).origin)).base;
       const url = `${base}${SHORTCUT_PATH}`;
