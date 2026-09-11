@@ -390,7 +390,12 @@ export const authModule: AppModule = {
       );
 
       return page(c, { title: 'My account' }, html`
-        ${pageHeader('My account', `${user.email} · ${ROLE_LABELS[user.role]}`)}
+        ${/* The name comes first. Reported 11 September 2026: *"In my profile -
+              my name is missing"* — the line under the heading had the email
+              address and the role but never the name, which is the one thing a
+              person checks a profile page to confirm is right. An administrator
+              changes it, under Settings → People. */ ''}
+        ${pageHeader('My account', `${user.name} · ${user.email} · ${ROLE_LABELS[user.role]}`)}
         <nav class="tabs">
           ${tabs.map((x) => html`
             <a class="${x.id === tab ? 'tab current' : 'tab'}" href="/account?tab=${x.id}">${x.label}</a>`)}

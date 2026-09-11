@@ -20,7 +20,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
-  actionButton, badge, csrfField, emptyState, errorList, field, flagBand, flagRaiser, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem, viewTabs,
+  actionButton, badge, csrfField, emptyState, errorList, field, flagBand, flagRaiser, foldedCard, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem, viewTabs,
   testDataBand,
 } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate, dateOrDateTime, instantForDate } from '../../ui/format';
@@ -942,7 +942,7 @@ export const casesModule: AppModule = {
 
             ${invoicesPanel}
 
-            ${foldingCard('Tasks', html`
+            ${foldedCard('Tasks', html`
               ${tasks.length === 0 ? emptyState('No tasks on this case yet.') : html`
                 <ul class="tasklist">
                   ${tasks.map((t: any) => html`
@@ -1009,7 +1009,7 @@ export const casesModule: AppModule = {
                               sources: readingSources, driveOn: driveConfigured(c.env) })
               : ''}
 
-            ${aiAvailable ? foldingCard('Brief me on this matter', html`
+            ${aiAvailable ? foldedCard('Brief me on this matter', html`
               ${brief ? html`
                 <p class="lede-sm">${brief.result.summary}</p>
                 ${brief.result.next_steps.length ? html`
@@ -1081,13 +1081,13 @@ export const casesModule: AppModule = {
                   </ul>`)
               : ''}
 
-            ${foldingCard('Files', filesPanel({
+            ${foldedCard('Files', filesPanel({
               csrf, entityType: 'case', entityId: kase.id, returnTo: `/cases/${kase.id}`,
               files: caseFiles, categories: docCats, canDelete: can(viewer, 'register:delete'),
               caseId: kase.id, linkable: writable ? linkableDocs : [],
             }))}
 
-            ${foldingCard('File notes', html`
+            ${foldedCard('File notes', html`
               ${writable ? html`
                 <form method="post" action="/cases/${kase.id}/entries" class="entry-form"
                       enctype="multipart/form-data">

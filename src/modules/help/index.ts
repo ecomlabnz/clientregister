@@ -37,6 +37,19 @@ interface Section { id: string; title: string; body: Raw }
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.48.0', date: '12 September 2026',
+    notes: [
+      'A client\u2019s Immigration tab now takes \u201cVisa conditions\u201d and a \u201cStay '
+        + 'limit\u201d \u2014 what the grant allows, and \u201c4 months per entry, 6 months in '
+        + 'any 12\u201d.',
+      'Nothing is counted from either and neither raises an alert. A stay limit only starts when '
+        + 'somebody crosses a border, and the register cannot know when that was.',
+      'On a matter, Read a document, Brief me, Files, File notes and Tasks now start closed. '
+        + 'Click the heading to open one. Status, parties and key details stay open.',
+      'My account shows your name, which it had been leaving out.',
+    ],
+  },
+  {
     version: '1.47.1', date: '12 September 2026',
     notes: [
       'Settings \u2192 Test data opens again. It had shown \u201cSomething went wrong\u201d every '

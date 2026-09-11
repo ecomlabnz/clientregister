@@ -108,6 +108,8 @@ export interface ClientRow {
   current_visa_type: string | null; current_visa_start: string | null;
   current_visa_expiry: string | null;
   current_visa_expiry_rule: string | null;
+  current_visa_conditions: string | null;
+  current_visa_stay_limit: string | null;
   inz_client_number: string | null;
   /**
    * The flat facts an application form asks for and nothing here held until
@@ -492,6 +494,22 @@ function clientForm(
             hint: 'Some grants have no date until an event happens — “24 months after first '
               + 'arrival in New Zealand”. Record the rule here; the register shows the expiry '
               + 'as not yet fixed and prompts for the date once the event has happened.' })}</div>
+          ${'' /* Both asked for on 11 September 2026, and both deliberately
+                   plain text that nothing counts from. A stay limit becomes a
+                   date only when somebody crosses a border, and the register
+                   does not know when they did: *"we often do not know when the
+                   person is entering the country - so do not want to be flooded
+                   with alerts and warnings."* Nothing here is ever read by the
+                   alerts. See migration 0088. */}
+          <div class="settings-cell">${field({ label: 'Stay limit',
+            name: 'current_visa_stay_limit', maxlength: 300,
+            value: values.current_visa_stay_limit ?? '',
+            hint: 'As the grant states it — “4 months per entry, 6 months in any 12”. '
+              + 'Nothing is counted from it and nothing alerts on it.' })}</div>
+          <div class="settings-cell-wide">${field({ label: 'Visa conditions',
+            name: 'current_visa_conditions', type: 'textarea', rows: 3, maxlength: 2000,
+            value: values.current_visa_conditions ?? '',
+            hint: 'What the grant allows and forbids, in its own words.' })}</div>
 
           <p class="settings-head subhead">Character and health</p>
           <div class="settings-cell-wide">
@@ -661,6 +679,8 @@ function readClientForm(f: FormReader, vocab: ClientVocabularies) {
     current_visa_start: f.date('current_visa_start'),
     current_visa_expiry: f.date('current_visa_expiry'),
     current_visa_expiry_rule: f.optional('current_visa_expiry_rule', { max: 200 }),
+    current_visa_conditions: f.optional('current_visa_conditions', { max: 2000 }),
+    current_visa_stay_limit: f.optional('current_visa_stay_limit', { max: 300 }),
     inz_client_number: inzClientNumber,
     // --- the flat facts an application form asks for (migration 0084) -------
     title: fromList('title', vocab.titles, 'titles'),
@@ -1276,18 +1296,20 @@ export const clientsModule: AppModule = {
             email, phone, whatsapp, telegram_username, telegram_user_id,
             date_of_birth,
             english_test_type, english_test_score, english_test_date,
-            current_visa_type, current_visa_start, current_visa_expiry, current_visa_expiry_rule, inz_client_number,
+            current_visa_type, current_visa_start, current_visa_expiry, current_visa_expiry_rule,
+            current_visa_conditions, current_visa_stay_limit, inz_client_number,
             title, gender, relationship_status, other_names,
             birth_country, birth_region, birth_town,
             national_id_number, national_id_country,
             address, status, assigned_to, notes,
             created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, ref, v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
         v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
-        v.current_visa_type, v.current_visa_start, v.current_visa_expiry, v.current_visa_expiry_rule, v.inz_client_number,
+        v.current_visa_type, v.current_visa_start, v.current_visa_expiry, v.current_visa_expiry_rule,
+        v.current_visa_conditions, v.current_visa_stay_limit, v.inz_client_number,
         v.title, v.gender, v.relationship_status, v.other_names,
         v.birth_country, v.birth_region, v.birth_town,
         v.national_id_number, v.national_id_country,
@@ -1818,6 +1840,15 @@ export const clientsModule: AppModule = {
                       ? html`${badge('not yet fixed', 'amber')}
                              <div class="muted small">${client.current_visa_expiry_rule}</div>`
                       : expiryCell(client.current_visa_expiry)}</dd>
+                    ${'' /* Shown only when there is something to show. A row
+                             reading "Stay limit —" on every client who has no
+                             stay limit is the kind of line that makes a page
+                             long without saying anything. */}
+                    ${client.current_visa_stay_limit
+                      ? html`<dt>Stay limit</dt><dd>${client.current_visa_stay_limit}</dd>` : ''}
+                    ${client.current_visa_conditions
+                      ? html`<dt>Conditions</dt>
+                             <dd class="prewrap">${client.current_visa_conditions}</dd>` : ''}
                     <dt>Police cert.</dt><dd>${client.police_certificate_country
                       ? html`${countryName(client.police_certificate_country)}<br>` : ''}${expiryCell(client.police_certificate_expiry)}
                       ${certificateDateUnverified(certificates, 'police', client.police_certificate_expiry)
@@ -2276,7 +2307,8 @@ export const clientsModule: AppModule = {
            nzbn=?, company_number=?, organisation_id=?, organisation_role=?, email=?, phone=?, whatsapp=?, telegram_username=?, telegram_user_id=?,
            date_of_birth=?,
            english_test_type=?, english_test_score=?, english_test_date=?,
-           current_visa_type=?, current_visa_start=?, current_visa_expiry=?, current_visa_expiry_rule=?, inz_client_number=?,
+           current_visa_type=?, current_visa_start=?, current_visa_expiry=?, current_visa_expiry_rule=?,
+           current_visa_conditions=?, current_visa_stay_limit=?, inz_client_number=?,
            title=?, gender=?, relationship_status=?, other_names=?,
            birth_country=?, birth_region=?, birth_town=?,
            national_id_number=?, national_id_country=?,
@@ -2287,7 +2319,8 @@ export const clientsModule: AppModule = {
         v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.date_of_birth,
         v.english_test_type, v.english_test_score, v.english_test_date,
-        v.current_visa_type, v.current_visa_start, v.current_visa_expiry, v.current_visa_expiry_rule, v.inz_client_number,
+        v.current_visa_type, v.current_visa_start, v.current_visa_expiry, v.current_visa_expiry_rule,
+        v.current_visa_conditions, v.current_visa_stay_limit, v.inz_client_number,
         v.title, v.gender, v.relationship_status, v.other_names,
         v.birth_country, v.birth_region, v.birth_town,
         v.national_id_number, v.national_id_country,
