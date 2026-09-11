@@ -99,6 +99,20 @@ When they say they do not follow, the fix is **shorter and more concrete**, not
 more detail — walk through what actually happens, step by step, with real
 things.
 
+**Keep a progress note as you go** (standing instruction, 12 September 2026):
+*"make sure detailed progress is maintained at all times for reference."*
+
+`docs/progress-<dates>.md`, in the practice's own voice, written **during** the
+work rather than reconstructed at the end. It is the reference somebody reaches
+for when asking *what did we do and why*, months later, and a reconstruction is
+already missing the reasons. Three things belong in it that belong nowhere else:
+what changed for the practice, **what was got wrong and what rule came out of
+it**, and what is waiting on them. No client is named in one, ever.
+
+It is not `CHANGELOG.md`, which is per release and for a developer, and it is
+not the end-of-day digest below, which is the short read. Those three overlap
+and each is kept.
+
 **End the day with a digest** (standing instruction, 9 September 2026): *"i do
 not always have time to read your writing but i want to - so at the end of the
 day produce easily readable digest of what has been accomplished."* Plain words,

@@ -21,7 +21,7 @@ A second register, from the same code. Architecture and the order of work:
 |---|---|---|
 | D1 database | `clientregister-trial-db` | `a2bdf373-974a-47b6-a7a3-72f7bf7b4730` |
 | KV namespace | `clientregister-trial-sessions` | `8e6c31e521fc4226b541003bf27bb466` |
-| R2 bucket | — | **not created; see below** |
+| R2 bucket | `clientregister-trial-files` | created 12 September 2026, in `OC` |
 | Worker | `clientregister-trial` | `https://trial.immigration.kiwi` (also `clientregister-trial.ecomlabnz.workers.dev`) |
 
 Both were created on 12 September 2026; the database carries the same `oc`
@@ -79,6 +79,11 @@ Run workflow, with a name that has never been used on this account and the
 location left at `oc`. It runs `wrangler r2 bucket create --location oc`, which
 says where the bucket goes explicitly, then reads it back to confirm where it
 landed.
+
+Done for the trial on 12 September 2026: `clientregister-trial-files`, created
+from a GitHub runner in the United States and confirmed afterwards to be in
+`OC`. That is the proof the location flag does what the dashboard workaround was
+standing in for.
 
 (An earlier version of this note said the bucket had to be created from a
 browser in New Zealand. That was the workaround, not the rule — it was needed
