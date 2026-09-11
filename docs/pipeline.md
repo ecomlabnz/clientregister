@@ -606,16 +606,20 @@ practice's files are held here at all (see the tenancy decision in CLAUDE.md).
   0.69.0 when the practice decided passport numbers are stored as written. The
   `FIELD_KEY` secret is now referenced by nothing; it can be removed from the
   deployment when convenient, and is harmless where it is.
-- **`scripts/seed-demo.mjs` had rotted in four ways**, none of them noticed
+- **The demonstration seed had rotted in four ways**, none of them noticed
   because nothing ever ran it: a dropped `clients.nationality` column, country
   names where migration 0055 requires ISO codes, no `assigned_to` on a matter
   (which a trigger has long refused), and writes to `fee_items` / `fee_shares`.
-  Fixed, and now **run by a test** against every migration with foreign keys and
-  triggers on.
-- `scripts/seed-demo-remove.sql` named the two dropped tables. Running it turned
-  up a real fault nobody had hit: `invoice_items` lacked the `demo_` exemption
-  that `invoices` and `invoice_payments` both carry, so demonstration data could
-  not be removed once an invoice was issued. Fixed in migration 0062.
+  Fixed at the time, and then run by a test against every migration.
+- Its removal script named the two dropped tables. Running it turned up a real
+  fault nobody had hit: `invoice_items` lacked the `demo_` exemption that
+  `invoices` and `invoice_payments` both carry, so demonstration data could not
+  be removed once an invoice was issued. **Fixed in migration 0062, which is
+  what still matters** — that exemption is in the database and stays there.
+- **All of it was deleted on 12 September 2026**, script, removal script,
+  workflow and test, when the practice said the demonstration data need not be
+  loadable into the live register. Admin → Test data does this job from inside
+  the register. See issue 1 in [`issues.md`](issues.md).
 
 **Still open here:** six stale branches on the remote. Deleting them needs the
 practice's own GitHub session; the token here is refused (403).

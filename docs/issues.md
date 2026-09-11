@@ -24,37 +24,48 @@ Nothing here names a client.
 
 ## Open
 
-### 1. The demonstration-data workflow can write to the live register
+### 1. The demonstration-data workflow can write to the live register — CLOSED 12 September 2026
 
 **Found** 12 September 2026, while looking at the Actions list.
-**Severity:** high — one click, no confirmation, on a register holding 245 real
-client files.
+**Severity was:** high — one click, no confirmation, on a register holding 245
+real client files.
 
-`.github/workflows/seed-demo.yml` has a **load** button that inserts invented
+`.github/workflows/seed-demo.yml` had a **load** button that inserted invented
 clients and matters straight into `clientregister-db`, and a **remove** button
-that deletes them again. It was written on 28 August, two days before the
+that deleted them again. It was written on 28 August, two days before the
 register went live, when it was the sensible way to fill an empty register.
 
 Checked before writing this, so the record is accurate rather than alarming:
 
-- The removal script is **safely scoped** — every statement is
+- The removal script was **safely scoped** — every statement was
   `WHERE id LIKE 'demo\_%'`, so it cannot delete a real record.
 - Its counter resets **happen to be correct today**: quote would be set 16 → 16,
   client 270 → 270, and the `case` counter it targets is a dead leftover from
   the old reference format (the live one is `case:2026`). So it is not
   currently destructive.
 
-The problem is the **load** button, and that the whole thing is hardcoded to the
-practice's database so it cannot serve any other practice.
+The problem was the **load** button, and that the whole thing was hardcoded to
+the practice's database, so it could not serve any other practice.
 
-**The fix:** delete the workflow, `scripts/seed-demo.mjs` and
-`scripts/seed-demo-remove.sql`. The Test Data page inside the register replaced
-all of it on 11 September — that one marks every row `is_test`, removes them
-again on request, works on any practice's register, and cannot be reached by
-anyone without an administrator's sign-in.
+**Closed by deleting it**, 12 September 2026. The practice was asked and said:
+*"yes, remove it, no need for the test data to be loaded into the live
+register."* Gone: `.github/workflows/seed-demo.yml`, `scripts/seed-demo.mjs`,
+`scripts/seed-demo-remove.sql`, and `test/seeddemo.test.ts`, which existed only
+to prove that script still ran. No deprecated copy was kept — there is now no
+way to write test data into the register from the Actions tab at all.
 
-**Not done yet:** it deletes a workflow the practice has not been asked about.
-Put to them 12 September; awaiting the answer.
+The Test Data page inside the register replaced all of it on 11 September: it
+marks every row `is_test`, lists what it would delete before deleting it,
+removes them again on request, works on any practice's register, and cannot be
+reached by anyone without an administrator's sign-in.
+
+**Two things were deliberately left alone.** The **Remove all demonstration
+data** button on Admin → Maintenance stays: any register seeded by the old
+workflow may still hold rows whose identifier begins `demo_`, and that button is
+the only way to take them out. It only appears when there are such rows, so on a
+clean register nobody ever sees it. And `CHANGELOG.md` and the Recent changes
+list in Help still mention the demonstration data, because they are the record
+of what shipped when and are not rewritten.
 
 ### 1a. The practice's register briefly refuses, and we do not know why
 
