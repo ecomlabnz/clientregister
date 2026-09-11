@@ -42,6 +42,23 @@ function register() {
   return { db, env, count };
 }
 
+/** A register with the caseload already laid down, and a way to read it. */
+async function seeded() {
+  const db = migratedSqlite();
+  db.prepare(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
+              VALUES ('u1','a@example.test','A Tester','x','admin','active',?,?)`).run(AT, AT);
+  const env = { DB: fakeD1(db) } as unknown as Env;
+  await seedTestData(env, 'u1');
+  return {
+    env,
+    count: (sql: string) => ((db.prepare(sql) as any).get() as { n: number }).n,
+    rows: <T>(sql: string): T[] => (db.prepare(sql) as any).all() as T[],
+  };
+}
+
+/** The practice's own vocabulary, read rather than copied. */
+const VOCABULARY_SOURCE = readFileSync('src/core/vocabulary.ts', 'utf8');
+
 const MARKED = ['clients', 'cases', 'quotes', 'tasks'];
 const UNDER = [
   'client_passports', 'client_certificates', 'client_nationalities',
@@ -54,7 +71,7 @@ describe('the caseload that is laid down', () => {
     const { env, count } = register();
     const result = await seedTestData(env, 'u1');
     expect(result.clients).toBeGreaterThanOrEqual(12);
-    expect(result.cases).toBeGreaterThanOrEqual(24);
+    expect(result.cases).toBe(20);
     expect(result.quotes).toBeGreaterThanOrEqual(12);
     expect(count('SELECT COUNT(*) AS n FROM clients')).toBe(result.clients);
   });
@@ -132,7 +149,7 @@ describe('all of it is marked as test data', () => {
     const tally = await tallyTestData(env);
     const byTable = Object.fromEntries(tally.map((t) => [t.table, t.count]));
     expect(byTable.clients).toBeGreaterThanOrEqual(12);
-    expect(byTable.cases).toBeGreaterThanOrEqual(24);
+    expect(byTable.cases).toBe(20);
     expect(byTable.quotes).toBeGreaterThanOrEqual(12);
   });
 });
@@ -245,5 +262,83 @@ describe('nothing in the caseload came from a real file', () => {
     for (const address of addresses) {
       expect(address, address).toMatch(/@[\w.-]*example\.test$/);
     }
+  });
+});
+
+describe('the caseload somebody trying the register is shown', () => {
+  // **Asked for on 12 September 2026:** *"give it 20 cases, varied, with people
+  // from different countries, make 5 simple ones and 10 complicated and 5
+  // unusual applications."* The mix is the point: a caseload of twenty
+  // straightforward visitor visas would tell a prospective customer nothing
+  // about whether the register can hold their actual work.
+
+  it('is twenty matters', async () => {
+    const { env, count } = await seeded();
+    expect(count('SELECT COUNT(*) AS n FROM cases')).toBe(20);
+    expect(env).toBeTruthy();
+  });
+
+  it('names only case types the practice’s own vocabulary carries', async () => {
+    // **This was broken, and it was the first thing a visitor would have seen.**
+    // Six of the twelve types the old caseload used — `advice_general`,
+    // `other_s61`, `rv_skilled` among them — are not in `core/vocabulary.ts`,
+    // so those matters displayed a raw key where every other matter shows a
+    // label. Checked here against the real vocabulary rather than a copy of it.
+    const { rows } = await seeded();
+    const configured = new Set(
+      [...VOCABULARY_SOURCE.matchAll(/([a-z][a-z_0-9]*) \| [A-Z]/g)].map((m) => m[1]!));
+    const used = rows<{ case_type: string }>('SELECT DISTINCT case_type FROM cases')
+      .map((r) => r.case_type);
+    expect(used.length).toBeGreaterThan(12);
+    for (const type of used) {
+      expect(configured.has(type), `${type} is not in the practice's case types`).toBe(true);
+    }
+  });
+
+  it('spreads across many kinds of work rather than repeating one', async () => {
+    const { count } = await seeded();
+    expect(count('SELECT COUNT(DISTINCT case_type) AS n FROM cases')).toBeGreaterThanOrEqual(15);
+  });
+
+  it('carries the hard ones, not only the easy ones', async () => {
+    // The five unusual matters, each by its type. A caseload without these is a
+    // caseload that does not show what the practice is chosen for.
+    const { count } = await seeded();
+    for (const type of ['rq_section_61_request', 'rq_ministerial_intervention',
+                        'rq_reconsideration_temporary_visa_decline',
+                        'reply_deportation_liability_response']) {
+      expect(count(`SELECT COUNT(*) AS n FROM cases WHERE case_type = '${type}'`), type)
+        .toBeGreaterThan(0);
+    }
+  });
+
+  it('has something declined, with the clock still running on it', async () => {
+    // A caseload where everything was granted is not one anybody will
+    // recognise, and a decline with a live deadline on it is the state a
+    // register is most needed in.
+    const { count } = await seeded();
+    expect(count(`SELECT COUNT(*) AS n FROM cases WHERE status = 'declined'`))
+      .toBeGreaterThanOrEqual(2);
+    expect(count(`SELECT COUNT(*) AS n FROM cases
+                   WHERE status = 'declined' AND next_action_due IS NOT NULL`))
+      .toBeGreaterThan(0);
+  });
+
+  it('puts a history on a file rather than one matter each', async () => {
+    // Eleven files carry the twenty. A client's file with a single matter on it
+    // shows none of what the register is for: the matter that was declined
+    // before the one that was granted, the visa that ran out while something
+    // else was being decided.
+    const { rows } = await seeded();
+    const perFile = rows<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM cases GROUP BY client_id').map((r) => r.n);
+    expect(perFile.filter((n) => n >= 2).length).toBeGreaterThanOrEqual(8);
+    expect(Math.max(...perFile)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('is people from many countries', async () => {
+    const { count } = await seeded();
+    expect(count(`SELECT COUNT(DISTINCT code) AS n FROM client_nationalities`))
+      .toBeGreaterThanOrEqual(12);
   });
 });
