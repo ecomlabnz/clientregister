@@ -485,6 +485,44 @@ unless somebody ticks a box, not a hole in it.
 
 ---
 
+### 15. A customised list never hears about improvements to the register's own
+
+**Found** 12 September 2026, answering the practice's question: *"so others may
+have their own fields right? what if we push updates - will those be knocked
+off?"*
+**Severity: medium, and OPEN.** Nothing is lost today; what is lost is
+everything added later.
+
+**The half that works.** A vocabulary is a setting. Once a practice saves one,
+their stored value wins over the code's default for ever, and no deploy touches
+it. Verified on the practice's own register, which carries two real
+customisations: `vocab.doc_categories` has *PPI Letter*, *RFI Letter* and
+*Visa* added to it, and `vocab.flag_kinds` has *Border alert*. Both have
+survived every deploy since.
+
+**The half that does not.** That same rule means a customised list is frozen.
+Add five visa types to the defaults next year and a practice who edited theirs
+gets none of them, is told nothing, and has no way to see they are behind.
+
+**And a list is pinned more easily than anyone would guess.** The settings form
+posts every field in its group, so **pressing Save on Lists and dropdowns
+stores all fourteen vocabularies**, including the thirteen nobody touched. From
+that press they are all frozen. This is not hypothetical: the practice's
+`vocab.education_levels` was byte-for-byte the default but *stored*, with CRLF
+line endings that prove it came from a browser textarea rather than a seed. It
+is the whole reason migration 0094 had to be guarded.
+
+**What would close it:** the settings page comparing a stored list against the
+register's current default and saying so — *"3 entries you added, 5 new ones
+available"* — with a button that takes the new lines and keeps theirs. A merge
+the administrator presses, not one a deploy performs, because the deploy has no
+way to know whether a line was deleted on purpose.
+
+**What not to do**, and the reason this is written down rather than fixed on the
+spot: never have a migration or a deploy overwrite a stored vocabulary
+unguarded. `vocab.doc_categories` is the proof — three lines the practice added
+for their own filing would have gone, silently, and nothing would have said so.
+
 ## Asked for, not yet built
 
 Not faults — work the practice has asked for that has not landed.
