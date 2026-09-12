@@ -7,6 +7,32 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.66.0 — 12 September 2026
+
+### Added
+**Three seasonal work visas in the "current visa" list.** *"there must be three
+seasonal ones ... they are all seasonal."* Your kinds-of-work list already had
+all three; the list of visas a client *holds* had one generic entry, so there
+was nowhere to record which seasonal visa somebody was actually on. WV. Seasonal
+(RSE) stays as it was — that is a different scheme and nothing was removed.
+
+### Fixed
+**Thirty-five client records held the description of a visa or test instead of
+its code.** All from the bulk load on 1 September.
+
+You would never have seen it. A value the register does not recognise is shown
+exactly as it was stored, so the page read "Work Visa - Accredited Employer Work
+Visa" and looked perfectly right.
+
+What it actually did was worse. The Current visa dropdown only offers the proper
+codes, so those records showed **blank** — and opening one and pressing Save
+would have quietly wiped the client's visa type. Thirty-five records, one press
+each.
+
+Fifteen visa records and twenty English-test records are now corrected. Nothing
+was deleted, and the change was rehearsed on a copy of your register first —
+including a check that a value merely *similar* to a wrong one is left alone.
+
 ## 1.65.1 — 12 September 2026
 
 ### Fixed
