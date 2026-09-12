@@ -30,6 +30,8 @@ only in a handler is a guarantee until somebody adds a second handler. So:
 | A trusted machine is never stored in the clear | `trusted_device_secret_is_hashed_on_insert`/`_update` (`0093`) |
 | A trusted machine's 40 days never slide | `trusted_device_expiry_never_moves` (`0093`) |
 | No machine is trusted for more than 90 days | `trusted_device_life_is_capped` (`0093`) |
+| A sign-in code emailed out is never stored in the clear | `login_email_code_is_hashed_on_insert`/`_on_update` (`0098`) |
+| An emailed sign-in code lasts ten minutes and is used once | `login_email_code_life_is_capped`, `login_email_code_is_used_once` (`0098`) |
 
 Each of these was verified by attacking the database directly — through the
 Cloudflare API, not through the application — rather than by reading the code

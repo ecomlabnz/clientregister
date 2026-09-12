@@ -628,6 +628,68 @@ spot: never have a migration or a deploy overwrite a stored vocabulary
 unguarded. `vocab.doc_categories` is the proof — three lines the practice added
 for their own filing would have gone, silently, and nothing would have said so.
 
+### 20. A sign-in code emailed out is readable in the register for ten minutes
+
+**Found** 12 September 2026, while building the email fallback (1.68.0).
+**Severity: low, and OPEN** — but it is a live credential sitting in a table, so
+it is written down rather than shrugged at.
+
+The code goes out through the ordinary outbound queue, which is what was asked
+for and is right: every letter the register sends is recorded in
+`outbound_emails`, and a sign-in code that skipped that would be the one piece of
+outbound mail with no record. The consequence is that the body of the message —
+the six digits — is in that table in the clear until it expires ten minutes
+later.
+
+**What that is actually worth to somebody.** They would need, all at once: an
+account holding `mail:send` (owner, administrator or specialist — not an
+assistant, not read only), the id of that one row, because nothing in the
+register lists mail sent to a *user* and the ids are not guessable, and the
+victim's password, because a code opens nothing on its own. And they would need
+all of it inside ten minutes.
+
+**What is already done about it.** The code is **not in the subject line**,
+which is where it would otherwise sit, because the queue writes the subject into
+the audit log and the audit log can never be edited or deleted — that would have
+put a credential permanently into the register instead of transiently. It is
+never in a log, a meta field or an error. In the `login_email_codes` table
+itself it is a PBKDF2 hash and the database refuses a row that is not one.
+
+**What would close it:** the queue scrubbing `body_text` on a message marked as
+holding a one-time secret once it has been sent, leaving the record of *what was
+sent to whom and when* and not the secret. That is a small change to `flushQueue`
+and one column. Not done today because it is a change to the path every letter
+the practice sends goes through, for a residual risk that requires a colleague
+with the password; it should be done when somebody is next working on the queue.
+
+### 21. Decided while building the email code, and worth the reasoning
+
+**Decided** 12 September 2026, 1.68.0. None of these is a fault; each is a
+question somebody will ask again.
+
+- **No setting to switch the email fallback off.** The switch is whether the
+  practice has email sending configured at all: with no provider the link is not
+  drawn and the page says so. A second switch would be a second answer to the
+  same question, and the one a practice would actually want — *off for this
+  person* — is already there, because a person without two-factor is never
+  offered a code.
+- **An email code does not revoke trusted machines; a recovery code still
+  does.** A recovery code is one of eight printed and put in a drawer, so using
+  one says the authenticator is gone. Asking for an email code says the phone is
+  in the other room. Treating them the same would make the fallback cost forty
+  days of convenience every time it was used, which is exactly the annoyance the
+  trusted machine was built to remove.
+- **The code is typed into the same box as the authenticator's.** A page with
+  two code fields is a page where somebody types into the wrong one. The route
+  tries the app, then the recovery codes, then the emailed code.
+- **No SMS.** The practice was told, before asking for this, that of the three
+  ways a text message is the weakest — a number is portable, and the message
+  travels through a carrier — and the only one that costs money per code.
+- **Trying a code is counted against the existing ten-attempts-per-15-minutes
+  allowance**, not a new one. One box, one allowance: a second counter would let
+  an attacker spend twenty attempts by alternating what they claimed to be
+  typing.
+
 ## Asked for, not yet built
 
 Not faults — work the practice has asked for that has not landed.

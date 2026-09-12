@@ -517,3 +517,70 @@ landed while this was being finished, so the caseload was rebased onto it and
 every qualification converted. Twenty-eight of the thirty-two now carry an award
 date, and the histories are written at all three date precisions, which is the
 easiest way to see that the shorter ones work.
+
+---
+
+## 13. A code by email, when the phone is not there (1.68.0)
+
+*"build the email code as a fallback"* — said after I told you that of the three
+ways of doing this, a text message is the weakest and the only one that costs
+money per code.
+
+**Until today, two-factor was an authenticator app and nothing else.** If your
+phone was lost, flat or at home, you had the eight recovery codes you printed
+when you set it up, and nothing else. That is a bad afternoon for anybody who
+did not print them.
+
+**Now there is a line under the code box: "Send a code to my email instead."**
+Press it, and six digits arrive at the address on your account. Type them into
+the same box. It lasts ten minutes and works once; if you ask for another, the
+first stops working.
+
+**What it deliberately is not.** It is a fallback, not a second way in. The app
+stays the ordinary way, and somebody who never loses their phone will not notice
+this exists. A code is only ever sent to an account that **already has
+two-factor switched on** — it is not a way to have weaker two-factor, it is a
+second way to pass the one you have. And it goes to the address on your account
+and nowhere else; there is no box anywhere to type a different address into,
+which is the whole reason this is safe to have at all.
+
+**The limits, because a six-digit code needs them.** Three requests a quarter of
+an hour for one account and ten from one machine, so nobody holding your password
+can fill your inbox. Guessing at the code is counted against the same
+ten-attempts allowance the app's code already had. A million possible codes and
+ten guesses in fifteen minutes is not a lock anybody picks.
+
+**If this register cannot send email, the line is not there.** With no email
+provider set up the register holds a message in a queue rather than failing, so
+the button would have looked like it worked and nothing would have arrived. The
+page says so instead of pretending.
+
+**Remembering a machine still works after signing in this way**, and using an
+emailed code does *not* forget the machines you have already trusted. That is
+different from a recovery code on purpose: a recovery code means your phone is
+gone, an emailed code usually means it is in the other room.
+
+### What I got wrong, and the rule that came out of it
+
+**I put the code in the subject line first** — *"Your sign-in code: 481920"* —
+because that is what every other service does and it saves you opening the
+email. A test caught it within the hour.
+
+The register writes a line into the audit log every time a message is sent, and
+that line carries who it went to **and the subject**. The audit log is the one
+table nothing can edit or delete, by design. So the subject I had written would
+have put a live sign-in code permanently into the register's own permanent
+record — not for ten minutes, for ever.
+
+**The rule:** *before putting a secret anywhere, follow what gets written down
+about it.* The code was hashed in its own table, kept out of every log and every
+error message, and it still would have gone into the audit log through the
+subject of the email carrying it. The thing to check is not where you put the
+secret; it is everything that quietly copies the thing you put it in.
+
+### What is waiting on you
+
+**Nothing for this.** It is on as soon as it deploys, for anybody with
+two-factor switched on, and your own register already sends email. If you want
+to see it: sign in, and at the code page press the new line instead of typing the
+app's code.

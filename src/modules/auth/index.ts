@@ -27,6 +27,10 @@ import {
   noteTrustedDeviceUsed, revokeAllTrustedDevices, revokeTrustedDevice, setTrustCookie,
   trustTokenFrom, trustedDeviceDays, trustedDevicesFor, verifyTrustedDevice,
 } from '../../core/trusteddevices';
+import {
+  EMAIL_CODE_MINUTES, clearLoginEmailCode, createLoginEmailCode, emailCodeOffer,
+  sendLoginEmailCode, verifyLoginEmailCode,
+} from '../../core/emailcodes';
 import { publicBase } from '../../core/publicurl';
 import { asInteger, readSettings } from '../../core/settings';
 import {
@@ -348,14 +352,30 @@ export const authModule: AppModule = {
        * rendered at all, rather than rendered and ignored.
        */
       const trustDays = await trustedDeviceDays(c.env);
+      /*
+       * The email fallback is offered as a link, not as a second form.
+       *
+       * *"build the email code as a fallback"* — 12 September 2026. The
+       * authenticator app is the way in; this is the line underneath it for the
+       * morning the phone is flat. Somebody who never loses their phone should
+       * not be able to tell this exists.
+       *
+       * When the practice has no email provider configured the link is **not
+       * drawn at all**, and the reason is printed instead. With no provider the
+       * queue accepts a message and holds it, so the button would appear to
+       * send something that never arrives — which is worse than not offering it.
+       */
+      const offer = await emailCodeOffer(c.env, user.id);
+      const nextParam = c.req.query('next') ?? '/';
       return page(c, { title: 'Two-factor', bare: true }, html`
         <div class="auth-card">
           <h1>Two-factor code</h1>
           <p class="muted">Enter the 6-digit code from your authenticator app.</p>
           ${c.req.query('err') ? html`<div class="alert alert-error">${c.req.query('err')}</div>` : ''}
+          ${c.req.query('ok') ? html`<div class="alert alert-ok">${c.req.query('ok')}</div>` : ''}
           <form method="post" action="/login/verify">
             ${csrfField(session.csrf)}
-            <input type="hidden" name="next" value="${c.req.query('next') ?? '/'}">
+            <input type="hidden" name="next" value="${nextParam}">
             ${field({ label: 'Code', name: 'code', required: true, autocomplete: 'one-time-code',
                       placeholder: '000000', maxlength: 20,
                       hint: 'Lost your device? Enter one of your recovery codes instead.' })}
@@ -368,11 +388,94 @@ export const authModule: AppModule = {
               </div>` : ''}
             <button class="btn btn-primary btn-block" type="submit">Verify</button>
           </form>
+          ${offer.ok ? html`
+            <form method="post" action="/login/email-code" class="mt">
+              ${csrfField(session.csrf)}
+              <input type="hidden" name="next" value="${nextParam}">
+              <button class="btn btn-link" type="submit">Send a code to my email instead</button>
+              <p class="hint">It goes to the address on your account, lasts
+                 ${String(EMAIL_CODE_MINUTES)} minutes and works once.</p>
+            </form>` : ''}
+          ${!offer.ok && offer.reason === 'no_provider' ? html`
+            <p class="hint mt">A code cannot be emailed to you: this register has no email
+               sending set up. Use a recovery code, or ask an administrator.</p>` : ''}
           <form method="post" action="/logout" class="mt">
             ${csrfField(session.csrf)}
             <button class="btn btn-link" type="submit">Cancel and sign out</button>
           </form>
         </div>`);
+    });
+
+    /**
+     * Send one of those codes.
+     *
+     * Everything that decides whether a code may be sent is read from the
+     * database here, at the moment of sending, rather than from the session's
+     * copy of the person — the same rule the trusted-machine cookie is judged
+     * by, over ten minutes instead of forty days. `emailCodeOffer` is the one
+     * place that decides, so the link on the page and this route cannot come to
+     * different answers.
+     *
+     * Limited twice: three a quarter of an hour for one person, so nobody's
+     * inbox can be filled by somebody holding their password, and ten from one
+     * address, so one machine cannot do it to a list of people. Trying a code is
+     * limited separately, by the same allowance the authenticator's code is
+     * counted against, in `POST /login/verify`.
+     */
+    r.post('/login/email-code', async (c) => {
+      const session = c.get('session');
+      const user = c.get('user');
+      if (!session || !user) return c.redirect('/login', 302);
+
+      const f = new FormReader(await c.req.formData());
+      const next = safeNext(f.optional('next', { max: 500 }) ?? undefined);
+      const back = `/login/verify?next=${encodeURIComponent(next)}`;
+
+      // Already through the challenge: there is nothing to send a code for.
+      if (session.verified) return c.redirect(await landingFor(c.env, user.id, next), 303);
+
+      const byIp = await rateLimit(c.env, 'login-email-code-ip', clientIp(c.req.raw) ?? 'unknown', 10, 900);
+      if (!byIp.ok) {
+        c.header('Retry-After', String(byIp.retryAfterSeconds));
+        return redirectWith(c, back, 'Too many codes asked for. Try again shortly.', 'err');
+      }
+      const byAccount = await rateLimit(c.env, 'login-email-code', user.id, 3, 900);
+      if (!byAccount.ok) {
+        c.header('Retry-After', String(byAccount.retryAfterSeconds));
+        await auditFrom(c, {
+          action: 'login.email_code_rate_limited', entityType: 'user', entityId: user.id,
+        });
+        return redirectWith(c, back,
+          'A code has already been sent. Check your email, or wait a few minutes and ask again.', 'err');
+      }
+
+      const offer = await emailCodeOffer(c.env, user.id);
+      if (!offer.ok) {
+        await auditFrom(c, {
+          action: 'login.email_code_refused', entityType: 'user', entityId: user.id,
+          meta: { reason: offer.reason },
+        });
+        return redirectWith(c, back,
+          offer.reason === 'no_provider'
+            ? 'A code cannot be emailed from this register — email sending is not set up.'
+            : 'A code cannot be emailed for this account.', 'err');
+      }
+
+      const made = await createLoginEmailCode(c.env, { userId: user.id, req: c.req.raw });
+      const result = await sendLoginEmailCode(c.env, {
+        userId: user.id, email: offer.email, code: made.code,
+      });
+      // The code itself never reaches the log, the meta or an error, exactly as
+      // a trusted machine's secret never does.
+      await auditFrom(c, {
+        action: 'login.email_code_sent', entityType: 'user', entityId: user.id,
+        meta: { sent: result.sent, expires_at: made.expiresAt },
+      });
+
+      return redirectWith(c, back, result.sent
+        ? `A code is on its way to the address on your account. It lasts ${EMAIL_CODE_MINUTES} minutes.`
+        : 'The code could not be sent just now. Use your authenticator app or a recovery code.',
+        result.sent ? 'ok' : 'err');
     });
 
     r.post('/login/verify', async (c) => {
@@ -400,6 +503,7 @@ export const authModule: AppModule = {
 
       let accepted = await verifyTotp(row.totp_secret, code);
       let usedRecovery = false;
+      let usedEmailCode = false;
 
       if (!accepted && row.recovery_code_hashes) {
         const hashes: string[] = JSON.parse(row.recovery_code_hashes);
@@ -414,6 +518,34 @@ export const authModule: AppModule = {
         }
       }
 
+      /*
+       * The emailed code, tried last and into the same box.
+       *
+       * One box rather than a second form: the person has six digits in front of
+       * them and does not care which of three things produced them, and a page
+       * with two code fields is a page where somebody types into the wrong one.
+       *
+       * It costs one PBKDF2 verification, performed whether or not a code is
+       * outstanding, so the time taken does not say whether one is — the same
+       * dummy verification an unknown upload token and an unknown trusted
+       * machine each get. Reached only after the authenticator and the recovery
+       * codes have both said no, so an ordinary sign-in does not pay for it.
+       */
+      if (!accepted) {
+        const check = await verifyLoginEmailCode(c.env, user.id, code);
+        if (check.ok) {
+          accepted = true;
+          usedEmailCode = true;
+        } else if (check.outstanding) {
+          // A live code existed and this was not it. Its own line in the log,
+          // because somebody guessing at an emailed code is a different event
+          // from somebody mistyping the one on their phone.
+          await auditFrom(c, {
+            action: 'login.email_code_failed', entityType: 'user', entityId: user.id,
+          });
+        }
+      }
+
       if (!accepted) {
         await auditFrom(c, { action: 'login.totp_failed', entityType: 'user', entityId: user.id });
         return redirectWith(c, `/login/verify?next=${encodeURIComponent(next)}`, 'That code was not accepted.', 'err');
@@ -423,8 +555,24 @@ export const authModule: AppModule = {
       await saveSession(c.env, session);
       await auditFrom(c, {
         action: 'login.success', entityType: 'user', entityId: user.id,
-        meta: { method: usedRecovery ? 'recovery_code' : 'totp' },
+        meta: { method: usedRecovery ? 'recovery_code' : usedEmailCode ? 'email_code' : 'totp' },
       });
+      if (usedEmailCode) {
+        // Separately from the sign-in, for the same reason the trusted machine
+        // has its own line: "the app was not used" is what somebody reads the
+        // log for after an account behaves oddly.
+        await auditFrom(c, {
+          action: 'login.email_code_used', entityType: 'user', entityId: user.id,
+        });
+      } else {
+        /*
+         * Got in another way, so any code sitting in an inbox is finished with.
+         * Not a security control — it is judged again when it is spent — but a
+         * code that outlives the sign-in it was asked for is untidy, and the
+         * untidy thing is the one somebody finds in a mailbox next week.
+         */
+        await clearLoginEmailCode(c.env, user.id);
+      }
 
       if (usedRecovery) {
         /*
@@ -443,6 +591,19 @@ export const authModule: AppModule = {
           });
         }
       } else if (remember) {
+        /*
+         * Reached by an emailed code as well as by the app, deliberately.
+         *
+         * An email code is not a recovery code: it says the phone is in the
+         * other room, not that the authenticator is gone, so there is nothing
+         * here to clear and no reason to make somebody who used the fallback
+         * once type a code for the next forty days.
+         *
+         * What the machine is trusted *against* does not change either. The row
+         * carries a hash of the **TOTP secret**, the same as every other, so
+         * two-factor turned off and on again still kills it. An email code
+         * creates no second kind of trust and pins nothing to itself.
+         */
         const days = await trustedDeviceDays(c.env);
         if (days > 0) {
           const made = await createTrustedDevice(c.env, {

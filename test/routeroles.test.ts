@@ -163,6 +163,7 @@ const PUBLIC: Record<string, string> = {
   'POST /login':                  'The sign-in attempt itself. Rate-limited and locks an account out.',
   'GET /login/verify':            'The two-factor challenge, reached with a session that is not yet verified.',
   'POST /login/verify':           'Answering that challenge.',
+  'POST /login/email-code':       'Asking for the six-digit code to be emailed instead. Reached with the same not-yet-verified session as the challenge itself, and it sends only to the address on that account.',
   'POST /logout':                 'Ending a session. Being signed out must never depend on being signed in.',
   'GET /':                        'The practice website, which answers for `/` when nobody is signed in. Behind it, the dashboard on the same path declares `register:read`.',
   'GET /robots.txt':              'For search engines. Public by definition.',
