@@ -281,14 +281,20 @@ studying \| Studying
 caring \| Caring for family
 volunteer \| Voluntary work
 other \| Other` | One per line, written as “key \| Label”. What a period in an employment history was. A period of unemployment is one of these, not a missing row. Blank lines and lines starting with # are ignored. |
-| `vocab.education_levels` | text | `secondary \| Secondary school
-certificate \| Certificate
-diploma \| Diploma
-bachelor \| Bachelor’s degree
-postgrad_diploma \| Postgraduate diploma
-masters \| Master’s degree
-doctorate \| Doctorate
-other \| Other` | One per line, written as “key \| Label”. Offered against a row of a client’s education history. Blank lines and lines starting with # are ignored. |
+| `vocab.education_levels` | text | `nzqcf_1 \| 1 — Certificate
+nzqcf_2 \| 2 — Certificate
+nzqcf_3 \| 3 — Certificate
+nzqcf_4 \| 4 — Certificate
+nzqcf_5 \| 5 — Certificate or Diploma
+nzqcf_6 \| 6 — Certificate or Diploma
+nzqcf_7 \| 7 — Bachelor’s degree, Diploma, Graduate Certificate or Diploma
+nzqcf_8 \| 8 — Bachelor Honours, Postgraduate Certificate or Diploma
+nzqcf_9 \| 9 — Master’s degree
+nzqcf_10 \| 10 — Doctoral degree
+
+secondary \| Secondary school (no framework level)
+overseas_unassessed \| Overseas — level not assessed
+other \| Other` | One per line, written as “key \| Label”. Offered against a row of a client’s education history. A key of the form “nzqcf_7” also tells the register the qualification sits at NZQCF level 7. Blank lines and lines starting with # are ignored. |
 | `vocab.education_outcomes` | text | `completed \| Completed
 incomplete \| Not completed
 in_progress \| Still studying` | One per line, written as “key \| Label”. Whether a course on a client’s education history was finished. Blank lines and lines starting with # are ignored. |

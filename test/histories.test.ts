@@ -471,7 +471,7 @@ describe('the three new lists are an administrator’s', () => {
  * ends in a month — which is exactly the noise the practice has asked twice not
  * to have.
  */
-describe('a history date may be a day or a month', () => {
+describe('a history date may be a day, a month or a year', () => {
   it('saves a month against a row', async () => {
     const h = mount();
     const res = await h.post('/clients/cl1/history/employment/add', {
@@ -518,11 +518,52 @@ describe('a history date may be a day or a month', () => {
     expect(() => h.db.prepare(
       `INSERT INTO client_employment (id, client_id, started_on, created_at, updated_at)
        VALUES ('e9','cl1','2019-3-1',?,?)`).run(AT, AT))
-      .toThrow(/a day or a month/);
+      .toThrow(/a day, a month or a year/);
     expect(() => h.db.prepare(
       `INSERT INTO client_travel (id, client_id, ended_on, created_at, updated_at)
        VALUES ('t9','cl1','not a date',?,?)`).run(AT, AT))
-      .toThrow(/a day or a month/);
+      .toThrow(/a day, a month or a year/);
+    // A year is four digits and nothing else: '19' and '2019-' are not years.
+    expect(() => h.db.prepare(
+      `INSERT INTO client_employment (id, client_id, started_on, created_at, updated_at)
+       VALUES ('e8','cl1','19',?,?)`).run(AT, AT))
+      .toThrow(/a day, a month or a year/);
+  });
+
+  /**
+   * **Asked for on 12 September 2026**, for the education history's award
+   * date: *"should be able to enter full date or month and year or just year."*
+   * A year is now a third precision everywhere a history date is kept, because
+   * one convention across the three tables beats two.
+   */
+  it('saves a year on its own, and keeps it a year', async () => {
+    const h = mount();
+    const res = await h.post('/clients/cl1/history/employment/add', {
+      kind: 'employed', employer: 'A Cabinetmaker', started_on: '2015', ended_on: '2019-08',
+    });
+    expect(res.status).toBe(303);
+    const row = rowsOf(h, 'client_employment')[0]!;
+    expect(row.started_on).toBe('2015');
+    expect(row.ended_on).toBe('2019-08');
+  });
+
+  it('takes a year on the education award date, which is why this exists', async () => {
+    const h = mount();
+    const res = await h.post('/clients/cl1/history/education/add', {
+      institution: 'A Polytechnic', qualification: 'A Diploma',
+      started_on: '2011', ended_on: '2013', awarded_on: '2014',
+    });
+    expect(res.status).toBe(303);
+    const row = rowsOf(h, 'client_education')[0]!;
+    expect(row.awarded_on).toBe('2014');
+  });
+
+  it('refuses a bad award date at the database, not only at the form', () => {
+    const h = mount();
+    expect(() => h.db.prepare(
+      `INSERT INTO client_education (id, client_id, awarded_on, created_at, updated_at)
+       VALUES ('ed9','cl1','sometime in 2014',?,?)`).run(AT, AT))
+      .toThrow(/a day, a month or a year/);
   });
 
   it('still refuses a period that ends before it starts, across the two shapes', () => {

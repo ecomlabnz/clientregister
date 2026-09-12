@@ -94,6 +94,20 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.64.0', date: '12 September 2026',
+    notes: [
+      'Education level is now the NZQCF level, 1 to 10, with the qualifications that sit at each '
+        + 'one named beside it. The old list could not give you a number for half its entries \u2014 '
+        + 'a certificate can be level 1 or level 6, and INZ counts the level, not the word.',
+      'Education rows now have an award date \u2014 the day the qualification was conferred, '
+        + 'which is usually months after study ended and is the date an application asks for.',
+      'A date in any history can now be just a year. Old certificates often give one, and '
+        + '\u201c2019-01\u201d would be inventing January.',
+      'Nothing you have entered changes. Your register had no education rows, so there was '
+        + 'nothing to convert.',
+    ],
+  },
+  {
     version: '1.63.0', date: '12 September 2026',
     notes: [
       'You no longer have to enter the six-digit code every time. When you enter it there is '

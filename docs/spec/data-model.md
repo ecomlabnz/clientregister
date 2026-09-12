@@ -256,6 +256,7 @@ later replaced still sits in the file that created it.
 | `updated_at` | TEXT | no | — |
 | `created_by` | TEXT | yes | — |
 | `completed` | TEXT | yes | — |
+| `awarded_on` | TEXT | yes | — |
 
 ## `client_employment`
 
