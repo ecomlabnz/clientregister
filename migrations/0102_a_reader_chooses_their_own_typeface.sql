@@ -1,0 +1,21 @@
+-- A reader chooses their own typeface.
+--
+-- **Asked for on 12 September 2026**, after a nine-column education history
+-- would not fit on the screen: *"the body-font change - please build it, with
+-- 3-4 options of various narrow font types if available so the user can
+-- select."*
+--
+-- Beside `theme` and `colour_mode` from migration 0009, and for the same
+-- reason they are there: this is a fact about one person's eyes and one
+-- person's screen, not about the practice. A partner on a large monitor and
+-- somebody on a laptop in a waiting room want different answers.
+--
+-- `system` is the default and is what every existing row gets, so nobody's
+-- register changes appearance because this shipped.
+--
+-- Not constrained to a fixed list in the schema, matching `theme`: the column
+-- holds what the application offers, and `fontOf()` falls back to `system` for
+-- anything it does not recognise. A CHECK here would have to be migrated every
+-- time a face is added or dropped, and an unrecognised value is already
+-- harmless.
+ALTER TABLE users ADD COLUMN font TEXT NOT NULL DEFAULT 'system';

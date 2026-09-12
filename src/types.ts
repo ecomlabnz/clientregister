@@ -96,6 +96,8 @@ export interface User {
   /** Appearance, so the server can render the right theme on the first paint. */
   theme: string;
   colour_mode: string;
+  /** The reader's chosen typeface. See `ui/theme.ts`. */
+  font: string;
 }
 
 export interface SessionData {

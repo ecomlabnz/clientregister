@@ -44,7 +44,8 @@ import { dateTime } from '../../ui/format';
 import { ROLE_LABELS, can } from '../../core/rbac';
 import type { ColourMode, Theme } from '../../ui/theme';
 import {
-  COLOUR_MODES, COLOUR_MODE_LABELS, THEMES, THEME_INFO, colourModeOf, isColourMode, isTheme, themeOf,
+  COLOUR_MODES, COLOUR_MODE_LABELS, FONTS, FONT_INFO, THEMES, THEME_INFO,
+  colourModeOf, fontOf, isColourMode, isFont, isTheme, themeOf,
 } from '../../ui/theme';
 
 const RECOVERY_CODE_COUNT = 8;
@@ -476,6 +477,7 @@ export const authModule: AppModule = {
       const session = c.get('session')!;
       const theme = themeOf(user);
       const mode = colourModeOf(user);
+      const font = fontOf(user);
       const prefs = await preferencesFor(c.env, user.id);
       // Tabs, because the account page had grown past a screen: two-factor,
       // password, appearance, preferences and every active session.
@@ -754,7 +756,27 @@ export const authModule: AppModule = {
                   </span>
                 </button>`)}
             </fieldset>
-            <p class="hint">Press one and it is on.</p>
+            ${'' /* The sample is set in the face it names, so the choice is
+                     made by looking rather than by reading a description and
+                     guessing. Nine digits and a handful of narrow letters,
+                     because fitting those is the whole reason this exists. */}
+            <fieldset class="appearance-set mt">
+              <legend>Typeface</legend>
+              ${FONTS.map((id) => html`
+                <button class="appearance-option" type="submit" name="font" value="${id}"
+                        aria-pressed="${id === font ? 'true' : 'false'}">
+                  <span class="appearance-option-head">
+                    <span class="appearance-tick" aria-hidden="true"></span>
+                    <span class="appearance-option-name">${FONT_INFO[id].name}</span>
+                  </span>
+                  <span class="font-sample" data-font="${id}" aria-hidden="true">
+                    Wintec · Diploma in Business · 2025-11-30 · 1234567890
+                  </span>
+                  <span class="hint">${FONT_INFO[id].description}</span>
+                </button>`)}
+            </fieldset>
+            <p class="hint">Press one and it is on. Nothing is downloaded — these are faces your
+               own device already has, so an option your device lacks simply looks like System.</p>
           </form>`)}` : ''}
       `);
     });
@@ -811,6 +833,7 @@ export const authModule: AppModule = {
       const f = new FormReader(await c.req.formData());
       const theme = f.text('theme', { max: 32 });
       const mode = f.text('colour_mode', { max: 32 });
+      const font = f.text('font', { max: 32 });
 
       const changes: Array<[string, string]> = [];
       if (theme !== '') {
@@ -824,6 +847,12 @@ export const authModule: AppModule = {
           return redirectWith(c, '/account?tab=appearance', 'That is not a setting we offer.', 'err');
         }
         changes.push(['colour_mode', mode]);
+      }
+      if (font !== '') {
+        if (!isFont(font)) {
+          return redirectWith(c, '/account?tab=appearance', 'That is not a typeface we offer.', 'err');
+        }
+        changes.push(['font', font]);
       }
       if (changes.length === 0) {
         return redirectWith(c, '/account?tab=appearance', 'Nothing was chosen.', 'err');

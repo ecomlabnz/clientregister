@@ -81,3 +81,72 @@ export function themeOf(user: { theme?: string | null } | null): Theme {
 export function colourModeOf(user: { colour_mode?: string | null } | null): ColourMode {
   return isColourMode(user?.colour_mode) ? user.colour_mode : 'system';
 }
+
+/**
+ * Typefaces.
+ *
+ * **Asked for on 12 September 2026**, after a nine-column table would not fit:
+ * *"the body-font change - please build it, with 3-4 options of various narrow
+ * font types if available so the user can select."*
+ *
+ * ## Why every one of these is a font the reader already has
+ *
+ * The content policy is `default-src 'none'`, and there is no `font-src` in
+ * it — this register downloads nothing, ever. That is not an obstacle here, it
+ * is the reason this works at all: a chosen face applies on the very next page
+ * with no request, no wait, no flash of the wrong type, and nothing about the
+ * reader leaving the building.
+ *
+ * The cost is honesty about availability. **A stack is a list of hopes**, and
+ * the last hope in each of these is the system's own interface font, so a
+ * reader on a machine that has none of the named faces sees exactly what they
+ * see today rather than something worse. `Narrow` is the one worth trusting:
+ * Arial Narrow is on virtually every Mac and Windows machine, and the two
+ * Linux substitutes below are the standard metric-compatible pair.
+ *
+ * ## Why a choice and not a setting for the whole practice
+ *
+ * It follows the theme it sits beside: this is about one person's eyes and one
+ * person's screen. A partner on a 27-inch monitor and somebody on a laptop in
+ * a waiting room want different answers, and neither is the practice's to
+ * decide.
+ */
+export const FONTS = ['system', 'compact', 'narrow', 'reading'] as const;
+export type FontChoice = (typeof FONTS)[number];
+
+export interface FontInfo {
+  id: FontChoice;
+  name: string;
+  description: string;
+}
+
+export const FONT_INFO: Record<FontChoice, FontInfo> = {
+  system: {
+    id: 'system',
+    name: 'System',
+    description: 'Whatever your device uses for its own menus. The most familiar, and the default.',
+  },
+  compact: {
+    id: 'compact',
+    name: 'Compact',
+    description: 'A little narrower than the system face, without looking squeezed. A good first try.',
+  },
+  narrow: {
+    id: 'narrow',
+    name: 'Narrow',
+    description: 'Properly condensed. Fits noticeably more in a column — best where tables are tight.',
+  },
+  reading: {
+    id: 'reading',
+    name: 'Reading',
+    description: 'A serif face, wider rather than narrower. Easier on the eye over a long document.',
+  },
+};
+
+export function isFont(value: string | null | undefined): value is FontChoice {
+  return typeof value === 'string' && (FONTS as readonly string[]).includes(value);
+}
+
+export function fontOf(user: { font?: string | null } | null): FontChoice {
+  return isFont(user?.font) ? user.font : 'system';
+}
