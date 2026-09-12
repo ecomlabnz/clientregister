@@ -991,4 +991,5 @@ later replaced still sits in the file that created it.
 | `updated_at` | TEXT | no | — |
 | `theme` | TEXT | no | `'slate'` |
 | `colour_mode` | TEXT | no | `'system'` |
+| `font` | TEXT | no | `'system'` |
 

@@ -7,6 +7,31 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.69.0 — 12 September 2026
+
+### Added
+**Choose your own typeface.** *"the body-font change - please build it, with 3-4
+options of various narrow font types."*
+
+Account → Appearance, under the theme, four choices with a sample of each set in
+the face it names so you pick by looking rather than by reading a description:
+
+- **System** — whatever your device uses for its own menus. As now.
+- **Compact** — a little narrower, without looking squeezed. Try this first.
+- **Narrow** — properly condensed. Fits noticeably more in a tight column.
+- **Reading** — a serif, wider rather than narrower. Easier over a long file note.
+
+It is your choice, not the practice's — the same as the theme. Somebody on a
+large monitor and somebody on a laptop want different answers.
+
+**Nothing is downloaded.** These are faces your own device already has, so the
+change is instant and works with no connection. The honest cost: if your device
+does not have the face, that option simply looks like System. Narrow is the one
+to rely on — Arial Narrow is on virtually every Mac and Windows machine.
+
+**It changes the face only, never the sizes.** Making everything smaller is a
+separate and much larger change, and it is still on the list rather than done.
+
 ## 1.68.0 — 12 September 2026
 
 ### Added

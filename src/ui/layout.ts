@@ -8,7 +8,7 @@ import { navEntries } from '../core/module';
 import { visibleNav } from '../core/module';
 import { initials } from './format';
 import { APP_VERSION } from '../version';
-import { themeOf, colourModeOf } from './theme';
+import { themeOf, colourModeOf, fontOf } from './theme';
 
 export interface PageOpts {
   title: string;
@@ -83,9 +83,12 @@ export function page(c: Context<AppContext>, opts: PageOpts, body: Raw): Respons
   const theme = themeOf(user ?? null);
   // A document is paper. See `paper` above for why this is not a print rule.
   const mode = opts.paper ? 'light' : colourModeOf(user ?? null);
+    // A document keeps the reader's face too: they are the one reading it, and
+  // the paper rules set their own sizes regardless.
+  const font = fontOf(user ?? null);
 
   const doc = html`<!doctype html>
-<html lang="en-NZ" data-theme="${theme}" data-mode="${mode}"${opts.paper ? raw(' data-paper') : ''}>
+<html lang="en-NZ" data-theme="${theme}" data-mode="${mode}" data-font="${font}"${opts.paper ? raw(' data-paper') : ''}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

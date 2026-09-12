@@ -153,6 +153,43 @@
   --mono: ui-monospace, SFMono-Regular, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 }
 
+/* The reader's own choice of typeface, from what their machine already has.
+ *
+ * **Asked for on 12 September 2026**, after a nine-column table would not fit.
+ * Nothing is downloaded: the content policy is `default-src 'none'` and there
+ * is no `font-src` in it, so a chosen face applies on the very next page with
+ * no request and no flash of the wrong type.
+ *
+ * Every stack ends in the system's own interface font, so a machine that has
+ * none of the named faces shows exactly what it shows today rather than
+ * something worse. `narrow` is the one to trust: Arial Narrow is on virtually
+ * every Mac and Windows machine, and the two Linux names after it are the
+ * standard metric-compatible substitutes.
+ */
+:root[data-font="compact"] {
+  /* Naturally narrow interface faces, in the order they are likely to exist.
+     Segoe UI is Windows' own and is already tighter than most; Roboto is
+     Android's and ships with Chrome on Linux. */
+  --font: "Segoe UI", Roboto, "Helvetica Neue", Inter, ui-sans-serif,
+    -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+}
+:root[data-font="narrow"] {
+  /* Properly condensed. Arial Narrow is the one that is genuinely everywhere;
+     Liberation Sans Narrow and DejaVu Sans Condensed are its Linux
+     equivalents, and Avenir Next Condensed is a nicer macOS answer where it
+     exists. */
+  --font: "Avenir Next Condensed", "Arial Narrow", "Liberation Sans Narrow",
+    "DejaVu Sans Condensed", "Roboto Condensed", "Segoe UI", ui-sans-serif,
+    -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+}
+:root[data-font="reading"] {
+  /* Wider rather than narrower, and the point of it: a serif for somebody
+     reading a long file note rather than scanning a table. Charter and Georgia
+     are the two that are reliably present and readable on a screen. */
+  --font: Charter, "Bitstream Charter", Georgia, "Iowan Old Style",
+    "Palatino Linotype", "Nimbus Roman", ui-serif, serif;
+}
+
 /* Light is the base. */
 :root {
   color-scheme: light;
@@ -657,6 +694,25 @@ tr:last-child td { border-bottom: none; }
    amber alert it already inherits, and is given a little more weight than an
    ordinary alert because it is a statement about the whole register rather
    than about the page. */
+/* The typeface sample on the appearance page, set in the face it names so the
+   choice is made by looking. The digits matter: fitting a date and a reference
+   into a narrow column is the reason this feature exists. */
+.font-sample {
+  display: block; margin: 6px 0 2px; font-size: 0.95rem;
+  font-variant-numeric: tabular-nums; color: var(--text);
+}
+.font-sample[data-font="compact"] {
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Inter, ui-sans-serif, Arial, sans-serif;
+}
+.font-sample[data-font="narrow"] {
+  font-family: "Avenir Next Condensed", "Arial Narrow", "Liberation Sans Narrow",
+    "DejaVu Sans Condensed", "Roboto Condensed", "Segoe UI", ui-sans-serif, Arial, sans-serif;
+}
+.font-sample[data-font="reading"] {
+  font-family: Charter, "Bitstream Charter", Georgia, "Iowan Old Style",
+    "Palatino Linotype", "Nimbus Roman", ui-serif, serif;
+}
+
 .trial-band { font-weight: 600; margin-bottom: 14px; }
 
 .row-urgent { background: var(--red-bg); }

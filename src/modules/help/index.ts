@@ -94,6 +94,19 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.69.0', date: '12 September 2026',
+    notes: [
+      'You can now choose your own typeface under Account \u2192 Appearance: System, Compact, '
+        + 'Narrow or Reading, each shown as a sample so you pick by looking.',
+      'Narrow is properly condensed and fits noticeably more into a tight column \u2014 worth '
+        + 'trying if a table has ever been too wide for your screen.',
+      'Nothing is downloaded. These are faces your device already has, so it is instant. If your '
+        + 'device lacks one, that option simply looks like System.',
+      'It changes the lettering only, not the sizes. Making everything smaller is a separate '
+        + 'change and is still on the list.',
+    ],
+  },
+  {
     version: '1.68.0', date: '12 September 2026',
     notes: [
       'A trial register now carries a band on every page saying it is a trial and counting down '
