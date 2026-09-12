@@ -853,8 +853,9 @@ export const adminModule: AppModule = {
                      ${seed.dueAt
                        ? html`Puts itself back ${stamp(seed.dueAt)}.`
                        : 'It does not put itself back on its own.'}</p>`
-            : html`<p>Twelve invented clients with families, matters and quotations \u2014
-                      enough to learn on. Nothing in it is real.</p>`}
+            : html`<p>Thirty-odd invented clients \u2014 families, companies, thirty-five
+                      matters, quotations, invoices and a few knowledge base articles.
+                      Enough to learn on. Nothing in it is real.</p>`}
           <div class="admin-links">
             <form method="post" action="/admin/test-data/seed" class="inline-form"
                   data-confirm="${seed.seededAt
@@ -951,7 +952,8 @@ export const adminModule: AppModule = {
         action: reset ? 'data.test_reset_by' : 'data.test_seeded_by',
         entityType: 'settings', entityId: 'test-data', meta: { ...result } });
       return redirectWith(c, '/admin/test-data',
-        `${result.clients} clients, ${result.cases} matters and ${result.quotes} quotations `
+        `${result.clients} clients, ${result.cases} matters, ${result.quotes} quotations, `
+        + `${result.invoices} invoices and ${result.articles} knowledge base articles `
         + `${reset ? 'put back' : 'laid down'}.`);
     });
 

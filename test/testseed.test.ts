@@ -30,7 +30,8 @@ import {
   AUTO_RESET_DAYS, SEEDED_AT, autoResetIfDue, resetTestData, seedState, seedTestData,
 } from '../src/core/testseed';
 import { purgeTestData, tallyTestData } from '../src/core/testdata';
-import { CASE_STATUSES } from '../src/domain';
+import { CASE_STATUSES, PARTY_ROLES, PRIORITIES, QUOTE_STATUSES } from '../src/domain';
+import { KB_STATUSES } from '../src/core/kb';
 
 const AT = '2026-09-11T09:00:00Z';
 
@@ -68,12 +69,12 @@ const UNDER = [
 ];
 
 describe('the caseload that is laid down', () => {
-  it('is about twelve files with matters and quotations on them', async () => {
+  it('is thirty-odd files with matters and quotations on them', async () => {
     const { env, count } = register();
     const result = await seedTestData(env, 'u1');
-    expect(result.clients).toBeGreaterThanOrEqual(12);
-    expect(result.cases).toBe(20);
-    expect(result.quotes).toBeGreaterThanOrEqual(12);
+    expect(result.clients).toBeGreaterThanOrEqual(30);
+    expect(result.cases).toBe(35);
+    expect(result.quotes).toBeGreaterThanOrEqual(35);
     expect(count('SELECT COUNT(*) AS n FROM clients')).toBe(result.clients);
   });
 
@@ -85,7 +86,7 @@ describe('the caseload that is laid down', () => {
     const rows = db.prepare(
       `SELECT client_id, COUNT(*) AS n FROM cases GROUP BY client_id`).all() as Array<{ n: number }>;
     const busy = rows.filter((r) => r.n >= 2);
-    expect(busy.length).toBeGreaterThanOrEqual(8);
+    expect(busy.length).toBeGreaterThanOrEqual(10);
     expect(Math.max(...rows.map((r) => r.n))).toBeGreaterThanOrEqual(3);
   });
 
@@ -164,9 +165,11 @@ describe('all of it is marked as test data', () => {
     await seedTestData(env, 'u1');
     const tally = await tallyTestData(env);
     const byTable = Object.fromEntries(tally.map((t) => [t.table, t.count]));
-    expect(byTable.clients).toBeGreaterThanOrEqual(12);
-    expect(byTable.cases).toBe(20);
-    expect(byTable.quotes).toBeGreaterThanOrEqual(12);
+    expect(byTable.clients).toBeGreaterThanOrEqual(30);
+    expect(byTable.cases).toBe(35);
+    expect(byTable.quotes).toBeGreaterThanOrEqual(35);
+    expect(byTable.invoices).toBeGreaterThanOrEqual(5);
+    expect(byTable.kb_articles).toBeGreaterThanOrEqual(6);
   });
 });
 
@@ -288,9 +291,9 @@ describe('the caseload somebody trying the register is shown', () => {
   // straightforward visitor visas would tell a prospective customer nothing
   // about whether the register can hold their actual work.
 
-  it('is twenty matters', async () => {
+  it('is thirty-five matters', async () => {
     const { env, count } = await seeded();
-    expect(count('SELECT COUNT(*) AS n FROM cases')).toBe(20);
+    expect(count('SELECT COUNT(*) AS n FROM cases')).toBe(35);
     expect(env).toBeTruthy();
   });
 
@@ -328,7 +331,7 @@ describe('the caseload somebody trying the register is shown', () => {
 
   it('spreads across many kinds of work rather than repeating one', async () => {
     const { count } = await seeded();
-    expect(count('SELECT COUNT(DISTINCT case_type) AS n FROM cases')).toBeGreaterThanOrEqual(15);
+    expect(count('SELECT COUNT(DISTINCT case_type) AS n FROM cases')).toBeGreaterThanOrEqual(20);
   });
 
   it('carries the hard ones, not only the easy ones', async () => {
@@ -356,14 +359,14 @@ describe('the caseload somebody trying the register is shown', () => {
   });
 
   it('puts a history on a file rather than one matter each', async () => {
-    // Eleven files carry the twenty. A client's file with a single matter on it
+    // Twenty files carry the thirty-five. A file with a single matter on it
     // shows none of what the register is for: the matter that was declined
     // before the one that was granted, the visa that ran out while something
     // else was being decided.
     const { rows } = await seeded();
     const perFile = rows<{ n: number }>(
       'SELECT COUNT(*) AS n FROM cases GROUP BY client_id').map((r) => r.n);
-    expect(perFile.filter((n) => n >= 2).length).toBeGreaterThanOrEqual(8);
+    expect(perFile.filter((n) => n >= 2).length).toBeGreaterThanOrEqual(10);
     expect(Math.max(...perFile)).toBeGreaterThanOrEqual(3);
   });
 
@@ -371,5 +374,411 @@ describe('the caseload somebody trying the register is shown', () => {
     const { count } = await seeded();
     expect(count(`SELECT COUNT(DISTINCT code) AS n FROM client_nationalities`))
       .toBeGreaterThanOrEqual(12);
+  });
+});
+
+/**
+ * The people on a matter.
+ *
+ * **Reported by the practice on 12 September 2026:** *"partners and children do
+ * not appear on the matters they belong to."* They did not. Four matters out of
+ * twenty carried a party row; everybody else's partner and children existed as
+ * clients of their own and appeared nowhere, so opening a matter showed the
+ * principal applicant and an empty Parties list.
+ *
+ * The worst of it was a **partnership** residence application that named no
+ * partner at all, which is not a thin file — it is not an application. That is
+ * the rule pinned below: pinned as a rule and not as that one matter, because
+ * the next partnership application somebody adds would otherwise be free to
+ * repeat it.
+ */
+describe('everybody who belongs on a matter is named on it', () => {
+  /**
+   * The roles that can stand for "the other half of the relationship".
+   *
+   * Three rather than one, because which of them is right depends on what is
+   * being applied for. On a partnership residence the partner supports and does
+   * not apply — `supporting_partner`. On a partner-of-a-worker visa the partner
+   * *is* the applicant and the worker is the `partner`. On a residence
+   * application filed for two people the partner is a `secondary_applicant`.
+   * What is never right is nobody at all.
+   */
+  const PARTNERISH = ['partner', 'supporting_partner', 'secondary_applicant'];
+
+  it('a partnership-based matter names a partner', async () => {
+    const { rows } = await seeded();
+    const matters = rows<{ id: string; ref: string; title: string; case_type: string }>(
+      'SELECT id, ref, title, case_type FROM cases');
+    const parties = rows<{ case_id: string; role: string }>(
+      'SELECT case_id, role FROM case_parties');
+
+    // Derived, not listed: anything whose type or title says partnership.
+    const partnership = matters.filter(
+      (m) => /partner/i.test(m.case_type) || /partner/i.test(m.title));
+    // The vacuity guard. A filter that matched nothing would make the loop
+    // below pass while saying nothing at all.
+    expect(partnership.length, 'no partnership matter was found to check')
+      .toBeGreaterThanOrEqual(3);
+
+    for (const m of partnership) {
+      const named = parties.filter(
+        (p) => p.case_id === m.id && PARTNERISH.includes(p.role));
+      expect(named.length, `${m.ref} “${m.title}” names no partner`).toBeGreaterThan(0);
+    }
+  });
+
+  it('links people to matters in numbers, not as a token four', async () => {
+    // The floor is set well above what was there when this was reported, so
+    // that quietly dropping the party rows again fails rather than passes.
+    const { count, rows } = await seeded();
+    expect(count('SELECT COUNT(*) AS n FROM case_parties')).toBeGreaterThanOrEqual(24);
+    const roles = new Set(
+      rows<{ role: string }>('SELECT DISTINCT role FROM case_parties').map((r) => r.role));
+    expect(roles.size, 'the caseload uses too few of the roles').toBeGreaterThanOrEqual(7);
+    for (const role of ['principal_applicant', 'supporting_partner', 'dependent_child',
+                        'employer', 'sponsor']) {
+      expect(roles, role).toContain(role);
+    }
+  });
+
+  it('names only roles the register has', async () => {
+    const { rows } = await seeded();
+    const used = rows<{ role: string }>('SELECT DISTINCT role FROM case_parties')
+      .map((r) => r.role);
+    for (const role of used) {
+      expect(PARTY_ROLES as readonly string[], `${role} is not a party role`).toContain(role);
+    }
+  });
+
+  it('puts every organisation on at least one matter', async () => {
+    // A company on the register that appears on nothing is a row with no reason
+    // to exist. Each of these is either the client of its own accreditation or
+    // job check, or the employer named on somebody's work visa — which is the
+    // whole point of a role living on the link rather than on the client.
+    const { rows } = await seeded();
+    const orphans = rows<{ full_name: string }>(
+      `SELECT full_name FROM clients c
+        WHERE c.kind = 'organisation'
+          AND NOT EXISTS (SELECT 1 FROM cases k WHERE k.client_id = c.id)
+          AND NOT EXISTS (SELECT 1 FROM case_parties p WHERE p.client_id = c.id)`);
+    expect(orphans.map((o) => o.full_name)).toEqual([]);
+    expect(rows<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM clients WHERE kind = 'organisation'`)[0]!.n)
+      .toBeGreaterThanOrEqual(4);
+  });
+
+  it('leaves a few clients attached to nothing, deliberately', async () => {
+    // Not every client has live work, and a caseload where every one of them
+    // does shows nothing of what the Leads list is for. What must not happen is
+    // a *partner or child* who is nowhere, which the test above covers.
+    const { rows } = await seeded();
+    const idle = rows<{ full_name: string }>(
+      `SELECT full_name FROM clients c
+        WHERE NOT EXISTS (SELECT 1 FROM cases k WHERE k.client_id = c.id)
+          AND NOT EXISTS (SELECT 1 FROM case_parties p WHERE p.client_id = c.id)`);
+    expect(idle.length).toBeGreaterThan(0);
+    expect(idle.length, 'too many clients are attached to nothing').toBeLessThanOrEqual(3);
+  });
+});
+
+/**
+ * Every value in the caseload comes from the list it belongs to.
+ *
+ * Three invented keys shipped on the morning of 12 September and the practice
+ * found them on the Cases list. `sv_student` was the instructive one: a real
+ * key, from the wrong vocabulary. So each field is checked against **its own**
+ * list here rather than against "somewhere in the vocabulary file", which is
+ * what let that one through.
+ */
+describe('nothing in the caseload is a key somebody made up', () => {
+  /** One vocabulary's default keys, read out of `core/vocabulary.ts` itself. */
+  function vocabKeys(name: string): Set<string> {
+    const block = VOCABULARY_SOURCE.match(
+      new RegExp(`export const ${name}[\\s\\S]*?defaults: \`([\\s\\S]*?)\`,`))?.[1];
+    expect(block, `${name} could not be read`).toBeTruthy();
+    const keys = new Set([...block!.matchAll(/^([a-z][a-z_0-9]*) \|/gm)].map((m) => m[1]!));
+    expect(keys.size, `${name} read as empty`).toBeGreaterThan(2);
+    return keys;
+  }
+
+  const CHECKS: Array<[string, string, string]> = [
+    // [vocabulary, table, column]
+    ['VISA_TYPE_VOCAB', 'clients', 'current_visa_type'],
+    ['FLAG_KIND_VOCAB', 'flags', 'kind'],
+    ['EMPLOYMENT_KIND_VOCAB', 'client_employment', 'kind'],
+    ['TRAVEL_PURPOSE_VOCAB', 'client_travel', 'purpose'],
+    ['EDUCATION_LEVEL_VOCAB', 'client_education', 'level'],
+  ];
+
+  it.each(CHECKS)('every %s value in %s.%s is one the list carries', async (vocab, table, column) => {
+    const { rows } = await seeded();
+    const configured = vocabKeys(vocab);
+    const used = rows<{ v: string }>(
+      `SELECT DISTINCT ${column} AS v FROM ${table} WHERE ${column} IS NOT NULL`)
+      .map((r) => r.v);
+    expect(used.length, `nothing was written to ${table}.${column}`).toBeGreaterThan(0);
+    for (const value of used) {
+      expect(configured.has(value), `${value} is not in ${vocab}`).toBe(true);
+    }
+  });
+
+  it('gives every matter a priority the register has', async () => {
+    const { rows } = await seeded();
+    for (const { priority } of rows<{ priority: string }>(
+      'SELECT DISTINCT priority FROM cases')) {
+      expect(PRIORITIES as readonly string[], priority).toContain(priority);
+    }
+  });
+});
+
+/**
+ * Money, and the histories that make the register worth looking at.
+ *
+ * **Asked for on 12 September 2026:** *"i do not see any invoices in trial data
+ * - please introduce say 5-7 invoices with various stages. also the same for
+ * quotes - increase number of quotes to the number of actual cases as one would
+ * think that a case once started with a quotation"*, and *"the principal
+ * clients should have varied employment, education and travel histories."*
+ */
+describe('the money and the histories', () => {
+  it('lays down invoices at more than one stage', async () => {
+    const { rows, count } = await seeded();
+    expect(count('SELECT COUNT(*) AS n FROM invoices')).toBeGreaterThanOrEqual(5);
+    const statuses = new Set(
+      rows<{ status: string }>('SELECT DISTINCT status FROM invoices').map((r) => r.status));
+    for (const s of statuses) {
+      expect(['draft', 'issued', 'part_paid', 'paid', 'void'], `${s} is not an invoice status`)
+        .toContain(s);
+    }
+    expect(statuses.size, 'the invoices are all in one state').toBeGreaterThanOrEqual(4);
+    expect(statuses).toContain('paid');
+    expect(statuses).toContain('part_paid');
+  });
+
+  it('has one invoice already past its due date, and one not', async () => {
+    // Overdue is a date and not a status, which is the distinction the Money
+    // page has to make and the one a caseload has to be able to show.
+    const { rows } = await seeded();
+    const owing = rows<{ due_on: string }>(
+      `SELECT due_on FROM invoices WHERE status IN ('issued', 'part_paid') AND due_on IS NOT NULL`);
+    const today = new Date().toISOString().slice(0, 10);
+    expect(owing.some((i) => i.due_on < today), 'nothing is overdue').toBe(true);
+    expect(owing.some((i) => i.due_on >= today), 'everything is overdue').toBe(true);
+  });
+
+  it('adds up: an invoice agrees with its own lines', async () => {
+    // The one page where being a cent out matters. Checked by adding the lines
+    // up in SQL rather than by trusting the figure the seed wrote.
+    const { rows } = await seeded();
+    const wrong = rows<{ ref: string }>(
+      `SELECT i.ref FROM invoices i JOIN invoice_items li ON li.invoice_id = i.id
+        GROUP BY i.id
+       HAVING i.net_cents   != SUM(li.net_cents)
+           OR i.gst_cents   != SUM(li.gst_cents)
+           OR i.gross_cents != SUM(li.gross_cents)`);
+    expect(wrong.map((r) => r.ref)).toEqual([]);
+  });
+
+  it('adds up: a quotation agrees with its own lines', async () => {
+    const { rows } = await seeded();
+    const wrong = rows<{ ref: string }>(
+      `SELECT q.ref FROM quotes q JOIN quote_items qi ON qi.quote_id = q.id
+        GROUP BY q.id
+       HAVING q.amount_cents + q.gst_cents + q.disbursements_cents != SUM(qi.gross_cents)`);
+    expect(wrong.map((r) => r.ref)).toEqual([]);
+  });
+
+  it('says an invoice is paid only when the payments come to the total', async () => {
+    const { rows } = await seeded();
+    const lying = rows<{ ref: string; status: string; paid: number; gross: number }>(
+      `SELECT ref, status, paid_cents AS paid, gross_cents AS gross FROM invoices
+        WHERE status IN ('paid', 'part_paid', 'issued')`)
+      .filter((i) => (i.status === 'paid' && i.paid < i.gross)
+                  || (i.status === 'part_paid' && (i.paid <= 0 || i.paid >= i.gross))
+                  || (i.status === 'issued' && i.paid !== 0));
+    expect(lying.map((i) => i.ref)).toEqual([]);
+  });
+
+  it('records the payments behind what it says has been paid', async () => {
+    const { rows } = await seeded();
+    const mismatched = rows<{ ref: string }>(
+      `SELECT i.ref FROM invoices i
+        WHERE i.paid_cents !=
+          (SELECT COALESCE(SUM(p.amount_cents), 0) FROM invoice_payments p
+            WHERE p.invoice_id = i.id)`);
+    expect(mismatched.map((r) => r.ref)).toEqual([]);
+  });
+
+  it('starts very nearly every matter with a quotation', async () => {
+    // *"a case once started with a quotation."* Not every one: a handful are
+    // covered by another matter's quotation, or were done at no charge, and
+    // those are named in the seed with the reason. The rule is that the
+    // exceptions stay a handful.
+    const { count } = await seeded();
+    const matters = count('SELECT COUNT(*) AS n FROM cases');
+    const quoted = count(
+      'SELECT COUNT(DISTINCT case_id) AS n FROM quotes WHERE case_id IS NOT NULL');
+    expect(matters - quoted, 'too many matters have no quotation on them')
+      .toBeLessThanOrEqual(4);
+    expect(count('SELECT COUNT(*) AS n FROM quotes')).toBeGreaterThanOrEqual(matters - 4);
+  });
+
+  it('does not make every quotation an accepted one', async () => {
+    const { rows } = await seeded();
+    const byStatus = rows<{ status: string; n: number }>(
+      'SELECT status, COUNT(*) AS n FROM quotes GROUP BY status');
+    expect(byStatus.length, 'the quotations are all in one state').toBeGreaterThanOrEqual(4);
+    for (const { status } of byStatus) {
+      expect(QUOTE_STATUSES as readonly string[], status).toContain(status);
+    }
+    for (const s of ['accepted', 'sent', 'declined', 'draft']) {
+      expect(byStatus.map((r) => r.status), s).toContain(s);
+    }
+  });
+
+  it('keeps a quotation on the matter it belongs to', async () => {
+    // The database refuses a quotation whose matter belongs to somebody else,
+    // and it refused two of these while they were being written. Checked again
+    // here because the refusal is silent once the data is right.
+    const { rows } = await seeded();
+    const wrong = rows<{ ref: string }>(
+      `SELECT q.ref FROM quotes q JOIN cases k ON k.id = q.case_id
+        WHERE q.client_id IS NOT k.client_id`);
+    expect(wrong.map((r) => r.ref)).toEqual([]);
+  });
+
+  it('gives the principal clients histories worth looking at', async () => {
+    const { count } = await seeded();
+    expect(count('SELECT COUNT(*) AS n FROM client_employment')).toBeGreaterThanOrEqual(50);
+    expect(count('SELECT COUNT(*) AS n FROM client_education')).toBeGreaterThanOrEqual(25);
+    expect(count('SELECT COUNT(*) AS n FROM client_travel')).toBeGreaterThanOrEqual(25);
+    // Everybody who holds a matter has a working life on file.
+    expect(count(
+      `SELECT COUNT(*) AS n FROM clients c
+        WHERE c.kind = 'individual'
+          AND EXISTS (SELECT 1 FROM cases k WHERE k.client_id = c.id)
+          AND NOT EXISTS (SELECT 1 FROM client_employment e WHERE e.client_id = c.id)`))
+      .toBe(0);
+  });
+
+  it('plants gaps in the employment histories, on more than one file', async () => {
+    // The register marks a period nobody has accounted for. A caseload with no
+    // gaps in it shows that doing nothing.
+    const { count } = await seeded();
+    expect(count(
+      `SELECT COUNT(DISTINCT client_id) AS n FROM client_employment
+        WHERE kind IN ('unemployed', 'caring')`)).toBeGreaterThanOrEqual(5);
+  });
+
+  it('writes history dates at all three precisions', async () => {
+    // A history date may be a whole day, a month or a year — 0091 allowed the
+    // first two, 0095 added the third. A caseload that wrote every one of them
+    // in full would never show the shorter forms work at all.
+    const { count } = await seeded();
+    for (const [precision, length] of [['a day', 10], ['a month', 7], ['a year', 4]] as const) {
+      expect(count(
+        `SELECT COUNT(*) AS n FROM client_employment WHERE LENGTH(started_on) = ${length}`),
+        `no employment date is written as ${precision}`).toBeGreaterThan(0);
+    }
+    // And on a trip, which is a different table with its own guard.
+    expect(count('SELECT COUNT(*) AS n FROM client_travel WHERE LENGTH(started_on) = 4'))
+      .toBeGreaterThan(0);
+  });
+
+  it('records when a qualification was awarded, not only when study ended', async () => {
+    // The date an application asks for, and it is usually months after the
+    // last exam. It had nowhere to go until migration 0095.
+    const { count, rows } = await seeded();
+    expect(count('SELECT COUNT(*) AS n FROM client_education WHERE awarded_on IS NOT NULL'))
+      .toBeGreaterThanOrEqual(20);
+    // Conferred after the study finished, never before it.
+    const backwards = rows<{ institution: string }>(
+      `SELECT institution FROM client_education
+        WHERE awarded_on IS NOT NULL AND ended_on IS NOT NULL
+          AND SUBSTR(awarded_on, 1, 4) < SUBSTR(ended_on, 1, 4)`);
+    expect(backwards.map((r) => r.institution)).toEqual([]);
+  });
+
+  it('gives a qualification a level on the framework, or says it has none', async () => {
+    // `nzqcf_7` carries the level in the key. `secondary` and
+    // `overseas_unassessed` are the two honest answers for a qualification that
+    // has no framework level, and both have to appear or the caseload is only
+    // showing half the list.
+    const { rows } = await seeded();
+    const levels = new Set(
+      rows<{ level: string }>(
+        'SELECT DISTINCT level FROM client_education WHERE level IS NOT NULL')
+        .map((r) => r.level));
+    expect(levels.size, 'too few education levels are used').toBeGreaterThanOrEqual(5);
+    expect([...levels].filter((l) => /^nzqcf_\d+$/.test(l)).length).toBeGreaterThanOrEqual(3);
+    expect(levels).toContain('secondary');
+    expect(levels).toContain('overseas_unassessed');
+  });
+});
+
+/**
+ * The knowledge base.
+ *
+ * **Asked for on 12 September 2026:** *"add some sample entries into the
+ * knowledge base to showcase it - all these data in the trial register will be
+ * there by default as a starting point for people to play with."*
+ */
+describe('the knowledge base is not an empty page', () => {
+  it('holds a handful of articles', async () => {
+    const { count } = await seeded();
+    expect(count('SELECT COUNT(*) AS n FROM kb_articles')).toBeGreaterThanOrEqual(6);
+  });
+
+  it('uses only kinds and statuses the knowledge base defines', async () => {
+    const { rows } = await seeded();
+    const source = readFileSync('src/core/kb.ts', 'utf8');
+    const defaults = source.match(/const DEFAULT_KINDS = \[([\s\S]*?)\]\.join/)?.[1];
+    expect(defaults, 'the knowledge base kinds could not be read').toBeTruthy();
+    const configured = new Set(
+      [...defaults!.matchAll(/'([a-z][a-z_0-9]*) \|/g)].map((m) => m[1]!));
+    expect(configured.size).toBeGreaterThan(5);
+
+    const used = rows<{ kind: string }>('SELECT DISTINCT kind FROM kb_articles');
+    expect(used.length).toBeGreaterThanOrEqual(4);
+    for (const { kind } of used) {
+      expect(configured.has(kind), `${kind} is not a knowledge base kind`).toBe(true);
+    }
+    for (const { status } of rows<{ status: string }>('SELECT DISTINCT status FROM kb_articles')) {
+      expect(KB_STATUSES as readonly string[], status).toContain(status);
+    }
+  });
+
+  it('shares at least one with a client, so the link has something to open', async () => {
+    const { rows, count } = await seeded();
+    expect(count('SELECT COUNT(*) AS n FROM kb_articles WHERE share_token IS NOT NULL'))
+      .toBeGreaterThan(0);
+    // The database insists a shared article says who shared it and when.
+    const half = rows<{ ref: string }>(
+      `SELECT ref FROM kb_articles
+        WHERE (share_token IS NULL) != (shared_at IS NULL)
+           OR (share_token IS NOT NULL AND shared_by IS NULL)`);
+    expect(half.map((r) => r.ref)).toEqual([]);
+  });
+
+  it('says in each one that it is a demonstration, not advice', async () => {
+    // These sit in a register somebody is being sold. Nothing in them may read
+    // as something a person could act on.
+    const { rows } = await seeded();
+    const bodies = rows<{ ref: string; body: string }>('SELECT ref, body FROM kb_articles');
+    expect(bodies.length).toBeGreaterThan(0);
+    for (const a of bodies) {
+      expect(a.body.toLowerCase(), `${a.ref} does not say it is a demonstration`)
+        .toContain('demonstration note');
+    }
+  });
+
+  it('goes with the rest of the caseload when it is put back', async () => {
+    // A knowledge base article could not be marked as test data at all until
+    // migration 0096, so a reset would have laid down a second copy of every
+    // one of them every time it ran.
+    const { env } = await seeded();
+    await purgeTestData(env, 'u1');
+    const after = await seedTestData(env, 'u1');
+    expect(after.articles).toBeGreaterThan(0);
   });
 });

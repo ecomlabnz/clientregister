@@ -418,7 +418,7 @@ describe('every kind of record offers the mark the same way', () => {
 });
 
 /**
- * The list screen reads a different column from every one of the six tables.
+ * The list screen reads a different column from every one of the tables.
  *
  * This is the test the practice paid for: clicking **Test data** with a matter
  * marked gave *Something went wrong*, because the list asked every table it had
@@ -428,7 +428,7 @@ describe('every kind of record offers the mark the same way', () => {
  * other tables are wrong.
  */
 describe('the list of marked records reads every table', () => {
-  it('names one marked row from each of the six', async () => {
+  it('names one marked row from each of them', async () => {
     const db = register();
     aUser(db);
     aClient(db, 'c1');
@@ -443,6 +443,12 @@ describe('the list of marked records reads every table', () => {
     db.prepare(
       `INSERT INTO tasks (id, title, assigned_to, is_test, created_at, updated_at)
        VALUES ('t1','Ring them back','u1',1,?,?)`).run(AT, AT);
+    // Added 12 September 2026 with migration 0096, when the demonstration
+    // caseload gained knowledge base articles and the reset had to be able to
+    // take them out again.
+    db.prepare(
+      `INSERT INTO kb_articles (id, ref, kind, title, body, status, is_test, created_at, updated_at)
+       VALUES ('a1','A1','guide','A written-down thing','body','draft',1,?,?)`).run(AT, AT);
     db.exec(`UPDATE clients SET is_test = 1 WHERE id = 'c1'`);
 
     const env = { DB: fakeD1(db) } as unknown as Parameters<typeof listTestData>[0];
@@ -450,7 +456,7 @@ describe('the list of marked records reads every table', () => {
 
     const seen = (t: string) => records.find((r) => r.table === t)!;
     expect(records.map((r) => r.table).sort())
-      .toEqual(['cases', 'clients', 'inquiries', 'invoices', 'quotes', 'tasks']);
+      .toEqual(['cases', 'clients', 'inquiries', 'invoices', 'kb_articles', 'quotes', 'tasks']);
     expect(seen('clients').title).toBe('A Person');
     expect(seen('cases').title).toBe('A matter');
     expect(seen('quotes').title).toBe('A matter');
@@ -460,15 +466,142 @@ describe('the list of marked records reads every table', () => {
     // A task has no reference number of its own, and must not claim one.
     expect(seen('tasks').ref).toBe('');
     expect(seen('cases').ref).toBe('K1');
+    expect(seen('kb_articles').title).toBe('A written-down thing');
   });
 
-  it('counts the same six', async () => {
+  it('counts the same tables', async () => {
     const db = register();
     aQuote(db, 'q1', true);
     const env = { DB: fakeD1(db) } as unknown as Parameters<typeof tallyTestData>[0];
     const tally = await tallyTestData(env);
     expect(tally.map((t) => t.table).sort())
-      .toEqual(['cases', 'clients', 'inquiries', 'invoices', 'quotes', 'tasks']);
+      .toEqual(['cases', 'clients', 'inquiries', 'invoices', 'kb_articles', 'quotes', 'tasks']);
     expect(tally.find((t) => t.table === 'quotes')?.count).toBe(1);
+  });
+});
+
+/**
+ * A rehearsal can be taken back out, and a real record still cannot.
+ *
+ * **Migration 0096**, written on 12 September 2026 when the demonstration
+ * caseload gained invoices. Migration 0083 already let an administrator mark an
+ * invoice as test data and already put `invoices` in the purge's delete order —
+ * but `invoices_cannot_be_deleted` refused every delete, so the first purge
+ * with a marked invoice in it would have aborted. Nobody had hit it, because
+ * nothing yet wrote one.
+ *
+ * Attacked directly rather than through the application, because the guarantee
+ * is a trigger and a route that remembers to check is not a guarantee.
+ */
+describe('a marked invoice can be deleted and a real one cannot', () => {
+  function anInvoice(db: Db, id: string, rehearsal: boolean, status = 'issued') {
+    db.prepare(
+      `INSERT INTO invoices (id, ref, client_id, description, status, is_test,
+                             payment_terms_days, created_at, updated_at)
+       VALUES (?, ?, 'c1', 'Work done', 'draft', ?, 7, ?, ?)`,
+    ).run(id, id.toUpperCase(), rehearsal ? 1 : 0, AT, AT);
+    db.prepare(
+      `INSERT INTO invoice_items (id, invoice_id, position, description, kind, unit_label,
+              quantity_milli, unit_amount_cents, gst_treatment, gst_rate_bp,
+              net_cents, gst_cents, gross_cents, created_at)
+       VALUES (?, ?, 0, 'Advice', 'professional', 'item', 1000, 100000,
+               'exclusive', 1500, 100000, 15000, 115000, ?)`,
+    ).run(`li_${id}`, id, AT);
+    if (status !== 'draft') {
+      db.prepare(
+        `UPDATE invoices SET status = ?, issued_on = '2026-08-01', due_on = '2026-08-08',
+                net_cents = 100000, gst_cents = 15000, gross_cents = 115000 WHERE id = ?`,
+      ).run(status, id);
+    }
+    db.prepare(
+      `INSERT INTO invoice_payments (id, invoice_id, paid_on, amount_cents, method,
+                                     created_at, created_by)
+       VALUES (?, ?, '2026-08-05', 50000, 'bank', ?, 'u1')`,
+    ).run(`pay_${id}`, id, AT);
+  }
+
+  it('takes a marked invoice, its lines and its payments', () => {
+    const db = register();
+    aUser(db);
+    aClient(db, 'c1');
+    anInvoice(db, 'i1', true);
+    db.exec(`DELETE FROM invoices WHERE is_test = 1`);
+    expect(one<{ n: number }>(db, 'SELECT COUNT(*) AS n FROM invoices').n).toBe(0);
+    expect(one<{ n: number }>(db, 'SELECT COUNT(*) AS n FROM invoice_items').n).toBe(0);
+    expect(one<{ n: number }>(db, 'SELECT COUNT(*) AS n FROM invoice_payments').n).toBe(0);
+  });
+
+  it('still refuses to delete a real invoice', () => {
+    const db = register();
+    aUser(db);
+    aClient(db, 'c1');
+    anInvoice(db, 'i2', false);
+    expect(run(db, `DELETE FROM invoices WHERE id = 'i2'`))
+      .toThrow('an invoice cannot be deleted; void it instead');
+  });
+
+  it('still refuses to delete a payment on a real invoice', () => {
+    const db = register();
+    aUser(db);
+    aClient(db, 'c1');
+    anInvoice(db, 'i3', false);
+    expect(run(db, `DELETE FROM invoice_payments WHERE id = 'pay_i3'`))
+      .toThrow('a payment cannot be deleted');
+  });
+
+  it('still refuses to take a line off a real issued invoice', () => {
+    const db = register();
+    aUser(db);
+    aClient(db, 'c1');
+    anInvoice(db, 'i4', false);
+    expect(run(db, `DELETE FROM invoice_items WHERE id = 'li_i4'`))
+      .toThrow('an issued invoice cannot lose a line');
+  });
+});
+
+describe('a knowledge base article can be a rehearsal too', () => {
+  function anArticle(db: Db, id: string, rehearsal: boolean) {
+    db.prepare(
+      `INSERT INTO kb_articles (id, ref, kind, title, body, status, is_test,
+                                created_at, updated_at)
+       VALUES (?, ?, 'guide', 'A written-down thing', 'body', 'published', ?, ?, ?)`,
+    ).run(id, id.toUpperCase(), rehearsal ? 1 : 0, AT, AT);
+  }
+
+  it('is deleted by the purge, and a real article is not', () => {
+    const db = register();
+    aUser(db);
+    anArticle(db, 'a1', true);
+    anArticle(db, 'a2', false);
+    db.exec(`DELETE FROM kb_articles WHERE is_test = 1`);
+    expect(one<{ n: number }>(db, 'SELECT COUNT(*) AS n FROM kb_articles').n).toBe(1);
+  });
+
+  it('makes the reminder it raises a rehearsal as well', () => {
+    // Otherwise the follow-up task outlives the article it points at, every
+    // time the caseload is put back.
+    const db = register();
+    aUser(db);
+    anArticle(db, 'a1', true);
+    db.prepare(
+      `INSERT INTO tasks (id, title, status, priority, assigned_to, entity_type, entity_id,
+                          created_at, updated_at)
+       VALUES ('t1', 'KB-1 is due for review', 'open', 'normal', 'u1', 'kb_article', 'a1', ?, ?)`,
+    ).run(AT, AT);
+    expect(one<{ n: number }>(db, `SELECT is_test AS n FROM tasks WHERE id = 't1'`).n).toBe(1);
+  });
+
+  it('sweeps the reminders already raised when it is marked afterwards', () => {
+    const db = register();
+    aUser(db);
+    anArticle(db, 'a1', false);
+    db.prepare(
+      `INSERT INTO tasks (id, title, status, priority, assigned_to, entity_type, entity_id,
+                          created_at, updated_at)
+       VALUES ('t1', 'KB-1 is due for review', 'open', 'normal', 'u1', 'kb_article', 'a1', ?, ?)`,
+    ).run(AT, AT);
+    expect(one<{ n: number }>(db, `SELECT is_test AS n FROM tasks WHERE id = 't1'`).n).toBe(0);
+    db.exec(`UPDATE kb_articles SET is_test = 1 WHERE id = 'a1'`);
+    expect(one<{ n: number }>(db, `SELECT is_test AS n FROM tasks WHERE id = 't1'`).n).toBe(1);
   });
 });
