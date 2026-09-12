@@ -862,3 +862,113 @@ mattered, and the note is where the shape gets recorded.
 Two red deploys and about an hour. No records, and no time of the practice's —
 both were found and fixed before anybody opened the register. The second is why
 1.72.0 and 1.72.1 are an hour apart.
+
+---
+
+## 16. Every box you type into is shorter (1.72.2)
+
+**Asked for** looking at a client's employment history: *"these kind of rows are
+a bit too tall... they seem to take too much space, and the font would still
+easily fit in"* — and then, the part that changed the size of the job,
+*"the height of any field should be reduced. i believe they are all standard?"*
+
+They are all standard, and that is the whole reason this was two lines rather
+than a week. Every box you type into anywhere in the register — a client's name,
+a date, a dropdown, a cell in a history table, a search box — is drawn by one
+declaration in `app.css`. Change it once and it changes in all 237 places.
+
+### What actually came off
+
+Not the font. The font is untouched, which is what was asked. What came off is
+**padding** — the empty space between the text and the edge of the box — and,
+in a table, the extra space the cell was adding on top of it:
+
+| | Before | After |
+|---|---|---|
+| A row in a history table | 48.3px | **34.2px** |
+| Any single field | 37.8px | **29.7px** |
+| A dropdown | 34.0px | **28.0px** |
+| A field on a phone | 44.8px | **44.8px** |
+
+A table row lost nearly a third of its height. Over a nine-row employment
+history that is about 130 pixels back — most of a screen's worth on a laptop.
+
+Those numbers were **measured in Chromium, before and after**, not reasoned
+about from the stylesheet. Arithmetic on padding gets the answer wrong because
+the browser's own line spacing is part of it, and that is the number nobody
+writes down.
+
+### A table row was paying twice
+
+Worth recording because it explains why the tables looked so much worse than a
+plain form. The field inside the cell had its own padding, and then the cell
+added its own on top — so every history row carried two lots of spacing where a
+form field carried one. That is why a row was 48px when the field in it was 38.
+
+Both are now thin, and two thin paddings read as one comfortable gap.
+
+### What nearly went wrong, and how it was caught
+
+**A field on a phone very nearly shrank with the rest of them, and it must not.**
+
+The register has two rules for these boxes: one for a desk, and one for a narrow
+screen that makes them bigger — because a finger needs more room to land on than
+a mouse pointer does, and because iOS zooms the whole page if a control's text
+is under 16px.
+
+The narrow-screen rule **only overrides what it names.** It restated the
+padding. It did not restate the line spacing — because until today the desk rule
+did not set any. Tightening the desk rule added one, and the phone silently
+inherited it: a field there came out at **42px against the 44px a thumb needs.**
+
+It was caught because the measuring script checked the phone width in the same
+pass as the desk, so the number was sitting right there in the output. Not
+cleverness — just measuring the thing that the standing decision says ranks
+first. Had the script only measured the desk, this would have shipped, and the
+only symptom would have been that the register got slightly harder to use on a
+phone, which is not the kind of thing anybody reports.
+
+**The rule that came out of it**, pinned in `test/css.test.ts`: *whatever the
+desk rule sets that changes a field's height, the phone rule states for itself.*
+Not "line-height must be 1.55" — that is a number, and the next person to tighten
+something will add a different property and the number will not protect them.
+The test reads both rules and fails when the desk sets a height-affecting
+property the phone does not restate. Mutation-tested by taking it out again.
+
+This is the third time today the same shape has come up: **a check that only
+looks where the change was made cannot see what the change did somewhere else.**
+Fault 44 was a conflict resolved correctly in the file being read while markers
+sat in the file beside it. Fault 48 was a query checked against the wrong
+database. This one would have been a field checked at the wrong screen width.
+
+### What is not done
+
+Buttons were left alone. They sit at 6px padding against a field's new 4px, and
+where the two sit side by side in a filter bar the button is now the taller of
+the pair by about a pixel — closer than they were before, as it happens, because
+the field used to be the taller one by three. Not worth a change until somebody
+looks at it and says it reads wrong.
+
+### Three lines removed from under three headings
+
+Asked for one at a time, looking at each page: *"remove the line: Every action
+taken in the register, by whom, and when"*, then the same for Export's *"Your
+records, as files you can open anywhere"* and Users' *"Everyone who can sign
+in"*.
+
+Each was a sentence under a heading that said what the heading said. A page
+titled **Audit log** with a column of actions, names and times under it does not
+also need telling that it holds every action, by whom, and when. The words cost
+a line of vertical space each and earned none of it back — the same complaint as
+the field heights above, arriving the same afternoon, which is probably not a
+coincidence.
+
+**One was kept and it is worth saying why.** The audit page has a second form:
+one person's activity, reached from their row on Users. There the line reads
+*"Everything <address> has done, most recent first"* — and that is not a restatement,
+it names whose activity is on screen and what order it is in, neither of which
+the heading carries. The rule that separates them: **a subtitle earns its line
+when it says something the heading cannot.**
+
+The remaining admin pages — Settings, Test data, Self-check — never had one, so
+there was nothing to take off them. They were checked rather than assumed.

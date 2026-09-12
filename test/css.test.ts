@@ -52,6 +52,29 @@ describe('nothing but tables and the nav may scroll sideways', () => {
   it('makes form controls 16px on a phone, so iOS does not zoom the page', () => {
     expect(css).toMatch(/input, select, textarea \{ font-size: 16px/);
   });
+
+  it('restates line-height on the phone rule, so a thumb target cannot shrink', () => {
+    // The desk rule and the phone rule set a field's height between them, and
+    // the phone rule only overrides what it names. On 12 September 2026 the
+    // desk padding was tightened and `line-height: 1.4` added with it; the
+    // phone rule restated the padding but not the line-height, so it inherited
+    // the tighter one and a field on a phone measured 42px against the 44px a
+    // thumb needs. Caught by measuring it in Chromium before it shipped.
+    //
+    // The rule, not the number: **whatever the desk rule sets that changes a
+    // field's height, the phone rule states for itself.** Anything it leaves
+    // out, it inherits.
+    const desk = css.match(/\ninput, select, textarea \{([^}]*)\}/);
+    expect(desk, 'no base rule for form controls').not.toBeNull();
+    const phone = css.match(/input, select, textarea \{ font-size: 16px[^}]*\}/);
+    expect(phone, 'no phone rule for form controls').not.toBeNull();
+
+    for (const property of ['padding', 'line-height', 'font-size']) {
+      if (!new RegExp(`\\b${property}:`).test(desk![1]!)) continue;
+      expect(phone![0], `the phone rule inherits ${property} from the desk rule`)
+        .toMatch(new RegExp(`\\b${property}:`));
+    }
+  });
 });
 
 describe('the header keeps to the same measure as the page', () => {

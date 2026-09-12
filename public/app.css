@@ -724,7 +724,9 @@ tr:last-child td { border-bottom: none; }
 .row-high { background: var(--amber-bg); }
 .row-muted { opacity: 0.55; }
 .edit-table input { width: 100%; }
-.edit-table td { padding: 5px 6px; }
+/* The cell adds its own space on top of the field's, so a table row was
+   carrying both. Two thin paddings read as one comfortable gap. */
+.edit-table td { padding: 2px 5px; }
 
 /* The space between two periods that do not meet.
  *
@@ -817,8 +819,19 @@ tr:last-child td { border-bottom: none; }
 .field { margin-bottom: 14px; }
 label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; }
 .req { color: var(--red); }
+/* Every box in the register is this one rule, which is why the height below is
+   a single number rather than a page's worth of them.
+
+   **Asked for on 12 September 2026**, of the employment history: *"these kind
+   of rows are a bit too tall... they seem to take too much space, and the font
+   would still easily fit in"* — then, when told it was one shared rule,
+   *"the height of any field should be reduced"*.
+
+   So the padding shrinks and the font does not. `line-height` is stated rather
+   than left to the browser because a row's height is now something a test
+   measures, and a browser default is not a number anybody can hold to. */
 input, select, textarea {
-  width: 100%; padding: 7px 10px; font: inherit; font-size: 0.88rem;
+  width: 100%; padding: 4px 9px; font: inherit; font-size: 0.88rem; line-height: 1.4;
   color: var(--text); background: var(--surface);
   border: 1px solid var(--border); border-radius: 5px;
 }
@@ -2638,8 +2651,13 @@ body.site { background: var(--bg); }
   .quote-doc-ref { text-align: left; }
 
   /* iOS Safari zooms the whole page whenever a focused control is smaller than
-     16px, which throws the layout off centre for the rest of the visit. */
-  input, select, textarea { font-size: 16px; padding: 9px 11px; }
+     16px, which throws the layout off centre for the rest of the visit.
+
+     `line-height` is restated here, not just the padding: the desktop rule
+     tightened it to 1.4, and inheriting that took a field on a phone to 42px —
+     under the 44px a thumb needs. A field is shorter on a desk and exactly as
+     tall as it was on a phone. */
+  input, select, textarea { font-size: 16px; padding: 9px 11px; line-height: 1.55; }
   .inline-form select { font-size: 16px; padding: 7px 8px; }
   .filters label { font-size: 0.85rem; }
 

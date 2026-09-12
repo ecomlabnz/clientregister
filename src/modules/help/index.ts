@@ -94,6 +94,20 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.72.2', date: '12 September 2026',
+    notes: [
+      'Every box you type into is shorter, so a table of work history or education fits more on '
+        + 'the screen without scrolling. A row in one of those tables was 48 pixels tall and is '
+        + 'now 34 \u2014 about a third less. A single field went from 38 to 30.',
+      'The writing is exactly the same size. What came off is the empty space around it inside '
+        + 'the box, which was more than the text needed.',
+      'On a phone nothing changed. A field there is still as tall as it was, because a finger '
+        + 'needs more room to hit it than a mouse pointer does.',
+      'Gone from three pages: the line under the heading that repeated the heading. Audit log, '
+        + 'Export and Users each had one. The page starts at the content now.',
+    ],
+  },
+  {
     version: '1.72.1', date: '12 September 2026',
     notes: [
       'The list check below did not reach the register on the first attempt \u2014 the deploy '
