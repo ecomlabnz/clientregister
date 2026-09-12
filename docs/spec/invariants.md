@@ -53,12 +53,12 @@ here is that it holds when the route is not.
 
 | On | The database refuses |
 |---|---|
-| insert | a date in a history is a day or a month, written 2019-03-15 or 2019-03 |
+| insert | a date in a history is a day, a month or a year, written 2019-03-15, 2019-03 or 2019 |
 | insert | a history note must be 1000 characters or fewer |
 | insert | a period cannot end before it starts |
 | insert | education country must be an ISO 3166-1 alpha-2 country code |
 | insert | whether a course was completed is a word, not a sentence |
-| update | a date in a history is a day or a month, written 2019-03-15 or 2019-03 |
+| update | a date in a history is a day, a month or a year, written 2019-03-15, 2019-03 or 2019 |
 | update | a history note must be 1000 characters or fewer |
 | update | a period cannot end before it starts |
 | update | education country must be an ISO 3166-1 alpha-2 country code |
@@ -68,11 +68,11 @@ here is that it holds when the route is not.
 
 | On | The database refuses |
 |---|---|
-| insert | a date in a history is a day or a month, written 2019-03-15 or 2019-03 |
+| insert | a date in a history is a day, a month or a year, written 2019-03-15, 2019-03 or 2019 |
 | insert | a history note must be 1000 characters or fewer |
 | insert | a period cannot end before it starts |
 | insert | employment country must be an ISO 3166-1 alpha-2 country code |
-| update | a date in a history is a day or a month, written 2019-03-15 or 2019-03 |
+| update | a date in a history is a day, a month or a year, written 2019-03-15, 2019-03 or 2019 |
 | update | a history note must be 1000 characters or fewer |
 | update | a period cannot end before it starts |
 | update | employment country must be an ISO 3166-1 alpha-2 country code |
@@ -95,12 +95,12 @@ here is that it holds when the route is not.
 
 | On | The database refuses |
 |---|---|
-| insert | a date in a history is a day or a month, written 2019-03-15 or 2019-03 |
+| insert | a date in a history is a day, a month or a year, written 2019-03-15, 2019-03 or 2019 |
 | insert | a history note must be 1000 characters or fewer |
 | insert | a mode of travel is a word, not a sentence |
 | insert | a trip cannot end before it starts |
 | insert | travel country must be an ISO 3166-1 alpha-2 country code |
-| update | a date in a history is a day or a month, written 2019-03-15 or 2019-03 |
+| update | a date in a history is a day, a month or a year, written 2019-03-15, 2019-03 or 2019 |
 | update | a history note must be 1000 characters or fewer |
 | update | a mode of travel is a word, not a sentence |
 | update | a trip cannot end before it starts |

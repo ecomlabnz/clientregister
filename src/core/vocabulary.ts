@@ -442,20 +442,84 @@ other | Other`,
  * New Zealand Qualifications Framework, which asks a different question and
  * would need translating for every overseas qualification anyway.
  */
+/**
+ * The level of a qualification, on the New Zealand Qualifications and
+ * Credentials Framework.
+ *
+ * **Asked for on 12 September 2026:** *"education level must also have a
+ * numerical identifier as per NZQCF."*
+ *
+ * ## Why the list is levels rather than the names of qualifications
+ *
+ * It used to read *Certificate, Diploma, Bachelor's degree…*, and **half of
+ * those cannot be turned into a number at all**:
+ *
+ *  * a **Certificate** sits at any of levels 1 to 6;
+ *  * a **Diploma** at 5, 6 or 7;
+ *  * **Secondary school** spans 1 to 3 (NCEA).
+ *
+ * Only Bachelor's (7), Postgraduate Diploma (8), Master's (9) and Doctoral (10)
+ * name exactly one level. And the old list was missing three qualifications
+ * that do: Graduate Certificate and Graduate Diploma (7), Bachelor Honours and
+ * Postgraduate Certificate (8).
+ *
+ * This is not tidiness. INZ states points and requirements **by level** — a
+ * certificate at level 2 and one at level 6 are different visas — so a field
+ * that records "Certificate" records nothing an application can be built on.
+ *
+ * So the field records the level, and the qualification's *name* stays in the
+ * free-text box beside it ("Master of Engineering"). One fact, one owner: the
+ * level column owns the level, and the label on each line names the
+ * qualifications that sit there so nobody has to hold the framework in their
+ * head while filling the form in.
+ *
+ * **The number is carried by the key**, `nzqcf_7` and so on, rather than in a
+ * second column somebody has to remember to keep in step. `nzqcfLevel()` below
+ * reads it back out.
+ *
+ * Two entries carry no number, and deliberately: secondary schooling, which is
+ * not a framework level, and an overseas qualification nobody has had assessed
+ * — which is the honest state of most of them when a file is opened.
+ */
 export const EDUCATION_LEVEL_VOCAB: VocabularyDef = {
   key: 'vocab.education_levels',
   label: 'Education levels',
   help: 'One per line, written as \u201ckey | Label\u201d. Offered against a row of a client\u2019s '
-    + 'education history. Blank lines and lines starting with # are ignored.',
-  defaults: `secondary | Secondary school
-certificate | Certificate
-diploma | Diploma
-bachelor | Bachelor\u2019s degree
-postgrad_diploma | Postgraduate diploma
-masters | Master\u2019s degree
-doctorate | Doctorate
+    + 'education history. A key of the form \u201cnzqcf_7\u201d also tells the register the '
+    + 'qualification sits at NZQCF level 7. Blank lines and lines starting with # are ignored.',
+  defaults: `nzqcf_1 | 1 \u2014 Certificate
+nzqcf_2 | 2 \u2014 Certificate
+nzqcf_3 | 3 \u2014 Certificate
+nzqcf_4 | 4 \u2014 Certificate
+nzqcf_5 | 5 \u2014 Certificate or Diploma
+nzqcf_6 | 6 \u2014 Certificate or Diploma
+nzqcf_7 | 7 \u2014 Bachelor\u2019s degree, Diploma, Graduate Certificate or Diploma
+nzqcf_8 | 8 \u2014 Bachelor Honours, Postgraduate Certificate or Diploma
+nzqcf_9 | 9 \u2014 Master\u2019s degree
+nzqcf_10 | 10 \u2014 Doctoral degree
+
+secondary | Secondary school (no framework level)
+overseas_unassessed | Overseas \u2014 level not assessed
 other | Other`,
 };
+
+/**
+ * The NZQCF level a stored education-level key stands for, or `null`.
+ *
+ * Reads the number out of the key rather than keeping a second table of them,
+ * so there is nothing to fall out of step. An administrator who adds a line of
+ * their own gets a level from it for free if they name it `nzqcf_<n>`, and
+ * `null` — not a wrong number — if they do not.
+ *
+ * Refuses anything outside 1 to 10: the framework has ten levels, and a key
+ * reading `nzqcf_11` is a typo rather than a qualification.
+ */
+export function nzqcfLevel(key: string | null | undefined): number | null {
+  const m = /^nzqcf_(\d{1,2})$/.exec(key ?? '');
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n >= 1 && n <= 10 ? n : null;
+}
 
 /**
  * Whether a course was finished.

@@ -8,6 +8,43 @@ The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
 <<<<<<< HEAD
+## 1.64.0 — 12 September 2026
+
+### Added
+**An education level is now a number on the NZQCF.** *"education level must
+also have a numerical identifier as per NZQCF - do you know how to determine
+the level?"*
+
+The honest answer was that for half the old list, you cannot. It read
+*Certificate, Diploma, Bachelor's degree…* — and a **Certificate** sits at any
+of levels 1 to 6, a **Diploma** at 5, 6 or 7, and secondary school spans 1 to 3.
+Only four of the eight named one level. Three qualifications that do name one
+were missing altogether: Graduate Certificate and Graduate Diploma (7),
+Bachelor Honours and Postgraduate Certificate (8).
+
+That matters because INZ states points and requirements **by level**. A
+certificate at level 2 and one at level 6 are different visas, so a field
+recording "Certificate" recorded nothing an application could be built on.
+
+The dropdown is now the level itself, 1 to 10, with the qualifications that sit
+at each named beside it. The qualification's own name stays in the box next to
+it, where it already was. Secondary school and an unassessed overseas
+qualification are still there, without a level, because neither has one.
+
+**An award date on an education row.** *"we also need the award date."* A
+qualification is conferred on a day that is often months after the last exam,
+and it is the conferral an application asks for. It had nowhere to go before.
+
+**A date in a history may now be just a year.** You could already write
+`2019-03-15` or `2019-03`. Now `2019` as well — because an old certificate
+frequently gives only the year, and writing `2019-01` would be the register
+inventing January. This applies to employment and travel dates too, not only
+education.
+
+**Nothing you have already entered changes**, and your own register had no
+education rows at all, so there was nothing to convert. If you had edited the
+education list yourself, yours is kept as it is.
+
 ## 1.63.0 — 12 September 2026
 
 ### Added

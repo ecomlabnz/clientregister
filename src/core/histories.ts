@@ -111,6 +111,21 @@ export const EDUCATION_HISTORY: HistoryDef = {
     { name: 'country', label: 'Country', kind: 'country' },
     { name: 'started_on', label: 'From', kind: 'date' },
     { name: 'ended_on', label: 'To', kind: 'date' },
+    // **Asked for on 12 September 2026:** *"for education section - we also
+    // need the award date (should be able to enter full date or month and year
+    // or just year)."*
+    //
+    // A third date, and a different fact from the two before it. A
+    // qualification is *conferred* on a day that is routinely months after the
+    // last exam, and it is the conferral that an application asks for and that
+    // the certificate itself carries. Before this it went in the note or
+    // nowhere.
+    //
+    // A year is a real answer here more often than anywhere else in the
+    // register — an old certificate frequently gives one — which is what
+    // widened a history date to a day, a month **or** a year. See migration
+    // 0095.
+    { name: 'awarded_on', label: 'Awarded', kind: 'date' },
     // Last, because it is the answer the row builds to. Asked for on 12
     // September 2026: *"another box - whether complete or incomplete."* It is
     // most of the point of an education history — a qualification claimed on an
@@ -211,10 +226,28 @@ export async function allHistories(
  * characters or ten — a second column saying so could disagree with the date
  * beside it, and `2019-03-15` marked "month only" is a state with no meaning.
  */
-export const HISTORY_DATE_RE = /^\d{4}-\d{2}(-\d{2})?$/;
+/**
+ * A history date: a day, a month, or a year.
+ *
+ * Widened from day-or-month on 12 September 2026, when the education history
+ * gained an award date. The argument is 0091's, one step further: a person
+ * remembers being awarded a qualification in 1998, and recording `1998-01`
+ * would be the register inventing January. The same is true of a job somebody
+ * held "in 2015", so all three histories take a year rather than education
+ * alone — the shape of a history date has one owner, and two conventions in
+ * one table family would be worse than none.
+ *
+ * The string still says its own precision, by being ten characters, seven, or
+ * four. No second column: see 0091 for why a precision column is worse.
+ */
+export const HISTORY_DATE_RE = /^\d{4}(-\d{2}(-\d{2})?)?$/;
 
 export function isMonthOnly(value: string): boolean {
   return value.length === 7;
+}
+
+export function isYearOnly(value: string): boolean {
+  return value.length === 4;
 }
 
 /**
@@ -229,6 +262,13 @@ export function isMonthOnly(value: string): boolean {
  */
 export function historyDateAt(value: string | null, end: boolean): number | null {
   if (!value || !HISTORY_DATE_RE.test(value)) return null;
+  // A year, like a month, is a period rather than a point, and for the same
+  // reason takes whichever end of itself the caller means: a period that began
+  // in 2015 began on 1 January, one that ended in 2015 ran to 31 December.
+  if (isYearOnly(value)) {
+    const y = Number(value);
+    return end ? Date.UTC(y, 11, 31) : Date.UTC(y, 0, 1);
+  }
   if (!isMonthOnly(value)) return Date.parse(`${value}T00:00:00Z`);
   const [y, m] = value.split('-').map(Number) as [number, number];
   // Day 0 of the next month is the last day of this one, which is also how
@@ -281,7 +321,8 @@ export function readHistoryRow(
       // rule (migration 0091); this is here so the message names the box.
       const raw = (f.optional(name, { max: 10 }) ?? '').trim();
       if (raw && !HISTORY_DATE_RE.test(raw)) {
-        f.errors[name] = `${col.label} is a day or a month — 2019-03-15, or 2019-03.`;
+        f.errors[name] = `${col.label} is a day, a month or a year — `
+          + '2019-03-15, 2019-03, or 2019.';
         values[col.name] = null;
       } else {
         values[col.name] = raw || null;
