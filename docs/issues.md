@@ -590,6 +590,130 @@ the shorter forms work at all.
 
 ---
 
+### 27. *(Fixed 12 September 2026, 1.72.0)* Nothing checked that a value came from its list
+
+**Found** 12 September 2026, after the practice spotted two raw codes on a page.
+**Severity when found:** high — silent data loss, on the live register.
+
+Reading the practice's register against its own lists found **35 client records
+holding the label of a visa or an English test instead of its key** — `Work Visa
+- Accredited Employer Work Visa` where every other row holds `wv_aewv`. They
+arrived with the bulk import of 1 September.
+
+Nothing displayed wrong: the register shows an unrecognised value as itself. The
+harm was one step further on. The dropdown offers keys only, so those records
+rendered **blank** on the edit form, and saving one would have written the blank
+back and erased the client's visa type without a word.
+
+Then the finding that mattered more: **no path validated.** Not the client form
+(`f.optional('current_visa_type', { max: 120 })` — any string), not the intake
+assistant, not the AI document reader, not an import, not the D1 console. Three
+columns out of sixteen were checked in a route, which is the ordinary fate of a
+rule kept in handlers.
+
+The practice's own conclusion: *"any bulk data MUST be checked before it is
+populated. Right? one of the selling points is that we can extract data from the
+practices files and prepopulate the app very quickly."*
+
+**Fixed** by migration 0101: the database refuses a value that is not on the
+practice's own list, in all sixteen columns, by reading the list out of
+`settings`. It checks only when the value is *changing*, so removing a term
+strands nothing; blank, whitespace and NULL always pass; and a list the database
+cannot find allows everything rather than refusing everything.
+
+Settings → Self-check reports every stored value that is not on its list, which
+is the import dry-run the practice asked for: *"load, look at the report, fix,
+before anyone relies on it."*
+
+**Not fixed by it**, and open below as 21, 22 and 23: the blank dropdown itself,
+the clauses column that holds a list rather than a value, and the friendliness of
+the refusal when it reaches somebody through a form.
+
+### 28. A stored value that is not on its list still renders as a blank dropdown
+
+**Found** 12 September 2026, while building the guard for issue 20.
+**Severity: medium, and OPEN.** No longer a route to silent data loss, but still
+the thing that hides one.
+
+`select()` in `src/ui/components.ts` marks an option selected when its value
+matches. A stored value that is not among the options — a term the practice
+retired, or one of the 35 — matches nothing, so the box renders on the *blank*
+option. The page beside it shows the value correctly; only the form is blind.
+
+Migration 0101 removes the danger: a save that writes the value back unchanged
+is allowed, and the column is only guarded when it changes. So an adviser who
+opens one of the 35 and saves no longer erases anything. But the field still
+*looks* empty, which invites somebody to fill it in with a guess.
+
+**What would fix it:** `select()` rendering an unrecognised stored value as an
+extra option, selected, and labelled as not on the list. One change, and it
+would fix every dropdown in the register at once.
+
+**Why it is not in 1.72.0:** it changes how every `<select>` in the application
+renders, which is a wide blast radius for a change nobody asked for, and the
+standing rule is that a change the practice has not asked for is put to them
+before it is built. It is small, and it is worth asking about.
+
+### 29. `engagement_clauses.case_types` holds a list, so membership is not the question
+
+**Found** 12 September 2026, working out which columns the guard covers.
+**Severity: low, and OPEN.**
+
+Every other vocabulary-backed column holds one term. This one holds several,
+space-separated — the kinds of matter a clause applies to — so a trigger asking
+"is this value on the list" cannot be pointed at it. Nothing validates it today,
+and a typo there silently narrows which clauses appear in a letter of
+engagement, which is the sort of thing nobody notices.
+
+**What would fix it:** a trigger that walks the value the same way
+`vocabulary_parsed` walks a list, and refuses when any word in it is not a case
+type. The parse already exists; it would need pointing at a column instead of a
+setting. Or the column becomes a child table with one row per type, and then it
+is guarded like everything else — which is the better answer and the larger one.
+
+### 30. A refusal from the database reaches a person as an error page
+
+**Found** 12 September 2026, with issue 20's fix.
+**Severity: low, and OPEN.**
+
+The client form's `<select>` only offers real keys, so nobody can produce a bad
+value through the interface — which is why this is low. But `current_visa_type`
+and `english_test_type` are read with `f.optional(...)` rather than the
+`fromList(...)` the three columns beside them use, so a crafted post reaches the
+database and comes back as an abort rather than as "That is not one of the visa
+types you have configured" against the box.
+
+**Why it was left:** `fromList` refuses an unchanged value too, and that is
+exactly what an adviser saving one of the 35 records does. Adding it would swap
+one silent failure for a loud one on the records least able to take it. The
+right fix is issue 21 first, then `fromList` with an exemption for the value the
+record already holds — which needs the handler to know the old value, and it
+does not today.
+
+### 31. The guard's match compares letters and digits only
+
+**Found** 12 September 2026, writing it.
+**Severity: low, and OPEN by choice — written down so nobody rediscovers it as a bug.**
+
+SQL has no regular expressions, so migration 0101 compares a value with its
+list after removing spaces, underscores, hyphens, dots, tabs and carriage
+returns. `wv aewv` is therefore accepted where the list says `wv_aewv`, and
+would then display as itself.
+
+That is the **safe** direction and it was chosen on purpose: being too strict
+means refusing a value the practice's own dropdown offers, which is migration
+0064's fault, where file notes were silently broken for a week. The near-miss it
+lets through is reported by Settings → Self-check, and nobody loses a record.
+
+The one case it gets wrong in the other direction is a key containing a
+character outside that set — `wv(aewv)`, say. `parseVocabulary` would make that
+`wv_aewv`; the guard would not, and would refuse it with a message naming the
+value. No list in the register has such a key.
+
+**What would fix it:** a character-by-character normalisation in
+`vocabulary_parsed`, which is another recursive walk inside the one already
+there. Not worth it for a case that has never occurred.
+
 ### 15. A customised list never hears about improvements to the register's own
 
 **Found** 12 September 2026, answering the practice's question: *"so others may
@@ -784,6 +908,37 @@ of the page and the table it is about is shut.
 `foldingCard` with it, fed from the same `openBlocks` set the rest of the page
 already uses. Perhaps ten lines. Not done here because nobody asked for it and
 it is not this change's business; put it to the practice first.
+
+### 32. Two issue numbers in this list each name two different issues
+
+**Found** 12 September 2026, while merging two agents' work into this file and
+checking for collisions between *their* numbers.
+**Severity: low, and OPEN.**
+
+`### 10.` is both *"Six kinds of matter showed a code, not a name"* and *"A Read
+only user could mint an upload token"*. `### 15.` is both *"A test invoice could
+be marked and never deleted"* and *"A customised list never hears about
+improvements to the register's own"*. Both collisions pre-date today; each pair
+is one closed issue and one that is still live, which is how they went unnoticed
+— nothing reads a closed issue.
+
+It matters because this list is cross-referenced by number, here and in
+`spec/mistakes.md` and the progress notes. *"Issue 15"* appears in three
+documents meaning the vocabulary-drift one, and a reader following it to the
+first `### 15.` finds a fixed invoice fault instead. A number that does not
+identify the thing it numbers is not an index.
+
+**What would close it:** the same shape as the front page of the specification —
+a test that reads this file, collects the `### N.` headings and fails when one
+number appears twice. Renumbering by hand is not the fix on its own, because
+nothing would stop the next collision; the two existing ones should be resolved
+in the same change, keeping the *live* issue's number and moving the closed one
+to the end, so no live cross-reference breaks.
+
+Not done in this change because renumbering touches three documents' worth of
+references and this change is already a merge of two agents' work — a file being
+renumbered while being merged is how a reference gets quietly pointed at the
+wrong thing.
 
 ## Asked for, not yet built
 

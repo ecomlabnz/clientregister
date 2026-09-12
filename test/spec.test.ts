@@ -21,6 +21,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
+// @ts-expect-error — a plain script shared with `npm run spec`, which is not TypeScript.
+import { refusalsIn } from '../scripts/spec-refusals.mjs';
 
 const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
 
@@ -47,21 +49,19 @@ const tables: string[] = (db.prepare(
  * a document that lists the message once has not said which — so these are
  * compared as a bag of (when, message) pairs rather than a set of messages.
  */
+// Read through the same extractor the generator uses, not a second copy of it.
+// There used to be three copies of one regular expression here, in
+// `spec.mjs`, `spec-schema.mjs` and this file — and what went wrong on
+// 12 September 2026 was not that they drifted but that all three were wrong in
+// the same way: they matched only a refusal that is one string literal, and
+// migration 0101's thirty-two name the value that was refused. Three copies
+// agreeing is not a check.
 const refusals: string[] = (db.prepare(
   `SELECT sql FROM sqlite_master WHERE type='trigger'`,
 ) as any).all()
-  .flatMap((r: { sql: string }) => {
-    // **Every** RAISE, not the first. This read one per trigger until
-    // 9 September 2026, which quietly excused ten refusals from the document —
-    // four of the five reasons an inquiry cannot be deleted were undocumented,
-    // and the two delete triggers added that day would have contributed one
-    // line between them for nine rules. A trigger is not one refusal; it is a
-    // list of them, and the list is the point.
-    const when = /(?:BEFORE|AFTER)\s+(\w+)(?:\s+OF\s+[\w,\s]+)?\s+ON/i.exec(r.sql)?.[1];
-    if (!when) return [];
-    return [...r.sql.matchAll(/RAISE\(ABORT,\s*'((?:[^']|'')*)'\)/g)]
-      .map((m) => `${when.toLowerCase()}|${m[1]!.replace(/''/g, "'")}`);
-  });
+  .flatMap((r: { sql: string }) =>
+    (refusalsIn(r.sql) as Array<{ when: string; text: string }>)
+      .map((x) => `${x.when}|${x.text}`));
 
 /** Compare two bags, so a duplicated row is not the same as a single one. */
 function tally(items: string[]): Map<string, number> {

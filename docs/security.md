@@ -206,6 +206,37 @@ interpolation reaches SQL anywhere in the codebase.
 **Mass assignment.** Routes read named fields through a `FormReader`; a field a
 route does not name cannot reach the database, however it is posted.
 
+**Values from the practice's own lists.** Sixteen columns hold a term from one
+of the fourteen vocabularies an administrator edits under Settings → Lists and
+dropdowns — the visa a client holds, the kind of a matter, a warning, a file
+note, a document heading, and so on. Since migration 0101 (1.66.0) the
+**database** refuses a value that is not on the practice's own list, by reading
+that list out of `settings` at write time. It had been checked in three routes
+out of sixteen, which is how 35 client records came to hold the label of a visa
+instead of its key after a bulk load — a value the dropdown then rendered blank,
+so that saving the record would have erased it.
+
+This is an integrity control rather than an access control, and the distinction
+is worth stating: it does not stop anybody doing something they are entitled to
+do. What it stops is a value nothing can read reaching a column something
+depends on, from any writer at all — a form, the intake assistant, the document
+reader, a bulk load, or the D1 console.
+
+Three properties are deliberate and each is proved by a test that attacks the
+database directly (`test/vocabguard.test.ts`):
+
+- It applies **only when the value is changing**, so removing a term from a list
+  never makes the records already using it unsaveable.
+- **Blank, whitespace and NULL always pass.** "Not recorded" is a legitimate
+  state.
+- **A list the database cannot find allows everything.** The failure is
+  permissive by construction: the other way round, a register whose lists could
+  not be read would refuse every write in sixteen columns.
+
+**Settings → Self-check** reads the same rule over the stored data and reports
+what does not match, by column, with counts. It is read-only: it has no write
+path and what it reads is a view.
+
 **Passport numbers.** Stored as written since migration 0042 (the practice's
 decision, 30 August 2026) and shown on the client's page to any signed-in role.
 They remain excluded from every bulk CSV export.

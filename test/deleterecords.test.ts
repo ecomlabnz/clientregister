@@ -36,7 +36,7 @@ function seed(h: Harness) {
     INSERT INTO clients (id, ref, kind, full_name, status, created_at, updated_at)
       VALUES ('cl_2', 'CL-0002', 'individual', 'Minh Duc TRAN', 'active', '${at}', '${at}');
     INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to, created_at, updated_at)
-      VALUES ('k_1', 'CASE-26-001', 'cl_1', 'RV. Partner', 'rv_partner', 'engaged', 'u_test', '${at}', '${at}');
+      VALUES ('k_1', 'CASE-26-001', 'cl_1', 'RV. Partner', 'rv_partnership', 'engaged', 'u_test', '${at}', '${at}');
     INSERT INTO entries (id, entity_type, entity_id, kind, body, occurred_at, created_at, created_by)
       VALUES ('e_note', 'case', 'k_1', 'note', 'The consultation, written up.', '${at}', '${at}', 'u_test');
     INSERT INTO entries (id, entity_type, entity_id, kind, body, occurred_at, created_at)

@@ -238,7 +238,7 @@ describe('and it restores', () => {
     // is the order between them.
     h.db.prepare(`INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
                                      created_at, updated_at)
-                  VALUES ('k_1', 'CASE-26-001', 'cl_1', 'Partnership', 'partnership_resident',
+                  VALUES ('k_1', 'CASE-26-001', 'cl_1', 'Partnership', 'rv_partnership',
                           'open', 'u_test', ?, ?)`).run(at, at);
     h.db.prepare(`INSERT INTO case_parties (id, case_id, client_id, role, created_at)
                   VALUES ('cp_1', 'k_1', 'cl_2', 'partner', ?)`).run(at);

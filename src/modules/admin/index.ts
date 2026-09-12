@@ -30,6 +30,9 @@ import { dateShort, dateTime, timeShort, truncate } from '../../ui/format';
 import {
   isTestTable, listTestData, purgeTestData, setTestMark, tallyTestData, TEST_TABLES,
 } from '../../core/testdata';
+import {
+  columnName, examples, listName, vocabularyListSizes, vocabularyMismatches,
+} from '../../core/selfcheck';
 import { resetTestData, seedState, seedTestData } from '../../core/testseed';
 import { safeReturn } from '../../core/returnto';
 import { isRole, ROLE_DESCRIPTIONS, ROLE_LABELS, type Permission } from '../../core/rbac';
@@ -143,6 +146,7 @@ export function adminTabs(current: string): Raw {
     { id: 'settings', label: 'Practice settings', href: '/admin/settings' },
     { id: 'audit', label: 'Audit log', href: '/admin/audit' },
     { id: 'testdata', label: 'Test data', href: '/admin/test-data' },
+    { id: 'selfcheck', label: 'Self-check', href: '/admin/self-check' },
     { id: 'automations', label: 'Automations', href: '/admin/automations' },
     { id: 'export', label: 'Export', href: '/admin/export' },
     { id: 'integrations', label: 'Integrations', href: '/admin?tab=integrations' },
@@ -969,6 +973,75 @@ export const adminModule: AppModule = {
           : `Deleted ${rows} test ${rows === 1 ? 'record' : 'records'}`
             + `${result.notes ? ` and ${result.notes} file ${result.notes === 1 ? 'note' : 'notes'}` : ''}.`,
         'ok');
+    });
+
+    /**
+     * The self-check: the register read against its own lists.
+     *
+     * **Asked for on 12 September 2026** as an import dry-run: *"load, look at
+     * the report, fix, before anyone relies on it."*
+     *
+     * Read-only, and there is no button on it. What to do about a value that is
+     * not on a list is a decision about a client's file — add the term, or
+     * correct the records — and neither belongs to a page.
+     *
+     * With migration 0101 in place this should normally be empty, which is the
+     * point of it: an empty report is how a load is proved clean.
+     */
+    r.get('/self-check', requirePermission('admin:settings'), async (c) => {
+      const [mismatches, sizes] = await Promise.all([
+        vocabularyMismatches(c.env), vocabularyListSizes(c.env),
+      ]);
+      const rows = mismatches.reduce((sum, m) => sum + m.rows_affected, 0);
+      const unchecked = sizes.filter((s) => s.terms === 0);
+
+      return page(c, { title: 'Self-check', active: '/admin' }, html`
+        ${pageHeader('Self-check')}
+        ${adminTabs('selfcheck')}
+
+        <p class="hint mb">Every value the register has stored, read against the list it should
+           have come from. Worth running after loading data from somewhere else: anything below
+           is a value nothing will show a name for, and a dropdown will show blank.</p>
+
+        ${mismatches.length === 0
+          ? emptyState('Nothing out of place. Every stored value is on its list.')
+          : html`
+            <div class="alert alert-warn">
+              <p><strong>${rows} ${rows === 1 ? 'record' : 'records'}</strong> hold a value that is
+                 not on its list, across ${mismatches.length}
+                 ${mismatches.length === 1 ? 'value' : 'different values'}.</p>
+              <p>Two ways to put it right, and which one depends on whether the value is a word
+                 this practice uses: add it to the list under
+                 <a href="/admin/settings?tab=vocabulary">Lists and dropdowns</a>, or correct the
+                 records to a key that is already there.</p>
+            </div>
+
+            ${table(['What it is', 'Value stored', 'Records', 'The list it should be on'],
+              mismatches.map((m) => html`
+                <tr>
+                  <td>${columnName(m)}
+                      <div class="muted small"><code>${m.table_name}.${m.column_name}</code></div></td>
+                  <td><code>${truncate(m.value, 80)}</code></td>
+                  <td>${m.rows_affected}
+                      ${examples(m).length
+                        ? html`<div class="muted small">e.g. ${examples(m).join(', ')}</div>`
+                        : ''}</td>
+                  <td><a href="/admin/settings?tab=vocabulary">${listName(m.setting_key)}</a></td>
+                </tr>`))}`}
+
+        ${'' /* A list the database holds no terms for is the one state where the guard
+                 stands aside entirely — migration 0101, rule 3 — so a clean report above
+                 would mean less than it looks. It cannot happen on a register that has run
+                 the migrations; it is shown because a silent exception is worse than a
+                 noisy one. */}
+        ${unchecked.length
+          ? card('Lists nothing is being checked against', html`
+              <p class="hint mb">The register holds no terms for these, so any value is accepted
+                 in the columns that use them. This should not happen — say so if you see it.</p>
+              <ul>${unchecked.map((s) => html`<li>${listName(s.setting_key)}
+                    <code class="muted">${s.setting_key}</code></li>`)}</ul>`)
+          : html`<p class="hint">Checked against ${sizes.length} lists,
+                   ${sizes.reduce((sum, s) => sum + s.terms, 0)} terms in all.</p>`}`);
     });
 
     r.get('/audit', requirePermission('audit:read'), async (c) => {

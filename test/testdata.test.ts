@@ -226,7 +226,7 @@ function aCase(db: Db, id: string, clientId: string) {
   aUser(db);
   db.prepare(
     `INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to, created_at, updated_at)
-     VALUES (?, ?, ?, 'A matter', 'other_other', 'open', 'u1', ?, ?)`,
+     VALUES (?, ?, ?, 'A matter', 'ot_other', 'open', 'u1', ?, ?)`,
   ).run(id, id.toUpperCase(), clientId, AT, AT);
 }
 

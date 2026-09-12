@@ -33,7 +33,7 @@ function mount() {
              VALUES ('cl1','CL-0901','individual','A Person','active','${AT}','${AT}')`);
   h.db.prepare(
     `INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to, created_at, updated_at)
-     VALUES ('k1','CASE-26-901','cl1','A matter','other_other','open',?,?,?)`).run(USER.id, AT, AT);
+     VALUES ('k1','CASE-26-901','cl1','A matter','ot_other','open',?,?,?)`).run(USER.id, AT, AT);
   return h;
 }
 

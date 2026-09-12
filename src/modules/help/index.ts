@@ -94,6 +94,30 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.72.0', date: '12 September 2026',
+    notes: [
+      'Until today nothing checked that a value came from one of your lists. Thirty-five client '
+        + 'files were holding the words of a visa — “Work Visa - Accredited Employer Work '
+        + 'Visa” — where the rest hold the short code. They came in with the bulk load on '
+        + '1 September. Nothing looked wrong, but the dropdown on the edit form showed blank for '
+        + 'them, and saving one would have wiped the visa type without a word.',
+      'The register now refuses a value that is not on the right list, in sixteen places — the '
+        + 'visa a client holds, their English test, title, gender and relationship status, the kind '
+        + 'of a matter, a quotation, a warning, a file note, a document heading, a period of work, '
+        + 'an education level, and why and how a trip was made.',
+      'Your lists are still yours. Add a visa type under Settings → Lists and dropdowns and it '
+        + 'can be used a second later. Taking a word off a list does not lock the files already '
+        + 'using it — they open, edit and save exactly as before. Leaving a box blank is always '
+        + 'allowed.',
+      'New page: Settings → Self-check. It reads everything the register holds against the list '
+        + 'it should have come from and reports anything that does not match. Run it after loading '
+        + 'data from anywhere else — load, look at the report, fix, and then rely on it. It only '
+        + 'reports; it never changes anything.',
+      'The thirty-five files are untouched and still save. They are listed on that page, and what '
+        + 'to do about each one is your call, not the register’s.',
+    ],
+  },
+  {
     version: '1.71.0', date: '12 September 2026',
     notes: [
       'Military service is built. The block on a client’s page now holds the three questions '

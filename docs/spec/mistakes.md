@@ -897,6 +897,86 @@ Both were mutation-tested — put the second clock reading back and the test say
 
 ---
 
+### 46. A dropdown offering the right answers is not a check
+
+**What happened.** Thirty-five client records in the live register held the
+*label* of a visa or an English test where every other record holds its key —
+`Work Visa - Accredited Employer Work Visa` instead of `wv_aewv`. They came in
+with a bulk import on 1 September 2026 and were found on the 12th, after the
+practice spotted two raw codes on a page and asked about them.
+
+**Nothing displayed wrong.** The register shows an unrecognised value as itself,
+which is the right behaviour and is why nobody saw it for eleven days. The harm
+was one step further on: the edit form's `<select>` offers keys only, so those
+records rendered **blank**, and saving one would have written the blank back and
+erased the client's visa type in silence.
+
+**Why nothing caught it.** Because nothing was looking. The `<select>` offered
+the right options and that had been mistaken for a rule. Of the sixteen columns
+holding a term from one of the practice's lists, **three** were checked on write
+in a route and thirteen were not; the client form read two of them with
+`f.optional(name, { max: 120 })`, which accepts any string. The import, the
+intake assistant, the document reader and the D1 console each wrote straight
+past all of it.
+
+Migration 0084 had even written the reasoning down: *"the database cannot check
+these. The list lives in `settings`, and a trigger that read it would be a rule
+that changes when somebody edits a text box — which is not a rule."* That is a
+good argument about the wrong hazard. It was protecting against an administrator
+*removing* a term and stranding the records filed under it — which is answered by
+checking only when the value is changing, not by not checking at all.
+
+**The rule.** **A control that offers the right answers is not a control that
+refuses the wrong ones, and the difference only shows when something writes
+without going through it.** Ask of every list, every format and every range: what
+would a bulk load do? A guarantee that lives in a form is a guarantee about that
+form.
+
+The corollary, which is the standing rule already and is here because this is
+what it costs to skip it: **an invariant belongs in the database.** A rule that
+is configuration — the practice's own list — does not escape that. It means the
+database reads the configuration, not that the rule moves to a route.
+
+And the third thing, about how it was found: **it was found by reading the data
+against the rule rather than by reading the code.** That reading is now a page,
+Settings → Self-check, so anybody can do it in a second — and the practice asked
+for it in exactly those terms: *"load, look at the report, fix, before anyone
+relies on it."*
+
+---
+
+### 47. Three copies of one wrong pattern agreeing with each other
+
+**What happened.** `docs/spec/invariants.md` promises to quote *every* refusal
+the database makes, and `test/spec.test.ts` holds it to that. Both read the
+refusal out of each trigger with `/RAISE\(ABORT,\s*'((?:[^']|'')*)'\)/` — a
+pattern that matches only a refusal which is a single string literal.
+
+The thirty-two refusals added by migration 0101 are not. They name the value
+that was refused — `'…Value: ' || NEW.current_visa_type` — because an
+administrator reading an abort has to know what to do about it. Every one of
+them would have been skipped **in silence**: the generator would not have
+written them, the test would not have missed them, and the document would have
+gone on claiming to list every refusal while listing 169 of 201.
+
+**Why nothing caught it.** The pattern existed in three files — `spec.mjs`,
+`spec-schema.mjs` and `spec.test.ts` — and the check consisted of two of those
+copies agreeing with each other. They did agree. They were the same copy.
+
+**The rule.** **Two things that must agree must not be two copies of one thing;
+a check is only a check when the sides are independent.** Where a generator and
+the test that holds it honest share a rule, the rule is a module both import —
+`scripts/spec-refusals.mjs` now — so that changing it changes both, and getting
+it wrong fails loudly instead of quietly narrowing what is checked.
+
+The tell, and it generalises: **a pattern that decides what to include can only
+fail by including too little, and too little looks exactly like nothing being
+there.**
+
+---
+
+---
+
 ## Working practices that caught things
 
 ### 14. Commit to the branch, not to `main`
