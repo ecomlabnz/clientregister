@@ -15,17 +15,18 @@ import { requireAuth, requirePermission } from '../../core/auth';
 import { page } from '../../ui/layout';
 import { html, raw } from '../../ui/html';
 import {
-  badge, card, caseSubline, emptyState, pageHeader, sparkline, stamp, statusTone, table,
+  badge, card, caseSubline, emptyState, pageHeader, rowClass, sparkline, stamp, statusTone, table,
 } from '../../ui/components';
 import { dateShort, isOverdue, money, relativeDays, truncate } from '../../ui/format';
 import {
   CASE_STATUS_LABELS, CLIENT_STATUS_LABELS, DEADLINE_CASE_STATUSES,
-  INQUIRY_STATUS_LABELS, OPEN_CASE_STATUSES, PRIORITY_LABELS, TASK_STATUS_LABELS,
+  INQUIRY_STATUS_LABELS, OPEN_CASE_STATUSES, PRIORITY_LABELS, PRIORITY_TONES, TASK_STATUS_LABELS,
+  type Priority,
 } from '../../domain';
 import { can } from '../../core/rbac';
 import { caseTypes, labelFor, termOptions } from '../../core/vocabulary';
 import { byWorkingOrder, collectAlerts, documentAlerts, needsAttentionToday,
-         type Alert } from '../alerts';
+         severityFor, SEVERITY_TONES, type Alert } from '../alerts';
 import { CHANNEL_LABELS } from '../../core/channels';
 import { preferencesFor } from '../../core/preferences';
 import { pageSizeFor } from '../../ui/pager';
@@ -348,7 +349,12 @@ export const dashboardModule: AppModule = {
                        two-line clamp holds fewer characters as the column gets
                        narrower and there is nothing to say the rest exists. A
                        row that needs three lines takes three lines. */}
-              <tr class="${a.date < today ? 'row-urgent' : ''}">
+              ${'' /* Red when it is past, amber when it is inside the
+                       fortnight the register already treats as pressing. Both
+                       come from `severityFor`, which the alerts list has used
+                       all along — the dashboard was deciding for itself and
+                       only ever getting the red half. */}
+              <tr class="${rowClass(SEVERITY_TONES[severityFor(a.date, today)])}">
                 <td class="small ${a.date < today ? 'warn' : ''}">${dateShort(a.date)}
                   <div class="muted">${relativeDays(a.date)}</div></td>
                 <td><a href="${a.href}">${a.title}</a>
@@ -376,7 +382,8 @@ export const dashboardModule: AppModule = {
                 { label: 'Status', sort: 'status' },
               ],
               deadlineCard.rows.slice(0, needsRows).map((d: any) => html`
-                <tr class="${isOverdue(d.decision_due_at) ? 'row-urgent' : ''}">
+                <tr class="${rowClass(SEVERITY_TONES[severityFor(
+                    String(d.decision_due_at).slice(0, 10), today)])}">
                   <td class="small ${isOverdue(d.decision_due_at) ? 'warn' : ''}">
                     ${dateShort(d.decision_due_at)}<div class="muted">${relativeDays(d.decision_due_at)}</div></td>
                   <td><a href="/cases/${d.id}">${d.title}</a>
@@ -391,7 +398,12 @@ export const dashboardModule: AppModule = {
             ${card('Tasks due or overdue', overdueTasks.length === 0 ? emptyState('Nothing due.') : table(
               ['Due', 'Task', 'Owner'],
               overdueTasks.map((t: any) => html`
-                <tr class="${isOverdue(t.due_at) ? 'row-urgent' : ''}">
+                ${'' /* Overdue outranks priority: a low-priority task that is
+                         late is still late. Below that the row follows the
+                         badge beside it, which has shown the priority since it
+                         was written. */}
+                <tr class="${rowClass(isOverdue(t.due_at)
+                    ? 'red' : PRIORITY_TONES[t.priority as Priority])}">
                   <td class="small">${dateShort(t.due_at)}<div class="muted">${relativeDays(t.due_at)}</div></td>
                   <td>${t.title}
                     ${t.priority !== 'normal' ? badge(PRIORITY_LABELS[t.priority as keyof typeof PRIORITY_LABELS], t.priority === 'urgent' ? 'red' : 'amber') : ''}

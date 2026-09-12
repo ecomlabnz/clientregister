@@ -94,6 +94,18 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.67.0', date: '12 September 2026',
+    notes: [
+      'The row tints are now on the dashboard and the alerts list as well as Cases. Red for '
+        + 'something past, amber for something pressing, nothing for the rest.',
+      'Before this each list decided for itself and all three only ever went red, so an alert '
+        + 'coming up next week looked the same as one months away \u2014 even though the '
+        + 'coloured tag on the same row already said otherwise.',
+      'On the dashboard Tasks list, late is red whatever the priority. A low-priority task that '
+        + 'is late is still late.',
+    ],
+  },
+  {
     version: '1.66.0', date: '12 September 2026',
     notes: [
       'Three seasonal work visas added to the Current visa list \u2014 AEWV Peak Seasonal, AEWV '

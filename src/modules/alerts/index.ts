@@ -20,9 +20,10 @@ import { settingValue } from '../../core/settings';
 import { requireAuth, requirePermission } from '../../core/auth';
 import { page } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
-import { badge, card, emptyState, pageHeader, table } from '../../ui/components';
+import { badge, card, emptyState, pageHeader, rowClass, table } from '../../ui/components';
 import { dateShort, relativeDays } from '../../ui/format';
-import { CASE_STATUS_LABELS, DEADLINE_CASE_STATUSES, LODGED_CASE_STATUSES, OPEN_CASE_STATUSES } from '../../domain';
+import { CASE_STATUS_LABELS, DEADLINE_CASE_STATUSES, LODGED_CASE_STATUSES, OPEN_CASE_STATUSES,
+         type RowTone } from '../../domain';
 import { pendingProposalCount } from '../../core/automations';
 
 export type AlertKind =
@@ -162,7 +163,11 @@ const KIND_LABELS: Record<AlertKind, string> = {
 /** Exposed for the tests, which check that every kind is named. */
 export const KIND_LABELS_FOR_TEST = KIND_LABELS;
 
-const SEVERITY_TONES: Record<AlertSeverity, 'red' | 'amber' | 'neutral'> = {
+/**
+ * How loud an alert is. Shared, since 12 September 2026, with the dashboard —
+ * which was deciding the same thing for itself and getting a narrower answer.
+ */
+export const SEVERITY_TONES: Record<AlertSeverity, RowTone> = {
   overdue: 'red', urgent: 'amber', soon: 'neutral',
 };
 
@@ -176,7 +181,7 @@ const URGENT_DAYS = 14;
  * day — a medical needs an appointment, an overseas police certificate can take
  * months — because a warning that arrives too late to act on is not a warning.
  */
-function severityFor(date: string, today: string, urgentDays = URGENT_DAYS): AlertSeverity {
+export function severityFor(date: string, today: string, urgentDays = URGENT_DAYS): AlertSeverity {
   if (date < today) return 'overdue';
   const days = Math.round((Date.parse(date) - Date.parse(today)) / 86_400_000);
   return days <= urgentDays ? 'urgent' : 'soon';
@@ -1071,7 +1076,11 @@ export const alertsModule: AppModule = {
               { label: 'Type', width: '18', hideOn: 'sm' },
               { label: 'Detail', width: '24', hideOn: 'sm' },
             ], shown.map((alert) => html`
-              <tr class="${alert.severity === 'overdue' ? 'row-urgent' : ''}">
+              ${'' /* The badge on this row has said amber for a pressing
+                       alert since it was written; the row behind it only ever
+                       reddened for an overdue one, so the middle tier was
+                       invisible. Both now read `SEVERITY_TONES`. */}
+              <tr class="${rowClass(SEVERITY_TONES[alert.severity])}">
                 <td class="small ${alert.severity === 'overdue' ? 'warn' : ''}">
                   ${dateShort(alert.date)}
                   <div class="muted">${relativeDays(alert.date)}</div></td>
