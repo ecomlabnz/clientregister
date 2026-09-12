@@ -7,6 +7,62 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.73.0 — 12 September 2026
+
+### Added
+**A shared demonstration account that is safe to be public.** Asked for on 12
+September 2026: an account in the trial register whose password is published,
+so anybody can sign in and look around.
+
+A published password breaks five things that are correct for an ordinary
+account. Each was read in the code first, and each is now answered:
+
+- **`POST /account/password`.** The first visitor to use it owns the account
+  and locks out everybody else, the practice included.
+- **`POST /account/2fa/enable`.** Worse: the password still works, but the
+  six-digit code is on a stranger's phone.
+- **Neither is undone by the reset.** `resetTestData` covers `TEST_TABLES`;
+  `users` is not one of them and must not be. So both are permanent.
+- **`LOCKOUT_THRESHOLD = 5`.** On a published password, five deliberate wrong
+  attempts shut the demonstration for up to thirty minutes, protecting nothing.
+- **`mail:send`.** A public account that can send from the register's
+  configured address is an open relay reaching third parties.
+
+**Migration 0103** adds `users.is_demo` and eight triggers. Six refuse an
+UPDATE to a marked row that actually changes `password_hash`, `email`,
+`totp_secret`, `totp_enabled`, `role` or `status` — `IS NOT`, so a whole-row
+save that renames the account still goes through, the same rule migration 0101
+is built on. Two refuse `is_demo = 1` on an owner or an administrator, on INSERT
+and on UPDATE, so it cannot depend on whoever writes the row remembering.
+
+**DELETE is deliberately not refused.** An administrator must be able to
+withdraw the demonstration without a migration, and a delete takes the account
+away from everybody equally rather than quietly from everybody but one person.
+
+### Changed
+- `core/rbac.ts` — `can()` refuses `mail:send` to a demonstration account
+  whatever role it holds. Not by choosing a role that lacks it: a role is a
+  dropdown an administrator can change, and three of the five carry it.
+- `core/auth.ts` — no lockout for a demonstration account, and no lockout
+  change for anybody else. The password check still runs first either way, so
+  the timing defence `DUMMY_HASH` exists for is untouched; only the counting is
+  skipped. The rehash-on-sign-in path also skips it, or raising the hashing
+  parameters would abort every visitor's sign-in against the new trigger. The
+  two-factor *requirement* exempts it too, or a trial with that setting on
+  would send every visitor to a page telling them to do the one thing they
+  cannot.
+- `core/uploadtokens.ts` — a token held by a demonstration account stops
+  working at the next request, the same rule already applied to a demotion.
+- **My account** — a demonstration account is shown neither the password form
+  nor the two-factor form, with one line saying why, and the POST routes refuse
+  in words rather than as a 500. It cannot mint an upload token (a write
+  credential that outlives the reset), and the Devices tab no longer lists the
+  sessions, because on a shared account those are *other people's* IP addresses
+  and browsers.
+- **Settings → People** — the row is badged *shared demonstration*, says why
+  its sign-in cannot be changed, and has no Reset password button. A rename
+  still works; an address, role or status change is refused with a sentence.
+
 ## 1.72.2 — 12 September 2026
 
 ### Removed

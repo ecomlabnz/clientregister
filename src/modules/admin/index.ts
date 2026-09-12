@@ -49,6 +49,24 @@ import { registeredModules } from '../../registry';
 import { PRACTICE_SETTINGS } from '../../core/practice';
 import { can } from '../../core/rbac';
 
+
+/**
+ * What an administrator is told about the shared demonstration account.
+ *
+ * **Asked for on 12 September 2026:** a shared account in the trial register
+ * that members of the public can sign in to, with its password published. The
+ * password, address, role and status of that account cannot be changed —
+ * migration 0103 refuses each of them in the database, because a change made
+ * by any one visitor locks out every other one.
+ *
+ * This sentence is on the row, and again wherever a change is refused, so that
+ * nobody spends ten minutes wondering why Reset password has gone.
+ */
+const DEMO_ROW_HINT =
+  'This is the shared demonstration account. Its password is published, so its sign-in cannot '
+  + 'be changed \u2014 not the password, not the address, not the role, not suspending it. '
+  + 'Delete the account to withdraw the demonstration.';
+
 const ROLES = ['owner', 'admin', 'adviser', 'assistant', 'readonly'] as const;
 
 /** Render one declared setting as the input its type calls for. */
@@ -447,7 +465,8 @@ export const adminModule: AppModule = {
     r.get('/users', requirePermission('admin:users'), async (c) => {
       const users = await all<any>(
         c.env.DB,
-        `SELECT id, email, name, role, status, totp_enabled, last_login_at, locked_until, created_at
+        `SELECT id, email, name, role, status, totp_enabled, last_login_at, locked_until, created_at,
+                is_demo
            FROM users ORDER BY created_at`,
       );
       const csrf = c.get('session')!.csrf;
@@ -503,19 +522,24 @@ export const adminModule: AppModule = {
               <form method="post" action="/admin/users/${u.id}" class="user-row-form" id="u_${u.id}">
                 ${csrfField(csrf)}
                 <input name="name" value="${u.name}" maxlength="120" required aria-label="Full name">
-                <input name="email" type="email" value="${u.email}" maxlength="320" required aria-label="Email">
+                ${u.is_demo === 1
+                  ? html`<input type="email" value="${u.email}" aria-label="Email" readonly>`
+                  : html`<input name="email" type="email" value="${u.email}" maxlength="320" required aria-label="Email">`}
               </form>
             </td>
             <td>
-              <select name="role" form="u_${u.id}" ${u.id === me.id ? raw('disabled') : ''} aria-label="Role">
+              <select name="role" form="u_${u.id}" ${u.id === me.id || u.is_demo === 1 ? raw('disabled') : ''} aria-label="Role">
                 ${ROLES.map((role) => html`<option value="${role}" ${role === u.role ? raw('selected') : ''}>${ROLE_LABELS[role]}</option>`)}
               </select>
-              <select name="status" form="u_${u.id}" ${u.id === me.id ? raw('disabled') : ''} aria-label="Status">
+              <select name="status" form="u_${u.id}" ${u.id === me.id || u.is_demo === 1 ? raw('disabled') : ''} aria-label="Status">
                 <option value="active" ${u.status === 'active' ? raw('selected') : ''}>Active</option>
                 <option value="suspended" ${u.status === 'suspended' ? raw('selected') : ''}>Suspended</option>
               </select>
               ${u.id === me.id
                 ? html`<p class="hint">This is you — you cannot change your own role or status.</p>`
+                : ''}
+              ${u.is_demo === 1
+                ? html`<p class="hint">${DEMO_ROW_HINT}</p>`
                 : ''}
             </td>
             <td class="col-sm-hide">${badge(u.status, u.status === 'active' ? 'green' : 'red')}
@@ -529,7 +553,11 @@ export const adminModule: AppModule = {
           </tr>` : html`
           <tr>
             <td><strong>${u.name}</strong>${u.id === me.id ? html` <span class="muted small">(you)</span>` : ''}
-                <div class="small muted clamp-1">${u.email}</div></td>
+                ${u.is_demo === 1 ? html` ${badge('shared demonstration', 'amber')}` : ''}
+                <div class="small muted clamp-1">${u.email}</div>
+                ${u.is_demo === 1
+                  ? html`<div class="small muted">${DEMO_ROW_HINT}</div>`
+                  : ''}</td>
             <td class="small">${ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] ?? u.role}
                 <div class="row-meta show-sm">
                   ${badge(u.status, u.status === 'active' ? 'green' : 'red')}
@@ -542,7 +570,7 @@ export const adminModule: AppModule = {
                 <div><a class="small" href="/admin/audit?actor=${u.id}">Activity</a></div></td>
             <td class="nowrap">
               <a class="btn btn-small btn-secondary" href="${`/admin/users?edit=${u.id}`}">Edit</a>
-              ${u.id === me.id ? '' : html`
+              ${u.id === me.id || u.is_demo === 1 ? '' : html`
                 <form method="post" action="/admin/users/${u.id}/reset-password" class="inline-form"
                       data-confirm="Issue a new temporary password for ${u.name}? All their sessions will end.">
                   ${csrfField(csrf)}
@@ -596,8 +624,8 @@ export const adminModule: AppModule = {
       const me = c.get('user')!;
       const f = new FormReader(await c.req.formData());
 
-      const target = await one<{ role: string; name: string; email: string }>(
-        c.env.DB, 'SELECT role, name, email FROM users WHERE id = ?', id);
+      const target = await one<{ role: string; name: string; email: string; is_demo: number }>(
+        c.env.DB, 'SELECT role, name, email, is_demo FROM users WHERE id = ?', id);
       if (!target) return c.notFound();
 
       const name = f.text('name', { required: true, label: 'Full name', max: 120 });
@@ -609,6 +637,30 @@ export const adminModule: AppModule = {
       // changes the name and nothing else, rather than resetting either.
       const wantsRole = f.optional('role', { max: 20 });
       const wantsStatus = f.optional('status', { max: 20 });
+
+      /*
+       * The shared demonstration account keeps its address, its role and its
+       * status. Migration 0103 refuses all three outright; this turns the
+       * refusal into a sentence, and a rename — which is allowed, and is the
+       * only thing this form can still do to that row — goes through.
+       *
+       * The page renders those three controls read-only or disabled, so
+       * reaching this is either a crafted post or a stale page.
+       */
+      if (target.is_demo === 1) {
+        if ((email && email !== target.email)
+            || (wantsRole && wantsRole !== target.role)
+            || (wantsStatus && wantsStatus !== 'active')) {
+          return redirectWith(c, '/admin/users', DEMO_ROW_HINT, 'err');
+        }
+        await run(c.env.DB, 'UPDATE users SET name = ?, updated_at = ? WHERE id = ?', name, nowIso(), id);
+        await auditFrom(c, {
+          action: 'admin.user_updated', entityType: 'user', entityId: id,
+          meta: target.name !== name ? { name: { from: target.name, to: name } } : {},
+        });
+        return redirectWith(c, '/admin/users', `${name} updated.`);
+      }
+
       const role = id === me.id ? target.role : (wantsRole ?? target.role);
       const status = id === me.id
         ? null
@@ -663,8 +715,12 @@ export const adminModule: AppModule = {
 
     r.post('/users/:id/reset-password', requirePermission('admin:users'), async (c) => {
       const id = c.req.param('id')!;
-      const target = await one<{ name: string; email: string }>(c.env.DB, 'SELECT name, email FROM users WHERE id = ?', id);
+      const target = await one<{ name: string; email: string; is_demo: number }>(
+        c.env.DB, 'SELECT name, email, is_demo FROM users WHERE id = ?', id);
       if (!target) return c.notFound();
+      // Migration 0103 refuses the write. This is so an administrator who
+      // pressed it from a stale page reads why instead of an error page.
+      if (target.is_demo === 1) return redirectWith(c, '/admin/users', DEMO_ROW_HINT, 'err');
 
       const tempPassword = randomToken(18);
       await run(

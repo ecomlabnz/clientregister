@@ -94,6 +94,33 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.73.0', date: '12 September 2026',
+    notes: [
+      'There can now be one account in a trial register that anybody may sign in to, with the '
+        + 'password given out openly. It is for showing the register to people who have not '
+        + 'bought it yet.',
+      'An account like that is marked, and the register then refuses to let it change the way '
+        + 'it signs in. Nobody can set a new password on it, move it to their own email '
+        + 'address, put it on their own phone as a two-step login, change what it is allowed '
+        + 'to do, or switch it off. Without that, the first stranger to press "change '
+        + 'password" would own it and everybody else would be locked out \u2014 including us.',
+      'It can never send email. That is the one thing a public account could do that reaches '
+        + 'somebody outside: anyone who read the password could send a message with our name '
+        + 'on it.',
+      'It can never be an owner or an administrator, and it cannot make an upload token, '
+        + 'which is the thing that lets a computer put files in without signing in.',
+      'It is also never locked out for wrong passwords. The password is published, so the lock '
+        + 'protects nothing and would only let one person shut the demonstration for half an '
+        + 'hour at a time. Every other account still locks after five wrong tries.',
+      'On the Users page that account is labelled, and it says why its password cannot be '
+        + 'reset. It can be renamed, and it can be deleted \u2014 deleting is how you take the '
+        + 'demonstration away.',
+      'Nothing on your own register changes. There is no such account in it.',
+      'The account itself has not been created. Say the word and we will make it in the trial '
+        + 'register and give you the address and the password to publish.',
+    ],
+  },
+  {
     version: '1.72.2', date: '12 September 2026',
     notes: [
       'Every box you type into is shorter, so a table of work history or education fits more on '

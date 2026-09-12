@@ -62,8 +62,32 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   readonly: ['register:read', 'document:read'],
 };
 
-export function can(user: Pick<User, 'role' | 'status'> | null, permission: Permission): boolean {
+/**
+ * What the shared demonstration account may never do, whatever role it holds.
+ *
+ * **Asked for on 12 September 2026:** a shared account in the trial register
+ * that members of the public can sign in to, with the password published.
+ *
+ * Sending email is the one power on this list because it is the only one that
+ * reaches somebody who never asked to be part of a demonstration. A public
+ * account that can send from the register's configured address is an open
+ * relay: anyone who reads the published password can put the practice's name
+ * and sending domain on a message to a stranger.
+ *
+ * It is enforced here, where permissions are decided, rather than by giving
+ * the account a role that happens to lack `mail:send`. A role is a thing an
+ * administrator changes from a dropdown; this is not. Three of the five roles
+ * carry `mail:send` today — owner, administrator and specialist — and the
+ * account is no less public for being moved into one of them by mistake.
+ */
+const DEMO_MAY_NEVER: readonly Permission[] = ['mail:send'];
+
+export function can(
+  user: Pick<User, 'role' | 'status'> & Partial<Pick<User, 'is_demo'>> | null,
+  permission: Permission,
+): boolean {
   if (!user || user.status !== 'active') return false;
+  if (user.is_demo === 1 && DEMO_MAY_NEVER.includes(permission)) return false;
   return ROLE_PERMISSIONS[user.role].includes(permission);
 }
 
