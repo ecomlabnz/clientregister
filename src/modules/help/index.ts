@@ -94,6 +94,18 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.66.0', date: '12 September 2026',
+    notes: [
+      'Three seasonal work visas added to the Current visa list \u2014 AEWV Peak Seasonal, AEWV '
+        + 'Global Workforce Seasonal, and AEWV Seasonal. WV. Seasonal (RSE) stays; it is a '
+        + 'different scheme.',
+      'Fixed: 35 client records held the description of a visa or English test instead of its '
+        + 'code, from the load on 1 September. They looked right on the page but showed blank in '
+        + 'the dropdown \u2014 so opening one and pressing Save would have wiped the entry.',
+      'Nothing was deleted, and the correction was rehearsed on a copy of your register first.',
+    ],
+  },
+  {
     version: '1.65.1', date: '12 September 2026',
     notes: [
       'Fixed before it reached you: remembering a machine for the maximum 90 days could be '
