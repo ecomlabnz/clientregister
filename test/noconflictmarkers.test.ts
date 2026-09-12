@@ -20,14 +20,30 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
-/** Every file git tracks, which is exactly the set that can be committed. */
-function trackedFiles(): string[] {
-  return execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
-    .split('\0')
-    .filter(Boolean);
+/**
+ * Everything committable, walked from disk.
+ *
+ * `git ls-files` would be the exact answer, but it needs `node:child_process`,
+ * which this project's TypeScript config does not carry types for — the code
+ * here is built for Workers, where there is no child process. Walking the tree
+ * and skipping what git ignores reaches the same set for this purpose.
+ */
+const IGNORED_DIRS = new Set(['.git', 'node_modules', '.wrangler', 'dist', 'coverage']);
+
+
+function committableFiles(dir = '.', out: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith('.') && entry.name !== '.github') continue;
+    const path = dir === '.' ? entry.name : `${dir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      if (!IGNORED_DIRS.has(entry.name)) committableFiles(path, out);
+    } else {
+      out.push(path);
+    }
+  }
+  return out;
 }
 
 /**
@@ -41,12 +57,17 @@ const MARKERS = [
 ];
 
 /** Binary and generated things a grep would only produce noise on. */
-const SKIP = /\.(png|jpe?g|gif|ico|webp|woff2?|ttf|pdf|zip|lock)$/i;
+const SKIP = /(\.(png|jpe?g|gif|ico|webp|woff2?|ttf|pdf|zip|lock)$|^package-lock\.json$|\.min\.[a-z]+$)/i;
 
 describe('nothing committed carries the debris of a merge', () => {
   it('has no conflict markers in any tracked file', () => {
     const found: string[] = [];
-    for (const file of trackedFiles()) {
+    const files = committableFiles();
+    // A walk that found almost nothing would pass silently, so check it read
+    // the repository rather than an empty directory.
+    expect(files.length, 'the walk found no files, so this proves nothing')
+      .toBeGreaterThan(200);
+    for (const file of files) {
       if (SKIP.test(file)) continue;
       let text: string;
       try {
