@@ -864,6 +864,37 @@ find anything read the same.
 
 ---
 
+### 45. Two readings of the clock are two different times
+
+**What happened.** Release 1.64.0 passed everything on its pull request — the
+full suite, the typecheck, the spec — and then **failed on deploy**. The
+migration that creates a trusted machine refuses a grant longer than ninety
+days. `createTrustedDevice` read the clock once to stamp `created_at` and again
+to compute `expires_at`:
+
+```ts
+const at = new Date().toISOString();
+const expiresAt = new Date(Date.now() + days * DAY_MS).toISOString();
+```
+
+Between those two statements, a millisecond or two passes. Ninety days measured
+from the *later* reading is ninety days and two milliseconds measured from the
+earlier one, and the database refused it.
+
+**Why nothing caught it.** The test that should have caught it asserted the
+length with `Math.round`, which rounded the excess milliseconds away. The check
+and the trigger were not asking the same question: the trigger compared exact
+Julian days, the test compared days rounded to the nearest whole one. A test
+that is more forgiving than the guarantee it protects is not protecting it.
+
+**The rule.** **Read the clock once and derive every timestamp from that one
+reading.** A function that stamps two related times takes `const now =
+Date.now()` at the top and uses it for both. And **assert the thing the database
+asserts, to the same precision**: the replacement test pins the grant's length
+to the millisecond, and a second test grants the ceiling twenty times in a row.
+Both were mutation-tested — put the second clock reading back and the test says
+`expected 3456000001 to be 3456000000`.
+
 ---
 
 ## Working practices that caught things
