@@ -27,6 +27,9 @@ only in a handler is a guarantee until somebody adds a second handler. So:
 | A sent message keeps its author | `created_by … ON DELETE RESTRICT` (`0017`, `0018`) |
 | An upload token is never stored in the clear | `upload_token_secret_is_hashed_on_insert`/`_update` (`0087`) |
 | A revoked upload token stays revoked | `upload_token_revocation_is_final` (`0087`) |
+| A trusted machine is never stored in the clear | `trusted_device_secret_is_hashed_on_insert`/`_update` (`0093`) |
+| A trusted machine's 40 days never slide | `trusted_device_expiry_never_moves` (`0093`) |
+| No machine is trusted for more than 90 days | `trusted_device_life_is_capped` (`0093`) |
 
 Each of these was verified by attacking the database directly — through the
 Cloudflare API, not through the application — rather than by reading the code

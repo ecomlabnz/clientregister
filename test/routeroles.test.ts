@@ -189,6 +189,7 @@ const SIGNED_IN_ONLY: Record<string, string> = {
   'POST /account/2fa/disable':            'Turning your own two-factor off.',
   'POST /account/upload-tokens/revoke':   'Revoking your own upload token. Taking authority away is never gated: a person moved to "Read only" still has a token on a laptop and must be able to cancel it. The statement is scoped to the token\'s owner.',
   'POST /account/sessions/revoke':        'Signing your own other devices out.',
+  'POST /account/trusted-machines/revoke': 'Forgetting a machine you had trusted with your second factor. Taking authority away is never gated, for the same reason as the upload token above, and the statement is scoped to the owner.',
   'GET /help':                            'The help pages. They describe the register, name no client, and everybody who can sign in can read them.',
 };
 

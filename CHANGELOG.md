@@ -7,6 +7,54 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+<<<<<<< HEAD
+## 1.63.0 — 12 September 2026
+
+### Added
+**A machine can be trusted for 40 days, so it stops asking for the six-digit
+code every time.**
+
+*"allow for 40 days of authentication memory on a machine, not every time. it is
+annoying. so the machine should become trusted and only reset on the 41st day"*
+
+When you enter the code there is now a box, already ticked: **Remember this
+machine for 40 days**. Tick it and that machine asks for your password only,
+until the fortieth day. On the forty-first it asks for the code again.
+
+**Your password is still asked for every single time.** The box skips the code
+and nothing else — it does not keep you signed in, it does not make a session
+last longer, and on its own it opens nothing.
+
+**The forty days do not move.** They run from the day you entered the code, not
+from the last time you used the machine. Using it every morning does not push
+the date out. The database refuses to move the date, so that stays true whatever
+anybody writes later.
+
+**My account → Devices** lists every machine you have remembered, when it
+expires, and a Forget button. It is forgotten everywhere automatically when:
+
+- you change your password, or an administrator resets it;
+- you turn two-factor off, or turn it on again;
+- your account is suspended;
+- you use a recovery code — that means your phone is gone, so every machine
+  trusted on the strength of it stops being trusted, and no new one is granted
+  on that sign-in.
+
+And it is checked again, from the register, every time it is used: the machine
+is still remembered, the day has not passed, the account is still active, and
+two-factor is still on and still the same authenticator. A cookie sitting on a
+laptop for forty days is a credential, and a credential is checked where it is
+spent.
+
+**Settings → Security** now has *Days a machine stays trusted*. It starts at 40,
+can be set to 0 to ask for the code every time, and cannot be set above 90.
+
+**Do not tick the box on a shared or public computer.** It is said next to the
+box as well.
+
+**Nothing to do.** Nothing changed for anybody who does not tick it.
+>>>>>>> 7bc13d7 (A machine can stand in for the code, for forty days and not a day more)
+
 ## 1.62.1 — 12 September 2026
 
 ### Fixed
@@ -32,7 +80,7 @@ The test written the day before to catch exactly this had passed, twice over: it
 *required* one of the invented statuses, and its check on types read the whole
 vocabulary file rather than the list of matter types, so a key from the wrong
 list looked right. Both now check against the register's own lists.
-
+=======
 ## 1.62.0 — 12 September 2026
 
 ### Removed

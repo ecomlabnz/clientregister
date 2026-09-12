@@ -435,6 +435,54 @@ individually correct. So when a page prints a token, a key or an address that is
 itself an authority, the question is not "who may read this page" — it is "who
 may hold this thing".
 
+### 14. Trusting a machine: four things decided, and three left open
+
+**Found** 12 September 2026, while building trusted machines (1.63.0).
+**Severity:** low — every one of these is a known limit of a feature that is off
+unless somebody ticks a box, not a hole in it.
+
+**Decided, with the reasoning, because the reasoning is the useful part:**
+
+- **A recovery code forgets every machine and grants no new one on that
+  sign-in.** A recovery code means the authenticator is gone. Handing out forty
+  fresh days on the machine being used to report the loss would undo the clearing
+  in the same request. Trust is offered again at the next ordinary code.
+- **The trust survives signing out**, deliberately. Forgetting a machine on
+  sign-out would make the feature worthless — signing out is the ordinary way to
+  end a day.
+- **The expiry is absolute, not sliding.** The practice said *"only reset on the
+  41st day"*, and a sliding window on a machine somebody opens every morning
+  never expires at all. The database refuses to move the date.
+- **Revoking is not behind a permission**, like revoking an upload token: taking
+  authority away must never be the thing somebody is locked out of. The statement
+  is scoped to the owner.
+
+**Open, with what would close each:**
+
+1. **One cookie name per browser, so one trusted machine per browser.** Two people
+   sharing one browser profile cannot both have their machine remembered — the
+   second to tick the box replaces the first. The first then types a code next
+   time, which is annoying rather than unsafe. *What would close it:* nothing
+   worth doing; a per-user cookie name would leak who uses the machine. Worth
+   knowing before somebody reports it as a bug.
+2. **An administrator cannot see or revoke somebody else's trusted machines.**
+   Revoking is scoped to the owner, so the levers an administrator has are
+   suspending the account or resetting the password — both of which do forget
+   every machine, so the capability exists, indirectly. *What would close it:* a
+   list on Settings → People with a Forget button, gated on `admin:users`.
+   Not built because nobody has asked and the two existing levers cover the
+   case somebody would actually be in.
+3. **A stolen cookie is a stolen second factor for up to 40 days.** That is
+   what the feature *is*, and the practice asked for it knowing the trade. It is
+   narrowed as far as it can be: the password is still required, the cookie is
+   `__Host-`/`HttpOnly`/`Secure`/`SameSite=Lax` so no script and no other site can
+   read it, it is checked against the live database on every use, and it dies on
+   a password change. *What would close it further:* binding the row to an IP or
+   a user-agent string. Deliberately not done — both change legitimately (a
+   laptop moves between networks, a browser updates itself), so it would ask for
+   the code at random and teach people to distrust the box rather than the
+   machine.
+
 ---
 
 ## Asked for, not yet built

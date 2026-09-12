@@ -22,6 +22,11 @@ import { authenticate, requireAuth, requirePermission, validatePassword } from '
 import {
   SHORTCUT_PATH, createUploadToken, revokeUploadToken, uploadTokensFor,
 } from '../../core/uploadtokens';
+import {
+  TRUSTED_DEVICE_DEFAULT_DAYS, TRUSTED_DEVICE_MAX_DAYS, clearTrustCookie, createTrustedDevice,
+  noteTrustedDeviceUsed, revokeAllTrustedDevices, revokeTrustedDevice, setTrustCookie,
+  trustTokenFrom, trustedDeviceDays, trustedDevicesFor, verifyTrustedDevice,
+} from '../../core/trusteddevices';
 import { publicBase } from '../../core/publicurl';
 import { asInteger, readSettings } from '../../core/settings';
 import {
@@ -121,6 +126,21 @@ export const SECURITY_SETTINGS: SettingsGroup = {
     { key: 'security.password_min_length', type: 'integer',
       label: 'Minimum password length', default: '12', min: 12, max: 128,
       help: 'Length does more for a password than composition rules. It cannot be set below 12.' },
+    /*
+     * A setting rather than a constant, because a second practice may want a
+     * different number and settings already live inside each practice's own
+     * database (CLAUDE.md, "one practice, one database"). The ceiling is a
+     * constant an administrator cannot raise, the way the password floor is one
+     * they cannot lower — and migration 0093 holds the same number as a refusal,
+     * so it survives a row written outside the application.
+     */
+    { key: 'security.trusted_device_days', type: 'integer',
+      label: 'Days a machine stays trusted', default: String(TRUSTED_DEVICE_DEFAULT_DAYS),
+      min: 0, max: TRUSTED_DEVICE_MAX_DAYS,
+      help: 'After entering a code, a person can tick "remember this machine". For this many days '
+        + 'that machine asks for the password only. The password is always asked for. Counted from '
+        + `the day the code was entered and not extended by use. 0 turns it off and asks every time; `
+        + `${TRUSTED_DEVICE_MAX_DAYS} is the most allowed.` },
   ],
 };
 
@@ -256,13 +276,55 @@ export const authModule: AppModule = {
         return loginPage(c, { error: message, email, next });
       }
 
-      const token = await createSession(c.env, result.user, c.req.raw, { verified: !result.needsTotp });
+      /*
+       * Is this a machine that has already proved it holds the authenticator?
+       *
+       * Consulted here and nowhere earlier, which is the whole of "a trusted
+       * machine does not weaken anything else": both rate limiters and the
+       * account lockout have already run, and a password has already been
+       * accepted. The cookie stands in for the six-digit code and for nothing
+       * else — it is never turned into a session, never extends one, and on its
+       * own opens nothing.
+       */
+      let trusted = false;
+      if (result.needsTotp) {
+        const presented = trustTokenFrom(c);
+        if (presented) {
+          const check = await verifyTrustedDevice(c.env, presented);
+          if (check.ok && check.userId === result.user.id) {
+            trusted = true;
+            await noteTrustedDeviceUsed(c.env, check.id);
+          } else if (!check.ok) {
+            /*
+             * Dead: expired, forgotten, or belonging to an account that has
+             * changed under it. Take it off the machine rather than leave a
+             * credential lying there being refused every morning.
+             *
+             * A cookie that verifies but belongs to *somebody else* is left
+             * alone — two people share a machine, and signing in as the second
+             * one is not a reason to make the first type a code again.
+             */
+            clearTrustCookie(c);
+          }
+        }
+      }
+      const needsTotp = result.needsTotp && !trusted;
+
+      const token = await createSession(c.env, result.user, c.req.raw, { verified: !needsTotp });
       setSessionCookie(c, token);
       await auditFrom(c, {
-        action: result.needsTotp ? 'login.password_ok' : 'login.success',
-        entityType: 'user', entityId: result.user.id, meta: { email },
+        action: needsTotp ? 'login.password_ok' : 'login.success',
+        entityType: 'user', entityId: result.user.id,
+        meta: trusted ? { email, method: 'trusted_machine' } : { email },
       });
-      if (result.needsTotp) return c.redirect(`/login/verify?next=${encodeURIComponent(next)}`, 303);
+      if (trusted) {
+        // Separately from the sign-in, because "the code was skipped" is the
+        // line somebody reads the log for after a laptop goes missing.
+        await auditFrom(c, {
+          action: 'login.trusted_machine_used', entityType: 'user', entityId: result.user.id,
+        });
+      }
+      if (needsTotp) return c.redirect(`/login/verify?next=${encodeURIComponent(next)}`, 303);
       return c.redirect(await landingFor(c.env, result.user.id, next), 303);
     });
 
@@ -272,6 +334,19 @@ export const authModule: AppModule = {
       const user = c.get('user');
       if (!session || !user) return c.redirect('/login', 302);
       if (session.verified) return c.redirect('/', 302);
+      /*
+       * "Remember this machine" is a real form field, ticked by default.
+       *
+       * Ticked because the practice asked for this and said the present
+       * behaviour is annoying — a box somebody has to find and tick every time
+       * is the same annoyance in a smaller shape. It is a plain checkbox in the
+       * form that is being submitted anyway, so it works with scripting
+       * switched off, which is the rule for every control here.
+       *
+       * When the period is set to 0 the feature is off and the box is not
+       * rendered at all, rather than rendered and ignored.
+       */
+      const trustDays = await trustedDeviceDays(c.env);
       return page(c, { title: 'Two-factor', bare: true }, html`
         <div class="auth-card">
           <h1>Two-factor code</h1>
@@ -283,6 +358,13 @@ export const authModule: AppModule = {
             ${field({ label: 'Code', name: 'code', required: true, autocomplete: 'one-time-code',
                       placeholder: '000000', maxlength: 20,
                       hint: 'Lost your device? Enter one of your recovery codes instead.' })}
+            ${trustDays > 0 ? html`
+              <div class="field checkbox-field">
+                <label><input type="checkbox" name="remember" value="yes" checked>
+                  Remember this machine for ${String(trustDays)} days</label>
+                <p class="hint">You will still be asked for your password every time — only the
+                   code is skipped. Do not tick this on a shared or public computer.</p>
+              </div>` : ''}
             <button class="btn btn-primary btn-block" type="submit">Verify</button>
           </form>
           <form method="post" action="/logout" class="mt">
@@ -303,6 +385,8 @@ export const authModule: AppModule = {
       const f = new FormReader(await c.req.formData());
       const code = f.text('code', { required: true, label: 'Code', max: 40 });
       const next = safeNext(f.optional('next', { max: 500 }) ?? undefined);
+      // A checkbox says no by being absent, which is how a browser sends one.
+      const remember = (f.optional('remember', { max: 10 }) ?? '') !== '';
 
       const row = await one<{ totp_secret: string | null; recovery_code_hashes: string | null }>(
         c.env.DB, 'SELECT totp_secret, recovery_code_hashes FROM users WHERE id = ?', user.id,
@@ -340,6 +424,36 @@ export const authModule: AppModule = {
         action: 'login.success', entityType: 'user', entityId: user.id,
         meta: { method: usedRecovery ? 'recovery_code' : 'totp' },
       });
+
+      if (usedRecovery) {
+        /*
+         * A recovery code means the authenticator is gone — a lost or wiped
+         * phone. Every machine trusted while it existed was trusted on the
+         * strength of it, so this is the moment to clear the ground, and not a
+         * moment to hand out a fresh forty days on the machine being used to
+         * report the loss. Trust is offered again at the next ordinary code.
+         */
+        const forgotten = await revokeAllTrustedDevices(c.env, user.id);
+        clearTrustCookie(c);
+        if (forgotten > 0) {
+          await auditFrom(c, {
+            action: 'account.machines_revoked', entityType: 'user', entityId: user.id,
+            meta: { n: forgotten, reason: 'recovery_code' },
+          });
+        }
+      } else if (remember) {
+        const days = await trustedDeviceDays(c.env);
+        if (days > 0) {
+          const made = await createTrustedDevice(c.env, {
+            userId: user.id, totpSecret: row.totp_secret, days, req: c.req.raw,
+          });
+          setTrustCookie(c, made.token, days);
+          await auditFrom(c, {
+            action: 'account.machine_trusted', entityType: 'trusted_device', entityId: made.row.id,
+            meta: { days, expires_at: made.row.expires_at },
+          });
+        }
+      }
       return c.redirect(await landingFor(c.env, user.id, next), 303);
     });
 
@@ -410,6 +524,9 @@ export const authModule: AppModule = {
           ORDER BY last_seen_at DESC LIMIT 25`,
         user.id, nowIso(),
       );
+      // Only read for the tab that shows them, like the upload tokens above.
+      const machines = tab === 'sessions' ? await trustedDevicesFor(c.env, user.id) : [];
+      const trustDays = tab === 'sessions' ? await trustedDeviceDays(c.env) : 0;
 
       return page(c, { title: 'My account' }, html`
         ${/* The name comes first. Reported 11 September 2026: *"In my profile -
@@ -492,7 +609,49 @@ export const authModule: AppModule = {
             <input type="hidden" name="sid" value="all">
             <button class="btn btn-secondary" type="submit">Sign out everywhere else</button>
           </form>
-          <p class="hint">Session ID shown to support: <code>${sessionLabel(session.sid)}</code></p>`)}` : ''}
+          <p class="hint">Session ID shown to support: <code>${sessionLabel(session.sid)}</code></p>`)}
+
+        ${'' /* Trusted machines sit beside the sessions because they are the
+                 same question — which machines can get to my register — and the
+                 answer to "I have lost a laptop" is on one screen rather than
+                 two. They are not sessions: forgetting one does not sign
+                 anybody out, and signing out does not forget one. */}
+        ${card('Trusted machines', html`
+          <p class="hint">A trusted machine asks for your password but not the six-digit code,
+             until the day it expires. Forgetting one means the code is asked for there again.</p>
+          ${machines.length
+            ? table(['Trusted', 'Expires', 'Last used', 'IP', 'Device', ''], machines.map((m) => {
+                const dead = m.revoked_at !== null || m.expires_at <= nowIso();
+                return html`
+                <tr>
+                  <td>${stamp(m.created_at)}</td>
+                  <td>${m.revoked_at
+                    ? badge('forgotten', 'grey')
+                    : m.expires_at <= nowIso()
+                      ? html`${stamp(m.expires_at)} ${badge('expired', 'grey')}`
+                      : stamp(m.expires_at)}</td>
+                  <td>${m.last_used_at ? stamp(m.last_used_at) : html`<span class="muted">never used</span>`}</td>
+                  <td>${m.ip ?? '—'}</td>
+                  <td class="ellipsis" title="${m.user_agent ?? ''}">${(m.user_agent ?? '—').slice(0, 60)}</td>
+                  <td>${dead
+                    ? html`<span class="muted small">no longer trusted</span>`
+                    : html`<form method="post" action="/account/trusted-machines/revoke" class="inline-form">
+                             ${csrfField(session.csrf)}
+                             <input type="hidden" name="id" value="${m.id}">
+                             <button class="btn btn-small btn-danger" type="submit">Forget</button>
+                           </form>`}
+                  </td>
+                </tr>`;
+              }))
+            : html`<p class="muted">${trustDays > 0
+                ? 'No machine is trusted. Tick the box when you next enter a code.'
+                : 'Remembering a machine is switched off for this practice, so the code is asked for every time.'}</p>`}
+          ${machines.some((m) => m.revoked_at === null && m.expires_at > nowIso()) ? html`
+          <form method="post" action="/account/trusted-machines/revoke" class="mt">
+            ${csrfField(session.csrf)}
+            <input type="hidden" name="id" value="all">
+            <button class="btn btn-secondary" type="submit">Forget every machine</button>
+          </form>` : ''}`)}` : ''}
 
         ${'' /* Sending files in from Finder or the Files app. The whole feature
                  is here rather than under Security because it is a thing the
@@ -708,8 +867,18 @@ export const authModule: AppModule = {
         await hashPassword(next), nowIso(), nowIso(), user.id,
       );
       const revoked = await revokeAllSessions(c.env, user.id, session.sid);
-      await auditFrom(c, { action: 'account.password_changed', entityType: 'user', entityId: user.id, meta: { revoked } });
-      return redirectWith(c, '/account', `Password changed. ${revoked} other session(s) signed out.`);
+      // A changed password is the answer to "somebody may have my credentials",
+      // and a trusted machine is half of a credential. It goes with the
+      // sessions, on every machine including this one.
+      const forgotten = await revokeAllTrustedDevices(c.env, user.id);
+      clearTrustCookie(c);
+      await auditFrom(c, {
+        action: 'account.password_changed', entityType: 'user', entityId: user.id,
+        meta: { revoked, machines_forgotten: forgotten },
+      });
+      return redirectWith(c, '/account',
+        `Password changed. ${revoked} other session(s) signed out`
+        + `${forgotten > 0 ? `, and ${forgotten} trusted machine(s) forgotten` : ''}.`);
     });
 
     r.get('/account/2fa', async (c) => {
@@ -758,7 +927,16 @@ export const authModule: AppModule = {
         secret, JSON.stringify(hashes), nowIso(), user.id,
       );
       await c.env.SESSIONS.delete(`totp-setup:${session.sid}`);
-      await auditFrom(c, { action: 'account.2fa_enabled', entityType: 'user', entityId: user.id });
+      // Turning two-factor on means a new secret, so every machine trusted
+      // under the old one is trusted on the strength of something that no
+      // longer exists. The fingerprint on the row would refuse them anyway;
+      // this takes them out of the list as well, so the page is honest.
+      const forgotten = await revokeAllTrustedDevices(c.env, user.id);
+      clearTrustCookie(c);
+      await auditFrom(c, {
+        action: 'account.2fa_enabled', entityType: 'user', entityId: user.id,
+        meta: forgotten > 0 ? { machines_forgotten: forgotten } : undefined,
+      });
 
       return page(c, { title: 'Recovery codes' }, html`
         ${pageHeader('Two-factor is on', 'Save these recovery codes now — they are shown once.')}
@@ -781,7 +959,13 @@ export const authModule: AppModule = {
         'UPDATE users SET totp_secret = NULL, totp_enabled = 0, recovery_code_hashes = NULL, updated_at = ? WHERE id = ?',
         nowIso(), user.id,
       );
-      await auditFrom(c, { action: 'account.2fa_disabled', entityType: 'user', entityId: user.id });
+      // There is no second factor left to stand in for, so nothing may claim to.
+      const forgotten = await revokeAllTrustedDevices(c.env, user.id);
+      clearTrustCookie(c);
+      await auditFrom(c, {
+        action: 'account.2fa_disabled', entityType: 'user', entityId: user.id,
+        meta: forgotten > 0 ? { machines_forgotten: forgotten } : undefined,
+      });
       return redirectWith(c, '/account', 'Two-factor authentication turned off.');
     });
 
@@ -928,6 +1112,50 @@ export const authModule: AppModule = {
           </ul>`)}
 
         <p><a class="btn btn-secondary" href="/account?tab=shortcut">Back to your account</a></p>`);
+    });
+
+    /*
+     * Forget a machine, or all of them.
+     *
+     * Not gated on any permission, for the same reason revoking an upload token
+     * is not: taking authority away must never be the thing somebody is locked
+     * out of. The statement is scoped to the owner, so this can only ever reach
+     * your own rows — naming somebody else's machine changes nothing and reads
+     * the same as naming one that never existed.
+     */
+    r.post('/account/trusted-machines/revoke', async (c) => {
+      const user = c.get('user')!;
+      const f = new FormReader(await c.req.formData());
+      const id = f.text('id', { required: true, label: 'Machine', max: 100 });
+
+      if (id === 'all') {
+        const n = await revokeAllTrustedDevices(c.env, user.id);
+        clearTrustCookie(c);
+        await auditFrom(c, {
+          action: 'account.machines_revoked', entityType: 'user', entityId: user.id,
+          meta: { n, reason: 'asked' },
+        });
+        return redirectWith(c, '/account?tab=sessions',
+          `${n} machine(s) forgotten. The code will be asked for on each of them.`);
+      }
+
+      const forgotten = await revokeTrustedDevice(c.env, { userId: user.id, id });
+      if (!forgotten) return redirectWith(c, '/account?tab=sessions', 'Machine not found.', 'err');
+      /*
+       * The cookie on *this* machine is cleared whichever row was named.
+       *
+       * It cannot be told from here which row the cookie in front of us holds —
+       * that would mean verifying it, and this request is not the place. So the
+       * safe direction is taken: the worst that happens is being asked for the
+       * code once more on the machine you are sitting at, which is what a person
+       * pressing Forget is asking for anyway.
+       */
+      clearTrustCookie(c);
+      await auditFrom(c, {
+        action: 'account.machine_revoked', entityType: 'trusted_device', entityId: id,
+      });
+      return redirectWith(c, '/account?tab=sessions',
+        'Forgotten. That machine will be asked for the code again.');
     });
 
     r.post('/account/sessions/revoke', async (c) => {
