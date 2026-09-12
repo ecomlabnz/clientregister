@@ -44,13 +44,67 @@ eight single-use recovery codes, stored as SHA-256 hashes. During enrolment the
 pending secret is held in KV against the session rather than in a hidden form
 field, so it is never echoed through the browser.
 
+**A code by email, as a fallback.** Since 1.68.0 the two-factor challenge
+carries one line under the code box — *Send a code to my email instead* — for
+the sign-in where the phone is lost, flat or at home. Asked for on 12 September
+2026: *"build the email code as a fallback"*, after SMS was described as the
+weakest of the three options and the only one that costs money.
+
+It is a **fallback, not an alternative**: the authenticator app stays the way
+in, and a code is only ever sent to an account that **already has two-factor
+switched on**, so this is not a way to have weak two-factor. It goes to the
+address on the account and nowhere else — there is no field to type another
+address into, on any page.
+
+Six cryptographically random digits (rejection-sampled, so no modulo bias),
+stored only as a PBKDF2 hash, which a database trigger enforces exactly as it
+does for an upload token and a trusted machine. **Ten minutes**, kept by the
+database as well as the code, and **one use** — a spent row cannot be touched
+again at all. `user_id` is unique, so asking again replaces the code before it
+and nobody ever holds two live ones.
+
+Hashing six digits does not make them unguessable, and is not claimed to: what
+it stops is the register holding a working credential in the clear for the ten
+minutes it is alive. What makes the code hard to guess through the register is
+the throttling — three requests per account and ten per address per 15 minutes,
+and an attempt counted against the same 10-per-15-minutes allowance a TOTP code
+is.
+
+Every condition is re-read from the database at the moment the code is
+presented: the row is unused, the deadline has not passed, the person is still
+active, two-factor is still on. Fault 43 again, over ten minutes instead of
+forty days.
+
+With **no email provider configured the link is not drawn at all**, and the page
+says why. With `MAIL_PROVIDER` unset the queue holds a message rather than
+failing, so the button would appear to send something that never arrives.
+
+The letter goes through the ordinary outbound queue, so it lands in
+`outbound_emails` like everything else. The code is in the body and **not in the
+subject**: the queue writes a `mail.sent` audit line carrying the subject, and
+the audit log cannot be edited or deleted, so a code there would be a live
+credential written permanently into the register. What it does mean is that the
+code is readable in `outbound_emails` for its ten minutes by somebody holding
+`mail:send` — recorded, with what would close it, in
+[`issues.md`](issues.md).
+
+Signing in this way still offers *Remember this machine*, and the trusted row is
+pinned to the **TOTP secret** as always, so two-factor turned off and on again
+still kills every machine. Unlike a recovery code, an email code does not revoke
+trusted machines: a recovery code means the authenticator is gone, an email code
+means the phone is in the other room. Asking, using, failing, refusing and
+throttling each have their own audit action, and the code itself reaches no log,
+no meta and no error.
+
 **Two-phase sign-in.** A correct password creates an *unverified* session that
 can reach nothing but the TOTP challenge and sign-out. Only the second factor
-promotes it.
+promotes it — the authenticator's code, a recovery code, or a code emailed to
+the address on the account.
 
-**Trusted machines.** Since 1.63.0 a person passing the TOTP challenge may mark
-that machine trusted, and for the next 40 days signing in on it asks for the
-password only. Asked for on 12 September 2026 — *"allow for 40 days of
+**Trusted machines.** Since 1.63.0 a person passing the two-factor challenge —
+by the authenticator's code or, since 1.68.0, by a code emailed to them — may
+mark that machine trusted, and for the next 40 days signing in on it asks for
+the password only. Asked for on 12 September 2026 — *"allow for 40 days of
 authentication memory on a machine, not every time"*.
 
 What it is: a bearer credential in a `__Host-cr_trust` cookie, `HttpOnly`,

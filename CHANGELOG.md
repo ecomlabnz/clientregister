@@ -7,6 +7,60 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.70.0 — 12 September 2026
+
+### Added
+**A code can be emailed to you when your phone is not there.**
+
+*"build the email code as a fallback"* — said after being told that of the three
+ways of doing this, a text message is the weakest and the only one that costs
+money.
+
+Two-factor was an authenticator app and nothing else. Somebody whose phone was
+lost, flat or at home had eight recovery codes and no third option. The
+two-factor page now carries one line under the code box — **Send a code to my
+email instead** — and the code arrives at the address on the account.
+
+What it is, and what it is not:
+
+- **A fallback, not a second way in.** The app stays the ordinary way. Somebody
+  who never loses their phone will not notice this exists.
+- **Only for an account that already has two-factor switched on.** With
+  two-factor off there is no challenge to pass, so there is no code to send.
+  This does not become a way of having weak two-factor.
+- **It goes to the address on the account and nowhere else.** There is no box to
+  type a different address into, on any page.
+- **Ten minutes, and one use.** Asking again replaces the code before it, so
+  there is never more than one live.
+- **Three a quarter of an hour**, and ten from one address, so nobody's inbox
+  can be filled by somebody holding their password. Trying a code is counted
+  against the same ten-attempt allowance the app's code is.
+- **Not offered at all on a register with no email sending set up**, because the
+  queue would hold the message and the button would look like it worked. The
+  page says so instead.
+
+The code is stored as a hash, the way a password, an upload token and a trusted
+machine are, and the database refuses a row that is not one. It is **not in the
+subject line** — the queue writes the subject into the audit log, which cannot
+be edited or deleted, so a code there would be a live credential written
+permanently into the register.
+
+Signing in this way still lets you tick **Remember this machine**, and the
+trusted machine is pinned to the authenticator exactly as before: turn
+two-factor off and on again and every machine is forgotten. Unlike a recovery
+code, using an email code does **not** forget your machines — a recovery code
+means the authenticator is gone, an email code means the phone is in the other
+room.
+
+Migration `0098` adds `login_email_codes` with seven refusals: stored hashed on
+insert and on update, ten minutes and no longer, the deadline never moves, a
+used code is finished, a code cannot be rewritten in place, and it belongs to
+the person it was sent to. One live code per person is a uniqueness rule rather
+than a convention.
+
+Asking, using and failing are each audited under their own name —
+`login.email_code_sent`, `login.email_code_used`, `login.email_code_failed` —
+alongside `login.email_code_refused` and `login.email_code_rate_limited`.
 ## 1.69.0 — 12 September 2026
 
 ### Added

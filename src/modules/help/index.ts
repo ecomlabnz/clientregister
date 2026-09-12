@@ -94,6 +94,21 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.70.0', date: '12 September 2026',
+    notes: [
+      'If your phone is not with you, the two-factor page can now email you a code instead. '
+        + 'There is a line under the code box that says so.',
+      'The code goes to the address on your account and nowhere else. It lasts ten minutes, '
+        + 'works once, and asking for another one cancels the first.',
+      'Your authenticator app is still the ordinary way in — this is only for the morning it '
+        + 'is flat, lost or at home.',
+      'You can still tick "Remember this machine" after signing in with an emailed code. Using '
+        + 'one does not forget the machines you have already trusted.',
+      'A register with no email sending set up does not offer this, and says why rather than '
+        + 'appearing to send you something.',
+    ],
+  },
+  {
     version: '1.69.0', date: '12 September 2026',
     notes: [
       'You can now choose your own typeface under Account \u2192 Appearance: System, Compact, '
@@ -3589,6 +3604,17 @@ function sections(origin: string): Section[] {
            immigration histories and fee arrangements. Two-factor is the single biggest thing you
            can do to protect it. You will be given eight recovery codes when you set it up — save
            them somewhere safe, because they are shown once.</p>
+        <h4>If your phone is not with you</h4>
+        <p>Under the code box there is a line: <strong>Send a code to my email instead</strong>.
+           Press it and a six-digit code goes to the address on your account. It lasts ten minutes
+           and works once; asking for another cancels the first. Type it into the same box.</p>
+        <p>It only goes to <em>your</em> address — there is nowhere to type a different one — and it
+           is only offered to an account that already has two-factor switched on. You can ask for
+           three in a quarter of an hour. If this register has no email sending set up, the line is
+           not there and the page says so.</p>
+        <p>Unlike a recovery code, using an emailed code does not forget the machines you have
+           remembered: a recovery code means your phone is gone, an emailed code usually means it
+           is in the other room.</p>
         <h4>Remembering a machine</h4>
         <p>When you enter the six-digit code there is a box: <strong>Remember this machine for 40
            days</strong>. Tick it and that machine asks for your password only, until the fortieth
