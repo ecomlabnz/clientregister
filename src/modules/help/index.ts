@@ -94,6 +94,21 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.72.1', date: '12 September 2026',
+    notes: [
+      'The list check below did not reach the register on the first attempt \u2014 the deploy '
+        + 'stopped and put it back. Nothing was lost and nothing was half-done: the register was '
+        + 'read afterwards to make sure, and every client and matter was exactly as before. It is '
+        + 'in now.',
+      'What went wrong is worth knowing, because it is the sort of thing that decides whether you '
+        + 'can trust a release: the Self-check page is built from one query that looks at sixteen '
+        + 'things at once, and the live database has a limit of five. The test computers allow '
+        + 'five hundred, so everything passed here and the real one said no. The query is now '
+        + 'built in four parts, and there is a new test that measures against the real limit '
+        + 'rather than the test computer\u2019s.',
+    ],
+  },
+  {
     version: '1.72.0', date: '12 September 2026',
     notes: [
       'Until today nothing checked that a value came from one of your lists. Thirty-five client '

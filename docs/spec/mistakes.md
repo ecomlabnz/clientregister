@@ -977,6 +977,65 @@ there.**
 
 ---
 
+---
+
+### 48. The database the tests run on is not the database that runs
+
+**What happened.** The vocabulary guard passed 2,991 tests, the typecheck and
+the spec, was merged, and **failed on deploy** — refused by the live register
+before a single object was created:
+
+```
+too many terms in compound SELECT: SQLITE_ERROR [code: 7500]
+```
+
+`vocabulary_mismatches` was one `SELECT` with sixteen branches, one per guarded
+column. **D1 sets `SQLITE_MAX_COMPOUND_SELECT` to 5.** The SQLite the tests run
+on allows 500. Measured afterwards against the live database rather than
+guessed: five terms succeed, six fail.
+
+**Why nothing caught it.** Every check in this repository runs against
+`migratedSqlite()` — a local SQLite built by applying every migration. That is
+the right tool, and it is the reason the guard's 32 triggers could be
+mutation-tested at all. But it answers *"is this SQL correct?"*, and the
+question that failed here was *"will D1 accept this SQL?"* Those are different
+questions, and nothing was asking the second one.
+
+This is fault 45's shape in a new place. There, a test rounded away the
+milliseconds the database was counting exactly; here, a test ran against an
+engine more permissive than the one that matters. **A check that is more
+forgiving than the thing it stands in for is not a check.**
+
+**What it cost, and what it did not.** A red deploy. Nothing else: migration
+0101 creates tables, views and triggers and writes only to its own two new
+tables, so there was no half-applied state to unpick — verified by reading the
+live database afterwards, not assumed. 245 clients, 199 cases, no vocabulary
+object, and the migration unrecorded. It was edited in place rather than
+followed by a corrective one, because it had reached neither database — the
+same call as migration 0093.
+
+**The rule.** **Where the deployed database is stricter than the one the tests
+run on, encode its limits as a test.** `test/vocabguard.test.ts` now walks every
+object in the built schema and fails when any one compound `SELECT` carries
+more than five terms, naming the object and its count. Mutation-tested by
+widening the view again: `vocabulary_mismatches has 6`.
+
+The report is four views of four branches joined by a fifth of four terms.
+`vocabulary_mismatches` is still the one name anything reads, and every branch
+still reads `vocabulary_terms`, so the report and the refusal still cannot
+disagree.
+
+**And the test that broke while fixing it earned its own correction.** *"Covers
+every guarded column"* searched the view's `CREATE VIEW` text for each column's
+name. Splitting the view into four made it fail — but it had never been able to
+fail for the reason that matters: a branch present in the text but reading the
+wrong column matches the search and reports nothing. It now plants a bad value
+in all sixteen columns with the guards lifted and asks the report what it found,
+checking that each branch names its *own* list and value. This register already
+knew that one — *a source match proves the words are in the file, nothing more*
+— and wrote it down two faults ago.
+
+
 ## Working practices that caught things
 
 ### 14. Commit to the branch, not to `main`

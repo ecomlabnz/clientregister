@@ -47,6 +47,29 @@ const GUARD = '0101_a_value_from_a_list_has_to_be_on_the_list.sql';
  * This table is the specification. A column added to the migration and not to
  * this list fails the count assertion at the bottom.
  */
+/**
+ * The widest compound SELECT in one SQL statement, counted as D1 counts it.
+ *
+ * Each CTE and each subquery is parsed as its own compound SELECT, so the
+ * number that matters is the widest run of set operators at any one level —
+ * not the total in the statement. Counting them separately is why the
+ * recursive walk in `vocabulary_parsed`, which has two `UNION ALL`s in two
+ * different CTEs, is two and two rather than three.
+ */
+function countCompoundTerms(sql: string): number {
+  let depth = 0;
+  const runs = [0];
+  for (const tok of sql.split(/(\(|\)|\bUNION\s+ALL\b|\bUNION\b|\bINTERSECT\b|\bEXCEPT\b)/i)) {
+    const t = tok.trim().toUpperCase();
+    if (t === '(') { depth++; runs[depth] = 0; }
+    else if (t === ')') { if (depth > 0) depth--; }
+    else if (t === 'UNION' || t.startsWith('UNION') || t === 'INTERSECT' || t === 'EXCEPT') {
+      runs[depth] = (runs[depth] ?? 0) + 1;
+    }
+  }
+  return Math.max(...runs.map((r) => r + 1));
+}
+
 const GUARDED: Array<{ table: string; column: string; list: string; good: string; bad: string }> = [
   { table: 'clients', column: 'current_visa_type', list: 'vocab.visa_types', good: 'wv_aewv', bad: 'Work Visa - Accredited Employer Work Visa' },
   { table: 'clients', column: 'english_test_type', list: 'vocab.english_tests', good: 'ielts', bad: 'IELTS (General)' },
@@ -482,14 +505,70 @@ describe('the self-check reports and never fixes', () => {
   });
 
   it('covers every guarded column and no other', () => {
-    const db = migratedSqlite();
-    const sql = (db.prepare(`SELECT sql FROM sqlite_master WHERE name = 'vocabulary_mismatches'`)
-      .get() as { sql: string }).sql;
+    // Asked of the view by *reading it back*, not by matching its source. The
+    // first version of this test searched the `CREATE VIEW` text for each
+    // column's name, and stopped being true the moment the view was split into
+    // four — which it had to be, because D1 accepts only five compound terms
+    // (fault 48). It also could not have failed for the reason that matters: a
+    // branch present in the text but joined wrongly, or reading the wrong
+    // column, matches the search and reports nothing. That is this register's
+    // own lesson — *a source match proves the words are in the file, nothing
+    // more* — so the check plants one bad value in every guarded column with
+    // the guard lifted, and asks the report what it found.
+    const db = register();
     for (const { table, column } of GUARDED) {
-      expect(sql, `${table}.${column} is in the self-check`)
-        .toContain(`'${table}' AS table_name, '${column}' AS column_name`);
+      db.exec(`DROP TRIGGER ${table}_${column}_is_on_its_list_insert`);
     }
-    expect(sql.match(/AS table_name/g)).toHaveLength(GUARDED.length);
+    for (const { table, column, bad } of GUARDED) insert(db, table, column, bad);
+
+    const found = db.prepare(`SELECT table_name, column_name, setting_key, value, rows_affected
+                                FROM vocabulary_mismatches`).all() as Array<{
+      table_name: string; column_name: string; setting_key: string;
+      value: string; rows_affected: number;
+    }>;
+
+    expect(found.map((r) => `${r.table_name}.${r.column_name}`).sort())
+      .toEqual(GUARDED.map((g) => `${g.table}.${g.column}`).sort());
+
+    // Each branch must report its *own* column's list and value — four
+    // near-identical branches copied and edited is exactly where one keeps a
+    // neighbour's column name, and a count alone would not see it.
+    for (const { table, column, list, bad } of GUARDED) {
+      const row = found.find((r) => r.table_name === table && r.column_name === column);
+      expect(row, `${table}.${column} is in the self-check`).toBeTruthy();
+      expect(row!.setting_key, `${table}.${column} names its own list`).toBe(list);
+      expect(row!.value, `${table}.${column} reports the value it found`).toBe(bad);
+      expect(row!.rows_affected).toBe(1);
+    }
+  });
+
+  it('is built from statements D1 will accept', () => {
+    // D1 sets SQLITE_MAX_COMPOUND_SELECT to 5 where the SQLite these tests run
+    // on allows 500, so a migration can pass everything here and be refused by
+    // the live register on deploy. That is not hypothetical: it is fault 48,
+    // and it cost a red deploy of 1.72.0. Measured against D1, not guessed —
+    // five terms succeed there and six fail.
+    const D1_MAX_COMPOUND_SELECT = 5;
+    const db = migratedSqlite();
+    const objects = db.prepare(
+      `SELECT name, sql FROM sqlite_master WHERE sql IS NOT NULL`).all() as Array<
+        { name: string; sql: string }>;
+    expect(objects.length, 'the schema is empty').toBeGreaterThan(50);
+
+    const over = objects
+      .map((o) => ({ name: o.name, terms: countCompoundTerms(o.sql) }))
+      .filter((o) => o.terms > D1_MAX_COMPOUND_SELECT);
+    expect(over, `D1 refuses more than ${D1_MAX_COMPOUND_SELECT} terms in one compound SELECT: `
+      + over.map((o) => `${o.name} has ${o.terms}`).join(', ')).toEqual([]);
+  });
+
+  it('would catch a statement D1 would refuse', () => {
+    // The counter proved able to fail, because a search that finds nothing and
+    // a search that cannot find anything read the same.
+    expect(countCompoundTerms('SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3')).toBe(3);
+    expect(countCompoundTerms('SELECT 1\nUNION ALL\nSELECT 2')).toBe(2);
+    expect(countCompoundTerms('SELECT 1 UNION SELECT 2 EXCEPT SELECT 3')).toBe(3);
+    expect(countCompoundTerms('SELECT 1')).toBe(1);
   });
 
   it('says nothing about a list it cannot find', () => {

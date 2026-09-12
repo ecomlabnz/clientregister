@@ -516,7 +516,19 @@ END;
 -- 4. The self-check: every stored value that is not on its list.
 -- ---------------------------------------------------------------------------
 
-CREATE VIEW vocabulary_mismatches AS
+-- The report is built in four parts and then joined, not as one sixteen-branch
+-- SELECT, because **D1 accepts at most five terms in a compound SELECT** —
+-- SQLITE_MAX_COMPOUND_SELECT is 5 there against 500 in the SQLite the tests
+-- run on. The sixteen-branch version passed every test and was refused by the
+-- live database on deploy: `too many terms in compound SELECT [code: 7500]`.
+-- Five terms succeed and six fail; that was measured against D1, not guessed.
+--
+-- Four views of four branches, joined by a fifth of four terms, leaves every
+-- statement here at or under four. `vocabulary_mismatches` is still the one
+-- name anything reads, and every branch still reads `vocabulary_terms`, so the
+-- report and the refusal cannot disagree — which was the point of one view.
+
+CREATE VIEW vocabulary_mismatches_1 AS
 SELECT 'clients' AS table_name, 'current_visa_type' AS column_name,
        'vocab.visa_types' AS setting_key, current_visa_type AS value,
        COUNT(*) AS rows_affected, SUBSTR(GROUP_CONCAT(id), 1, 200) AS example_ids
@@ -567,8 +579,9 @@ SELECT 'clients' AS table_name, 'gender' AS column_name,
                     AND term_key = LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
                       clients.gender,
                       CHAR(9), ''), CHAR(13), ''), ' ', ''), '_', ''), '-', ''), '.', '')))
- GROUP BY gender
-UNION ALL
+ GROUP BY gender;
+
+CREATE VIEW vocabulary_mismatches_2 AS
 SELECT 'clients' AS table_name, 'relationship_status' AS column_name,
        'vocab.relationship_statuses' AS setting_key, relationship_status AS value,
        COUNT(*) AS rows_affected, SUBSTR(GROUP_CONCAT(id), 1, 200) AS example_ids
@@ -619,8 +632,9 @@ SELECT 'quote_items' AS table_name, 'case_type' AS column_name,
                     AND term_key = LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
                       quote_items.case_type,
                       CHAR(9), ''), CHAR(13), ''), ' ', ''), '_', ''), '-', ''), '.', '')))
- GROUP BY case_type
-UNION ALL
+ GROUP BY case_type;
+
+CREATE VIEW vocabulary_mismatches_3 AS
 SELECT 'documents' AS table_name, 'category' AS column_name,
        'vocab.doc_categories' AS setting_key, category AS value,
        COUNT(*) AS rows_affected, SUBSTR(GROUP_CONCAT(id), 1, 200) AS example_ids
@@ -672,8 +686,9 @@ SELECT 'client_employment' AS table_name, 'kind' AS column_name,
                     AND term_key = LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
                       client_employment.kind,
                       CHAR(9), ''), CHAR(13), ''), ' ', ''), '_', ''), '-', ''), '.', '')))
- GROUP BY kind
-UNION ALL
+ GROUP BY kind;
+
+CREATE VIEW vocabulary_mismatches_4 AS
 SELECT 'client_education' AS table_name, 'level' AS column_name,
        'vocab.education_levels' AS setting_key, level AS value,
        COUNT(*) AS rows_affected, SUBSTR(GROUP_CONCAT(id), 1, 200) AS example_ids
@@ -725,6 +740,15 @@ SELECT 'client_travel' AS table_name, 'mode' AS column_name,
                       client_travel.mode,
                       CHAR(9), ''), CHAR(13), ''), ' ', ''), '_', ''), '-', ''), '.', '')))
  GROUP BY mode;
+
+CREATE VIEW vocabulary_mismatches AS
+SELECT * FROM vocabulary_mismatches_1
+UNION ALL
+SELECT * FROM vocabulary_mismatches_2
+UNION ALL
+SELECT * FROM vocabulary_mismatches_3
+UNION ALL
+SELECT * FROM vocabulary_mismatches_4;
 
 -- ---------------------------------------------------------------------------
 -- 5. The guard itself.
