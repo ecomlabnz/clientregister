@@ -628,7 +628,6 @@ spot: never have a migration or a deploy overwrite a stored vocabulary
 unguarded. `vocab.doc_categories` is the proof — three lines the practice added
 for their own filing would have gone, silently, and nothing would have said so.
 
-<<<<<<< HEAD
 ### 20. A sign-in code emailed out is readable in the register for ten minutes
 
 **Found** 12 September 2026, while building the email fallback (1.68.0).
@@ -690,8 +689,8 @@ question somebody will ask again.
   allowance**, not a new one. One box, one allowance: a second counter would let
   an attacker spend twenty attempts by alternating what they claimed to be
   typing.
-=======
-### 20. An employment location can no longer be counted or matched
+
+### 22. An employment location can no longer be counted or matched
 
 **Found** 12 September 2026, while making the change that caused it.
 **Severity: low, and OPEN by decision.**
@@ -717,7 +716,7 @@ with the code doing the counting and the text doing the reading. Not built,
 because the first thing that needs it will say what it needs — and a column
 nobody fills in is worse than no column.
 
-### 21. Two boxes in the employment history have no ceiling in the database
+### 23. Two boxes in the employment history have no ceiling in the database
 
 **Found** 12 September 2026, adding ceilings to the three boxes migration 0100
 touches.
@@ -738,7 +737,7 @@ somebody else's.
 **What would close it:** one migration giving every free-text column on the four
 history tables a ceiling, in the same words.
 
-### 22. The three military questions are read in one place and answered in another
+### 24. The three military questions are read in one place and answered in another
 
 **Found** 12 September 2026, building them.
 **Severity: low, and OPEN by decision.**
@@ -754,7 +753,7 @@ second writer of a column that already has an owner — which is how the
 certificate cache got wiped once. If it is built, the client form should stop
 writing them in the same change, not both write.
 
-### 23. `ARCHITECTURE.md` states a test count that nothing keeps true
+### 25. `ARCHITECTURE.md` states a test count that nothing keeps true
 
 **Found** 12 September 2026, reading it before starting work.
 **Severity: low, and OPEN.**
@@ -767,7 +766,7 @@ thing goes stale in silence), in the one document a new reader starts with.
 **What would close it:** either drop the number, or have the test that already
 counts the specification's front page count this one too.
 
-### 24. A history block that refuses a save reopens closed
+### 26. A history block that refuses a save reopens closed
 
 **Found** 12 September 2026, while building the fourth history.
 **Severity: low, and OPEN.** Pre-existing since 11 September; nothing is lost,
@@ -785,7 +784,6 @@ of the page and the table it is about is shut.
 `foldingCard` with it, fed from the same `openBlocks` set the rest of the page
 already uses. Perhaps ten lines. Not done here because nobody asked for it and
 it is not this change's business; put it to the practice first.
->>>>>>> 8bd9776 (Military service, asked and answered, and a job that says where and what)
 
 ## Asked for, not yet built
 

@@ -176,6 +176,16 @@ describe('the numbers on the front page of the specification', () => {
     expect(stated('routes and the permission')).toBe(routes);
   });
 
+  it('says how many faults have been suffered, and agrees with the list', () => {
+    // Written as a word ("Forty-two") it escaped this block entirely while the
+    // list grew to forty-five: `stated()` reads digits, so a number spelled out
+    // is a number nothing checks. It is a digit now for that reason.
+    const doc = readFileSync('docs/spec/mistakes.md', 'utf8');
+    const faults = (doc.match(/^### \d+\. /gm) ?? []).length;
+    expect(faults, 'the numbered fault list is missing').toBeGreaterThan(30);
+    expect(stated('faults, each with the rule')).toBe(faults);
+  });
+
   it('lists every module that is actually mounted', async () => {
     const { registeredModules } = await import('../src/registry');
     const features = readFileSync('docs/spec/features.md', 'utf8');

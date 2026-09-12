@@ -518,7 +518,6 @@ every qualification converted. Twenty-eight of the thirty-two now carry an award
 date, and the histories are written at all three date precisions, which is the
 easiest way to see that the shorter ones work.
 
-<<<<<<< HEAD
 ---
 
 ## 13. A code by email, when the phone is not there (1.68.0)
@@ -585,7 +584,7 @@ secret; it is everything that quietly copies the thing you put it in.
 two-factor switched on, and your own register already sends email. If you want
 to see it: sign in, and at the code page press the new line instead of typing the
 app's code.
-=======
+
 ## 12 September, later still: military service, and what the form asks of a job (1.66.0)
 
 ### What you asked for
@@ -664,4 +663,3 @@ answers them, which is the right state — the register does not guess at a
 character question. The try-it caseload has two files carrying an answer, one who
 served and one who was exempt, so you can see both shapes of the block without
 touching a real file.
->>>>>>> 8bd9776 (Military service, asked and answered, and a job that says where and what)
