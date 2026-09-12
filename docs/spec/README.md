@@ -24,7 +24,7 @@ claim, not a fact.
 
 ## Read them in this order
 
-**1. [`mistakes.md`](mistakes.md).** 47 faults, each with the rule that
+**1. [`mistakes.md`](mistakes.md).** 48 faults, each with the rule that
 replaced it. The other documents tell you *what* to build; this one tells you
 what will go wrong while you build it. A rebuild that skips it will
 rediscover a primary-passport collision, a search that only works in one word

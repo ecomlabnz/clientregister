@@ -7,6 +7,41 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.72.1 — 12 September 2026
+
+### Fixed
+**The 1.72.0 deploy failed and the guard never reached the register.** Nothing
+was lost and nothing was half-applied — the register was read afterwards to
+check, not assumed: 245 clients, 199 matters, and no trace of the migration.
+
+`vocabulary_mismatches`, the view behind Settings → Self-check, was one `SELECT`
+with sixteen branches, one per guarded column. **D1 accepts at most five terms
+in a compound `SELECT`** where the SQLite the tests run on accepts 500, so the
+view passed 2,991 tests and was refused by the live database:
+`too many terms in compound SELECT [code: 7500]`. The limit was then measured
+against D1 rather than guessed — five terms succeed, six fail.
+
+The report is now four views of four branches joined by a fifth of four terms.
+`vocabulary_mismatches` is still the only name anything reads and every branch
+still reads `vocabulary_terms`, so the report and the refusal still cannot
+disagree.
+
+Migration 0101 is edited in place rather than followed by a corrective one: it
+had reached neither database. The same call as migration 0093, for the same
+reason.
+
+`test/vocabguard.test.ts` now walks every object in the built schema and fails
+when one compound `SELECT` carries more than five terms, naming the object and
+its count — mutation-tested by widening the view again. Fault 48 is the general
+version: *where the deployed database is stricter than the one the tests run
+on, encode its limits as a test*.
+
+Also rewritten: *"covers every guarded column"* matched the view's source text,
+so it broke when the view was split — and could never have failed for the
+reason that matters, a branch reading the wrong column. It now plants a bad
+value in all sixteen columns and reads the report back, checking each branch
+names its own list and value.
+
 ## 1.72.0 — 12 September 2026
 
 ### Added
