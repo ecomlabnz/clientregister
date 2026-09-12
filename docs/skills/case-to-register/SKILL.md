@@ -374,7 +374,8 @@ supporting_partner    | Supporting partner (the application turns on the relatio
 partner               | Partner (the applicant's partner, not part of the application)
 dependent_child       | Dependent child
 family_member         | Family member (any other relative, not applying)
-employer              | Employer
+employer              | Employer (the organisation itself)
+director              | Director (the person who signs for a company)
 sponsor               | Sponsor
 agent                 | Agent or representative
 lawyer                | Lawyer (not this practice — prior or opposing counsel)

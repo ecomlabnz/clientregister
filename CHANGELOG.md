@@ -7,6 +7,32 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.68.0 — 12 September 2026
+
+### Added
+**A trial register now says so, on every page.** A band across the top: *"This
+is a trial register. Everything in it goes back to how it started in 4 days, on
+17 Sept 2026."* It counts down, and it cannot be dismissed — the person being
+shown the register for the first time is exactly the one who might mistake it
+for the real thing, and the one least likely to go hunting under Settings for
+when it wipes.
+
+Your own register never shows it, and never even asks the question.
+
+**Director, as a role on a matter.** On an employer accreditation or a job
+check the client is the company, and the director is the person INZ actually
+deals with — the one who signs the declaration. Until now the nearest role was
+"Other", which says nothing on a page whose whole job is saying who somebody is.
+
+### Changed
+**The try-it caseload has real tasks on it.** Four across thirty-five matters
+became seventy-odd, spread across every state a task can be in — open, in
+progress, blocked, done, cancelled — and across dates that are overdue, due
+this week, and months out.
+
+Two reasons. A prospective customer opening the Tasks page saw almost nothing;
+and the new row tints only show their worth when there is something to tint.
+
 ## 1.67.0 — 12 September 2026
 
 ### Changed

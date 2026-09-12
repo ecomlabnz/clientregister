@@ -651,6 +651,14 @@ th {
 td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
 tr:last-child td { border-bottom: none; }
 .totals-row td { border-top: 2px solid var(--border); background: var(--surface-2); }
+/* A trial register says so on every page. Asked for on 12 September 2026:
+   *"there should be a running line or a banner above saying in how many days
+   the reset will take place."* Sits above everything else in `main`, uses the
+   amber alert it already inherits, and is given a little more weight than an
+   ordinary alert because it is a statement about the whole register rather
+   than about the page. */
+.trial-band { font-weight: 600; margin-bottom: 14px; }
+
 .row-urgent { background: var(--red-bg); }
 /* A high-priority matter, called out more quietly than an urgent one. Asked for
    on 12 September 2026: the badge already said amber for high and red for

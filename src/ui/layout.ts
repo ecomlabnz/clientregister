@@ -184,6 +184,12 @@ ${opts.landing
   </div>
 </header>
 <main class="main">
+  ${'' /* A trial register says so on every page, above anything else on it.
+           Asked for on 12 September 2026. It is deliberately not dismissible:
+           somebody being shown the register for the first time is exactly the
+           person who must not mistake it for the real thing, and they are also
+           the person least likely to press anything before reading. */}
+  ${c.get('trialNotice') ? html`<div class="alert alert-warn trial-band">${c.get('trialNotice')}</div>` : ''}
   ${ok ? html`<div class="alert alert-ok">${ok}</div>` : ''}
   ${err ? html`<div class="alert alert-error">${err}</div>` : ''}
   ${body}

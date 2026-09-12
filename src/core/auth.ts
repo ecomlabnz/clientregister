@@ -13,6 +13,7 @@ import { hashPassword, PASSWORD_HASH_PARAMS, passwordNeedsRehash, verifyPassword
 import { readSession, sessionTokenFrom } from './session';
 import { can, type Permission } from './rbac';
 import { asPrefBoolean, asPrefInteger, preferencesFor } from './preferences';
+import { trialNotice } from './testseed';
 
 interface UserRow extends User {
   password_hash: string;
@@ -28,6 +29,7 @@ export async function attachSession(c: Context<AppContext>, next: Next): Promise
   c.set('user', null);
   c.set('session', null);
   c.set('notify', null);
+  c.set('trialNotice', await trialNotice(c.env));
 
   const token = sessionTokenFrom(c);
   if (token) {
