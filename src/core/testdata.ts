@@ -43,6 +43,12 @@ export const TEST_TABLES = {
   inquiries: 'inquiry',
   invoices: 'invoice',
   tasks: 'task',
+  // Added 12 September 2026, when the demonstration caseload gained knowledge
+  // base articles. An article belongs to no client, so nothing marks one except
+  // somebody marking it — but the caseload puts itself back every ten days, and
+  // anything the seed writes has to be something the purge can take. See
+  // migration 0096.
+  kb_articles: 'knowledge base article',
 } as const;
 
 export type TestTable = keyof typeof TEST_TABLES;
@@ -60,7 +66,8 @@ export function isTestTable(value: string): value is TestTable {
  * `SET NULL` or `CASCADE` — but it would leave nameless rows behind, which is
  * exactly what the practice asked not to have to think about.
  */
-const DELETE_ORDER: TestTable[] = ['invoices', 'quotes', 'inquiries', 'tasks', 'cases', 'clients'];
+const DELETE_ORDER: TestTable[] =
+  ['invoices', 'quotes', 'inquiries', 'tasks', 'kb_articles', 'cases', 'clients'];
 
 /** Where a file note can be filed, and the table that owns each. */
 const NOTE_OWNERS: Record<string, TestTable> = {
@@ -111,7 +118,7 @@ export interface TestRecord { table: TestTable; noun: string; id: string; ref: s
 /**
  * Which column names each record on the list, per table.
  *
- * Written out one table at a time rather than derived, because the six tables
+ * Written out one table at a time rather than derived, because the tables
  * genuinely disagree: a matter has a `title`, a quotation has a `description`,
  * an inquiry has a `subject`, and a task has no reference number at all. An
  * earlier version guessed `description` for anything it had not named, which
@@ -122,6 +129,7 @@ export interface TestRecord { table: TestTable; noun: string; id: string; ref: s
  */
 const LIST_COLUMNS: Record<TestTable, { ref: string; title: string }> = {
   invoices: { ref: 'ref', title: 'description' },
+  kb_articles: { ref: 'ref', title: 'title' },
   quotes: { ref: 'ref', title: 'description' },
   inquiries: { ref: 'ref', title: "COALESCE(subject, '')" },
   tasks: { ref: "''", title: 'title' },

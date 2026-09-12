@@ -7,6 +7,81 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.65.0 — 12 September 2026
+
+### Added
+**The try-it caseload is a working practice now, not a list of rows.**
+
+*"bring the total of trial cases to 35 and increase the number of clients, add
+some more organisation"*, *"partners and children do not appear on the matters
+they belong to"*, *"i do not see any invoices in trial data"*, *"add some sample
+entries into the knowledge base to showcase it"*, and *"the principal clients
+should have varied employment, education and travel histories."*
+
+**Thirty-five matters on twenty files**, up from twenty on eleven. Nine are
+simply done, eighteen are real work, eight are unusual — the same mix as before,
+scaled up. Approved, lodged, on hold, a PPI, two declines, a reconsideration, an
+appeal at the Tribunal, deadlines that have passed and deadlines still to come.
+
+**Thirty-three clients**, up from twenty, including **five companies** — two of
+them with their own accreditation and job check matters, three named as the
+employer on somebody else's work visa.
+
+**Everybody who belongs on a matter is now on it.** This was the fault: a
+partner or a child existed as a client of their own and the matter they belonged
+to named only the principal applicant. Worst of all, the partnership residence
+application named no partner at all. There are now 28 party links across the
+caseload using nine of the twelve roles — partners, children, supporting
+partners, sponsors, employer companies and the director who signs for one.
+
+**Seven invoices**, where there were none: two paid, one part paid, one issued
+and not yet due, one overdue, one still a draft and one voided with its reason
+on it. Every figure is computed from the invoice's own lines, so nothing on the
+page disagrees with anything else.
+
+**Thirty-nine quotations**, one for very nearly every matter. Not all accepted —
+one declined, one withdrawn and re-quoted, one left to expire and one still a
+draft.
+
+**Eight knowledge base articles**, so that page is not empty: a partnership
+checklist, a note on PPI letters, what a job check needs from an employer, a
+covering-letter template, an office procedure, a draft and a superseded document
+list. Two are shared, so the client link has something to open. Every one of
+them says on its first line that it is a demonstration and not advice, and none
+of it is copied from anywhere.
+
+**Varied histories on every principal client.** Sixty-nine employment rows,
+thirty-two qualifications and thirty-eight trips, including deliberate gaps —
+periods of unemployment and of caring for family — because the register marks a
+period nobody has accounted for and a caseload with no gaps shows that doing
+nothing.
+
+Every qualification carries its framework level and, where it has been
+conferred, the day it was awarded — both of which arrived in 1.64.0 above with
+nothing yet using them. The dates are written at all three precisions on
+purpose: a day, a month, and a bare year on the older ones, because a caseload
+that wrote every date in full would never show that the shorter forms work.
+
+### Fixed
+**A rehearsal can now be taken back out, whatever it is.** An invoice marked as
+test data could be marked and never deleted, so the first reset with one in it
+would have failed; a knowledge base article could not be marked at all, so a
+reset would have laid down a second copy of every article every time. Migration
+0096 fixes both. A real invoice still cannot be deleted, only voided, and that
+is tested by attacking the database directly.
+
+**More invented keys, found on the way through.** A flag kind that was not a
+flag kind (`general`), an employment kind that was not one (`employee`), travel
+purposes written as words rather than keys (`Work`, `Family visit`), and eleven
+of the visas the caseload said its clients held — `resident`, `aewv`,
+`partner_work` and the rest — none of which are keys the *visa a client holds*
+list carries. Each of them displayed a raw code, or nothing at all, on the first
+pages a prospective customer opens. Each field is now checked against its own
+list rather than against the vocabulary file as a whole, which is what let
+`sv_student` through this morning.
+
+**Only the demonstration caseload was affected by any of this.** Nothing in your
+own register changed.
 ## 1.64.0 — 12 September 2026
 
 ### Added

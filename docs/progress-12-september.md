@@ -410,3 +410,110 @@ not something a deploy should do on its own. That is the same reason the old
 workflow was deleted today. I cannot press it; I have no account on the trial.
 It takes about ten seconds and it is the last step before the trial is ready to
 show anybody.
+
+---
+
+## 12 September, later: the try-it caseload becomes a practice (1.64.0)
+
+### What you asked for
+
+Five things, in your words:
+
+- *"bring the total of trial cases to 35 and increase the number of clients, add
+  some more organisation - all with fake details"*
+- *"partners and children do not appear on the matters they belong to"*
+- *"i do not see any invoices in trial data - please introduce say 5-7 invoices
+  with various stages. also the same for quotes - increase number of quotes to
+  the number of actual cases as one would think that a case once started with a
+  quotation"*
+- *"add some sample entries into the knowledge base to showcase it"*
+- *"the principal clients should have varied employment, education and travel
+  histories - we need prepopulated register to showcase the system"*
+
+### What changed for the practice
+
+The caseload on Settings → Test data is now a working practice rather than a
+list of rows. It is what somebody deciding whether to buy this opens first, so
+that is the standard it is held to.
+
+**Thirty-five matters on twenty files.** Nine simply done, eighteen that are
+real work, eight unusual — the same mix you asked for in the twenty, scaled up.
+Approved, lodged, on hold, a PPI, two declines, a reconsideration, an appeal at
+the Tribunal, an Active Investor Plus still gathering evidence, deadlines gone
+past and deadlines still to come.
+
+**Thirty-three clients, five of them companies.** Two companies carry their own
+accreditation and job check matters; three are on the register only as the
+employer named on somebody else's work visa. One company has two employees on
+the register, which is what an accredited employer actually looks like.
+
+**Everybody who belongs on a matter is on it.** Twenty-eight party links, nine
+of the twelve roles. Partners, children, supporting partners who are not
+applying, a sponsor, employer companies, and the director who signs for one.
+
+**Seven invoices**, where there were none at all: two paid, one part paid, one
+waiting and not yet due, one overdue, one draft and one voided with the reason
+on it.
+
+**Thirty-nine quotations**, one for very nearly every matter. Three matters have
+none on purpose — two are covered by another matter's quotation and one was done
+at no charge — and the reason is written beside each in the code.
+
+**Eight knowledge base articles.** Two of them are shared, so the client link
+has something to open.
+
+**Varied histories.** Sixty-nine employment rows, thirty-two qualifications,
+thirty-eight trips, across every client who holds a matter.
+
+### What was got wrong, and the rule that came out of it
+
+**An invoice could be marked as a rehearsal and then never deleted.** The
+register has let an administrator mark an invoice as test data since 11
+September, and the purge has had `invoices` at the head of its delete list since
+the same day. But the database has refused to delete any invoice since it was
+built, on purpose — an invoice is a tax document, you void it, you do not delete
+it. Nobody had found this, because until today nothing ever wrote a test
+invoice. The first reset with one in it would have failed outright.
+
+The knowledge base had the other half of the same problem: an article could not
+be marked at all, so the ten-day reset would have laid down a second copy of
+every article each time it ran.
+
+**The rule:** *a mark that cannot be unmade is not a mark.* Anything the register
+lets you call a rehearsal has to be something the purge can actually take, and
+that has to be proved by deleting one — not by reading the trigger and believing
+it. Both are fixed in migration 0096, and both halves are now tested by
+attacking the database directly: a marked invoice goes, a real one still refuses.
+
+**More codes instead of names.** You caught three this morning. Checking every
+field the same way turned up five more lists with the same fault — a warning
+kind that was not one, a kind of employment that was not one, two travel
+purposes written as labels, and eleven of the visas the caseload said its clients
+held.
+
+**The rule:** *check a value against the list it belongs to, not against the file
+the lists live in.* The test written yesterday to catch exactly this read the
+whole vocabulary file, so a key from the wrong list looked right — which is how
+`sv_student` got through. Each field is now checked against its own list, by
+name.
+
+**A partnership application with no partner.** The one that mattered most. Not
+untidy — impossible. The test now derives which matters are partnership-based
+from their type and their title and fails if any of them names nobody, so the
+next one somebody adds cannot repeat it. Pinning the rule rather than the case
+is the difference between a test that catches this and a test that catches only
+the one we already know about.
+
+### What is waiting on you
+
+**The trial register is still empty, and this is still the last step.** It is one
+press of the button on Settings → Test data inside the trial register. Nothing
+in a deploy will do it, on purpose — that is the same reason the old workflow was
+deleted this morning. It takes about ten seconds.
+
+**Nothing else.** The education change that was being written at the same time —
+framework levels instead of words, and a date the qualification was awarded —
+landed while this was being finished, so the caseload was rebased onto it and
+every qualification converted. Twenty-eight of the thirty-two now carry an award
+date, and the histories are written at all three date precisions, which is the
+easiest way to see that the shorter ones work.

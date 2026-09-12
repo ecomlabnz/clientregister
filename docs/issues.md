@@ -483,6 +483,111 @@ unless somebody ticks a box, not a hole in it.
    the code at random and teach people to distrust the box rather than the
    machine.
 
+### 15. *(Fixed 12 September 2026)* A test invoice could be marked and never deleted
+
+**Found** 12 September 2026, while adding invoices to the try-it caseload.
+**Severity when found:** medium — nobody had hit it, and the first person to
+would have found the whole purge refusing.
+
+Migration 0083 let an administrator mark an invoice as test data, and put
+`invoices` at the head of the purge's delete order. Migration 0018 says an
+invoice is never deleted, only voided, and enforces it with
+`invoices_cannot_be_deleted` — which has no exemption for a marked row. So
+`DELETE FROM invoices WHERE is_test = 1` raised *an invoice cannot be deleted;
+void it instead* and took the purge down with it. Proved by attacking the
+database directly rather than by reading the trigger.
+
+It had never fired because nothing wrote a test invoice. The moment the
+demonstration caseload did, the ten-day reset would have failed every time.
+
+**Fixed** by migration 0096: the three delete guards on the invoice tables —
+the invoice, its lines, its payments — stand aside for a row marked as test
+data, exactly the way migration 0083 already did for a file note filed against a
+test record. Every refusal keeps its exact wording, because that wording is what
+the practice reads on a real invoice, and `test/testdata.test.ts` now proves
+both halves: a marked invoice goes, a real one still cannot.
+
+**What would let the exemption be removed:** a purge that archives rather than
+deletes. Not true today.
+
+### 16. *(Fixed 12 September 2026)* A knowledge base article could not be marked as test data
+
+**Found** 12 September 2026, immediately after issue 15 and for the same reason.
+**Severity when found:** medium.
+
+`kb_articles` had no `is_test` column, so the caseload's sample articles could
+not be marked, could not be purged, and the ten-day reset would have laid down a
+second copy of every one of them each time it ran — eight, then sixteen, then
+twenty-four.
+
+**Fixed** by migration 0096: the column, the index, the table in
+`core/testdata.ts`'s delete order, and one thing that is not obvious — the
+follow-up task an article raises overnight now inherits the mark, so a reminder
+about a demonstration article goes out with the article instead of outliving it
+as a task pointing at nothing.
+
+### 17. *(Fixed 12 September 2026)* Partners and children were on nobody's matter
+
+**Found** 12 September 2026 — reported by the practice looking at the trial:
+*"partners and children do not appear on the matters they belong to."*
+**Severity when found:** medium, and high as a sales problem.
+
+Four matters out of twenty carried a party row. Everybody else's partner and
+children existed as clients in their own right and appeared on nothing, so
+opening a matter showed the principal applicant and an empty Parties list. The
+worst instance was a **partnership** residence application naming no partner at
+all, which is not a thin file — it is not an application.
+
+Only the demonstration caseload was affected; real matters carry the parties
+somebody entered.
+
+**Fixed:** 28 party links across 35 matters, using nine of the twelve roles. The
+rule is pinned rather than the instance — `test/testseed.test.ts` derives which
+matters are partnership-based from their type and title and fails if any of them
+names nobody in a partner, supporting-partner or secondary-applicant role. A
+count alone would have let the next one through.
+
+### 18. *(Fixed 12 September 2026)* More invented keys in the caseload, in five more lists
+
+**Found** 12 September 2026, checking every field of the caseload against its own
+list after the three found that morning.
+**Severity when found:** medium — each one displayed a raw code, or nothing, on
+a page a prospective customer opens.
+
+Beyond the three the practice had already spotted:
+
+- `general` as a **flag kind**. The list has `safety`, `character`, `border`,
+  `health`, `immigration`, `contact`, `money`, `other` — not `general`.
+- `employee` as an **employment kind**. The list says `employed`.
+- `Work` and `Family visit` as **travel purposes**, written as labels rather
+  than keys.
+- Eleven **visas a client holds** — `resident`, `working_holiday`, `work`,
+  `aewv`, `partner_work`, `visitor`, `student`, `work_other`, `post_study_work`
+  among them. None is a key in `VISA_TYPE_VOCAB`, whose keys are `rv_resident`,
+  `wv_working_holiday`, `wv_aewv` and so on.
+
+**Fixed:** every value in the caseload now comes from its own list, and
+`test/testseed.test.ts` checks each column against **the vocabulary it belongs
+to**, read out of `core/vocabulary.ts` by name. That is the point of the fix:
+the check that let `sv_student` through was reading the whole file, so a key
+from the wrong list looked right.
+
+### 19. *(Fixed 12 September 2026)* The caseload could not write a history date as a bare year
+
+**Found** 12 September 2026, writing the varied histories.
+**Severity when found:** cosmetic, and never a defect in the register.
+
+Old qualifications often give only a year, and the caseload was written with
+several — `from: '2007'`. Migration 0091 allowed a history date to be a whole day
+or a month and nothing shorter, so the database refused every one of them, and
+they were written as months instead.
+
+**Fixed** the same day, by somebody else's migration 0095, which added the year
+precision alongside `client_education.awarded_on`. The caseload now writes all
+three — day, month and year — and `test/testseed.test.ts` fails if any one of
+them is missing, because a caseload that writes every date in full never shows
+the shorter forms work at all.
+
 ---
 
 ### 15. A customised list never hears about improvements to the register's own

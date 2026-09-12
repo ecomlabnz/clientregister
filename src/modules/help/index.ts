@@ -94,6 +94,31 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.65.0', date: '12 September 2026',
+    notes: [
+      'Settings \u2192 Test data now lays down a much bigger caseload to practise on: 35 matters '
+        + 'on 20 files, 33 invented clients and 5 companies, instead of 20 matters on 11 files.',
+      'Partners and children now appear on the matters they belong to. They did not before \u2014 '
+        + 'opening a matter showed the main applicant and nobody else, and the partnership '
+        + 'residence application named no partner at all.',
+      'There are invoices in it now, where there were none: two paid, one part paid, one waiting, '
+        + 'one overdue, one draft and one voided. Every figure adds up from the invoice\u2019s own '
+        + 'lines.',
+      'Nearly every matter now has the quotation it started with \u2014 39 of them, and not all '
+        + 'accepted: one declined, one withdrawn, one expired, one still a draft.',
+      'The knowledge base has eight sample articles in it, two of them shared so you can see what '
+        + 'a client sees. Each one says on its first line that it is a demonstration, not advice.',
+      'Everybody who holds a matter now has a work, study and travel history worth looking at, '
+        + 'gaps included \u2014 the gaps are there on purpose, because the register marks them.',
+      'Those histories show off the two boxes added just before this: every qualification has '
+        + 'its framework level and the day it was awarded, and the dates are written as a day, a '
+        + 'month and a bare year so you can see all three.',
+      'Several things in the caseload were showing a code instead of a name: a warning kind, a '
+        + 'kind of employment, two travel purposes and eleven of the visas. All fixed.',
+      'Nothing in your own register changed. This is only the caseload for trying things on.',
+    ],
+  },
+  {
     version: '1.64.0', date: '12 September 2026',
     notes: [
       'Education level is now the NZQCF level, 1 to 10, with the qualifications that sit at each '
