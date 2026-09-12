@@ -19,6 +19,9 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { mountModule, fakeUser } from './support/d1';
 import { casesModule } from '../src/modules/cases';
+import { rowClass } from '../src/ui/components';
+import { PRIORITY_TONES, PRIORITIES, type Priority } from '../src/domain';
+import { SEVERITY_TONES, severityFor } from '../src/modules/alerts';
 
 const AT = '2026-09-12T00:00:00Z';
 const USER = fakeUser();
@@ -112,5 +115,50 @@ describe('the tint follows the reader’s theme', () => {
     // Mapped in all three states: bare :root, the media query, and the stamp.
     expect([...css.matchAll(/--amber-bg:\s*var\(--[ld]-amber-bg\)/g)].length)
       .toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('every list paints the same tone the same way', () => {
+  /**
+   * **Asked for on 12 September 2026:** *"i like the tints for cases, but also
+   * want them on the dashboard and for alerts too."*
+   *
+   * Three lists were each deciding for themselves what a row should look like,
+   * and all three had arrived at the red half only — while the badge sitting on
+   * the very same row already knew about amber. So the mapping has one owner
+   * now, and these check it rather than the pixels: the lists still decide how
+   * pressing a thing is, and `rowClass` decides what that looks like.
+   */
+  it('turns a tone into the same class wherever it is asked', () => {
+    expect(rowClass('red')).toBe('row-urgent');
+    expect(rowClass('amber')).toBe('row-high');
+    expect(rowClass('neutral')).toBe('');
+    expect(rowClass(null)).toBe('');
+    expect(rowClass(undefined)).toBe('');
+  });
+
+  it('has a tone for every priority the register has', () => {
+    // A priority with no entry would read as neutral and be silently quiet,
+    // which is how the amber tier went missing in the first place.
+    for (const p of PRIORITIES) {
+      expect(PRIORITY_TONES[p as Priority], p).toBeTruthy();
+    }
+    expect(PRIORITY_TONES.urgent).toBe('red');
+    expect(PRIORITY_TONES.high).toBe('amber');
+  });
+
+  it('gives an alert the tone its own badge already showed', () => {
+    expect(SEVERITY_TONES.overdue).toBe('red');
+    expect(SEVERITY_TONES.urgent).toBe('amber');
+    expect(SEVERITY_TONES.soon).toBe('neutral');
+  });
+
+  it('reddens a date that has passed and ambers one that is close', () => {
+    const today = '2026-09-12';
+    expect(rowClass(SEVERITY_TONES[severityFor('2026-09-11', today)])).toBe('row-urgent');
+    expect(rowClass(SEVERITY_TONES[severityFor(today, today)])).toBe('row-high');
+    expect(rowClass(SEVERITY_TONES[severityFor('2026-09-25', today)])).toBe('row-high');
+    // Beyond the fortnight the register treats as pressing, a row is quiet.
+    expect(rowClass(SEVERITY_TONES[severityFor('2026-11-01', today)])).toBe('');
   });
 });

@@ -235,10 +235,35 @@ export const CLIENT_STATUS_LABELS: Record<ClientStatus, string> = {
 export const LEAD_STATUS: ClientStatus = 'prospect';
 export const CLIENT_ACTIVE_STATUS: ClientStatus = 'active';
 
+/**
+ * How loud a row is, in the only three volumes this register has.
+ *
+ * One vocabulary shared by priorities, alert severities and deadlines, so a
+ * red row means the same thing wherever it appears. `ui/components.ts` turns a
+ * tone into the class that paints it.
+ */
+export type RowTone = 'red' | 'amber' | 'neutral';
+
 export const PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
 export type Priority = (typeof PRIORITIES)[number];
 export const PRIORITY_LABELS: Record<Priority, string> = {
   low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent',
+};
+
+/**
+ * How loudly a priority is shown — on its badge and on the row behind it.
+ *
+ * Beside the label because it is the same kind of fact: what this priority
+ * looks like. It lived inside the cases module until 12 September 2026, when
+ * the practice asked for the tints on the dashboard and the alerts list too:
+ * *"i like the tints for cases, but also want them on the dashboard and for
+ * alerts too."*
+ *
+ * `neutral` rather than a missing entry, so a caller reads a tone for every
+ * priority and never has to know which ones are quiet.
+ */
+export const PRIORITY_TONES: Record<Priority, RowTone> = {
+  urgent: 'red', high: 'amber', normal: 'neutral', low: 'neutral',
 };
 
 export const TASK_STATUSES = ['open', 'in_progress', 'blocked', 'done', 'cancelled'] as const;

@@ -7,6 +7,29 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.67.0 — 12 September 2026
+
+### Changed
+**The tints are on the dashboard and the alerts list too.** *"i like the tints
+for cases, but also want them on the dashboard and for alerts too."*
+
+Red for something that has passed, amber for something pressing, nothing for
+the rest — the same on every list now.
+
+What was there before: each list had decided for itself, and all three had
+arrived at the red half only. So an alert that was *coming up* looked exactly
+like one that was months away, even though the coloured tag beside it on the
+same row already said otherwise.
+
+- **Alerts** — the row now matches its own tag. Overdue is red; pressing, which
+  is anything inside the next fortnight, is amber.
+- **Dashboard, Needs attention and Decisions due** — the same rule.
+- **Dashboard, Tasks** — late is red whatever the priority, because a low
+  priority task that is late is still late. Otherwise the row follows the
+  priority tag beside it.
+
+One place now decides what a colour means, so these cannot drift apart again.
+
 ## 1.66.0 — 12 September 2026
 
 ### Added

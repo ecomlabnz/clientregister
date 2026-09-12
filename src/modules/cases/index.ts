@@ -20,7 +20,7 @@ import { page, redirectWith, breadcrumbs } from '../../ui/layout';
 import { html, raw, type Raw } from '../../ui/html';
 import { limitFor, pageNumberFor, pageSizeFor, pager } from '../../ui/pager';
 import {
-  actionButton, badge, csrfField, emptyState, errorList, field, findBox, flagBand, flagRaiser, foldedCard, foldingCard, optionsFrom, pageHeader, select, stamp, statusTone, table, timelineItem, viewTabs,
+  actionButton, badge, csrfField, emptyState, errorList, field, findBox, flagBand, flagRaiser, foldedCard, foldingCard, optionsFrom, pageHeader, rowClass, select, stamp, statusTone, table, timelineItem, viewTabs,
   testDataBand,
 } from '../../ui/components';
 import { dateInputValue, dateShort, dateTime, isOverdue, relativeDays, truncate, dateOrDateTime, instantForDate } from '../../ui/format';
@@ -28,7 +28,7 @@ import {
   canTransition, CASE_STATUS_HELP, CASE_STATUS_LABELS, CASE_STATUSES, CASE_TRANSITIONS,
   DEADLINE_CASE_STATUSES, ENTRY_KIND_LABELS, type EntryKind,
   isAwaitingStatus, isOpenStatus, isPartyRole, OPEN_CASE_STATUSES, PARTY_ROLE_LABELS, PARTY_ROLES, PRIORITIES,
-  PRIORITY_LABELS, TASK_STATUS_LABELS, type CaseStatus,
+  PRIORITY_LABELS, PRIORITY_TONES, TASK_STATUS_LABELS, type CaseStatus, type Priority,
 } from '../../domain';
 import { clientOptions, isAssignable, userOptions } from '../../core/lookups';
 import { threadsFor } from '../../core/channels';
@@ -322,30 +322,6 @@ export function elapsedLine(
   return `${days} days (about ${months} month${months === 1 ? '' : 's'})`;
 }
 
-/**
- * What a priority looks like, said once.
- *
- * **Asked for on 12 September 2026:** *"high status should have yellowish
- * background as a general rule, urgent ones - reddish as they do."* The badge
- * already said amber for high and red for urgent; the row behind it tinted for
- * urgent only, so a high matter was called out in the badge and not in the row.
- * Two places deciding the same thing, and they disagreed.
- *
- * They now come from one map. A priority added to `PRIORITIES` with no entry
- * here gets the badge's amber and no row tint, which is the quiet default
- * rather than a crash.
- */
-const PRIORITY_TONES: Record<string, 'red' | 'amber'> = {
-  urgent: 'red',
-  high: 'amber',
-};
-
-/** The class that tints a row for its priority. `''` for anything ordinary. */
-const priorityRow = (priority: string | null | undefined): string => {
-  const tone = PRIORITY_TONES[priority ?? ''];
-  return tone === 'red' ? 'row-urgent' : tone === 'amber' ? 'row-high' : '';
-};
-
 export const casesModule: AppModule = {
   name: 'cases',
   title: 'Cases',
@@ -529,7 +505,7 @@ export const casesModule: AppModule = {
         ], shown.map((row) => {
           const overdue = isOverdue(row.decision_due_at) && isOpenStatus(row.status);
           return html`
-          <tr class="${priorityRow(row.priority)}">
+          <tr class="${rowClass(PRIORITY_TONES[row.priority as Priority])}">
             ${'' /* Whichever cell comes first carries the row on a phone,
                      where the other columns are dropped and their content is
                      folded in here as a sentence. With the Matter column off
@@ -538,7 +514,7 @@ export const casesModule: AppModule = {
             ${(() => {
               const priorityBadge = row.priority !== 'normal'
                 ? badge(PRIORITY_LABELS[row.priority as keyof typeof PRIORITY_LABELS],
-                        PRIORITY_TONES[row.priority] ?? 'amber')
+                        PRIORITY_TONES[row.priority as Priority])
                 : '';
               const onAPhone = html`
                 <div class="row-meta show-sm">

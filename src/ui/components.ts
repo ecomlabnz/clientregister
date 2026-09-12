@@ -2,6 +2,7 @@
 
 import { html, join, raw, type Raw } from './html';
 import { dateOrDateTime, isDateOnly } from './format';
+import type { RowTone } from '../domain';
 
 export function badge(text: string, tone: 'neutral' | 'green' | 'amber' | 'red' | 'blue' | 'grey' = 'neutral'): Raw {
   return html`<span class="badge badge-${raw(tone)}">${text}</span>`;
@@ -993,4 +994,23 @@ export function testDataBand(opts: {
           })
         : ''}
     </div>`;
+}
+
+/**
+ * The class that tints a table row for how pressing it is.
+ *
+ * **The single owner of that mapping.** Before this, each list decided
+ * separately: the cases list tinted for `urgent`, the alerts list for
+ * `overdue`, the dashboard for a date in the past — and in every one of them
+ * the *badge* beside the row already knew about an amber tier the row did not.
+ * The practice noticed the gap on the cases list first and then asked for the
+ * tints everywhere: *"i like the tints for cases, but also want them on the
+ * dashboard and for alerts too."*
+ *
+ * So the lists keep deciding *how pressing a thing is* — that genuinely
+ * differs, being a priority here, a severity there and a deadline elsewhere —
+ * and this decides what that looks like.
+ */
+export function rowClass(tone: RowTone | null | undefined): string {
+  return tone === 'red' ? 'row-urgent' : tone === 'amber' ? 'row-high' : '';
 }
