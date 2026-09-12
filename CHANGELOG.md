@@ -7,6 +7,55 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.72.2 — 12 September 2026
+
+### Removed
+**Three lines under a heading that only said the heading again.** Asked for one
+at a time on 12 September 2026, looking at each page:
+
+- Audit log — *"Every action taken in the register, by whom, and when."*
+- Export — *"Your records, as files you can open anywhere."*
+- Users — *"Everyone who can sign in."*
+
+The Activity view keeps its line, because there it names *whose* activity is
+being shown, which the heading does not.
+
+The other admin pages — Settings, Test data, Self-check — never had one.
+
+### Changed
+**Every box you type into is shorter.** Asked for looking at the employment
+history: *"these kind of rows are a bit too tall... they seem to take too much
+space, and the font would still easily fit in"*, then *"the height of any field
+should be reduced"*.
+
+The font is untouched. What came off is padding — the space around the text
+inside the box, and the space the table cell adds on top of it:
+
+| | Before | After |
+|---|---|---|
+| A row in a history table | 48.3px | **34.2px** |
+| Any single field | 37.8px | **29.7px** |
+| A dropdown | 34.0px | **28.0px** |
+| A field on a phone | 44.8px | **44.8px** |
+
+Measured in Chromium, before and after, rather than reasoned about.
+
+Two rules changed and no more, because every control in the register is drawn
+by the one declaration: `input, select, textarea` goes from `7px 10px` to
+`4px 9px` with `line-height` stated at 1.4, and `.edit-table td` from `5px 6px`
+to `2px 5px`. A table row was carrying its own padding and the field's on top.
+
+### Fixed
+**A field on a phone nearly shrank with them.** The phone rule overrides only
+what it names: it restated the padding but not the line-height, so it inherited
+the tightened one and a field measured 42px against the 44px a thumb needs.
+Caught by measuring the phone width in the same pass, before it shipped.
+
+The phone rule now states `line-height` for itself and a field there is exactly
+as tall as it was. `test/css.test.ts` pins the rule rather than the number:
+whatever the desk rule sets that changes a field's height, the phone rule must
+state for itself. Mutation-tested by removing it again.
+
 ## 1.72.1 — 12 September 2026
 
 ### Fixed

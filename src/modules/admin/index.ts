@@ -455,7 +455,7 @@ export const adminModule: AppModule = {
       const editing = c.req.query('edit') ?? '';
 
       return page(c, { title: 'Users', active: '/admin' }, html`
-        ${pageHeader('Users', 'Everyone who can sign in.')}
+        ${pageHeader('Users')}
         ${adminTabs('users')}
 
         ${/* Adding a user is rare; reading the list is not. The form waits
@@ -1072,11 +1072,14 @@ export const adminModule: AppModule = {
           Object.entries(over).map(([k, v]) => [k, String(v)])) }).toString();
 
       return page(c, { title: 'Audit log', active: '/admin' }, html`
+        ${'' /* No subtitle on the whole-register view. Asked for on 12 September 2026:
+                 it said "Every action taken in the register, by whom, and when", which the
+                 heading, the three columns underneath and the append-only notice already
+                 say between them. The one-person view keeps its line, because there it
+                 names *whose* activity this is, which the heading alone does not. */}
         ${pageHeader(
           subject ? `Activity — ${subject.name}` : 'Audit log',
-          subject
-            ? `Everything ${subject.email} has done, most recent first.`
-            : 'Every action taken in the register, by whom, and when.')}
+          subject ? `Everything ${subject.email} has done, most recent first.` : null)}
         ${adminTabs('audit')}
 
         ${'' /* Database triggers refuse every attempt to change or delete a row — from this

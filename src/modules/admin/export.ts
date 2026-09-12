@@ -257,7 +257,7 @@ export function registerExportRoutes(r: Hono<AppContext>): void {
     const counts = await countEach(c.env);
     const backup = await backupState(c.env);
     return page(c, { title: 'Export', active: '/admin' }, html`
-      ${pageHeader('Export', 'Your records, as files you can open anywhere.')}
+      ${pageHeader('Export')}
       ${adminTabs('export')}
 
       ${card('What you can take', html`
