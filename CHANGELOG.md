@@ -7,7 +7,6 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
-<<<<<<< HEAD
 ## 1.64.0 — 12 September 2026
 
 ### Added
@@ -90,7 +89,6 @@ can be set to 0 to ask for the code every time, and cannot be set above 90.
 box as well.
 
 **Nothing to do.** Nothing changed for anybody who does not tick it.
->>>>>>> 7bc13d7 (A machine can stand in for the code, for forty days and not a day more)
 
 ## 1.62.1 — 12 September 2026
 
@@ -117,7 +115,6 @@ The test written the day before to catch exactly this had passed, twice over: it
 *required* one of the invented statuses, and its check on types read the whole
 vocabulary file rather than the list of matter types, so a key from the wrong
 list looked right. Both now check against the register's own lists.
-=======
 ## 1.62.0 — 12 September 2026
 
 ### Removed

@@ -827,6 +827,43 @@ whoever wrote it, an hour after writing it.
 
 ---
 
+### 44. Conflict markers, committed, pushed, and green
+
+**What happened.** Cherry-picking the trusted-machine work conflicted in
+`CHANGELOG.md` — both sides had added a release at the top. The resolution was
+to reorder the two blocks so the newer version came first. That worked, and the
+three marker lines were carried along *with* the blocks instead of being
+deleted.
+
+It was committed, pushed, and it passed everything: 2,739 tests, the typecheck,
+`npm run spec`. It was found by a subagent opening the file for an unrelated
+reason, hours later.
+
+**Why nothing caught it.** The check made after resolving was `grep -n "^## 1\."
+CHANGELOG.md` — are the releases in the right order? They were. The same session
+had just checked `grep -c "<<<<<<<"` on two *other* conflicted files and got
+zero, and did not run it on the third.
+
+That is the fault worth naming, and it is not carelessness about one file. **A
+check that asks whether the outcome looks right cannot see debris beside it.**
+The headings were in order with the markers still there; the question had no
+way to fail.
+
+`CHANGELOG.md` is also the perfect place for this to hide: every release edits
+the same first few lines, so conflicts there are routine, and almost nothing
+reads it back. A marker in a `.ts` file fails the typecheck in seconds. One in
+prose can sit for months.
+
+**The rule.** **After resolving a conflict, ask the plain question — "are there
+markers left?" — of every file the conflict touched, not of the file you are
+looking at.** And it is now asked automatically:
+`test/noconflictmarkers.test.ts` walks everything `git ls-files` reports and
+fails with the file and line. It carries a second test proving the pattern can
+actually match, because a search that finds nothing and a search that cannot
+find anything read the same.
+
+---
+
 ---
 
 ## Working practices that caught things
