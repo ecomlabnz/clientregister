@@ -940,6 +940,67 @@ references and this change is already a merge of two agents' work — a file bei
 renumbered while being merged is how a reference gets quietly pointed at the
 wrong thing.
 
+### 33. The demonstration account has to be created by hand, and nothing checks it was created correctly
+
+**Found** 12 September 2026, building it.
+**Severity: medium, and OPEN by choice.**
+
+The mechanism shipped; the account did not. Real credentials never enter the
+repository, so the row is created by hand in the live trial database with
+`is_demo = 1`. Nothing in the register creates it, and nothing warns if it is
+created **without** the mark — an unmarked account with a published password is
+exactly the thing this change exists to prevent, and it would look completely
+ordinary.
+
+The database refuses the dangerous shapes once the mark is on (and refuses the
+mark on an owner or an administrator at all), so the failure mode is narrow: the
+mark simply missing.
+
+**What would fix it:** a line on Settings → Self-check that names any account
+whose password was published — which the register cannot know — or, more
+usefully, a short runbook entry in `docs/operations.md` giving the exact INSERT.
+Not written yet because the practice has not said which address or role the
+account should have.
+
+### 34. Nothing stops a second demonstration account, or a demonstration account in the practice's own register
+
+**Found** 12 September 2026, building it.
+**Severity: low, and OPEN by choice.**
+
+`is_demo` is a column on a row, so two rows can carry it, and nothing ties it to
+`APP_ENV` being a trial. Marking an account in the practice's own live register
+would be a bad idea and the database would allow it.
+
+Left open deliberately. A rule that said "only in a trial" would have to read
+`APP_ENV` from inside the database, which it cannot; a rule that said "only one"
+would be a unique index on a column that is 0 for everybody else, which SQLite
+cannot express without a partial index the migration would then have to carry
+for a case that has never occurred. The mark is set by hand by whoever holds the
+database, once.
+
+**What would fix it, if it ever matters:** `CREATE UNIQUE INDEX ... ON users
+(is_demo) WHERE is_demo = 1`, which is a partial unique index and is supported.
+One line, when there is a reason.
+
+### 35. A demonstration account cannot be signed out of a lost session, by anybody
+
+**Found** 12 September 2026, building it.
+**Severity: low, and OPEN.**
+
+The Devices tab draws nothing for a demonstration account — the sessions on a
+shared account belong to strangers, and listing them would show one visitor
+another's IP address and browser — and `POST /account/sessions/revoke` is
+refused for the same reason. The consequence is that nobody can end a session on
+that account except the person holding it, by signing out.
+
+That is the right trade today: the account holds only demonstration records, the
+password is published anyway, and a session ends by itself. It would stop being
+right if the demonstration were ever pointed at something real.
+
+**What would fix it:** the ability to end *every* session on the demonstration
+account, from Settings → People, as an administrator — one button, no list, so
+no address is shown to anybody. Not built because nobody has needed it.
+
 ## Asked for, not yet built
 
 Not faults — work the practice has asked for that has not landed.

@@ -25,6 +25,24 @@ interface UserRow extends User {
 const LOCKOUT_THRESHOLD = 5;
 const MAX_LOCKOUT_MINUTES = 30;
 
+/**
+ * The shared demonstration account is never locked out.
+ *
+ * Lockout exists to make guessing a password expensive. The demonstration
+ * account's password is **published**, so there is nothing to guess and
+ * nothing to protect — and the lock is then not a defence but a weapon: five
+ * wrong attempts by anybody on the internet, and every member of the public
+ * trying the demonstration is shut out for up to thirty minutes. Repeated,
+ * that closes it permanently, and the practice cannot even reopen it, because
+ * a demonstration account's password cannot be reset either (migration 0103).
+ *
+ * This exempts that one account and nobody else. Every other account still
+ * locks after five.
+ */
+function locksOut(row: Pick<UserRow, 'is_demo'>): boolean {
+  return row.is_demo !== 1;
+}
+
 export async function attachSession(c: Context<AppContext>, next: Next): Promise<void> {
   c.set('user', null);
   c.set('session', null);
@@ -37,7 +55,7 @@ export async function attachSession(c: Context<AppContext>, next: Next): Promise
     if (session) {
       const row = await one<User>(
         c.env.DB,
-        'SELECT id, email, name, role, status, totp_enabled, theme, colour_mode, font FROM users WHERE id = ?',
+        'SELECT id, email, name, role, status, totp_enabled, theme, colour_mode, font, is_demo FROM users WHERE id = ?',
         session.userId,
       );
       if (row && row.status === 'active') {
@@ -116,7 +134,7 @@ export type LoginResult =
 export async function authenticate(env: Env, email: string, password: string): Promise<LoginResult> {
   const row = await one<UserRow>(
     env.DB,
-    `SELECT id, email, name, role, status, totp_enabled, theme, colour_mode, font,
+    `SELECT id, email, name, role, status, totp_enabled, theme, colour_mode, font, is_demo,
             password_hash, failed_logins, locked_until, totp_secret
        FROM users WHERE email = ?`,
     email.trim().toLowerCase(),
@@ -128,13 +146,17 @@ export async function authenticate(env: Env, email: string, password: string): P
     return { ok: false, reason: 'invalid' };
   }
 
-  if (row.locked_until && new Date(row.locked_until) > new Date()) {
+  if (locksOut(row) && row.locked_until && new Date(row.locked_until) > new Date()) {
     const mins = Math.ceil((new Date(row.locked_until).getTime() - Date.now()) / 60000);
     return { ok: false, reason: 'locked', retryAfterMinutes: mins };
   }
 
   const valid = await verifyPassword(password, row.password_hash);
   if (!valid) {
+    // The password check above has already happened either way, so the
+    // demonstration account's sign-in takes the same work — and the same
+    // time — as anybody else's. What is skipped is only the counting.
+    if (!locksOut(row)) return { ok: false, reason: 'invalid' };
     const failed = row.failed_logins + 1;
     let lockedUntil: string | null = null;
     if (failed >= LOCKOUT_THRESHOLD) {
@@ -148,7 +170,11 @@ export async function authenticate(env: Env, email: string, password: string): P
 
   if (row.status !== 'active') return { ok: false, reason: 'suspended' };
 
-  if (passwordNeedsRehash(row.password_hash)) {
+  // Not for the demonstration account: the database refuses a change to its
+  // hash, so a rehash here would abort the sign-in of every visitor the day
+  // the hashing parameters are raised. Its stored hash is what it is, and it
+  // guards a password anybody can read.
+  if (row.is_demo !== 1 && passwordNeedsRehash(row.password_hash)) {
     const rehashed = await hashPassword(password);
     await run(env.DB, 'UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', rehashed, nowIso(), row.id);
   }
@@ -163,6 +189,7 @@ export async function authenticate(env: Env, email: string, password: string): P
     id: row.id, email: row.email, name: row.name,
     role: row.role, status: row.status, totp_enabled: row.totp_enabled,
     theme: row.theme, colour_mode: row.colour_mode, font: row.font,
+    is_demo: row.is_demo,
   };
   return { ok: true, user, needsTotp: row.totp_enabled === 1 && !!row.totp_secret };
 }
@@ -206,6 +233,12 @@ export function requireTwoFactorWhenPolicyDemands() {
   return async (c: Context<AppContext>, next: Next): Promise<Response | void> => {
     const user = c.get('user');
     if (!user || user.totp_enabled === 1) return next();
+    // The shared demonstration account cannot turn two-factor on — the
+    // database refuses it, because the code would end up on one visitor's
+    // phone. Without this line, switching the requirement on in a trial
+    // register would send every visitor to a page that tells them to do the
+    // one thing they are not allowed to do, for ever.
+    if (user.is_demo === 1) return next();
 
     const path = new URL(c.req.url).pathname;
     if (EXEMPT.some((p) => path === p || path.startsWith(`${p}/`))) return next();

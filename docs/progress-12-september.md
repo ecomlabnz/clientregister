@@ -972,3 +972,102 @@ when it says something the heading cannot.**
 
 The remaining admin pages — Settings, Test data, Self-check — never had one, so
 there was nothing to take off them. They were checked rather than assumed.
+
+
+## A demonstration account the public can sign in to (1.73.0)
+
+Asked for today: an account in the trial register that anybody may sign in to,
+with the password published, so the register can be shown to people who have
+not bought it.
+
+### What changed for the practice
+
+There is now a way to mark one account as the shared demonstration account, and
+once it is marked the register refuses to let it change the way it signs in. No
+new password on it, no moving it to somebody's own email address, no putting it
+on somebody's phone as a two-step login, no changing what it is allowed to do,
+no switching it off. It can never send email, it can never be an owner or an
+administrator, and it cannot make an upload token.
+
+It is also never locked out for wrong passwords, which is the one that reads
+backwards until you say it out loud: the password is *published*, so the lock
+is not protecting anything. All it could do is let one person shut the
+demonstration for half an hour at a time, over and over. Every other account
+still locks after five wrong tries — that did not change for anybody.
+
+**The account itself has not been created, and no password of any kind is in
+the repository.** That is waiting on the practice.
+
+### Why the refusals are in the database and not in the pages
+
+The five ways this breaks were read in the code before anything was built.
+Three of them are ordinary, correct features that only become dangerous when
+the password is shared: changing your own password, attaching your own
+authenticator, and being locked out after five wrong tries. The fourth is that
+the ten-day reset would not undo any of it — the reset clears the caseload
+tables and leaves `users` alone, as it must, or it would delete the trial's own
+administrator. So a stranger's password change would be permanent, not "until
+Thursday".
+
+Twelve statements in this application update the `users` table today, spread
+over three files. Putting the rule in the pages would mean remembering it in
+each of them, and in the next one. It is eight
+triggers in migration 0103 instead, and the pages carry the *sentence* rather
+than the rule, so that a refusal reads as an explanation rather than as an error
+page.
+
+One decision worth keeping: **deleting the account is allowed.** Everything else
+is refused, so the temptation was to refuse that too. But an administrator has
+to be able to withdraw the demonstration without a migration, and a delete is
+not the fault being guarded against — the fault is one visitor quietly taking a
+shared account away from everybody else, and a delete takes it away from
+everybody equally, us included. What *is* refused is suspending it, which looks
+harmless, can be done from Settings → People in two clicks, and locks the public
+out while leaving the row on screen looking perfectly fine.
+
+### Something found while building it, that nobody asked about
+
+On a shared account, the Devices tab was a list of **other visitors'** IP
+addresses and browsers. It is the right screen for an account that belongs to
+one person and the wrong one for an account that belongs to everybody. It is
+not drawn for the demonstration account now, and "sign out everywhere else" is
+refused there, because on that account those sessions are strangers'. Nobody
+trying a demonstration expects to be shown to the next person who tries it.
+
+### What was got wrong, and the rules that came out of it
+
+**The mutation test proved nothing on its first attempt.** Each of the eight
+triggers is supposed to be dropped, the bad write shown to land, the trigger put
+back, and the write shown to be refused again. The first version put the trigger
+back on a *fresh* database — which is not a restoration, it is a second database
+that happened to have the trigger all along. It failed loudly ("trigger already
+exists") rather than passing quietly, which was luck. **Rule: a mutation test
+drops and restores on the same database, or it is comparing two databases
+instead of removing one guard.**
+
+**A comment broke a test, and the test was right.** `test/shortcut.test.ts`
+checks that exactly one file in the register consults an upload token, by
+reading the source. A new comment in the account module that merely *named*
+`verifyUploadToken` made it a second file. The first instinct was to relax the
+test. **Rule: a test that reads source cannot tell prose from code, and that is
+its job, not its fault — reword the comment.**
+
+**One of the five premises this was built on was wrong.** The brief said
+`mail:send` is held by `adviser` and `assistant`. `assistant` does not have it;
+`owner`, `admin` and `adviser` do — three of the five roles, not two. It does
+not change what was built, since the whole point is that the account is refused
+the permission whatever role it holds, but a comment stating the wrong count had
+to be corrected. **Rule: check the table, do not repeat the sentence about the
+table.**
+
+### What is waiting on the practice
+
+1. **Say the word and the account gets created.** We need two things: the email
+   address it should sign in with, and which role it should have. `assistant` is
+   the quiet default — it can work the register and cannot quote or delete.
+   `adviser` shows more of what the register does. Either is safe: neither can
+   send email, because that is refused separately.
+2. **Three things are written down as open rather than fixed** (issues 33-35 in
+   `docs/issues.md`): nothing warns if the account is created *without* the
+   mark, nothing stops a second one, and nobody can end a stray session on it.
+   Each says what would fix it. None is urgent and none is hidden.

@@ -98,6 +98,13 @@ export interface User {
   colour_mode: string;
   /** The reader's chosen typeface. See `ui/theme.ts`. */
   font: string;
+  /**
+   * 1 for the shared demonstration account whose password is published.
+   *
+   * Its sign-in cannot be changed — migration 0103 refuses that in the
+   * database — and `can()` never gives it `mail:send`, whatever role it holds.
+   */
+  is_demo: number;
 }
 
 export interface SessionData {

@@ -220,12 +220,12 @@ export async function verifyUploadToken(env: Env, presented: string): Promise<Up
     ? await one<{
         id: string; user_id: string; secret_hash: string; label: string; revoked_at: string | null;
         user_name: string | null; user_email: string | null; user_status: string | null;
-        user_role: string | null;
+        user_role: string | null; user_is_demo: number | null;
       }>(
         env.DB,
         `SELECT t.id, t.user_id, t.secret_hash, t.label, t.revoked_at,
                 u.name AS user_name, u.email AS user_email, u.status AS user_status,
-                u.role AS user_role
+                u.role AS user_role, u.is_demo AS user_is_demo
            FROM upload_tokens t JOIN users u ON u.id = t.user_id
           WHERE t.selector = ?`,
         parts.selector)
@@ -253,9 +253,16 @@ export async function verifyUploadToken(env: Env, presented: string): Promise<Up
    * made. A demotion stops the token at the next request, with nothing to
    * revoke and nobody to remember to do it — which is the difference between a
    * rule and an intention. Found in review, 12 September 2026.
+   *
+   * `is_demo` is here for the same reason. The shared demonstration account is
+   * refused a token at the point of minting, and refused again here, so a
+   * token made before the account was marked stops at the next request rather
+   * than living on as a write credential anybody may hold.
    */
   const role: string = row.user_role ?? '';
-  if (!isRole(role) || !can({ role: role as Role, status: 'active' }, 'ingest:triage')) {
+  if (row.user_is_demo === 1) return { ok: false };
+  if (!isRole(role)
+      || !can({ role: role as Role, status: 'active', is_demo: row.user_is_demo ?? 0 }, 'ingest:triage')) {
     return { ok: false };
   }
 

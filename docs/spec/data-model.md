@@ -1028,6 +1028,7 @@ later replaced still sits in the file that created it.
 | `theme` | TEXT | no | `'slate'` |
 | `colour_mode` | TEXT | no | `'system'` |
 | `font` | TEXT | no | `'system'` |
+| `is_demo` | INTEGER | no | `0` |
 
 ## `vocabulary_defaults`
 

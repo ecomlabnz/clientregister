@@ -54,6 +54,27 @@ import {
 
 const RECOVERY_CODE_COUNT = 8;
 
+/**
+ * What the shared demonstration account is told when it tries to change its
+ * own sign-in, and when it tries to make an upload token.
+ *
+ * Neither sentence *creates* the rule. The sign-in is refused by migration
+ * 0103, in the database, and a token that somehow exists is refused where a
+ * token is checked, in `core/uploadtokens.ts`. These exist because a refusal
+ * that reaches a person as a 500 is not an answer — issue 30 in
+ * `docs/issues.md` — and because somebody trying a demonstration deserves to
+ * know why rather than to think the register is broken.
+ */
+const DEMO_FIXED =
+  'This is the shared demonstration account. Its password is published and everybody trying the '
+  + 'register out signs in with it, so the password, the email address and two-factor '
+  + 'authentication cannot be changed here — a change would lock everybody else out.';
+
+const DEMO_NO_TOKEN =
+  'This is the shared demonstration account, so it cannot make an upload token. A token puts '
+  + 'files into the practice\'s inbox without signing in, and one made here would be one anybody '
+  + 'could use.';
+
 async function userCount(env: Env): Promise<number> {
   return count(env.DB, 'SELECT COUNT(*) AS n FROM users');
 }
@@ -663,7 +684,27 @@ export const authModule: AppModule = {
        * has a token on a laptop, and the screen where they cancel it must not
        * disappear with the permission. What goes is the form that makes one.
        */
-      const canSendFilesIn = can(user, 'ingest:triage');
+      /*
+       * The shared demonstration account, whose password is published.
+       *
+       * Everything it changes, it changes for every other visitor at the same
+       * time, which turns three ordinary parts of this page into ways for one
+       * person to take a public account away from everybody else — and a
+       * fourth into a privacy leak. So:
+       *
+       *  - **Password and two-factor** are not drawn at all, and their forms
+       *    are refused below. The database refuses them too (migration 0103);
+       *    this is so a person reads a sentence instead of an error page.
+       *  - **Upload tokens** are not offered. A token is a write credential
+       *    that puts files into the practice's inbox without signing in, it
+       *    survives the ten-day reset, and a public account minting one is
+       *    handing that out to whoever asks.
+       *  - **The list of sessions** is not drawn, because on a shared account
+       *    it is a list of *other people's* IP addresses and devices. Nobody
+       *    trying a demonstration expects to be shown to the next visitor.
+       */
+      const isDemo = user.is_demo === 1;
+      const canSendFilesIn = can(user, 'ingest:triage') && !isDemo;
       const tab = c.req.query('tab') ?? 'security';
       const tabs = [
         { id: 'security', label: 'Security' },
@@ -729,7 +770,13 @@ export const authModule: AppModule = {
               </div>
             </form>`))}` : ''}
 
-        ${tab === 'security' ? html`
+        ${tab === 'security' && isDemo ? card('Signing in', html`
+          <p>This is the shared demonstration account. Its password is published, so everybody
+             who is trying the register out is signed in as this same account.</p>
+          <p>That is why there is nothing to change here: a new password, a new email address
+             or an authenticator app would lock out everybody else.</p>`) : ''}
+
+        ${tab === 'security' && !isDemo ? html`
         ${card('Two-factor authentication', user.totp_enabled
           ? html`<p>Two-factor authentication is <strong>on</strong>.</p>
                  <form method="post" action="/account/2fa/disable">
@@ -750,7 +797,13 @@ export const authModule: AppModule = {
             <button class="btn btn-primary" type="submit">Change password</button>
           </form>`)}` : ''}
 
-        ${tab === 'sessions' ? html`
+        ${tab === 'sessions' && isDemo ? card('Who is signed in', html`
+          <p>This is the shared demonstration account, so the people signed in to it right now
+             are strangers to each other. Their addresses and devices are not shown here, and
+             yours is not shown to them.</p>
+          <p>Close the tab or sign out when you have finished looking.</p>`) : ''}
+
+        ${tab === 'sessions' && !isDemo ? html`
         ${card('Active sessions', html`
           ${table(['Started', 'Last seen', 'IP', 'Device', ''], sessions.map((s) => html`
             <tr>
@@ -832,6 +885,13 @@ export const authModule: AppModule = {
              into the register.</strong></p>
           <p><a class="btn btn-primary" href="/account/shortcut">How to build the shortcut,
              step by step</a></p>`
+          : isDemo
+          ? html`
+          <p>An upload token lets a device put files into the practice's inbox without signing
+             in, and it keeps working until somebody revokes it. This is the shared
+             demonstration account, so a token made here would be one anybody could use.</p>
+          <p class="hint">Everything else about sending files in works the same way on a
+             register of your own.</p>`
           : html`
           <p>Sending files in puts them in the practice's inbox, so it belongs to the people
              who work the inbox. Your role does not, so you cannot make an upload token.</p>
@@ -855,7 +915,9 @@ export const authModule: AppModule = {
                            </form>`}
                   </td>
                 </tr>`))
-            : html`<p class="muted">No upload token yet. Make one to build your first shortcut.</p>`}
+            : isDemo
+              ? html`<p class="muted">This account has no upload tokens, and cannot make one.</p>`
+              : html`<p class="muted">No upload token yet. Make one to build your first shortcut.</p>`}
 
           ${canSendFilesIn ? html`
           <form method="post" action="/account/upload-tokens" class="mt">
@@ -1037,6 +1099,9 @@ export const authModule: AppModule = {
     r.post('/account/password', async (c) => {
       const user = c.get('user')!;
       const session = c.get('session')!;
+      // The database refuses this too (migration 0103). This line is so the
+      // refusal reaches a person as a sentence rather than as an error page.
+      if (user.is_demo === 1) return redirectWith(c, '/account', DEMO_FIXED, 'err');
       const f = new FormReader(await c.req.formData());
       const current = f.text('current_password', { required: true, label: 'Current password', max: 256 });
       const next = f.text('new_password', { required: true, label: 'New password', max: 256 });
@@ -1074,6 +1139,9 @@ export const authModule: AppModule = {
     r.get('/account/2fa', async (c) => {
       const user = c.get('user')!;
       const session = c.get('session')!;
+      // The database refuses this too (migration 0103). This line is so the
+      // refusal reaches a person as a sentence rather than as an error page.
+      if (user.is_demo === 1) return redirectWith(c, '/account', DEMO_FIXED, 'err');
       if (user.totp_enabled) return c.redirect('/account', 302);
 
       // Hold the pending secret in KV against the session, not in a hidden
@@ -1100,6 +1168,9 @@ export const authModule: AppModule = {
     r.post('/account/2fa/enable', async (c) => {
       const user = c.get('user')!;
       const session = c.get('session')!;
+      // The database refuses this too (migration 0103). This line is so the
+      // refusal reaches a person as a sentence rather than as an error page.
+      if (user.is_demo === 1) return redirectWith(c, '/account', DEMO_FIXED, 'err');
       const secret = await c.env.SESSIONS.get(`totp-setup:${session.sid}`);
       if (!secret) return redirectWith(c, '/account/2fa', 'Setup timed out — start again.', 'err');
 
@@ -1138,6 +1209,9 @@ export const authModule: AppModule = {
 
     r.post('/account/2fa/disable', async (c) => {
       const user = c.get('user')!;
+      // The database refuses this too (migration 0103). This line is so the
+      // refusal reaches a person as a sentence rather than as an error page.
+      if (user.is_demo === 1) return redirectWith(c, '/account', DEMO_FIXED, 'err');
       const f = new FormReader(await c.req.formData());
       const password = f.text('password', { required: true, label: 'Password', max: 256 });
       const row = await one<{ password_hash: string }>(c.env.DB, 'SELECT password_hash FROM users WHERE id = ?', user.id);
@@ -1171,6 +1245,7 @@ export const authModule: AppModule = {
      */
     r.post('/account/upload-tokens', requirePermission('ingest:triage'), async (c) => {
       const user = c.get('user')!;
+      if (user.is_demo === 1) return redirectWith(c, '/account?tab=shortcut', DEMO_NO_TOKEN, 'err');
       const f = new FormReader(await c.req.formData());
       const label = f.text('label', { required: true, label: 'What it is for', max: 80 });
 
@@ -1232,6 +1307,9 @@ export const authModule: AppModule = {
      */
     r.get('/account/shortcut', requirePermission('ingest:triage'), async (c) => {
       const user = c.get('user')!;
+      // Every step on this page ends in making a token, which this account
+      // cannot do. Sending them down it would be a dead end.
+      if (user.is_demo === 1) return redirectWith(c, '/account?tab=shortcut', DEMO_NO_TOKEN, 'err');
       const base = (await publicBase(c.env, new URL(c.req.url).origin)).base;
       const url = `${base}${SHORTCUT_PATH}`;
       const live = (await uploadTokensFor(c.env, user.id)).filter((t) => !t.revoked_at).length;
@@ -1351,6 +1429,15 @@ export const authModule: AppModule = {
     r.post('/account/sessions/revoke', async (c) => {
       const user = c.get('user')!;
       const session = c.get('session')!;
+      // Nothing in the database stops this one — signing a session out is not
+      // a change to the account. It is refused here because on a shared
+      // account the sessions belong to other people: "sign out everywhere
+      // else" would throw every other visitor out mid-sentence.
+      if (user.is_demo === 1) {
+        return redirectWith(c, '/account?tab=sessions',
+          'This is the shared demonstration account, so the other people signed in to it are '
+          + 'not yours to sign out. Use Sign out to end your own.', 'err');
+      }
       const f = new FormReader(await c.req.formData());
       const sid = f.text('sid', { required: true, label: 'Session', max: 100 });
 
