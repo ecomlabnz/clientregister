@@ -56,7 +56,7 @@ function harness() {
   client('cl_noemail', 'CL-9006', 'individual', 'NOBODY WITH AN ADDRESS', null);
 
   x(`INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to, created_at, updated_at)
-     VALUES ('k1','M-9001','cl_client','A matter','partner_resident','open',?,?,?)`, USER.id, AT, AT);
+     VALUES ('k1','M-9001','cl_client','A matter','rv_partnership','open',?,?,?)`, USER.id, AT, AT);
   // The matter's own parties. The principal applicant row is written by the
   // migration that created the table, so only the partner is added here.
   x(`INSERT INTO case_parties (id, case_id, client_id, role, created_at)

@@ -27,7 +27,7 @@ import { quotesModule } from '../src/modules/quotes';
 const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
 const AT = '2026-09-09T00:00:00Z';
 const USER = fakeUser();
-const VOCAB = 'rv_partner | RV. Partner\nwv_aewv | WV. AEWV';
+const VOCAB = 'rv_partnership | RV. Partner\nwv_aewv | WV. AEWV';
 
 function schema() {
   const db = new DatabaseSync(':memory:');
@@ -111,7 +111,7 @@ describe('2. a quotation belongs to one client', () => {
              VALUES ('mine','CL-1','individual','The Client','active','${AT}','${AT}'),
                     ('other','CL-2','individual','Somebody Else','active','${AT}','${AT}');
              INSERT INTO cases (id,ref,client_id,title,case_type,status,assigned_to,created_at,updated_at)
-             VALUES ('k1','CASE-1','mine','A matter','rv_partner','engaged','u1','${AT}','${AT}');
+             VALUES ('k1','CASE-1','mine','A matter','rv_partnership','engaged','u1','${AT}','${AT}');
              INSERT INTO quotes (id,ref,client_id,case_id,description,amount_cents,gst_cents,
                                  disbursements_cents,currency,status,created_at,updated_at)
              VALUES ('q1','Q-1','mine','k1','A quote',0,0,0,'NZD','draft','${AT}','${AT}')`);
@@ -132,7 +132,7 @@ describe('2. a quotation belongs to one client', () => {
   it('refuses attaching a matter whose client is somebody else', () => {
     const db = schema(); seed(db);
     db.exec(`INSERT INTO cases (id,ref,client_id,title,case_type,status,assigned_to,created_at,updated_at)
-             VALUES ('k2','CASE-2','other','Another','rv_partner','engaged','u1','${AT}','${AT}')`);
+             VALUES ('k2','CASE-2','other','Another','rv_partnership','engaged','u1','${AT}','${AT}')`);
     expect(refuses(db, `UPDATE quotes SET case_id = 'k2' WHERE id = 'q1'`))
       .toMatch(/that matter's client/);
   });
@@ -171,13 +171,13 @@ describe('3. the letter sees every kind of work on the quotation', () => {
              INSERT INTO clients (id,ref,kind,full_name,status,created_at,updated_at)
              VALUES ('c1','CL-1','individual','A','active','${AT}','${AT}');
              INSERT INTO cases (id,ref,client_id,title,case_type,status,assigned_to,created_at,updated_at)
-             VALUES ('k1','CASE-1','c1','A matter','rv_partner','engaged','u1','${AT}','${AT}');
+             VALUES ('k1','CASE-1','c1','A matter','rv_partnership','engaged','u1','${AT}','${AT}');
              INSERT INTO quotes (id,ref,client_id,case_id,description,amount_cents,gst_cents,
                                  disbursements_cents,currency,status,created_at,updated_at)
              VALUES ('q1','Q-1','c1','k1','A quote',0,0,0,'NZD','draft','${AT}','${AT}')`);
     db.exec(readFileSync(`migrations/${files.find((f) => f.startsWith('0075'))!}`, 'utf8'));
     expect(((db.prepare(`SELECT case_type FROM quotes WHERE id='q1'`) as any).get()).case_type)
-      .toBe('rv_partner');
+      .toBe('rv_partnership');
   });
 
   it('takes the union of all three sources, not one instead of the others', async () => {
@@ -194,7 +194,7 @@ describe('3. the letter sees every kind of work on the quotation', () => {
                VALUES ('c1','CL-1','individual','A Client','active','${AT}','${AT}');
                INSERT INTO quotes (id,ref,client_id,description,case_type,amount_cents,gst_cents,
                                    disbursements_cents,currency,status,with_letter,created_at,updated_at)
-               VALUES ('q1','Q-1','c1','A quote','rv_partner',0,0,0,'NZD','draft',1,'${AT}','${AT}');
+               VALUES ('q1','Q-1','c1','A quote','rv_partnership',0,0,0,'NZD','draft',1,'${AT}','${AT}');
                INSERT INTO quote_items (id,quote_id,position,case_type,description,kind,unit_label,
                                         quantity_milli,unit_amount_cents,net_cents,gst_cents,
                                         gross_cents,created_at,updated_at)
@@ -202,7 +202,7 @@ describe('3. the letter sees every kind of work on the quotation', () => {
                        '${AT}','${AT}');
                INSERT INTO engagement_clauses (id,position,heading,body,case_types,active,
                                                created_at,updated_at)
-               VALUES ('cl_p',1,'Partnership clause','About partnerships.','rv_partner',1,'${AT}','${AT}'),
+               VALUES ('cl_p',1,'Partnership clause','About partnerships.','rv_partnership',1,'${AT}','${AT}'),
                       ('cl_w',2,'Work clause','About work visas.','wv_aewv',1,'${AT}','${AT}'),
                       ('cl_x',3,'Unrelated clause','Not this work.','sv_student',1,'${AT}','${AT}')`);
     const body = await (await h.request('/quotes/q1/letter')).text();

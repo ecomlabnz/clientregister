@@ -585,7 +585,7 @@ two-factor switched on, and your own register already sends email. If you want
 to see it: sign in, and at the code page press the new line instead of typing the
 app's code.
 
-## 12 September, later still: military service, and what the form asks of a job (1.66.0)
+## 12 September, later still: military service, and what the form asks of a job (1.71.0)
 
 ### What you asked for
 
@@ -663,3 +663,116 @@ answers them, which is the right state — the register does not guess at a
 character question. The try-it caseload has two files carrying an answer, one who
 served and one who was exempt, so you can see both shapes of the block without
 touching a real file.
+
+---
+
+## 14. A value now has to be on your list (1.72.0)
+
+### What happened, in order
+
+You spotted two raw codes on a page and asked about them. Reading the whole
+register against its own lists then found **35 client files** holding the *words*
+of a visa where every other file holds the short code — `Work Visa - Accredited
+Employer Work Visa` instead of `wv_aewv`. Twelve more held the words of an
+English test. They came in with the bulk load on 1 September.
+
+Nothing looked wrong. That is the part worth sitting with. The client page showed
+the words, correctly. But the dropdown on the edit form only offers the short
+codes, so for those 35 files the box showed **blank** — and saving the record
+would have written that blank back and wiped the visa type, without a word.
+
+Then the thing that turned a data problem into a design problem: **nothing
+anywhere was checking.** Not the client form, not the intake assistant, not the
+document reader, not a bulk load, not the database console. The dropdown offered
+the right answers, and that had been mistaken for a rule for as long as the
+register has existed.
+
+Your own words on it were the brief: *"any bulk data MUST be checked before it
+is populated. Right? one of the selling points is that we can extract data from
+the practices files and prepopulate the app very quickly bringing the practice up
+to speed."*
+
+### What was built
+
+The check now lives in the database — the one place every way of writing goes
+through. Sixteen fields are covered: the visa a client holds, their English test,
+title, gender and relationship status; the kind of a matter, of a quotation, of a
+line on a quotation; the kind of a warning, of a file note, of a document
+heading; what a period of work history was; an education level and whether the
+course was finished; and why and how a trip was made.
+
+Four decisions inside it that you would want to have made yourself:
+
+**Your lists stay yours.** The check reads *your* lists, from Settings → Lists
+and dropdowns. Add a visa type there and it can be stored a second later, with
+nothing deployed. That has been proved by attacking the database directly, not
+by reasoning about it.
+
+**Taking a word off a list does not lock the files already using it.** The check
+only applies when the value is being *changed*. A file recorded last year under a
+type you have since retired opens, edits and saves exactly as before. This was
+the whole reason an earlier decision had said the database could not do this job
+at all — and it turns out to be answered by four words in the right place.
+
+**Blank is always allowed**, including a box filled with spaces. "Not recorded"
+is a real answer everywhere in this register.
+
+**The 35 files are untouched.** This release adds a rule; it does not rewrite
+anybody's file. What `Work Visa - Accredited Employer Work Visa` should have been
+is a judgement about a client's file, and it is yours, not the register's.
+
+### The new page: Settings → Self-check
+
+The import dry-run you asked for — *"load, look at the report, fix, before anyone
+relies on it."*
+
+It reads everything the register holds against the list it should have come from
+and shows what does not match: which field, what value, how many records. It only
+reports. There is no button on it, on purpose.
+
+On your register today it will show those two rows. On a clean load it shows
+nothing, and that emptiness is the point: it is how you prove a load went in
+cleanly before anybody starts working from it.
+
+### What was got wrong, and the rules that came out of it
+
+**A dropdown offering the right answers is not a check.** That is the whole
+lesson and it took 35 records to learn. A guarantee that lives in a form is a
+guarantee about that form; everything else — an import, the assistant, the
+console — writes straight past it. Written down as fault 46.
+
+**Three copies of one pattern agreeing with each other is not a check either.**
+The specification document promises to quote every refusal the database makes,
+and a test holds it to that. Both read the refusals with the same pattern, copied
+— and the pattern could not match the new refusals, which name the offending
+value. All 32 would have been left out in silence, with the document still
+claiming to be complete. The pattern now lives in one file that all three read.
+Fault 46.
+
+**A rehearsal belongs on this machine, not in the cloud.** Rehearsing the change
+was done first against a scratch database created in the Cloudflare account —
+which you noticed as an unexplained permission prompt, which is a bad way to find
+out. It was wrong: it costs money, it sits beside your live register, and it
+leaves debris. The repository already had the local way of doing it. The
+rehearsal is now part of the test suite and runs on every build.
+
+**Ten invented codes were found in the register's own test fixtures.** The new
+rule found them the moment it was switched on: `rv_partner` where the list says
+`rv_partnership`, a residence *visa* code being used as a *matter* type, and
+eight more. None of them was in your register. It is the same fault as the one
+found in the practice caseload last week, in a place nobody had looked.
+
+### What is waiting on you
+
+**Two rows on Settings → Self-check.** The 35 visa types and the 12 English
+tests. Each needs a decision: either the words are what you want and the term
+goes on the list, or the record should carry the short code and the records need
+correcting. Correcting them is a migration and a rehearsal, and it needs your
+answer first — `Work Visa - Accredited Employer Work Visa` is *probably*
+`wv_aewv`, and probably is not good enough for 35 client files.
+
+**One small thing worth a yes or no.** When a stored value is not on its list the
+edit form's dropdown still shows blank. It can no longer erase anything, but an
+empty-looking box invites a guess. Making it show the value, marked as not on the
+list, is one change that would fix every dropdown in the register at once. It was
+not built because nobody asked for it. Say the word.

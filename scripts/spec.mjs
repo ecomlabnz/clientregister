@@ -21,6 +21,7 @@
  */
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createServer } from 'vite';
+import { refusalsIn } from './spec-refusals.mjs';
 
 const { DatabaseSync } = process.getBuiltinModule('node:sqlite');
 
@@ -45,13 +46,7 @@ const tables = q(`SELECT name FROM sqlite_master WHERE type='table'
   .map((r) => r.name);
 
 const refusals = q(`SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger'`)
-  .flatMap((r) => {
-    const when = /(?:BEFORE|AFTER)\s+(\w+)(?:\s+OF\s+[\w,\s]+)?\s+ON/i.exec(r.sql)?.[1] ?? '?';
-    // Every RAISE, not the first: a trigger is a list of refusals, and the
-    // list is the point.
-    return [...r.sql.matchAll(/RAISE\(ABORT,\s*'((?:[^']|'')*)'\)/g)]
-      .map((m) => ({ table: r.tbl_name, when: when.toLowerCase(), text: m[1].replace(/''/g, "'") }));
-  });
+  .flatMap((r) => refusalsIn(r.sql).map((x) => ({ table: r.tbl_name, ...x })));
 
 const uniques = q(`SELECT tbl_name, sql FROM sqlite_master
                     WHERE type='index' AND sql LIKE '%UNIQUE%' ORDER BY tbl_name`)

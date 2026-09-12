@@ -312,7 +312,7 @@ describe('the client summary is one grouped card', () => {
 describe('an English test says how long it is accepted for', () => {
   const withTest = async (taken: string) => {
     const h = mount();
-    h.db.prepare(`UPDATE clients SET english_test_type='ielts_general', english_test_score='6.5',
+    h.db.prepare(`UPDATE clients SET english_test_type='ielts', english_test_score='6.5',
                                      english_test_date=? WHERE id='cl1'`).run(taken);
     return page(h);
   };

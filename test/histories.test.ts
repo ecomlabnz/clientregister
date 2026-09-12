@@ -433,14 +433,36 @@ describe('the three new lists are an administrator’s', () => {
     expect(keys).toContain('vocab.travel_modes');
   });
 
-  it('so the database accepts a word that is not on today’s list', () => {
-    // The proof that these are configuration rather than schema: an
-    // administrator adds "Medical treatment" to the reasons for a trip and it
-    // stores, with no migration. A CHECK listing today's words would need one.
+  /**
+   * **Rewritten on 12 September 2026, with migration 0101.**
+   *
+   * This used to read *"so the database accepts a word that is not on today's
+   * list"*, and it proved the right thing the wrong way: that these lists are
+   * configuration rather than schema, demonstrated by the database accepting
+   * anything at all. That was also the hole 35 client records fell through.
+   *
+   * The rule has not changed — an administrator still adds a word without a
+   * migration — but the proof has. The word has to be **on their list**, and
+   * putting it there is the thing that needs no deployment.
+   */
+  it('so an administrator adds a word to the list and it stores, with no migration', () => {
     const h = mount();
+    const add = (key: string, terms: string) => h.db.prepare(
+      `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)`).run(key, terms, AT);
+
+    // Before: not on the list, so the database will not take it.
+    expect(() => h.db.prepare(
+      `INSERT INTO client_travel (id, client_id, purpose, created_at, updated_at)
+       VALUES ('t8','cl1','medical_treatment',?,?)`).run(AT, AT))
+      .toThrow(/not on the practice's list/);
+
+    add('vocab.travel_purposes', 'family | Family\nmedical_treatment | Medical treatment');
+    add('vocab.education_outcomes', 'completed | Completed\nabandoned | Abandoned');
+
+    // After: it stores, and nothing was deployed to make that true.
     h.db.prepare(
       `INSERT INTO client_travel (id, client_id, purpose, mode, created_at, updated_at)
-       VALUES ('t9','cl1','medical_treatment','ferry',?,?)`).run(AT, AT);
+       VALUES ('t9','cl1','medical_treatment','sea',?,?)`).run(AT, AT);
     h.db.prepare(
       `INSERT INTO client_education (id, client_id, completed, created_at, updated_at)
        VALUES ('e9','cl1','abandoned',?,?)`).run(AT, AT);
@@ -449,8 +471,14 @@ describe('the three new lists are an administrator’s', () => {
   });
 
   it('but still refuses a paragraph in place of a word', () => {
-    // The one rule they do carry, and it is the database's.
+    // 0090's rule, and it is now the *second* thing that would refuse this: a
+    // sixty-one character value is off every list as well as too long, and
+    // `parseVocabulary` will not make a key longer than sixty, so it can never
+    // be put on one. To prove the length rule is still there rather than the
+    // list rule standing in for it, the list is taken away first — which is
+    // exactly the state in which 0101's guard stands aside.
     const h = mount();
+    h.db.exec(`DELETE FROM vocabulary_defaults WHERE setting_key = 'vocab.travel_modes'`);
     expect(() => h.db.prepare(
       `INSERT INTO client_travel (id, client_id, mode, created_at, updated_at)
        VALUES ('t8','cl1',?,?,?)`).run('x'.repeat(61), AT, AT))

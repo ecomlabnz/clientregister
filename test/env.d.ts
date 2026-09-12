@@ -24,6 +24,8 @@ declare module 'node:fs' {
 interface SqliteStatement {
   run(...params: unknown[]): unknown;
   all(...params: unknown[]): unknown[];
+  /** One row, or `undefined`. Used where a check asks the database a question. */
+  get(...params: unknown[]): unknown;
 }
 interface SqliteDatabase {
   exec(sql: string): void;

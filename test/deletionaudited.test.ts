@@ -28,7 +28,7 @@ function register() {
     .run(at, at);
   db.prepare(`INSERT INTO cases (id, ref, client_id, title, case_type, status, assigned_to,
                                  created_at, updated_at, created_by)
-              VALUES ('k1', 'CASE-26-901', 'c1', 'A resident visa', 'rv_resident', 'open', 'u1', ?, ?, 'u1')`)
+              VALUES ('k1', 'CASE-26-901', 'c1', 'A resident visa', 'rv_general', 'open', 'u1', ?, ?, 'u1')`)
     .run(at, at);
   return db;
 }

@@ -185,7 +185,7 @@ const CASES: Case[] = [
     name: 'a case cannot be created without an owner',
     fk: false,
     attack: (d) => exec(d, `INSERT INTO cases (id, ref, client_id, title, case_type, status, created_at, updated_at)
-                            VALUES ('C','C','CL','t','visa','lead','${AT}','${AT}')`),
+                            VALUES ('C','C','CL','t','wv_aewv','lead','${AT}','${AT}')`),
     aborts: /assigned to somebody/,
   },
 ];

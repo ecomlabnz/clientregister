@@ -125,7 +125,7 @@ describe('what a client may be pointed at', () => {
     db.prepare(`INSERT INTO users (id,email,name,password_hash,role,status,created_at,updated_at)
                 VALUES ('u1','a@example.test','A User','x','admin','active',?,?)`).run(AT, AT);
     db.prepare(`INSERT INTO cases (id,ref,client_id,title,case_type,status,assigned_to,created_at,updated_at)
-                VALUES ('k1','CASE-26-001','cl1','A matter','other_other','open','u1',?,?)`).run(AT, AT);
+                VALUES ('k1','CASE-26-001','cl1','A matter','ot_other','open','u1',?,?)`).run(AT, AT);
     const doc = (id: string, entity: string, entityId: string, name: string) =>
       db.prepare(`INSERT INTO documents (id,entity_type,entity_id,r2_key,filename,content_type,
                                          size_bytes,category,uploaded_at,uploaded_by)

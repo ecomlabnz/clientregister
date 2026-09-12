@@ -62,7 +62,7 @@ beforeAll(() => {
         extra.inz ?? null, extra.lodged ?? null, extra.decided ?? null, extra.due ?? null,
         `${extra.created ?? TODAY}T00:00:00Z`, `${TODAY}T00:00:00Z`);
 
-  client('cl_visa', 'CL-1', 'individual', 'Given FAMILY', 'AEWV');
+  client('cl_visa', 'CL-1', 'individual', 'Given FAMILY', 'wv_aewv');
   client('cl_blank', 'CL-2', 'individual', 'Other PERSON', null);
   client('cl_space', 'CL-3', 'individual', 'Third PERSON', '   ');
   client('cl_org', 'CL-4', 'organisation', 'An Employer Limited', null);
