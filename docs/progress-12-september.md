@@ -776,3 +776,89 @@ edit form's dropdown still shows blank. It can no longer erase anything, but an
 empty-looking box invites a guess. Making it show the value, marked as not on the
 list, is one change that would fix every dropdown in the register at once. It was
 not built because nobody asked for it. Say the word.
+
+---
+
+## 15. Two deploys failed, and the same mistake was underneath both (1.72.1)
+
+**Neither one lost anything, and that was checked rather than assumed.** After
+the second, the live register was read directly: 245 clients, 199 matters, no
+half-created object, the migration unrecorded. The trial register too. Saying
+"it should be fine because of how migrations work" would have been a guess about
+the practice's own files, which is not good enough.
+
+### What happened, both times
+
+**The morning one (1.64.0).** Remembering a machine for ninety days was refused
+at random. The register asked the clock once to stamp when the permission was
+granted and again to work out when it ends — and between those two questions a
+millisecond or two goes by, which put "ninety days" a hair over ninety days. The
+database, which enforces ninety days exactly, said no. It passed on the pull
+request and failed on deploy because whether it broke depended on whether the
+clock happened to tick.
+
+**The afternoon one (1.72.0).** The Self-check page is built from one query that
+looks at sixteen columns at once. **The live database accepts five parts in a
+query like that. The computers the tests run on accept five hundred.** So 2,991
+tests passed here and the real database refused it outright:
+`too many terms in compound SELECT [code: 7500]`.
+
+### The thing they have in common, which is the point
+
+Both times there *was* a check. Both times **the check was gentler than the
+thing it was standing in for.**
+
+The first rounded the permission's length to the nearest whole day before
+comparing — and ninety days and ninety days plus an hour both round to ninety.
+The second ran against a database that allows five hundred of something where
+the real one allows five.
+
+A test like that does not fail when the thing goes wrong. It cannot. It is not a
+weaker version of a check, it is the appearance of one, and the appearance is
+worse than nothing because it stops anybody looking.
+
+**The rule, in one line: a check that is more forgiving than the guarantee it
+protects is not a check.** Written up as faults 45 and 48. Both now have a
+replacement that fails: the first pins the length to the millisecond, the second
+walks every object in the database and refuses one built from more parts than
+the live database accepts. Both were proved able to fail by putting the bug back.
+
+And the real limit was **measured against the practice's own database**, not
+recalled or reasoned about — five parts work, six do not. The first version of
+that number would have been a guess, and a guess is what caused the problem.
+
+### One more, found while fixing it
+
+Splitting the query into four parts broke a test called *"covers every guarded
+column"*. It turned out that test was searching the query's **text** for each
+column's name. That could never have failed for the reason that matters: a part
+that is present in the text but reads the *wrong* column matches the search
+perfectly and reports nothing.
+
+It now puts a bad value into all sixteen columns with the guards lifted and reads
+the report back, checking each part names its own list and its own value.
+
+This register had already written that lesson down, two faults earlier — *a
+source match proves the words are in the file, nothing more*. Knowing a rule and
+applying it in the one place it was needed turn out to be different things, which
+is the argument for tests over notes.
+
+### And one I made writing this up
+
+The paragraphs above were written, checked, and then **thrown away by my own
+`git reset --hard`** — reaching for it to move the branch while the only copy of
+this section was sitting uncommitted beside it. Rewritten from scratch a minute
+later, which is the cheap version of this mistake.
+
+The rule is the boring one: **commit a thing before moving the branch under it.**
+`git reset --hard` does not distinguish between the history you meant to change
+and the work you had not saved. It is in this note rather than in
+`spec/mistakes.md` because nothing the practice relies on was ever at risk — it
+cost a minute of retyping — but it is the same shape as a fault that would have
+mattered, and the note is where the shape gets recorded.
+
+### What it cost
+
+Two red deploys and about an hour. No records, and no time of the practice's —
+both were found and fixed before anybody opened the register. The second is why
+1.72.0 and 1.72.1 are an hour apart.
