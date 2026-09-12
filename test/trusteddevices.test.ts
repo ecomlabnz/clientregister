@@ -886,6 +886,46 @@ describe('how long a machine stays trusted is a setting with a ceiling in code',
     const days = (Date.parse(made.row.expires_at) - Date.parse(made.row.created_at)) / 86_400_000;
     expect(Math.round(days)).toBe(TRUSTED_DEVICE_MAX_DAYS);
   });
+
+  /**
+   * **The row is exactly as long as it says, to the millisecond.**
+   *
+   * This was written after a deploy went red. `createTrustedDevice` read the
+   * clock twice — once for `created_at` and again for `expires_at` — so a row
+   * asked for at the ceiling came out a few milliseconds *over* ninety days
+   * and the database refused it. Whether it failed depended on whether the
+   * clock ticked between two statements, so it passed on the pull request and
+   * failed on `main` minutes later.
+   *
+   * `Math.round` was what hid it: the old assertion above rounded the length
+   * to the nearest day, which is true of 90 days and of 90 days plus an hour.
+   * So the rule is pinned exactly here — not rounded — because "exactly" is
+   * what the ceiling compares against.
+   */
+  it('makes a row exactly as many days long as it was asked for', async () => {
+    for (const days of [1, 40, TRUSTED_DEVICE_MAX_DAYS]) {
+      const h = mountAuth();
+      const made = await createTrustedDevice(h.env as any, {
+        userId: USER.id, totpSecret: TOTP_SECRET, days,
+      });
+      const ms = Date.parse(made.row.expires_at) - Date.parse(made.row.created_at);
+      expect(ms, `${days} days`).toBe(days * 86_400_000);
+    }
+  });
+
+  it('grants the ceiling every time, not only when the clock is kind', async () => {
+    // The original fault was intermittent, so once proves little. Twenty
+    // consecutive grants at exactly the ceiling: any drift between the two
+    // ends of the row puts one of them over and the database aborts.
+    const h = mountAuth();
+    for (let i = 0; i < 20; i++) {
+      const made = await createTrustedDevice(h.env as any, {
+        userId: USER.id, totpSecret: TOTP_SECRET, days: TRUSTED_DEVICE_MAX_DAYS,
+      });
+      expect(Date.parse(made.row.expires_at) - Date.parse(made.row.created_at))
+        .toBe(TRUSTED_DEVICE_MAX_DAYS * 86_400_000);
+    }
+  });
 });
 
 // --- 8. The revocation helpers themselves ------------------------------------
