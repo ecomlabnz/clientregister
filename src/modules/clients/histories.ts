@@ -1,9 +1,14 @@
 /**
- * The three history blocks on a client page, and the routes behind them.
+ * The four history blocks on a client page, and the routes behind them.
  *
  * **Asked for on 11 September 2026.** The shape of the data is migration 0089;
  * how a person works with it is `core/histories.ts`; what a screen looks like
  * is here.
+ *
+ * The fourth block is military service, asked for on 12 September 2026 and
+ * built as migration 0099. It is the same table as the other three with one
+ * thing on top of it: the three questions Section D of INZ 1200 asks, which are
+ * facts about the person rather than rows — see `militaryQuestions`.
  *
  * ## Why these blocks look like the quotation lines
  *
@@ -100,7 +105,8 @@ function cell(
                        aria-label="${col.label}">`;
   }
   return html`<input name="${name}" value="${value}" maxlength="${String(col.max ?? 200)}"
-                     size="${String(col.size ?? 16)}" aria-label="${col.label}">`;
+                     size="${String(col.size ?? 16)}" aria-label="${col.label}"
+                     placeholder="${col.placeholder ?? ''}">`;
 }
 
 /** One row of the read-only list, for whoever may not write. */
@@ -133,12 +139,21 @@ export function historyPanel(opts: {
   clientId: string;
   csrf: string;
   writable: boolean;
+  /**
+   * Something to show above the table, inside the same block.
+   *
+   * Used by one history: military service, where the three questions the form
+   * asks are facts about the person rather than rows, and belong on the screen
+   * beside the periods they are about. See `militaryQuestions`.
+   */
+  intro?: Raw;
 }): Raw {
-  const { def, rows, vocab, clientId, csrf, writable } = opts;
+  const { def, rows, vocab, clientId, csrf, writable, intro } = opts;
   const gaps = def.showsGaps ? gapsIn(rows) : new Map<number, number>();
   const note = rows.length === 0 ? '' : `${rows.length} ${rows.length === 1 ? def.noun : `${def.noun}s`}`;
 
   return collapsibleCard(def.title, html`
+    ${intro ?? ''}
     ${rows.length === 0
       ? emptyState(`Nothing recorded.`)
       : writable
@@ -200,9 +215,10 @@ export function historyPanel(opts: {
               : c.kind === 'date'
                 ? field({ label: c.label, name: c.name, maxlength: 10,
                           placeholder: 'YYYY-MM-DD',
-                          hint: 'Or just the month: 2019-03.' })
+                          hint: 'Or just the month: 2019-03. Or just the year: 2019.' })
                 : field({ label: c.label, name: c.name, type: 'text',
-                          maxlength: c.max ?? 200 }))}
+                          maxlength: c.max ?? 200,
+                          placeholder: c.placeholder, hint: c.hint }))}
           ${field({ label: 'Note', name: 'notes', maxlength: HISTORY_NOTE_MAX })}
           <button class="btn btn-primary" type="submit">Add it</button>
         </form>
@@ -210,22 +226,57 @@ export function historyPanel(opts: {
 }
 
 /**
- * The military records block.
+ * The three questions INZ 1200 asks about military service, at the top of the
+ * military block.
  *
- * **Asked for on 11 September 2026:** *"client must have a dedicated section on
- * military records - create the block but keep it as a placeholder for now."*
+ * **Asked for on 12 September 2026:** *"yes build the three questions, but the
+ * table - nothing fancy."* This is the three questions; the table under them is
+ * the fourth history.
  *
- * So it is a heading and a sentence, and nothing else. There is deliberately no
- * table behind it: the shape of a military record is the part nobody has
- * decided — whether it is one period or several, whether a discharge and a rank
- * belong on it, whether it is a history like the three above or a set of facts
- * like the flat ones on a client. Guessing now would mean rebuilding, which is
- * the reason the three histories above waited a day for their shape to be
- * written down first.
+ * They are read here and written on the client's own form, because they are
+ * columns on `clients` like every other flat fact an application asks for, and
+ * that form owns them. One fact, one owner: a second form writing the same
+ * column is how the certificate cache got wiped once.
+ *
+ * A question nobody has answered shows as "Not answered" rather than as "No".
+ * The difference matters on this of all forms — "we have not asked" and "the
+ * client says no" are not the same answer to a character question, and a screen
+ * that prints one as the other is how the wrong thing gets declared.
  */
-export function militaryPlaceholder(): Raw {
-  return collapsibleCard('Military records', html`
-    ${emptyState('Not built yet.')}`, 'placeholder');
+export function militaryQuestions(opts: {
+  clientId: string;
+  compulsory: string | null;
+  served: string | null;
+  exempt: string | null;
+  exemptionDetail: string | null;
+  writable: boolean;
+}): Raw {
+  const said = (value: string | null) => value === 'yes' ? 'Yes'
+    : value === 'no' ? 'No' : null;
+  const answer = (value: string | null) => {
+    const word = said(value);
+    return word ? html`${word}` : html`<span class="muted">Not answered</span>`;
+  };
+  return html`
+    <dl class="kv">
+      <dt>Has military service ever been compulsory in their home country?</dt>
+      <dd>${answer(opts.compulsory)}</dd>
+      <dt>Have they ever undertaken military service in any country?</dt>
+      <dd>${answer(opts.served)}</dd>
+      <dt>Were they exempt from military service?</dt>
+      <dd>${answer(opts.exempt)}
+        ${opts.exempt === 'yes'
+          ? (opts.exemptionDetail
+              ? html`<div class="small">${opts.exemptionDetail}</div>`
+              : html`<div class="small muted">The form asks how they came to be exempt.
+                       Nothing recorded yet.</div>`)
+          : ''}</dd>
+    </dl>
+    ${opts.writable
+      ? html`<p class="hint">Section D of INZ 1200.
+               <a href="/clients/${opts.clientId}/edit">Answer them on the client’s record</a>,
+               under Immigration, character, health and English.</p>`
+      : ''}`;
 }
 
 /** What the client page needs to draw all four blocks. */

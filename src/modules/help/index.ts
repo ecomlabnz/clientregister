@@ -94,6 +94,34 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.71.0', date: '12 September 2026',
+    notes: [
+      'Military service is built. The block on a client’s page now holds the three questions '
+        + 'the INZ 1200 asks — whether service was ever compulsory where they are from, '
+        + 'whether they ever served, and whether they were exempt — and a table of service '
+        + 'under them.',
+      'You answer the three on the client’s own form, under Immigration, character, health '
+        + 'and English. A question nobody has asked yet reads Not answered, which is not the same '
+        + 'as No.',
+      'Answer Yes to the exemption question and there is a box for how they came to be exempt, '
+        + 'which is what the form asks for. It can only be filled in against a Yes.',
+      'The service table is deliberately short: country, unit, rank, duties and the dates. The '
+        + 'form asks for corps, division, brigade, battalion and commanding officers too — we '
+        + 'attach the service document and let them read those off it.',
+      'On the employment history, the employer and the supervisor now share one box — put '
+        + 'both in it, the way a reference letter says them.',
+      'Country on the employment history is now Location, and you can type anything: a full '
+        + 'address, a town and a country, or just a country. It used to be a list of countries, '
+        + 'which could not hold “Onehunga, Auckland”.',
+      'Anything already stored as a country there was written out in full when this shipped, so '
+        + 'nothing was lost. Your own register had no work history rows in it yet; the try-it '
+        + 'caseload did, and they now read as country names.',
+      'There is a Duties box on the employment history, with the usual sentence ready in it: '
+        + '“Standard duties of a carpenter”.',
+      'Education and travel are untouched, as you asked.',
+    ],
+  },
+  {
     version: '1.70.0', date: '12 September 2026',
     notes: [
       'If your phone is not with you, the two-factor page can now email you a code instead. '
@@ -2875,8 +2903,9 @@ function sections(origin: string): Section[] {
            when they did. A date it guessed would be worse than none, because dates are what the
            alerts read. The visa's own expiry is still the only date watched on a visa.</p>
         <h4>Employment, education and travel history</h4>
-        <p>Three blocks on the client's page, under Certificates. Each starts closed. None is
-           compulsory — they are there for the application forms that ask for them.</p>
+        <p>Three blocks on the client's page, under Certificates — four with Military service.
+           Each starts closed. None is compulsory — they are there for the application forms that
+           ask for them.</p>
         <p>They are edited the way quotation lines are: change anything on any line, type a number
            in the <strong>#</strong> box to move a row up or down, tick the red cross to take a
            line out, and one <strong>Save</strong> does the lot. <strong>Add a line</strong>
@@ -2889,12 +2918,27 @@ function sections(origin: string): Section[] {
            shaded line saying how many months. It is never refused and never raises an alert: a
            history half entered legitimately has gaps, and a gap is often the true answer. It is a
            question to answer, not a mistake.</p>
-        <p>A date can be a whole date or just a month: write <code>2019-03-15</code>, or
-           <code>2019-03</code> where the day is not known. A month shows as
-           <em>Mar 2019</em>.</p>
-        <h4>Military records</h4>
-        <p>A heading on the client's page and nothing behind it yet. It is there because the
-           practice asked for the block before the shape of it was decided.</p>
+        <p>A date can be a whole date, a month, or a year: write <code>2019-03-15</code>,
+           <code>2019-03</code> where the day is not known, or <code>2019</code> where only the
+           year is. A month shows as <em>Mar 2019</em>.</p>
+        <p><strong>The employment history has one box for the employer and the supervisor</strong>
+           — put both in it, the way a reference letter says them. <strong>Location</strong> takes
+           whatever the client can give, from a full address down to a country, and
+           <strong>Duties</strong> is where the usual sentence goes: <em>Standard duties of a
+           carpenter</em>.</p>
+        <h4>Military service</h4>
+        <p>The three questions the INZ 1200 asks, and a table of service under them.</p>
+        <p>The three questions are answered on the client's own form, under
+           <em>Immigration, character, health and English</em>: whether military service has ever
+           been compulsory where they are from, whether they have ever served anywhere, and
+           whether they were exempt. A question nobody has asked yet shows as
+           <em>Not answered</em>, which is not the same as No.</p>
+        <p>Answer <em>Yes</em> to the exemption question and a box appears for how they came to be
+           exempt — the form asks for that in detail. The explanation can only be saved against a
+           Yes.</p>
+        <p>The table under them is deliberately short: country, unit, rank, duties and the dates.
+           The form's own table asks for corps, division, brigade, battalion and commanding
+           officers as well; we attach the service document and let INZ read those off it.</p>
         <h4>Companies and organisations</h4>
         <p>Choose <em>Company or organisation</em> as the record type and the form changes: a
            registered name, an NZBN and a Companies Office number instead of personal details.</p>

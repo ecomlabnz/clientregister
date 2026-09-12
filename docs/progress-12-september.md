@@ -518,6 +518,7 @@ every qualification converted. Twenty-eight of the thirty-two now carry an award
 date, and the histories are written at all three date precisions, which is the
 easiest way to see that the shorter ones work.
 
+<<<<<<< HEAD
 ---
 
 ## 13. A code by email, when the phone is not there (1.68.0)
@@ -584,3 +585,83 @@ secret; it is everything that quietly copies the thing you put it in.
 two-factor switched on, and your own register already sends email. If you want
 to see it: sign in, and at the code page press the new line instead of typing the
 app's code.
+=======
+## 12 September, later still: military service, and what the form asks of a job (1.66.0)
+
+### What you asked for
+
+Two sections of the INZ 1200, read against the register:
+
+> *"yes build the three questions, but the table - nothing fancy - just bare
+> bones info - we normally say in the INZ1200 - see the document attached and
+> let them peruse the records."*
+
+> *"Name of the employer and supervisor name - can be joined."*
+> *"Country should change to Location which will include whatever address the
+> applicant can provide - sometimes it is minimal - country and area."*
+> *"Detailed account of duties - not sure we need it - Just open a new field -
+> and write - Duties - we fill it in usually with general statement 'Standard
+> duties of [INSERT ROLE]' - … of a carpenter."*
+
+And, said in the same breath, what **not** to do: *"Education/travel additions -
+town/province only - use existing field - Country - so not add anything else.
+Travel needs nothing - good leave as is."* Both were left alone.
+
+### What changed for the practice
+
+**Military service is no longer a heading with nothing behind it.** It had been
+"Not built yet" since 11 September, on purpose, because the shape had not been
+decided. It now holds the three questions the form asks — compulsory where they
+are from, ever served anywhere, exempt — answered on the client's own form and
+shown at the top of the block. A question nobody has asked yet reads *Not
+answered*, which is deliberately not the same as *No*.
+
+Say yes to the exemption question and a box appears for how they came to be
+exempt, because that is what the form demands. The register will not store that
+explanation against a No, either way round — including the awkward way round,
+where the answer is changed afterwards and the explanation left behind.
+
+**Under the questions is a short table**, the same to work with as the work,
+study and travel histories: country, unit or formation, rank, duties, and the
+two dates. The form's own table asks for corps, division, brigade, battalion and
+commanding officers as well. Those are deliberately absent, exactly as you said
+— the document goes in and INZ reads it. That reason is written into the
+migration, so in a year it reads as a decision rather than as a gap.
+
+**The employment history now matches section B1.** One box for the employer and
+the supervisor. Country replaced by Location, free text, so "Onehunga, Auckland"
+is an answer and so is "Viet Nam". A Duties box with your own sentence sitting in
+it as a prompt.
+
+**Nothing of yours moved.** Your register holds no work-history rows at all —
+checked before the change was written — so the conversion had nothing to convert
+in it. The try-it caseload did have rows, and every country code in them was
+written out as the country's own name: `NZ` became `New Zealand`. The change was
+rehearsed on a copy first, with the rows printed before and after.
+
+### What was got wrong, and the rule that came out of it
+
+**The first plan kept the column called `employer` and only changed the label.**
+That was the cheap change and the wrong one: a column named for one fact, now
+holding two, is a small lie that the next person to read it writes a report on.
+It was renamed instead.
+
+**The rule:** *when a box changes what it holds, rename it in the same breath.* A
+label and a column that disagree cost nothing on the day and cost an afternoon
+the first time somebody trusts the name.
+
+**The second thing, and it is a trade rather than a mistake.** Making Location
+free text gives up something real: nothing can count how many clients have
+worked in a given country any more, because "Viet Nam", "Vietnam" and "Vinh,
+Nghe An" are three different strings again. That is written down as an open issue
+with what would fix it, rather than left to be discovered by whoever first wants
+the count.
+
+### What is waiting on you
+
+**Nothing.** The three questions are blank on every client until somebody
+answers them, which is the right state — the register does not guess at a
+character question. The try-it caseload has two files carrying an answer, one who
+served and one who was exempt, so you can see both shapes of the block without
+touching a real file.
+>>>>>>> 8bd9776 (Military service, asked and answered, and a job that says where and what)

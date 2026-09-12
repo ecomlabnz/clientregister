@@ -64,7 +64,7 @@ import { isAiEnabled } from '../../ai/provider';
 import { driveConfigured } from '../../integrations/gdrive';
 import { countryCodeFor, countryName, countryOptions } from '../../core/countries';
 import {
-  HISTORIES, historyPanel, militaryPlaceholder, registerHistoryRoutes, type HistoryVocab,
+  HISTORIES, historyPanel, militaryQuestions, registerHistoryRoutes, type HistoryVocab,
 } from './histories';
 import { allHistories } from '../../core/histories';
 import { FLAG_LIVES, flagKinds, flagsForClient, isShowing } from '../../core/flags';
@@ -135,6 +135,13 @@ export interface ClientRow {
   other_names: string | null;
   birth_country: string | null; birth_region: string | null; birth_town: string | null;
   national_id_number: string | null; national_id_country: string | null;
+  /**
+   * Section D of INZ 1200, added 12 September 2026 (migration 0099). Three
+   * questions, each `yes`, `no`, or NULL for one nobody has asked yet — and the
+   * explanation the form demands where the answer to the third is yes.
+   */
+  military_compulsory: string | null; military_served: string | null;
+  military_exempt: string | null; military_exemption_detail: string | null;
   address: string | null; status: ClientStatus; assigned_to: string | null; notes: string | null;
   created_at: string; updated_at: string; created_by: string | null;
 }
@@ -197,6 +204,24 @@ function block(id: string, open: Set<string>, title: string, body: Raw): Raw {
  * the date of birth.
  */
 const ENGLISH_TEST_MONTHS = 24;
+
+/**
+ * The only two answers to a question on INZ 1200 Section D.
+ *
+ * Not a vocabulary, and it is the one list in the register that is not. Every
+ * dropdown the practice uses is an administrator's, because those are the words
+ * *this practice* works in; these two words are the form's, and a third one
+ * added here would be an answer nobody could write on it. The database refuses
+ * anything else (migration 0099), which it could not do if the list were a
+ * setting somebody edits.
+ *
+ * A question nobody has answered is neither of these — it is NULL, and it shows
+ * as "Not answered".
+ */
+export const MILITARY_ANSWERS = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' },
+];
 
 function englishExpiry(taken: string | null): string | null {
   if (!taken) return null;
@@ -614,6 +639,44 @@ function clientForm(
               : html`<p class="hint">Added on the client's own page, once this record exists.</p>`}
           </div>
 
+          ${'' /* **Asked for on 12 September 2026:** *"yes build the three
+                   questions."* Section D of INZ 1200, and they sit in this block
+                   because that is where the questions INZ assesses a person on
+                   already live — immigration, character, health and English.
+
+                   Three dropdowns rather than three vocabularies, which is the
+                   exception to the standing rule that every list is an
+                   administrator's: the answers belong to INZ's form, not to this
+                   practice, and an administrator who added "Perhaps" would be
+                   recording an answer that cannot be written on it. The database
+                   says the same thing — see migration 0099.
+
+                   "Not answered" is the state every client starts in and is not
+                   the same as "No". On a character question that difference is
+                   the whole point. */}
+          <p class="settings-head subhead">Military service</p>
+          <div class="settings-cell">${select({
+            label: 'Has military service ever been compulsory in their home country?',
+            name: 'military_compulsory', value: values.military_compulsory ?? '',
+            options: MILITARY_ANSWERS, includeBlank: 'Not answered' })}</div>
+          <div class="settings-cell">${select({
+            label: 'Have they ever undertaken military service in any country?',
+            name: 'military_served', value: values.military_served ?? '',
+            options: MILITARY_ANSWERS, includeBlank: 'Not answered',
+            hint: values.id
+              ? 'Each period goes in Military service on their own page.'
+              : 'Each period goes in Military service on their page, once this record exists.' })}</div>
+          <div class="settings-cell">${select({
+            label: 'Were they exempt from military service?',
+            name: 'military_exempt', value: values.military_exempt ?? '',
+            options: MILITARY_ANSWERS, includeBlank: 'Not answered' })}</div>
+          <div class="settings-cell-wide">${field({
+            label: 'How they came to be exempt', name: 'military_exemption_detail',
+            type: 'textarea', rows: 3, maxlength: 2000,
+            value: values.military_exemption_detail ?? '',
+            hint: 'The form asks for a detailed explanation, so this is where it goes. It can '
+              + 'only be filled in where the answer above is yes.' })}</div>
+
           <p class="settings-head subhead">English</p>
           <div class="settings-cell">${select({ label: 'Test or exemption', name: 'english_test_type',
                     value: values.english_test_type ?? '', options: termOptions(vocab.englishTests),
@@ -681,6 +744,45 @@ export function refusalMessage(err: unknown): string | null {
   // The database writes its refusals in lower case, mid-sentence. On a screen
   // it is the whole sentence.
   return `${said.charAt(0).toUpperCase()}${said.slice(1)}.`;
+}
+
+/**
+ * The three answers about military service, and the explanation of an
+ * exemption.
+ *
+ * The rule is the database's (migration 0099) and this only makes it say so
+ * against the right box: an explanation of how somebody came to be exempt,
+ * saved against "no, they were not exempt", is a contradiction that would go
+ * onto a form. Without this the person who answers yes, types the explanation,
+ * then corrects the answer to no gets a refusal with no box named and loses the
+ * rest of what they typed.
+ *
+ * It runs one way only, like the trigger: an exemption with the explanation not
+ * yet typed is an ordinary half-filled record and saves.
+ *
+ * `f.enum` rather than `f.optional`, so a request built by hand carrying
+ * "maybe" is refused here with a sentence rather than at the trigger with a
+ * 500.
+ */
+function militaryService(f: FormReader): {
+  military_compulsory: string | null; military_served: string | null;
+  military_exempt: string | null; military_exemption_detail: string | null;
+} {
+  const answers = ['yes', 'no'] as const;
+  const exempt = f.enum('military_exempt', answers, { label: 'Exempt from military service' });
+  const detail = f.optional('military_exemption_detail', { max: 2000 });
+  if (detail && exempt !== 'yes') {
+    f.errors['military_exemption_detail'] =
+      'An explanation of an exemption belongs with an answer of yes. '
+      + 'Answer yes to the exemption question, or clear the explanation.';
+  }
+  return {
+    military_compulsory: f.enum('military_compulsory', answers,
+      { label: 'Military service compulsory' }),
+    military_served: f.enum('military_served', answers, { label: 'Military service undertaken' }),
+    military_exempt: exempt,
+    military_exemption_detail: detail,
+  };
 }
 
 function nationalIdentity(f: FormReader): {
@@ -822,6 +924,8 @@ function readClientForm(f: FormReader, vocab: ClientVocabularies) {
     birth_region: f.optional('birth_region', { max: 120 }),
     birth_town: f.optional('birth_town', { max: 120 }),
     ...nationalIdentity(f),
+    // --- military service, INZ 1200 Section D (migration 0099) -------------
+    ...militaryService(f),
     address: f.optional('address', { max: 500 }),
     status: f.enum('status', CLIENT_STATUSES, { fallback: 'prospect' })!,
     assigned_to: f.optional('assigned_to', { max: 60 }),
@@ -1441,9 +1545,10 @@ export const clientsModule: AppModule = {
             title, gender, relationship_status, other_names,
             birth_country, birth_region, birth_town,
             national_id_number, national_id_country,
+            military_compulsory, military_served, military_exempt, military_exemption_detail,
             address, status, assigned_to, notes,
             created_at, updated_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         id, ref, v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
         v.nzbn, v.company_number, v.organisation_id || null, v.organisation_role, v.email, v.phone, v.whatsapp, v.telegram_username, v.telegram_user_id,
         v.date_of_birth,
@@ -1453,6 +1558,7 @@ export const clientsModule: AppModule = {
         v.title, v.gender, v.relationship_status, v.other_names,
         v.birth_country, v.birth_region, v.birth_town,
         v.national_id_number, v.national_id_country,
+        v.military_compulsory, v.military_served, v.military_exempt, v.military_exemption_detail,
         v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), nowIso(), user.id,
       );
@@ -1987,15 +2093,26 @@ export const clientsModule: AppModule = {
                     Passports, Certificates". So they sit here, under the certificates,
                     and behave like the quotation lines: one table, a number to reorder
                     by, a cross to take a line out, one Save. */}
+            ${'' /* Military service is the fourth of these, and the three questions
+                     Section D of INZ 1200 asks ride on top of its table rather than
+                     sitting in a block of their own: they are about the same thing,
+                     and two headings for one subject is how a page gets long. Asked
+                     for on 12 September 2026 — see migration 0099. */}
             ${isOrg ? '' : html`
               ${HISTORIES.map((def) => html`
                 <div id="history-${def.key}">
                   ${historyPanel({ def, rows: histories[def.key], vocab: historyVocab,
-                                   clientId: client.id, csrf, writable })}
-                </div>`)}
-              ${'' /* Asked for on the same day, and deliberately empty: "create the
-                      block but keep it as a placeholder for now." */}
-              ${militaryPlaceholder()}`}
+                                   clientId: client.id, csrf, writable,
+                                   intro: def.key === 'military'
+                                     ? militaryQuestions({
+                                         clientId: client.id,
+                                         compulsory: client.military_compulsory,
+                                         served: client.military_served,
+                                         exempt: client.military_exempt,
+                                         exemptionDetail: client.military_exemption_detail,
+                                         writable })
+                                     : undefined })}
+                </div>`)}`}
 
             ${'' /* Last on the page, by instruction on 12 September 2026: "reorder,
                     Cases, Quotes, Passports, Certificates, Files, the rest, and at the
@@ -2762,6 +2879,8 @@ export const clientsModule: AppModule = {
            title=?, gender=?, relationship_status=?, other_names=?,
            birth_country=?, birth_region=?, birth_town=?,
            national_id_number=?, national_id_country=?,
+           military_compulsory=?, military_served=?, military_exempt=?,
+           military_exemption_detail=?,
            address=?, status=?, assigned_to=?, notes=?, updated_at=?
          WHERE id=?`,
         v.kind, v.full_name, v.given_names, v.family_name, v.preferred_name,
@@ -2774,6 +2893,7 @@ export const clientsModule: AppModule = {
         v.title, v.gender, v.relationship_status, v.other_names,
         v.birth_country, v.birth_region, v.birth_town,
         v.national_id_number, v.national_id_country,
+        v.military_compulsory, v.military_served, v.military_exempt, v.military_exemption_detail,
         v.address, v.status, v.assigned_to || null, v.notes,
         nowIso(), id,
       );

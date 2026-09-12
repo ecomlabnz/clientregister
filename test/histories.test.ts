@@ -75,7 +75,7 @@ describe('a period of unemployment is a row like any other', () => {
     const rows = rowsOf(h, 'client_employment');
     expect(rows).toHaveLength(1);
     expect(rows[0]!.kind).toBe('unemployed');
-    expect(rows[0]!.employer).toBe(null);
+    expect(rows[0]!.employer_and_supervisor).toBe(null);
     expect(rows[0]!.role).toBe(null);
     expect(rows[0]!.notes).toContain('Made redundant');
   });
@@ -149,9 +149,9 @@ describe('a gap between two periods', () => {
     // often the true answer. Nothing about it stops a row being saved.
     const h = mount();
     await h.post('/clients/cl1/history/employment/add',
-      { kind: 'employed', employer: 'One', started_on: '2020-01-01', ended_on: '2021-06-30' });
+      { kind: 'employed', employer_and_supervisor: 'One', started_on: '2020-01-01', ended_on: '2021-06-30' });
     const res = await h.post('/clients/cl1/history/employment/add',
-      { kind: 'employed', employer: 'Two', started_on: '2023-03-01' });
+      { kind: 'employed', employer_and_supervisor: 'Two', started_on: '2023-03-01' });
     expect(res.status).toBe(303);
     expect(rowsOf(h, 'client_employment')).toHaveLength(2);
   });
@@ -159,9 +159,9 @@ describe('a gap between two periods', () => {
   it('is drawn on the employment history and not on the others', async () => {
     const h = mount();
     await h.post('/clients/cl1/history/employment/add',
-      { kind: 'employed', employer: 'One', started_on: '2020-01-01', ended_on: '2021-06-30' });
+      { kind: 'employed', employer_and_supervisor: 'One', started_on: '2020-01-01', ended_on: '2021-06-30' });
     await h.post('/clients/cl1/history/employment/add',
-      { kind: 'employed', employer: 'Two', started_on: '2023-03-01', ended_on: '2024-01-01' });
+      { kind: 'employed', employer_and_supervisor: 'Two', started_on: '2023-03-01', ended_on: '2024-01-01' });
     await h.post('/clients/cl1/history/travel/add',
       { country: 'VN', started_on: '2020-01-01', ended_on: '2020-02-01' });
     await h.post('/clients/cl1/history/travel/add',
@@ -215,23 +215,26 @@ describe('the table is edited the way quotation lines are', () => {
   it('edits every field of every row in one press', async () => {
     const h = mount();
     await h.post('/clients/cl1/history/employment/add',
-      { kind: 'employed', employer: 'Old name', role: 'Chef', country: 'NZ' });
+      { kind: 'employed', employer_and_supervisor: 'Old name', role: 'Chef',
+        location: 'Hamilton, New Zealand' });
     const [row] = rowsOf(h, 'client_employment');
 
     await h.post('/clients/cl1/history/employment', {
       [`position_${row!.id}`]: '1',
       [`kind_${row!.id}`]: 'self_employed',
-      [`employer_${row!.id}`]: 'New name',
+      [`employer_and_supervisor_${row!.id}`]: 'New name',
       [`role_${row!.id}`]: 'Head chef',
-      [`country_${row!.id}`]: 'VN',
+      [`location_${row!.id}`]: 'Vinh, Nghe An',
+      [`duties_${row!.id}`]: 'Standard duties of a head chef.',
       [`started_on_${row!.id}`]: '2021-02-01',
       [`notes_${row!.id}`]: 'Bought the business.',
     });
     const after = rowsOf(h, 'client_employment')[0]!;
     expect(after.kind).toBe('self_employed');
-    expect(after.employer).toBe('New name');
+    expect(after.employer_and_supervisor).toBe('New name');
     expect(after.role).toBe('Head chef');
-    expect(after.country).toBe('VN');
+    expect(after.location).toBe('Vinh, Nghe An');
+    expect(after.duties).toBe('Standard duties of a head chef.');
     expect(after.started_on).toBe('2021-02-01');
     expect(after.notes).toBe('Bought the business.');
   });
@@ -248,7 +251,7 @@ describe('the table is edited the way quotation lines are', () => {
     // A register that cannot say when a period appeared is worse than one that
     // never held it.
     const h = mount();
-    await h.post('/clients/cl1/history/employment/add', { kind: 'employed', employer: 'One' });
+    await h.post('/clients/cl1/history/employment/add', { kind: 'employed', employer_and_supervisor: 'One' });
     const notes = h.db.prepare(
       `SELECT body FROM entries WHERE entity_id = 'cl1'`).all() as Array<{ body: string }>;
     expect(notes.map((n) => n.body).join('\n')).toContain('Employment history');
@@ -262,7 +265,7 @@ describe('the table is edited the way quotation lines are', () => {
 // ---------------------------------------------------------------------------
 
 describe('the database refuses what it can check', () => {
-  it.each(['client_employment', 'client_education', 'client_travel'])(
+  it.each(['client_employment', 'client_education', 'client_travel', 'client_military'])(
     '%s refuses a period that ends before it starts', (table) => {
       const db = bareRegister();
       expect(() => db.prepare(
@@ -271,7 +274,11 @@ describe('the database refuses what it can check', () => {
         .toThrow(/cannot end before it starts/);
     });
 
-  it.each(['client_employment', 'client_education', 'client_travel'])(
+  // Employment is not on this list any more, and that is the point of migration
+  // 0100: its country became a free-text Location on 12 September 2026, because
+  // the answer the practice actually gets is "Vinh, Nghe An" as often as it is a
+  // country. The three that still hold a country still refuse one that is not.
+  it.each(['client_education', 'client_travel', 'client_military'])(
     '%s refuses a country that is not one', (table) => {
       const db = bareRegister();
       expect(() => db.prepare(
@@ -280,7 +287,7 @@ describe('the database refuses what it can check', () => {
         .toThrow(/ISO 3166-1 alpha-2/);
     });
 
-  it.each(['client_employment', 'client_education', 'client_travel'])(
+  it.each(['client_employment', 'client_education', 'client_travel', 'client_military'])(
     '%s bounds the note', (table) => {
       const db = bareRegister();
       expect(() => db.prepare(
@@ -289,7 +296,7 @@ describe('the database refuses what it can check', () => {
         .toThrow(/1000 characters or fewer/);
     });
 
-  it.each(['client_employment', 'client_education', 'client_travel'])(
+  it.each(['client_employment', 'client_education', 'client_travel', 'client_military'])(
     '%s goes with the client', (table) => {
       const db = bareRegister();
       db.prepare(`INSERT INTO ${table} (id, client_id, created_at, updated_at)
@@ -304,7 +311,7 @@ describe('the database refuses what it can check', () => {
 // ---------------------------------------------------------------------------
 
 describe('on the client page', () => {
-  it('shows all three, each closed', async () => {
+  it('shows all four, each closed', async () => {
     const body = await (await mount().request('/clients/cl1')).text();
     for (const def of HISTORIES) {
       expect(body, def.title).toContain(`<h2>${def.title}</h2>`);
@@ -314,14 +321,14 @@ describe('on the client page', () => {
     }
   });
 
-  it('shows the military block, as a placeholder and nothing more', async () => {
-    // *"create the block but keep it as a placeholder for now."* There is
-    // deliberately no table behind it: the shape of a military record is the
-    // part nobody has decided.
+  it('shows the military block with a table behind it now', async () => {
+    // It was a heading and "Not built yet" from 11 September until the practice
+    // decided the shape of it the next day: *"yes build the three questions,
+    // but the table - nothing fancy - just bare bones info."*
     const body = await (await mount().request('/clients/cl1')).text();
-    expect(body).toContain('<h2>Military records</h2>');
-    expect(body).toContain('Not built yet.');
-    expect(body).not.toContain('history/military');
+    expect(body).toContain('<h2>Military service</h2>');
+    expect(body).not.toContain('Not built yet.');
+    expect(body).toContain('history/military');
   });
 
   it('shows none of them on an organisation', async () => {
@@ -330,7 +337,7 @@ describe('on the client page', () => {
                VALUES ('org1','CL-0902','organisation','Acme Limited','active','${AT}','${AT}')`);
     const body = await (await h.request('/clients/org1')).text();
     expect(body).not.toContain('<h2>Employment history</h2>');
-    expect(body).not.toContain('<h2>Military records</h2>');
+    expect(body).not.toContain('<h2>Military service</h2>');
   });
 });
 
@@ -475,7 +482,7 @@ describe('a history date may be a day, a month or a year', () => {
   it('saves a month against a row', async () => {
     const h = mount();
     const res = await h.post('/clients/cl1/history/employment/add', {
-      kind: 'employed', employer: 'Lagos Meat Company',
+      kind: 'employed', employer_and_supervisor: 'Lagos Meat Company',
       started_on: '2018-02', ended_on: '2024-01',
     });
     expect(res.status).toBe(303);
@@ -487,7 +494,7 @@ describe('a history date may be a day, a month or a year', () => {
   it('still saves a whole date', async () => {
     const h = mount();
     await h.post('/clients/cl1/history/employment/add', {
-      kind: 'employed', employer: 'Kaitiaki Foods', started_on: '2024-06-10',
+      kind: 'employed', employer_and_supervisor: 'Kaitiaki Foods', started_on: '2024-06-10',
     });
     expect(rowsOf(h, 'client_employment')[0]!.started_on).toBe('2024-06-10');
   });
@@ -495,7 +502,7 @@ describe('a history date may be a day, a month or a year', () => {
   it('shows a month as a month, not as the first of it', async () => {
     const h = mount();
     await h.post('/clients/cl1/history/employment/add', {
-      kind: 'employed', employer: 'Lagos Meat Company', started_on: '2018-02',
+      kind: 'employed', employer_and_supervisor: 'Lagos Meat Company', started_on: '2018-02',
     });
     const body = await (await h.request('/clients/cl1?open=history-employment')).text();
     expect(body).toContain('2018-02');
@@ -505,7 +512,7 @@ describe('a history date may be a day, a month or a year', () => {
   it('refuses anything that is neither', async () => {
     const h = mount();
     const res = await h.post('/clients/cl1/history/employment/add', {
-      kind: 'employed', employer: 'Somewhere', started_on: 'March 2018',
+      kind: 'employed', employer_and_supervisor: 'Somewhere', started_on: 'March 2018',
     });
     expect(res.status).not.toBe(500);
     expect(rowsOf(h, 'client_employment')).toEqual([]);
@@ -539,7 +546,7 @@ describe('a history date may be a day, a month or a year', () => {
   it('saves a year on its own, and keeps it a year', async () => {
     const h = mount();
     const res = await h.post('/clients/cl1/history/employment/add', {
-      kind: 'employed', employer: 'A Cabinetmaker', started_on: '2015', ended_on: '2019-08',
+      kind: 'employed', employer_and_supervisor: 'A Cabinetmaker', started_on: '2015', ended_on: '2019-08',
     });
     expect(res.status).toBe(303);
     const row = rowsOf(h, 'client_employment')[0]!;
@@ -632,37 +639,302 @@ describe('a bad date does not half-save a table', () => {
     // the reader to tell which half.
     const h = mount();
     await h.post('/clients/cl1/history/employment/add',
-      { kind: 'employed', employer: 'First', started_on: '2018-01' });
+      { kind: 'employed', employer_and_supervisor: 'First', started_on: '2018-01' });
     await h.post('/clients/cl1/history/employment/add',
-      { kind: 'employed', employer: 'Second', started_on: '2019-01' });
+      { kind: 'employed', employer_and_supervisor: 'Second', started_on: '2019-01' });
     const [a, b] = rowsOf(h, 'client_employment');
 
     const res = await h.post('/clients/cl1/history/employment', {
-      [`kind_${a!.id}`]: 'employed', [`employer_${a!.id}`]: 'Changed first',
+      [`kind_${a!.id}`]: 'employed', [`employer_and_supervisor_${a!.id}`]: 'Changed first',
       [`started_on_${a!.id}`]: '2018-01',
-      [`kind_${b!.id}`]: 'employed', [`employer_${b!.id}`]: 'Changed second',
+      [`kind_${b!.id}`]: 'employed', [`employer_and_supervisor_${b!.id}`]: 'Changed second',
       [`started_on_${b!.id}`]: 'nonsense',
     });
     expect(res.status).toBe(303);
     expect(res.headers.get('location')).toContain('err=');
 
     const after = rowsOf(h, 'client_employment');
-    expect(after[0]!.employer, 'the good row must not have been written either').toBe('First');
-    expect(after[1]!.employer).toBe('Second');
+    expect(after[0]!.employer_and_supervisor,
+      'the good row must not have been written either').toBe('First');
+    expect(after[1]!.employer_and_supervisor).toBe('Second');
   });
 
   it('saves both when both are right', async () => {
     const h = mount();
     await h.post('/clients/cl1/history/employment/add',
-      { kind: 'employed', employer: 'First', started_on: '2018-01' });
+      { kind: 'employed', employer_and_supervisor: 'First', started_on: '2018-01' });
     const [a] = rowsOf(h, 'client_employment');
     const res = await h.post('/clients/cl1/history/employment', {
-      [`kind_${a!.id}`]: 'employed', [`employer_${a!.id}`]: 'Changed first',
+      [`kind_${a!.id}`]: 'employed', [`employer_and_supervisor_${a!.id}`]: 'Changed first',
       [`started_on_${a!.id}`]: '2018-01-15',
     });
     expect(res.status).toBe(303);
     const after = rowsOf(h, 'client_employment')[0]!;
-    expect(after.employer).toBe('Changed first');
+    expect(after.employer_and_supervisor).toBe('Changed first');
     expect(after.started_on).toBe('2018-01-15');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Military service: the three questions, and the bare record under them
+// ---------------------------------------------------------------------------
+
+/**
+ * **Asked for on 12 September 2026:** *"yes build the three questions, but the
+ * table - nothing fancy - just bare bones info - we normally say in the INZ1200
+ * - see the document attached and let them peruse the records."*
+ *
+ * Section D of INZ 1200 asks three questions and then a table of eleven
+ * columns. The three questions are here in full; five of the eleven columns
+ * are, and the other six are deliberately absent — which is a decision worth a
+ * test of its own, because the next person to read the form will otherwise
+ * wonder whether they were forgotten.
+ */
+
+/** The client form posts every box, so a partial post would blank the rest. */
+const personForm = (over: Record<string, string> = {}) => ({
+  kind: 'individual', given_names: 'A', family_name: 'PERSON', status: 'active', ...over,
+});
+
+describe('the three questions on Section D', () => {
+  it('saves all three and the explanation of an exemption', async () => {
+    const h = mount();
+    const res = await h.post('/clients/cl1', personForm({
+      military_compulsory: 'yes', military_served: 'no', military_exempt: 'yes',
+      military_exemption_detail: 'Presented at 18 and was not called up; holds the certificate.',
+    }));
+    expect(res.status).toBe(303);
+    const row = h.get<Record<string, string | null>>(
+      `SELECT military_compulsory, military_served, military_exempt, military_exemption_detail
+         FROM clients WHERE id = 'cl1'`)!;
+    expect(row.military_compulsory).toBe('yes');
+    expect(row.military_served).toBe('no');
+    expect(row.military_exempt).toBe('yes');
+    expect(row.military_exemption_detail).toContain('not called up');
+  });
+
+  it('shows the answers in the military block, each question asked in full', async () => {
+    const h = mount();
+    await h.post('/clients/cl1', personForm({
+      military_compulsory: 'yes', military_served: 'no', military_exempt: 'no',
+    }));
+    const body = await (await h.request('/clients/cl1?open=history-military')).text();
+    expect(body).toContain('Has military service ever been compulsory in their home country?');
+    expect(body).toContain('Have they ever undertaken military service in any country?');
+    expect(body).toContain('Were they exempt from military service?');
+  });
+
+  it('says “Not answered” where nobody has asked, which is not “No”', async () => {
+    // The difference is the whole point on a character question: "we have not
+    // asked" and "the client says no" are not the same answer, and a screen
+    // that prints one as the other is how the wrong thing gets declared.
+    const h = mount();
+    const body = await (await h.request('/clients/cl1?open=history-military')).text();
+    expect(body).toContain('Not answered');
+  });
+
+  it('refuses an explanation with no exemption to explain, and names the box', async () => {
+    const h = mount();
+    const res = await h.post('/clients/cl1', personForm({
+      military_exempt: 'no', military_exemption_detail: 'Bought my way out.',
+    }));
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('belongs with an answer of yes');
+    expect(h.get<{ military_exemption_detail: string | null }>(
+      `SELECT military_exemption_detail FROM clients WHERE id = 'cl1'`)!.military_exemption_detail)
+      .toBe(null);
+  });
+
+  it('allows an exemption whose explanation has not been typed yet', async () => {
+    // A half-filled record is ordinary. The rule runs one way only.
+    const h = mount();
+    const res = await h.post('/clients/cl1', personForm({ military_exempt: 'yes' }));
+    expect(res.status).toBe(303);
+    expect(h.get<{ military_exempt: string }>(
+      `SELECT military_exempt FROM clients WHERE id = 'cl1'`)!.military_exempt).toBe('yes');
+  });
+
+  it('refuses a third answer built by hand', async () => {
+    const h = mount();
+    const res = await h.post('/clients/cl1', personForm({ military_served: 'maybe' }));
+    expect(res.status).toBe(400);
+    expect(h.get<{ military_served: string | null }>(
+      `SELECT military_served FROM clients WHERE id = 'cl1'`)!.military_served).toBe(null);
+  });
+
+  it('and the database refuses both, whatever the route', () => {
+    // The rules are the database's (migration 0099); the form checks are so the
+    // message names the box. A bulk load or a reading of a document is the
+    // other way in.
+    const db = bareRegister();
+    expect(() => db.prepare(
+      `UPDATE clients SET military_served = 'maybe' WHERE id = 'c1'`).run())
+      .toThrow(/is yes or no/);
+    expect(() => db.prepare(
+      `UPDATE clients SET military_exemption_detail = 'Bought out.' WHERE id = 'c1'`).run())
+      .toThrow(/belongs to an answer of yes/);
+    expect(() => db.prepare(
+      `INSERT INTO clients (id, ref, kind, full_name, status, created_at, updated_at,
+                            military_compulsory)
+       VALUES ('c2','CL-9002','individual','B Person','active',?,?,'unknown')`).run(AT, AT))
+      .toThrow(/is yes or no/);
+  });
+
+  it('refuses turning an exemption to no while its explanation is still there', () => {
+    // The pair has to hold at every moment, not only when it is created.
+    const db = bareRegister();
+    db.prepare(`UPDATE clients SET military_exempt = 'yes',
+                    military_exemption_detail = 'Studying abroad.' WHERE id = 'c1'`).run();
+    expect(() => db.prepare(
+      `UPDATE clients SET military_exempt = 'no' WHERE id = 'c1'`).run())
+      .toThrow(/belongs to an answer of yes/);
+  });
+
+  it('bounds the explanation, so a pasted document cannot land in it', () => {
+    const db = bareRegister();
+    expect(() => db.prepare(
+      `UPDATE clients SET military_exempt = 'yes', military_exemption_detail = ? WHERE id = 'c1'`)
+      .run('x'.repeat(2001)))
+      .toThrow(/2000 characters or fewer/);
+  });
+});
+
+describe('the military record itself', () => {
+  it('is a history like the other three', async () => {
+    const h = mount();
+    const res = await h.post('/clients/cl1/history/military/add', {
+      country: 'CO', unit: 'Batallón de Ingenieros No. 4', rank: 'Soldado',
+      duties: 'Standard duties of a conscript sapper.', started_on: '2002-07', ended_on: '2003-06',
+    });
+    expect(res.status).toBe(303);
+    const row = rowsOf(h, 'client_military')[0]!;
+    expect(row.country).toBe('CO');
+    expect(row.unit).toBe('Batallón de Ingenieros No. 4');
+    expect(row.rank).toBe('Soldado');
+    expect(String(row.duties)).toContain('conscript sapper');
+    expect(row.started_on).toBe('2002-07');
+    expect(row.ended_on).toBe('2003-06');
+  });
+
+  it('reorders, edits and removes in one press, like every other history', async () => {
+    const h = mount();
+    await h.post('/clients/cl1/history/military/add', { country: 'CO', unit: 'First' });
+    await h.post('/clients/cl1/history/military/add', { country: 'CO', unit: 'Second' });
+    const rows = rowsOf(h, 'client_military');
+
+    await h.post('/clients/cl1/history/military', {
+      [`position_${rows[0]!.id}`]: '2', [`unit_${rows[0]!.id}`]: 'First, corrected',
+      [`country_${rows[0]!.id}`]: 'CO',
+      [`position_${rows[1]!.id}`]: '1', [`unit_${rows[1]!.id}`]: 'Second',
+      [`country_${rows[1]!.id}`]: 'CO',
+      [`remove_${rows[1]!.id}`]: 'on',
+    });
+    const after = rowsOf(h, 'client_military');
+    expect(after).toHaveLength(1);
+    expect(after[0]!.unit).toBe('First, corrected');
+  });
+
+  it('keeps to five things, and none of the form’s military hierarchy', async () => {
+    // *"nothing fancy - just bare bones info."* Corps, division, brigade,
+    // battalion and commanding officers are on the form's own table and are
+    // deliberately not here: the practice attaches the service document and
+    // lets INZ read them off it. This test exists so that absence reads as a
+    // decision rather than an oversight.
+    const { MILITARY_HISTORY } = await import('../src/core/histories');
+    expect(MILITARY_HISTORY.columns.map((c) => c.name)).toEqual(
+      ['country', 'unit', 'rank', 'duties', 'started_on', 'ended_on']);
+
+    const h = mount();
+    const body = await (await h.request('/clients/cl1?open=history-military')).text();
+    for (const absent of ['Corps', 'Division', 'Brigade', 'Battalion', 'Commanding']) {
+      expect(body, absent).not.toContain(`>${absent}<`);
+    }
+  });
+
+  it('draws no gap marker between two postings', async () => {
+    // A gap in a work history is a question INZ asks. A gap between two
+    // postings is not, and drawing one would be noise.
+    const h = mount();
+    await h.post('/clients/cl1/history/military/add',
+      { country: 'CO', unit: 'One', started_on: '2000-01', ended_on: '2001-01' });
+    await h.post('/clients/cl1/history/military/add',
+      { country: 'CO', unit: 'Two', started_on: '2005-01', ended_on: '2006-01' });
+    const body = await (await h.request('/clients/cl1?open=history-military')).text();
+    expect(body).not.toContain('history-gap');
+  });
+
+  it('bounds the unit, the rank and the duties at the database', () => {
+    const h = mount();
+    for (const [column, over] of [['unit', 201], ['rank', 121], ['duties', 501]] as const) {
+      expect(() => h.db.prepare(
+        `INSERT INTO client_military (id, client_id, ${column}, created_at, updated_at)
+         VALUES ('m_${column}','cl1',?,?,?)`).run('x'.repeat(over), AT, AT), column)
+        .toThrow(/short answers, not a document/);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// What section B1 asks of an employment row
+// ---------------------------------------------------------------------------
+
+/**
+ * **Asked for on 12 September 2026**, three changes in the practice's words:
+ * *"Name of the employer and supervisor name - can be joined"*, *"Country
+ * should change to Location which will include whatever address the applicant
+ * can provide"*, and a Duties box filled with *"Standard duties of [INSERT
+ * ROLE]"*. Migration 0100.
+ */
+describe('an employment row after section B1', () => {
+  it('takes an address in Location, which a country dropdown could never hold', async () => {
+    const h = mount();
+    const res = await h.post('/clients/cl1/history/employment/add', {
+      kind: 'employed', employer_and_supervisor: 'Talleres Medellín — supervisor Óscar Restrepo',
+      role: 'Panel beater', location: 'Medellín, Antioquia, Colombia',
+      duties: 'Standard duties of a panel beater.',
+    });
+    expect(res.status).toBe(303);
+    const row = rowsOf(h, 'client_employment')[0]!;
+    expect(row.location).toBe('Medellín, Antioquia, Colombia');
+    expect(String(row.employer_and_supervisor)).toContain('Óscar Restrepo');
+    expect(row.duties).toBe('Standard duties of a panel beater.');
+  });
+
+  it('offers a text box for Location and not a list of countries', async () => {
+    const h = mount();
+    const body = await (await h.request('/clients/cl1?open=history-employment')).text();
+    expect(body).toContain('Location');
+    expect(body).not.toContain('<select id="f_location"');
+    expect(body).not.toContain('<select name="location"');
+  });
+
+  it('says in the box what the practice writes in it', async () => {
+    // The placeholder is the sentence they actually use, so the box is not
+    // filled in three different ways by three people.
+    const h = mount();
+    const body = await (await h.request('/clients/cl1?open=history-employment')).text();
+    expect(body).toContain('Standard duties of a carpenter');
+    expect(body).toContain('Employer and supervisor');
+    expect(body).toContain('supervisor’s name after it');
+  });
+
+  it('bounds the three boxes at the database', () => {
+    const h = mount();
+    for (const [column, over] of
+      [['employer_and_supervisor', 301], ['location', 201], ['duties', 501]] as const) {
+      expect(() => h.db.prepare(
+        `INSERT INTO client_employment (id, client_id, ${column}, created_at, updated_at)
+         VALUES ('e_${column}','cl1',?,?,?)`).run('x'.repeat(over), AT, AT), column)
+        .toThrow(/short answers, not a document/);
+    }
+  });
+
+  it('no longer refuses a location that is not a country code', () => {
+    // The rule that used to be here was right for a country and wrong for an
+    // address. It was dropped rather than worked around — migration 0100.
+    const h = mount();
+    h.db.prepare(`INSERT INTO client_employment (id, client_id, location, created_at, updated_at)
+                  VALUES ('e7','cl1','Vinh, Nghe An',?,?)`).run(AT, AT);
+    expect(rowsOf(h, 'client_employment')[0]!.location).toBe('Vinh, Nghe An');
   });
 });

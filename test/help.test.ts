@@ -160,7 +160,7 @@ describe('the guidance matches what the register does', () => {
     ['the three histories', 'Employment, education and travel history'],
     ['a gap is drawn', 'shaded line saying how many months'],
     ['unemployment is a row', 'A period of unemployment is a row like any other'],
-    ['military records is a placeholder', 'nothing behind it yet'],
+    ['the military block holds the three questions', 'The three questions the INZ 1200 asks'],
     ['visa conditions and stay limit', 'Stay limit'],
     ['the five closed blocks on a matter', 'Five of them start closed'],
     ['the practice caseload', 'Load the caseload'],

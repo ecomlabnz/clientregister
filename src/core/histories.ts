@@ -1,5 +1,6 @@
 /**
- * Employment, education and travel: what a person has done, one period a row.
+ * Employment, education, travel and military service: what a person has done,
+ * one period a row.
  *
  * **Asked for on 11 September 2026:** *"build placeholders for the histories
  * discussed - employment, education, international travel ... they will live
@@ -11,8 +12,10 @@
  * able to move the table rows up or down - if possible, and add or delete more
  * lines for the entries."*
  *
- * The three tables are migration 0089, and the reasoning for their shape is
- * there rather than repeated here.
+ * The first three tables are migration 0089, and the reasoning for their shape
+ * is there rather than repeated here. The fourth — military service, asked for
+ * on 12 September 2026 — is migration 0099, and cost a definition and nothing
+ * else, which is what this file was written to make true.
  *
  * ## Why one file rather than three
  *
@@ -40,7 +43,7 @@ import { all, nowIso, run } from './db';
 import { newId } from './ids';
 import type { FormReader } from './validate';
 
-export type HistoryKey = 'employment' | 'education' | 'travel';
+export type HistoryKey = 'employment' | 'education' | 'travel' | 'military';
 
 /** How one column of a history behaves, on the page and on the way in. */
 export interface HistoryColumn {
@@ -54,6 +57,17 @@ export interface HistoryColumn {
   max?: number;
   /** Width of the input, in characters. Dates and selects size themselves. */
   size?: number;
+  /**
+   * What to show in an empty box, on the "Add a …" form and in the table.
+   *
+   * For the two boxes where the answer has a *form* the practice already uses —
+   * an employer with the supervisor after it, and "Standard duties of a
+   * carpenter" — because a box labelled Duties with nothing in it is a box
+   * three people fill in three different ways.
+   */
+  placeholder?: string;
+  /** A sentence under the box on the "Add a …" form. */
+  hint?: string;
 }
 
 export interface HistoryDef {
@@ -90,9 +104,35 @@ export const EMPLOYMENT_HISTORY: HistoryDef = {
     // all — the practice called that out as critical — and because it decides
     // whether an employer is expected on the row.
     { name: 'kind', label: 'What', kind: 'vocab', vocab: 'employment_kinds' },
-    { name: 'employer', label: 'Employer', kind: 'text', max: 200, size: 22 },
+    // **Asked for on 12 September 2026:** *"Name of the employer and supervisor
+    // name - can be joined."* One box rather than two, because that is how the
+    // answer arrives — off a reference letter, in one line — and because the
+    // practice said so. The label and the hint carry the whole instruction:
+    // somebody has to know the supervisor goes in here, and a box called
+    // "Employer" would never tell them. See migration 0100.
+    { name: 'employer_and_supervisor', label: 'Employer and supervisor', kind: 'text',
+      max: 300, size: 24,
+      placeholder: 'Fletcher Construction — supervisor Jane Doe',
+      hint: 'Both in this one box: the employer, then the supervisor’s name after it.' },
     { name: 'role', label: 'Role', kind: 'text', max: 200, size: 18 },
-    { name: 'country', label: 'Country', kind: 'country' },
+    // **Asked for on 12 September 2026:** *"Country should change to Location
+    // which will include whatever address the applicant can provide - sometimes
+    // it is minimal - country and area."* So this is free text and no longer a
+    // country code: a client who can say "Vinh, Nghe An" should not be made to
+    // pick a country out of a list of 250, and one who can only say "Viet Nam"
+    // still can. Migration 0100 rewrote every code already stored as the
+    // country's own name.
+    { name: 'location', label: 'Location', kind: 'text', max: 200, size: 22,
+      placeholder: 'Auckland, New Zealand',
+      hint: 'Whatever they can give — a full address, a town and a country, or just a country.' },
+    // **Asked for on 12 September 2026:** *"Detailed account of duties - not
+    // sure we need it - Just open a new field - and write - Duties - we fill it
+    // in usually with general statement 'Standard duties of [INSERT ROLE]' - …
+    // of a carpenter."* The placeholder is that sentence, so the box is filled
+    // in the practice's own words rather than three different ways.
+    { name: 'duties', label: 'Duties', kind: 'text', max: 500, size: 24,
+      placeholder: 'Standard duties of a carpenter',
+      hint: 'The usual form of words: “Standard duties of …”, then the role.' },
     { name: 'started_on', label: 'From', kind: 'date' },
     { name: 'ended_on', label: 'To', kind: 'date' },
   ],
@@ -158,7 +198,60 @@ export const TRAVEL_HISTORY: HistoryDef = {
   ],
 };
 
-export const HISTORIES: HistoryDef[] = [EMPLOYMENT_HISTORY, EDUCATION_HISTORY, TRAVEL_HISTORY];
+/**
+ * Military service, one period a row.
+ *
+ * **Asked for on 12 September 2026:** *"yes build the three questions, but the
+ * table - nothing fancy - just bare bones info - we normally say in the INZ1200
+ * - see the document attached and let them peruse the records."*
+ *
+ * ## What is deliberately not here
+ *
+ * Section D of INZ 1200 asks a table of eleven things: date started, date
+ * finished, location, corps, division, brigade, battalion, unit, rank, duties
+ * and commanding officers. Five are kept.
+ *
+ * **Corps, division, brigade and battalion** are the levels of formation above
+ * a unit. A client who can name their battalion writes it in the unit box; the
+ * four separate columns would be four empty boxes on every screen, for an
+ * answer the attached service document already gives in full.
+ *
+ * **Commanding officers** are the names of people who are not clients here and
+ * have not been asked. The register does not collect third parties' names to
+ * sit unused in a database.
+ *
+ * **Location** is the country, because the town a barracks stands in answers
+ * nothing an application asks — which is the opposite of the employment
+ * history, where the practice asked for the free-text address on the same day
+ * and for a reason: an employer's location is checked, a garrison's is not.
+ *
+ * The answer to all four is the same sentence, and it is the practice's: they
+ * attach the document and let INZ read it.
+ */
+export const MILITARY_HISTORY: HistoryDef = {
+  key: 'military',
+  table: 'client_military',
+  title: 'Military service',
+  noun: 'period',
+  // A gap between two postings is not a question anybody asks, and drawing one
+  // would be the noise the practice has asked twice not to have.
+  showsGaps: false,
+  columns: [
+    { name: 'country', label: 'Country', kind: 'country' },
+    { name: 'unit', label: 'Unit or formation', kind: 'text', max: 200, size: 20,
+      placeholder: '3rd Battalion, Royal Engineers',
+      hint: 'In their own words — a unit, a battalion, a corps. Whatever the document says.' },
+    { name: 'rank', label: 'Rank', kind: 'text', max: 120, size: 14 },
+    { name: 'duties', label: 'Duties', kind: 'text', max: 500, size: 24,
+      placeholder: 'Standard duties of a signaller' },
+    { name: 'started_on', label: 'From', kind: 'date' },
+    { name: 'ended_on', label: 'To', kind: 'date' },
+  ],
+};
+
+export const HISTORIES: HistoryDef[] = [
+  EMPLOYMENT_HISTORY, EDUCATION_HISTORY, TRAVEL_HISTORY, MILITARY_HISTORY,
+];
 
 export function historyByKey(key: string): HistoryDef | undefined {
   return HISTORIES.find((h) => h.key === key);
@@ -181,15 +274,21 @@ export async function historyRows(
   );
 }
 
-/** Every history a client holds, read in one go for the client page. */
+/**
+ * Every history a client holds, read in one go for the client page.
+ *
+ * Built from `HISTORIES` rather than named one at a time, so that a fourth
+ * history — military service, added 12 September 2026 — is a definition and
+ * nothing else. The version that destructured three results in order was one
+ * line of the file that had to be found and changed to add one.
+ */
 export async function allHistories(
   env: Env, clientId: string,
 ): Promise<Record<HistoryKey, HistoryRow[]>> {
-  const [employment, education, travel] = await Promise.all(
-    HISTORIES.map((def) => historyRows(env, def, clientId)));
-  return {
-    employment: employment ?? [], education: education ?? [], travel: travel ?? [],
-  };
+  const read = await Promise.all(HISTORIES.map((def) => historyRows(env, def, clientId)));
+  const out = {} as Record<HistoryKey, HistoryRow[]>;
+  HISTORIES.forEach((def, i) => { out[def.key] = read[i] ?? []; });
+  return out;
 }
 
 /**

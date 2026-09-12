@@ -140,7 +140,24 @@ interface SeedPerson {
    * and a caseload that wrote every one of them in full would never show that
    * the shorter forms work. Old rows here use the shorter forms on purpose.
    */
-  employment?: Array<{ kind: string; employer?: string; role?: string; country?: string; from?: string; to?: string; notes?: string }>;
+  /**
+   * `employer` is the one box that holds the employer **and** the supervisor,
+   * and `location` is free text rather than a country code — both the
+   * practice's decisions of 12 September 2026, and both migration 0100. A few
+   * rows here carry a supervisor and a town to show the shape of the answer;
+   * the rest carry the plain country, which is also an answer people give.
+   */
+  employment?: Array<{ kind: string; employer?: string; role?: string; location?: string;
+    duties?: string; from?: string; to?: string; notes?: string }>;
+  /** One period of military service. INZ 1200 Section D, migration 0099. */
+  military?: Array<{ country: string; unit?: string; rank?: string; duties?: string;
+    from?: string; to?: string; notes?: string }>;
+  /**
+   * The three questions on Section D, each `yes` or `no`. Left off a person
+   * entirely where nobody has asked — which is most of them, and is the state
+   * the register shows as "Not answered".
+   */
+  militaryAnswers?: { compulsory?: string; served?: string; exempt?: string; detail?: string };
   /**
    * What was studied. `level` is a key of the education-level vocabulary —
    * `nzqcf_7` and the rest since migration 0094, where the key carries the
@@ -258,9 +275,9 @@ const PEOPLE: SeedPerson[] = [
     // The unbroken run: twelve years with one employer, offshore and then here.
     employment: [
       { kind: 'employed', employer: 'Pacific Rim Logistics Limited', role: 'Operations manager',
-        country: 'NZ', from: '2019-02-04' },
+        location: 'New Zealand', from: '2019-02-04' },
       { kind: 'employed', employer: 'Pacific Rim Logistics (Colombo)', role: 'Freight coordinator',
-        country: 'LK', from: '2013-07', to: '2019-01' },
+        location: 'Sri Lanka', from: '2013-07', to: '2019-01' },
     ],
     education: [
       { institution: 'University of Moratuwa', qualification: 'BSc Transport Management',
@@ -283,11 +300,11 @@ const PEOPLE: SeedPerson[] = [
     // gaps are the honest answer, not a missing row.
     employment: [
       { kind: 'employed', employer: 'Southern Orchards Limited', role: 'Fruit picker',
-        country: 'NZ', from: '2026-02' },
+        location: 'New Zealand', from: '2026-02' },
       { kind: 'unemployed', from: '2026-01-15', to: '2026-01-31',
         notes: 'Travelling and looking for the first season’s work.' },
       { kind: 'employed', employer: 'Nadi Bay Resort', role: 'Front of house',
-        country: 'FJ', from: '2021-05', to: '2025-11' },
+        location: 'Fiji', from: '2021-05', to: '2025-11' },
       { kind: 'unemployed', from: '2020-04', to: '2021-04',
         notes: 'No work available; living with family.' },
     ],
@@ -309,11 +326,11 @@ const PEOPLE: SeedPerson[] = [
     certificates: [{ kind: 'police', country: 'UA', issued: '2025-08-19' }],
     employment: [
       { kind: 'employed', employer: 'Riverbend Signs Limited', role: 'Graphic designer',
-        country: 'NZ', from: '2025-11-10' },
+        location: 'New Zealand', from: '2025-11-10' },
       { kind: 'unemployed', from: '2025-03', to: '2025-10',
         notes: 'Arrived on a visitor visa; no work rights until the AEWV was granted.' },
       { kind: 'self_employed', employer: 'Kovalenko Design', role: 'Freelance designer',
-        country: 'UA', from: '2016-02', to: '2025-02' },
+        location: 'Ukraine', from: '2016-02', to: '2025-02' },
     ],
     education: [
       { institution: 'Kyiv National University of Culture and Arts',
@@ -342,9 +359,9 @@ const PEOPLE: SeedPerson[] = [
     certificates: [{ kind: 'police', country: 'NZ', issued: '2026-01-20', submitted: '2026-02-09' }],
     employment: [
       { kind: 'employed', employer: 'Riverbend Signs Limited', role: 'Workshop manager',
-        country: 'NZ', from: '2016-04-11' },
+        location: 'New Zealand', from: '2016-04-11' },
       { kind: 'employed', employer: 'Kirikiriroa Print Works', role: 'Machine operator',
-        country: 'NZ', from: '2010', to: '2016-03' },
+        location: 'New Zealand', from: '2010', to: '2016-03' },
     ],
     education: [
       { institution: 'Hamilton Boys’ College', qualification: 'NCEA Level 3',
@@ -371,13 +388,13 @@ const PEOPLE: SeedPerson[] = [
     ],
     employment: [
       { kind: 'employed', employer: 'Kauri Construction Limited', role: 'Quantity surveyor',
-        country: 'NZ', from: '2025-04' },
+        location: 'New Zealand', from: '2025-04' },
       { kind: 'caring', from: '2023-09', to: '2025-03',
         notes: 'At home with the children after the family decided to emigrate.' },
       { kind: 'employed', employer: 'Highveld Quantity Surveyors', role: 'Senior quantity surveyor',
-        country: 'ZA', from: '2016-01', to: '2023-08' },
+        location: 'South Africa', from: '2016-01', to: '2023-08' },
       { kind: 'employed', employer: 'Tshwane Build Group', role: 'Quantity surveyor',
-        country: 'ZA', from: '2012-03-05', to: '2015-12-18' },
+        location: 'South Africa', from: '2012-03-05', to: '2015-12-18' },
     ],
     travel: [
       { country: 'ZA', port: 'Johannesburg', purpose: 'family', from: '2026-06-02', to: '2026-06-28' },
@@ -395,9 +412,9 @@ const PEOPLE: SeedPerson[] = [
     certificates: [{ kind: 'police', country: 'ZA', issued: '2024-11-12' }],
     employment: [
       { kind: 'employed', employer: 'Waikato Signage Supplies Limited', role: 'Storeperson',
-        country: 'NZ', from: '2025-06-02' },
+        location: 'New Zealand', from: '2025-06-02' },
       { kind: 'employed', employer: 'Gauteng Freight Services', role: 'Warehouse supervisor',
-        country: 'ZA', from: '2009', to: '2025-04' },
+        location: 'South Africa', from: '2009', to: '2025-04' },
     ],
     education: [
       { institution: 'Pretoria Technical High School', qualification: 'National Senior Certificate',
@@ -425,12 +442,21 @@ const PEOPLE: SeedPerson[] = [
     employment: [
       { kind: 'unemployed', from: '2025-09',
         notes: 'No work rights since the visa expired.' },
-      { kind: 'employed', employer: 'Riverside Panel and Paint', role: 'Panel beater',
-        country: 'NZ', from: '2022-11', to: '2025-08' },
+      { kind: 'employed', employer: 'Riverside Panel and Paint — supervisor Dean Harper',
+        role: 'Panel beater', location: 'Onehunga, Auckland, New Zealand',
+        duties: 'Standard duties of a panel beater.', from: '2022-11', to: '2025-08' },
       { kind: 'unemployed', from: '2021', to: '2022-10',
         notes: 'Period the client says he cannot document. Discussed at the first meeting.' },
-      { kind: 'employed', employer: 'Talleres Medellín', role: 'Panel beater',
-        country: 'CO', from: '2006', to: '2020' },
+      { kind: 'employed', employer: 'Talleres Medellín — supervisor Óscar Restrepo',
+        role: 'Panel beater', location: 'Medellín, Antioquia, Colombia',
+        duties: 'Standard duties of a panel beater.', from: '2006', to: '2020' },
+    ],
+    // Conscription, served, and no exemption: the ordinary Section D answer for
+    // a Colombian man of his age, and the one the block is drawn for.
+    militaryAnswers: { compulsory: 'yes', served: 'yes', exempt: 'no' },
+    military: [
+      { country: 'CO', unit: 'Batallón de Ingenieros No. 4', rank: 'Soldado',
+        duties: 'Standard duties of a conscript sapper.', from: '2002-07', to: '2003-06' },
     ],
     education: [
       { institution: 'SENA Medellín', qualification: 'Técnico en Mecánica Automotriz',
@@ -456,13 +482,13 @@ const PEOPLE: SeedPerson[] = [
     ],
     employment: [
       { kind: 'employed', employer: 'Kaitiaki Foods Limited', role: 'Halal Butcher',
-        country: 'NZ', from: '2024-06-10' },
+        location: 'New Zealand', from: '2024-06-10' },
       { kind: 'unemployed', from: '2024-01-05', to: '2024-05-30',
         notes: 'Between roles while the AEWV was processed offshore.' },
       { kind: 'employed', employer: 'Lagos Meat Company', role: 'Butcher',
-        country: 'NG', from: '2018-02-01', to: '2024-01-04' },
+        location: 'Nigeria', from: '2018-02-01', to: '2024-01-04' },
       { kind: 'employed', employer: 'Owerri Cold Storage', role: 'Trainee butcher',
-        country: 'NG', from: '2015-09', to: '2018-01' },
+        location: 'Nigeria', from: '2015-09', to: '2018-01' },
     ],
     education: [
       { institution: 'Federal Polytechnic Nekede', qualification: 'Food Technology',
@@ -485,10 +511,10 @@ const PEOPLE: SeedPerson[] = [
     certificates: [{ kind: 'police', country: 'NG', issued: '2024-02-01' }],
     employment: [
       { kind: 'employed', employer: 'Te Awa Early Learning Centre', role: 'Teacher aide',
-        country: 'NZ', from: '2024-09-02' },
+        location: 'New Zealand', from: '2024-09-02' },
       { kind: 'caring', from: '2016-11', to: '2024-08', notes: 'At home with the children.' },
       { kind: 'employed', employer: 'Enugu Community Bank', role: 'Teller',
-        country: 'NG', from: '2014', to: '2016-10' },
+        location: 'Nigeria', from: '2014', to: '2016-10' },
     ],
     education: [
       { institution: 'University of Nigeria, Nsukka', qualification: 'BSc Banking and Finance',
@@ -518,9 +544,9 @@ const PEOPLE: SeedPerson[] = [
     ],
     employment: [
       { kind: 'employed', employer: 'Kaitiaki Foods Limited', role: 'Halal Butcher',
-        country: 'NZ', from: '2026-02-09' },
+        location: 'New Zealand', from: '2026-02-09' },
       { kind: 'employed', employer: 'Port Harcourt Provisions', role: 'Butcher',
-        country: 'NG', from: '2016-05-03', to: '2025-12-19' },
+        location: 'Nigeria', from: '2016-05-03', to: '2025-12-19' },
     ],
     education: [
       { institution: 'Rivers State Technical College', qualification: 'Trade Certificate in Meat Processing',
@@ -549,10 +575,19 @@ const PEOPLE: SeedPerson[] = [
       { kind: 'unemployed', from: '2026-05-21',
         notes: 'Visitor visa; no work rights. Living on savings from the sale of the business.' },
       { kind: 'self_employed', employer: 'Silva Marcenaria', role: 'Cabinetmaker',
-        country: 'BR', from: '2014-03-01', to: '2026-05-20' },
-      { kind: 'employed', employer: 'Móveis Paulista', role: 'Cabinetmaker',
-        country: 'BR', from: '2008', to: '2014-02' },
+        location: 'São Paulo, Brazil',
+        duties: 'Standard duties of a cabinetmaker.', from: '2014-03-01', to: '2026-05-20' },
+      { kind: 'employed', employer: 'Móveis Paulista — supervisor Rafael Lima',
+        role: 'Cabinetmaker', location: 'São Paulo, Brazil',
+        duties: 'Standard duties of a cabinetmaker.', from: '2008', to: '2014-02' },
     ],
+    // Conscription, but exempt — the answer that has to carry an explanation,
+    // and the only place in this caseload where one is stored.
+    militaryAnswers: {
+      compulsory: 'yes', served: 'no', exempt: 'yes',
+      detail: 'Presented for selection at 18 and was not called up. Holds a Certificado de '
+        + 'Dispensa de Incorporação, issued 2006, which is on the file.',
+    },
     education: [
       { institution: 'SENAI São Paulo', qualification: 'Curso Técnico em Marcenaria',
         level: 'overseas_unassessed', country: 'BR', from: '2005', to: '2007', awarded: '2007' },
@@ -588,9 +623,9 @@ const PEOPLE: SeedPerson[] = [
     employment: [
       { kind: 'studying', from: '2025-02-10', notes: 'Full-time study in New Zealand.' },
       { kind: 'employed', employer: 'Hamilton Central Café', role: 'Barista',
-        country: 'NZ', from: '2025-04', notes: 'Twenty hours a week in term time, as permitted.' },
+        location: 'New Zealand', from: '2025-04', notes: 'Twenty hours a week in term time, as permitted.' },
       { kind: 'employed', employer: 'An Phat Trading', role: 'Accounts clerk',
-        country: 'VN', from: '2018-08-01', to: '2024-12-20' },
+        location: 'Vietnam', from: '2018-08-01', to: '2024-12-20' },
     ],
     travel: [
       { country: 'NZ', port: 'Auckland', purpose: 'study', from: '2025-02-08' },
@@ -613,13 +648,13 @@ const PEOPLE: SeedPerson[] = [
     // certificates. The AE years are the reason for the second one.
     employment: [
       { kind: 'employed', employer: 'Tasman Orchards Limited', role: 'Orchard Supervisor',
-        country: 'NZ', from: '2023-09-20' },
+        location: 'New Zealand', from: '2023-09-20' },
       { kind: 'unemployed', from: '2023-08-01', to: '2023-09-19',
         notes: 'Between the Gulf contract ending and arriving in New Zealand.' },
       { kind: 'employed', employer: 'Gulf Agriculture LLC', role: 'Farm Supervisor',
-        country: 'AE', from: '2016-01-10', to: '2023-07-30' },
+        location: 'United Arab Emirates', from: '2016-01-10', to: '2023-07-30' },
       { kind: 'employed', employer: 'Coimbatore Agri Services', role: 'Field officer',
-        country: 'IN', from: '2008', to: '2015-12' },
+        location: 'India', from: '2008', to: '2015-12' },
     ],
     education: [
       { institution: 'Tamil Nadu Agricultural University', qualification: 'BSc Horticulture',
@@ -641,10 +676,10 @@ const PEOPLE: SeedPerson[] = [
     certificates: [{ kind: 'police', country: 'IN', issued: '2026-05-30', submitted: '2026-06-20' }],
     employment: [
       { kind: 'employed', employer: 'Motueka Packhouse Limited', role: 'Packhouse hand',
-        country: 'NZ', from: '2024-02' },
+        location: 'New Zealand', from: '2024-02' },
       { kind: 'caring', from: '2016', to: '2024-01', notes: 'At home with the family in the Gulf.' },
       { kind: 'employed', employer: 'Erode Textiles', role: 'Quality inspector',
-        country: 'IN', from: '2010', to: '2015' },
+        location: 'India', from: '2010', to: '2015' },
     ],
     education: [
       { institution: 'Bharathiar University', qualification: 'BA Economics',
@@ -662,9 +697,9 @@ const PEOPLE: SeedPerson[] = [
     passports: [{ country: 'CN', number: 'EG1129940', issued: '2018-02-14', expires: '2028-02-13' }],
     employment: [
       { kind: 'self_employed', employer: 'Harbour Bridge Imports Limited', role: 'Director',
-        country: 'NZ', from: '2019-06-01' },
+        location: 'New Zealand', from: '2019-06-01' },
       { kind: 'employed', employer: 'Ningbo Trade Partners', role: 'Export manager',
-        country: 'CN', from: '2003', to: '2019-05' },
+        location: 'China', from: '2003', to: '2019-05' },
     ],
     education: [
       { institution: 'Zhejiang Gongshang University', qualification: 'Bachelor of International Trade',
@@ -718,9 +753,9 @@ const PEOPLE: SeedPerson[] = [
       { kind: 'unemployed', from: '2026-03-11',
         notes: 'No work rights while unlawful. Supported by family.' },
       { kind: 'employed', employer: 'Southern Cross Scaffolding Limited', role: 'Scaffolder',
-        country: 'NZ', from: '2022-01-17', to: '2026-03-10' },
+        location: 'New Zealand', from: '2022-01-17', to: '2026-03-10' },
       { kind: 'employed', employer: 'Apia Building Supplies', role: 'Yard hand',
-        country: 'WS', from: '2013', to: '2021-11' },
+        location: 'Samoa', from: '2013', to: '2021-11' },
     ],
     education: [
       { institution: 'Avele College', qualification: 'Samoa School Certificate',
@@ -742,7 +777,7 @@ const PEOPLE: SeedPerson[] = [
     passports: [{ country: 'NZ', number: 'LM880412', issued: '2019-10-30', expires: '2029-10-29' }],
     employment: [
       { kind: 'employed', employer: 'Waikato District Health Services', role: 'Health care assistant',
-        country: 'NZ', from: '2018-08' },
+        location: 'New Zealand', from: '2018-08' },
     ],
     education: [
       { institution: 'Te Wānanga o Aotearoa', qualification: 'Certificate in Health and Wellbeing',
@@ -758,11 +793,11 @@ const PEOPLE: SeedPerson[] = [
     certificates: [{ kind: 'police', country: 'IQ', issued: '2025-03-19' }],
     employment: [
       { kind: 'employed', employer: 'Aotearoa Resettlement Trust', role: 'Community liaison',
-        country: 'NZ', from: '2025-08-11' },
-      { kind: 'volunteer', employer: 'Amman Refugee Support Network', country: 'JO',
+        location: 'New Zealand', from: '2025-08-11' },
+      { kind: 'volunteer', employer: 'Amman Refugee Support Network', location: 'Jordan',
         from: '2019', to: '2025-06', notes: 'Unpaid; the work the specific purpose visa was granted for.' },
       { kind: 'employed', employer: 'Baghdad Teaching Institute', role: 'Lecturer',
-        country: 'IQ', from: '2015', to: '2018' },
+        location: 'Iraq', from: '2015', to: '2018' },
     ],
     education: [
       { institution: 'University of Baghdad', qualification: 'MA Sociology',
@@ -789,13 +824,13 @@ const PEOPLE: SeedPerson[] = [
     ],
     employment: [
       { kind: 'employed', employer: 'Waikato Care Group Limited', role: 'Registered Nurse',
-        country: 'NZ', from: '2024-11-18' },
+        location: 'New Zealand', from: '2024-11-18' },
       { kind: 'unemployed', from: '2024-10-01', to: '2024-11-17',
         notes: 'Relocating; nursing registration completed in this period.' },
       { kind: 'employed', employer: 'Manila Doctors Hospital', role: 'Staff Nurse',
-        country: 'PH', from: '2015-03-02', to: '2024-09-30' },
+        location: 'Philippines', from: '2015-03-02', to: '2024-09-30' },
       { kind: 'employed', employer: 'Cebu Provincial Clinic', role: 'Ward nurse',
-        country: 'PH', from: '2012-08', to: '2015-02' },
+        location: 'Philippines', from: '2012-08', to: '2015-02' },
     ],
     education: [
       { institution: 'University of Santo Tomas', qualification: 'Bachelor of Science in Nursing',
@@ -815,9 +850,9 @@ const PEOPLE: SeedPerson[] = [
     passports: [{ country: 'RU', number: '7712004411', issued: '2021-09-15', expires: '2031-09-14' }],
     employment: [
       { kind: 'self_employed', employer: 'Petrov Software', role: 'Contract developer',
-        country: 'RS', from: '2022-05' },
+        location: 'Serbia', from: '2022-05' },
       { kind: 'employed', employer: 'Nevsky Systems', role: 'Senior developer',
-        country: 'RU', from: '2009', to: '2022-04' },
+        location: 'Russia', from: '2009', to: '2022-04' },
     ],
     education: [
       { institution: 'Saint Petersburg State University', qualification: 'Specialist in Applied Mathematics',
@@ -838,7 +873,7 @@ const PEOPLE: SeedPerson[] = [
     visa: { type: 'none_offshore' },
     employment: [
       { kind: 'employed', employer: 'Nairobi Learning Trust', role: 'Programme coordinator',
-        country: 'KE', from: '2021' },
+        location: 'Kenya', from: '2021' },
     ],
   },
   {
@@ -858,13 +893,13 @@ const PEOPLE: SeedPerson[] = [
     ],
     employment: [
       { kind: 'employed', employer: 'Northshore Fabrication Limited', role: 'Design engineer',
-        country: 'NZ', from: '2026-02-16',
+        location: 'New Zealand', from: '2026-02-16',
         notes: 'Started before the visa conditions allowed it — the breach the '
           + 'deportation liability notice is about.' },
       { kind: 'studying', from: '2023-07-17', to: '2025-11-28',
         notes: 'Full-time study in New Zealand.' },
       { kind: 'employed', employer: 'Song Hong Engineering', role: 'Graduate engineer',
-        country: 'VN', from: '2021-08', to: '2023-05' },
+        location: 'Vietnam', from: '2021-08', to: '2023-05' },
     ],
     travel: [
       { country: 'NZ', port: 'Auckland', purpose: 'study', from: '2023-07-10' },
@@ -888,7 +923,7 @@ const PEOPLE: SeedPerson[] = [
       { kind: 'caring', from: '2025-03-10',
         notes: 'Caring for her brother’s children while the residence application is decided.' },
       { kind: 'employed', employer: 'Addis Textile Works', role: 'Line supervisor',
-        country: 'ET', from: '2017', to: '2025-01' },
+        location: 'Ethiopia', from: '2017', to: '2025-01' },
       { kind: 'unemployed', from: '2015', to: '2016', notes: 'Displaced; no work available.' },
     ],
     education: [
@@ -908,7 +943,7 @@ const PEOPLE: SeedPerson[] = [
     passports: [{ country: 'ET', number: 'EP1180933', issued: '2020-06-04', expires: '2030-06-03' }],
     employment: [
       { kind: 'employed', employer: 'Kaitiaki Foods Limited', role: 'Production supervisor',
-        country: 'NZ', from: '2019-02-11' },
+        location: 'New Zealand', from: '2019-02-11' },
     ],
     education: [
       { institution: 'Bahir Dar University', qualification: 'BSc Food Science',
@@ -928,9 +963,9 @@ const PEOPLE: SeedPerson[] = [
     ],
     employment: [
       { kind: 'self_employed', employer: 'Bauer Anlagenbau GmbH', role: 'Managing director',
-        country: 'DE', from: '2003-04-01' },
+        location: 'Germany', from: '2003-04-01' },
       { kind: 'employed', employer: 'Sächsische Maschinenbau AG', role: 'Project engineer',
-        country: 'DE', from: '1999-11', to: '2003-03' },
+        location: 'Germany', from: '1999-11', to: '2003-03' },
     ],
     travel: [
       { country: 'NZ', port: 'Christchurch', purpose: 'business', from: '2026-02-04', to: '2026-02-19' },
@@ -947,7 +982,7 @@ const PEOPLE: SeedPerson[] = [
     passports: [{ country: 'DE', number: 'CF7723020', issued: '2021-01-25', expires: '2031-01-24' }],
     employment: [
       { kind: 'self_employed', employer: 'Bauer Anlagenbau GmbH', role: 'Finance director',
-        country: 'DE', from: '2006' },
+        location: 'Germany', from: '2006' },
     ],
     education: [
       { institution: 'Universität Leipzig', qualification: 'Diplom-Kauffrau',
@@ -1877,13 +1912,18 @@ export async function seedTestData(env: Env, byUserId: string): Promise<SeedResu
       `INSERT INTO clients (id, ref, kind, full_name, given_names, family_name, email, phone,
           date_of_birth, current_visa_type, current_visa_start, current_visa_expiry,
           current_visa_expiry_rule, current_visa_conditions, current_visa_stay_limit,
-          inz_client_number, status, assigned_to, is_test, created_at, updated_at, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)`,
+          inz_client_number, military_compulsory, military_served, military_exempt,
+          military_exemption_detail,
+          status, assigned_to, is_test, created_at, updated_at, created_by)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)`,
       id, ref, p.given ? 'individual' : 'organisation', p.name, p.given || null, p.family || null,
       p.email || null, p.phone || null, p.dob || null,
       p.visa?.type ?? null, p.visa?.start ?? null, p.visa?.expiry ?? null,
       p.visa?.rule ?? null, p.visa?.conditions ?? null, p.visa?.stay ?? null,
-      p.inzClient ?? null, p.status ?? 'active', author, at, at, author,
+      p.inzClient ?? null,
+      p.militaryAnswers?.compulsory ?? null, p.militaryAnswers?.served ?? null,
+      p.militaryAnswers?.exempt ?? null, p.militaryAnswers?.detail ?? null,
+      p.status ?? 'active', author, at, at, author,
     );
     result.clients += 1;
 
@@ -1918,11 +1958,21 @@ export async function seedTestData(env: Env, byUserId: string): Promise<SeedResu
     for (const [i, e] of (p.employment ?? []).entries()) {
       await run(
         env.DB,
-        `INSERT INTO client_employment (id, client_id, position, kind, employer, role, country,
+        `INSERT INTO client_employment (id, client_id, position, kind, employer_and_supervisor,
+            role, location, duties, started_on, ended_on, notes, created_at, updated_at, created_by)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        newId('emp'), id, i + 1, e.kind, e.employer ?? null, e.role ?? null, e.location ?? null,
+        e.duties ?? null, e.from ?? null, e.to ?? null, e.notes ?? null, at, at, author);
+    }
+
+    for (const [i, m] of (p.military ?? []).entries()) {
+      await run(
+        env.DB,
+        `INSERT INTO client_military (id, client_id, position, country, unit, rank, duties,
             started_on, ended_on, notes, created_at, updated_at, created_by)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        newId('emp'), id, i + 1, e.kind, e.employer ?? null, e.role ?? null, e.country ?? null,
-        e.from ?? null, e.to ?? null, e.notes ?? null, at, at, author);
+        newId('mil'), id, i + 1, m.country, m.unit ?? null, m.rank ?? null, m.duties ?? null,
+        m.from ?? null, m.to ?? null, m.notes ?? null, at, at, author);
     }
 
     for (const [i, e] of (p.education ?? []).entries()) {

@@ -266,9 +266,28 @@ later replaced still sits in the file that created it.
 | `client_id` | TEXT | no | — |
 | `position` | INTEGER | no | `0` |
 | `kind` | TEXT | no | `'employed'` |
-| `employer` | TEXT | yes | — |
+| `employer_and_supervisor` | TEXT | yes | — |
 | `role` | TEXT | yes | — |
+| `location` | TEXT | yes | — |
+| `started_on` | TEXT | yes | — |
+| `ended_on` | TEXT | yes | — |
+| `notes` | TEXT | yes | — |
+| `created_at` | TEXT | no | — |
+| `updated_at` | TEXT | no | — |
+| `created_by` | TEXT | yes | — |
+| `duties` | TEXT | yes | — |
+
+## `client_military`
+
+| Column | Type | Null | Default |
+|---|---|---|---|
+| `id` _(pk)_ | TEXT | yes | — |
+| `client_id` | TEXT | no | — |
+| `position` | INTEGER | no | `0` |
 | `country` | TEXT | yes | — |
+| `unit` | TEXT | yes | — |
+| `rank` | TEXT | yes | — |
+| `duties` | TEXT | yes | — |
 | `started_on` | TEXT | yes | — |
 | `ended_on` | TEXT | yes | — |
 | `notes` | TEXT | yes | — |
@@ -386,6 +405,10 @@ later replaced still sits in the file that created it.
 | `national_id_country` | TEXT | yes | — |
 | `current_visa_conditions` | TEXT | yes | — |
 | `current_visa_stay_limit` | TEXT | yes | — |
+| `military_compulsory` | TEXT | yes | — |
+| `military_served` | TEXT | yes | — |
+| `military_exempt` | TEXT | yes | — |
+| `military_exemption_detail` | TEXT | yes | — |
 
 ## `counters`
 

@@ -246,9 +246,10 @@ So:
 | Table | One row is | Carries |
 |---|---|---|
 | `client_residence` | a period living in one country | country, from, to, address (optional) |
-| `client_employment` | a period in one job | employer, role, country, from, to, industry, whether it is claimed as skilled work |
+| `client_employment` | a period in one job | employer and supervisor in one box, role, location (free text since 0100), duties, from, to |
 | `client_education` | a period at one institution | institution, country, qualification, level, from, to |
 | `client_travel` | one trip | country, from, to, purpose |
+| `client_military` | a period of service | country, unit, rank, duties, from, to |
 
 **The gapless rule belongs to `client_residence` alone.** It is the one INZ
 actually enforces — the form says *"Do not leave any gaps in the timeline"* —
@@ -319,11 +320,22 @@ Two things the request added that the plan above did not have, both built:
     to answer, not a fault, and a history part-way through entry has them
     legitimately. Nothing alerts on one.
 
-**Military records** is a block on the client page and nothing behind it, by
-the practice's own instruction: *"create the block but keep it as a placeholder
-for now."* The shape is the undecided part — whether it is one period or
-several, whether a rank and a discharge belong on it, whether it is a history
-like the three above or a set of flat facts like the ones on a client record.
+**Military service was that placeholder until 12 September 2026**, when the
+practice decided its shape: *"yes build the three questions, but the table -
+nothing fancy - just bare bones info - we normally say in the INZ1200 - see the
+document attached and let them peruse the records."*
+
+So it is **both** of the two shapes that were open: the three questions on
+Section D of INZ 1200 are flat facts on `clients` (`military_compulsory`,
+`military_served`, `military_exempt` and the explanation the form demands of an
+exemption), and the service itself is a fourth history, `client_military` —
+country, unit or formation, rank, duties and the two dates. Migration 0099.
+
+Six of the form's eleven table columns are deliberately absent: corps,
+division, brigade, battalion, location within the country, and commanding
+officers. The practice attaches the service document and lets INZ read them off
+it, and the reasoning is written into the migration so the absence reads as a
+decision.
 
 #### The direction the practice actually wants: the client sends documents, not data
 

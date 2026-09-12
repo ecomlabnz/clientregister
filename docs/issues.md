@@ -628,6 +628,7 @@ spot: never have a migration or a deploy overwrite a stored vocabulary
 unguarded. `vocab.doc_categories` is the proof — three lines the practice added
 for their own filing would have gone, silently, and nothing would have said so.
 
+<<<<<<< HEAD
 ### 20. A sign-in code emailed out is readable in the register for ten minutes
 
 **Found** 12 September 2026, while building the email fallback (1.68.0).
@@ -689,6 +690,102 @@ question somebody will ask again.
   allowance**, not a new one. One box, one allowance: a second counter would let
   an attacker spend twenty attempts by alternating what they claimed to be
   typing.
+=======
+### 20. An employment location can no longer be counted or matched
+
+**Found** 12 September 2026, while making the change that caused it.
+**Severity: low, and OPEN by decision.**
+
+`client_employment.country` was an ISO country code, from the same list as
+nationality and passport country, and the database refused anything that was not
+on it. It is now `location`, free text, because the practice asked for it:
+*"Country should change to Location which will include whatever address the
+applicant can provide - sometimes it is minimal - country and area."*
+
+They are right about the answer they get. The cost, said out loud rather than
+discovered later: **nothing can now count how many clients have worked in a
+given country, or match a work history against a police-certificate rule, from
+this column.** "Viet Nam", "Vietnam" and "Vinh, Nghe An" are three different
+strings again — the exact problem migration 0030 solved for nationality.
+
+Nothing in the register does either of those things today, which is why this was
+not worth a second column now.
+
+**What would close it:** a `country` code beside `location`, filled in where the
+text names a country the register recognises and left null where it does not,
+with the code doing the counting and the text doing the reading. Not built,
+because the first thing that needs it will say what it needs — and a column
+nobody fills in is worse than no column.
+
+### 21. Two boxes in the employment history have no ceiling in the database
+
+**Found** 12 September 2026, adding ceilings to the three boxes migration 0100
+touches.
+**Severity: low, and OPEN.**
+
+`employer_and_supervisor`, `location` and `duties` are refused over 300, 200 and
+500 characters. `role` and `kind` on the same table, and `institution`,
+`qualification` and `port_of_entry` on the other two histories, have no such
+rule — the form limits them and nothing else does. A reading of a document, or a
+bulk load, is a second way in, and that is exactly the argument the note's
+1000-character ceiling was written on.
+
+It was left out of 0100 on purpose: a ceiling on three columns of one table is
+this change's business, and a ceiling on every text column in the register is a
+rule of its own that should land in one migration rather than half-done in
+somebody else's.
+
+**What would close it:** one migration giving every free-text column on the four
+history tables a ceiling, in the same words.
+
+### 22. The three military questions are read in one place and answered in another
+
+**Found** 12 September 2026, building them.
+**Severity: low, and OPEN by decision.**
+
+The answers show at the top of the Military service block on the client's page,
+but they are edited on the client's own form, two clicks away, because they are
+columns on `clients` and that form owns them. Somebody reading the block will
+reasonably try to answer them there.
+
+**What would close it:** a small form in the block that writes those four
+columns and nothing else. Deliberately not built today, because it would make a
+second writer of a column that already has an owner — which is how the
+certificate cache got wiped once. If it is built, the client form should stop
+writing them in the same change, not both write.
+
+### 23. `ARCHITECTURE.md` states a test count that nothing keeps true
+
+**Found** 12 September 2026, reading it before starting work.
+**Severity: low, and OPEN.**
+
+The shape-of-the-thing diagram says *"test/ 2,320 tests"*. The suite passes
+2,802 as this is written. Nothing checks the number, so it has drifted by five
+hundred — which is fault 21's shape exactly (a stated number about a measured
+thing goes stale in silence), in the one document a new reader starts with.
+
+**What would close it:** either drop the number, or have the test that already
+counts the specification's front page count this one too.
+
+### 24. A history block that refuses a save reopens closed
+
+**Found** 12 September 2026, while building the fourth history.
+**Severity: low, and OPEN.** Pre-existing since 11 September; nothing is lost,
+but the message is harder to act on than it should be.
+
+When a history save is refused — a date in the wrong shape, say — the route
+redirects to `/clients/<id>?open=history-employment#history-employment`, which
+reads as an instruction to open that block. It is not one. The three history
+blocks (four now) are drawn with `collapsibleCard`, which takes no "open"
+option and always renders folded, unlike the blocks above them which are drawn
+with `foldingCard` and do honour `?open=`. So the red banner appears at the top
+of the page and the table it is about is shut.
+
+**What would close it:** `historyPanel` taking an `open` flag and drawing
+`foldingCard` with it, fed from the same `openBlocks` set the rest of the page
+already uses. Perhaps ten lines. Not done here because nobody asked for it and
+it is not this change's business; put it to the practice first.
+>>>>>>> 8bd9776 (Military service, asked and answered, and a job that says where and what)
 
 ## Asked for, not yet built
 
