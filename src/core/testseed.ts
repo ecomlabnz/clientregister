@@ -405,7 +405,7 @@ const CASES: SeedCase[] = [
   // One applicant, one visa, nothing in the way. A practice's bread and butter,
   // and the register should not make them feel heavy.
   { of: 'nguyen', title: 'Further student visa',
-    type: 'sv_student', status: 'approved', lodged: '2026-01-08',
+    type: 'sv_general', status: 'approved', lodged: '2026-01-08',
     decided: '2026-02-02', outcome: 'approved',
     summary: 'Second year of the diploma. Offer of place and fees receipt held.' },
   { of: 'perera', title: 'Transfer of a resident visa to a new passport',
@@ -465,7 +465,7 @@ const CASES: SeedCase[] = [
     summary: 'Third job check this year. Held until the employer produces the '
       + 'advertising and the market rate evidence.' },
   { of: 'santos', title: 'Straight to residence, with a medical waiver sought',
-    type: 'rv_green_list_str', status: 'awaiting_information', lodged: '2026-07-15',
+    type: 'rv_green_list_str', status: 'ppi', lodged: '2026-07-15',
     inzApp: '74203311', priority: 'urgent',
     nextAction: 'Specialist report for the medical waiver', nextActionDue: '2026-09-29',
     summary: 'Green list role. The medical assessor has raised a condition and a '
@@ -514,7 +514,7 @@ const CASES: SeedCase[] = [
     nextActionDue: '2026-09-24',
     summary: 'Fresh evidence of ties and of funds filed within the period.' },
   { of: 'mendoza', title: 'Ministerial intervention after a decline',
-    type: 'rq_ministerial_intervention', status: 'open', priority: 'high',
+    type: 'rq_ministerial_intervention', status: 'preparing', priority: 'high',
     nextAction: 'Submissions to be settled with the client',
     nextActionDue: '2026-10-08',
     summary: 'Appeal rights exhausted. Character is the obstacle and a waiver was '

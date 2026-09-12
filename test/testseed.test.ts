@@ -30,6 +30,7 @@ import {
   AUTO_RESET_DAYS, SEEDED_AT, autoResetIfDue, resetTestData, seedState, seedTestData,
 } from '../src/core/testseed';
 import { purgeTestData, tallyTestData } from '../src/core/testdata';
+import { CASE_STATUSES } from '../src/domain';
 
 const AT = '2026-09-11T09:00:00Z';
 
@@ -88,15 +89,30 @@ describe('the caseload that is laid down', () => {
     expect(Math.max(...rows.map((r) => r.n))).toBeGreaterThanOrEqual(3);
   });
 
-  it('carries the complications, not a page of clean grants', async () => {
+  it('uses only statuses the register actually has', async () => {
+    // **This test used to assert the bug.** It required `awaiting_information`
+    // to be present — a status that is not in `CASE_STATUSES` and never has
+    // been — so the seed wrote it, the matter displayed the raw key instead of
+    // a label, and the test went green. A second matter carried `open`, equally
+    // invented. The practice spotted both in the trial on 12 September 2026,
+    // on the page a prospective customer would open first.
+    //
+    // A test that names the values it wants can only ever check the ones
+    // somebody thought of. This checks the whole set against the register's own
+    // list, so an invented status fails whatever it is called.
     const { db, env } = register();
     await seedTestData(env, 'u1');
     const statuses = new Set((db.prepare('SELECT DISTINCT status AS s FROM cases').all() as Array<{ s: string }>)
       .map((r) => r.s));
-    // A declined matter, one waiting on information, one on hold, one closed.
-    for (const s of ['declined', 'awaiting_information', 'on_hold', 'approved']) {
+    for (const s of statuses) {
+      expect(CASE_STATUSES as readonly string[], `${s} is not a case status`).toContain(s);
+    }
+    // And it still has to be a caseload with something wrong in it, or it
+    // shows nothing of what the register is for.
+    for (const s of ['declined', 'on_hold', 'approved', 'lodged']) {
       expect(statuses, s).toContain(s);
     }
+    expect(statuses.size).toBeGreaterThanOrEqual(5);
     const quoteStatuses = new Set(
       (db.prepare('SELECT DISTINCT status AS s FROM quotes').all() as Array<{ s: string }>)
         .map((r) => r.s));
@@ -284,9 +300,24 @@ describe('the caseload somebody trying the register is shown', () => {
     // `other_s61`, `rv_skilled` among them — are not in `core/vocabulary.ts`,
     // so those matters displayed a raw key where every other matter shows a
     // label. Checked here against the real vocabulary rather than a copy of it.
+    // **And this check was too loose to catch the second one.** It harvested
+    // every `key | Label` line in the whole file, so a key belonging to a
+    // *different* vocabulary passed: the seed gave a student matter the type
+    // `sv_student`, which is a visa a client **holds**, not a kind of work the
+    // practice does. The case-type list has `sv_general` for that. Spotted by
+    // the practice on 12 September 2026 in the trial's Type column, one day
+    // after this test was written to prevent exactly this.
+    //
+    // So read the case-type vocabulary itself, not the file it lives in.
     const { rows } = await seeded();
+    const caseTypeBlock = VOCABULARY_SOURCE.match(
+      /export const CASE_TYPE_VOCAB[\s\S]*?defaults: `([\s\S]*?)`,/)?.[1];
+    expect(caseTypeBlock, 'the case type vocabulary could not be read').toBeTruthy();
     const configured = new Set(
-      [...VOCABULARY_SOURCE.matchAll(/([a-z][a-z_0-9]*) \| [A-Z]/g)].map((m) => m[1]!));
+      [...caseTypeBlock!.matchAll(/^([a-z][a-z_0-9]*) \|/gm)].map((m) => m[1]!));
+    // If the block ever stops being found, the set is empty and every type
+    // "fails" — loud, not silent. Check it read something sane.
+    expect(configured.size).toBeGreaterThan(40);
     const used = rows<{ case_type: string }>('SELECT DISTINCT case_type FROM cases')
       .map((r) => r.case_type);
     expect(used.length).toBeGreaterThan(12);
