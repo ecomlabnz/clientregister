@@ -125,6 +125,17 @@ export interface Vars {
   nonce: string;
   /** Resolved once per request for the banner in the corner. */
   notify: NotifySettings | null;
+  /**
+   * The band across the top of a trial register, or `null` on a real one.
+   *
+   * **Asked for on 12 September 2026:** *"there should be a running line or a
+   * banner above saying in how many days the reset will take place."*
+   *
+   * Resolved in `attachSession`, beside the other per-request facts, and only
+   * where `APP_ENV` is not `production` — the practice's own register does not
+   * pay a query for a band it will never show.
+   */
+  trialNotice: string | null;
 }
 
 export type AppContext = { Bindings: Env; Variables: Vars };

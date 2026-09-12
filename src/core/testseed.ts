@@ -113,6 +113,7 @@ import { newId } from './ids';
 import { audit } from './audit';
 import { purgeTestData } from './testdata';
 import { computeLine, summariseQuote } from './quotes';
+import { dateShort } from '../ui/format';
 import type { FeeKind, GstTreatment } from './money';
 import { newShareToken } from './kblink';
 
@@ -987,11 +988,13 @@ const CASES: SeedCase[] = [
   { key: 'sv_nguyen', of: 'nguyen', title: 'Further student visa',
     type: 'sv_general', status: 'approved', lodged: '2026-01-08',
     decided: '2026-02-02', outcome: 'approved',
-    summary: 'Second year of the diploma. Offer of place and fees receipt held.' },
+    summary: 'Second year of the diploma. Offer of place and fees receipt held.',
+    tasks: [{ title: 'File the enrolment confirmation on the file', status: 'done' }] },
   { key: 'trnsf_perera', of: 'perera', title: 'Transfer of a resident visa to a new passport',
     type: 'trnsf_transfer_to_new_passport', status: 'approved', lodged: '2026-01-28',
     decided: '2026-02-06', outcome: 'approved',
-    summary: 'Old passport expired. Same person, same visa, new label.' },
+    summary: 'Old passport expired. Same person, same visa, new label.',
+    tasks: [{ title: 'Send the new visa label to the client', status: 'done' }] },
   { key: 'sv_okafor_child', of: 'okafor', title: 'Dependent child student visa',
     type: 'sv_dep_child', status: 'approved', lodged: '2026-03-02',
     decided: '2026-04-18', outcome: 'approved',
@@ -999,36 +1002,46 @@ const CASES: SeedCase[] = [
     parties: [
       { who: 'okafor_child', role: 'principal_applicant' },
       { who: 'okafor', role: 'family_member', note: 'Mother; the child’s visa runs with hers' },
-    ] },
+    ],
+    tasks: [{ title: 'Check the guardianship declaration is signed', status: 'done' },
+            { title: 'Diarise the course end date', due: '2027-02-12' }] },
   { key: 'vv_tuilagi', of: 'tuilagi', title: 'Visitor visa, once the section 61 request was granted',
     type: 'vv_general', status: 'approved', lodged: '2026-05-06',
     decided: '2026-05-20', outcome: 'approved',
     summary: 'The straightforward half of a matter that was anything but.',
     parties: [{ who: 'tuilagi_partner', role: 'partner',
-                note: 'New Zealand citizen; not an applicant' }] },
+                note: 'New Zealand citizen; not an applicant' }],
+    tasks: [{ title: 'Confirm the visa conditions with the client by phone', status: 'done' }] },
   { key: 'pswv_hoang', of: 'hoang', title: 'Post study work visa',
     type: 'wv_post_study', status: 'approved', lodged: '2025-11-10',
     decided: '2025-12-04', outcome: 'approved',
-    summary: 'Three years, open conditions, on the qualification completed here.' },
+    summary: 'Three years, open conditions, on the qualification completed here.',
+    tasks: [{ title: 'Remind the client this visa cannot be renewed', due: '2026-11-10' }] },
   { key: 'whv_vakatawa', of: 'vakatawa', title: 'Working holiday visa',
     type: 'wv_working_holiday', status: 'approved', lodged: '2025-11-20',
     decided: '2025-12-08', outcome: 'approved', priority: 'low',
-    summary: 'One applicant, twelve months, nothing in the way.' },
+    summary: 'One applicant, twelve months, nothing in the way.',
+    tasks: [{ title: 'Warn about the six-month limit with one employer', due: '2026-09-20' },
+            { title: 'Check whether an extension is worth applying for', due: '2026-10-15' }] },
   { key: 'voc_perera', of: 'perera', title: 'Variation of the travel conditions on a resident visa',
     type: 'voc_variation_residence_travel_conditions', status: 'approved', lodged: '2026-03-10',
     decided: '2026-03-27', outcome: 'approved',
-    summary: 'Extended travel conditions before a long trip home.' },
+    summary: 'Extended travel conditions before a long trip home.',
+    tasks: [{ title: 'Send the varied travel conditions to the client', status: 'done' }] },
   { key: 'voc_abadi', of: 'abadi', title: 'Variation of conditions to add a second employer',
     type: 'voc_variation_work', status: 'approved', lodged: '2026-05-18',
     decided: '2026-06-09', outcome: 'approved',
-    summary: 'Second part-time role with a related organisation.' },
+    summary: 'Second part-time role with a related organisation.',
+    tasks: [{ title: 'Get the second employment agreement', due: '2026-09-08', status: 'blocked' },
+            { title: 'Ask the employer for the job description', due: '2026-09-15' }] },
   { key: 'sv_dlamini_child', of: 'dlamini', title: 'Dependent child student visa',
     type: 'sv_dep_child', status: 'approved', lodged: '2026-02-16',
     decided: '2026-03-24', outcome: 'approved',
     parties: [
       { who: 'dlamini_child', role: 'principal_applicant' },
       { who: 'dlamini', role: 'family_member', note: 'Mother; the child’s visa runs with hers' },
-    ] },
+    ],
+    tasks: [{ title: 'Chase the school for the offer of place', due: '2026-09-11' }] },
 
   // --- Eighteen that are work ----------------------------------------------
   // More than one person, or more than one moving part, or waiting on somebody
@@ -1046,14 +1059,16 @@ const CASES: SeedCase[] = [
     ],
     notes: ['Job check reference confirmed by the employer.',
             'Second police certificate obtained and submitted with the application.'],
-    tasks: [{ title: 'Diarise INZ decision due date', due: '2026-10-30' }] },
+    tasks: [{ title: 'Diarise INZ decision due date', due: '2026-10-30' },
+            { title: 'Check the job check is still current at decision', due: '2026-10-20', status: 'in_progress' }] },
   { key: 'wv_okafor_partner', of: 'okafor', title: 'Partner of a worker work visa, filed alongside',
     type: 'wv_partner', status: 'lodged', lodged: '2026-08-14', due: '2026-10-30',
     parties: [
       { who: 'okafor_partner', role: 'principal_applicant' },
       { who: 'okafor', role: 'partner', note: 'The worker this visa depends on' },
     ],
-    summary: 'Stands or falls with the principal renewal above.' },
+    summary: 'Stands or falls with the principal renewal above.',
+    tasks: [{ title: 'Keep the two applications moving together', due: '2026-10-30', status: 'in_progress' }] },
   { key: 'rv_ramasamy', of: 'ramasamy', title: 'Residence from work, principal and partner',
     type: 'rv_general', status: 'lodged', lodged: '2026-06-20', due: '2027-02-20',
     inzApp: '74110882', priority: 'high',
@@ -1062,25 +1077,31 @@ const CASES: SeedCase[] = [
       { who: 'tasman_orchards', role: 'employer' },
     ],
     summary: 'Two applicants, one application. Waiting on a decision.',
-    tasks: [{ title: 'Six month check with INZ', due: '2026-12-20' }] },
+    tasks: [{ title: 'Six month check with INZ', due: '2026-12-20' },
+            { title: 'Update the medicals before they expire', due: '2026-11-02' }] },
   { key: 'aewv_ramasamy', of: 'ramasamy', title: 'The AEWV the residence application rests on',
     type: 'wv_aewv', status: 'approved', lodged: '2024-09-02',
     decided: '2024-10-28', outcome: 'approved',
     parties: [{ who: 'tasman_orchards', role: 'employer' }],
     summary: 'Two years on an accredited employer, which is what makes the '
-      + 'residence application possible.' },
+      + 'residence application possible.',
+    tasks: [{ title: 'File the approval letter with the residence application', status: 'done' }] },
   { key: 'acc_harbour', of: 'harbour', title: 'Employer accreditation renewal',
     type: 'emp_accreditation_renewal', status: 'approved', lodged: '2026-01-19',
     decided: '2026-02-24', outcome: 'approved',
     parties: [{ who: 'chen', role: 'other', note: 'Director; signed the declaration' }],
-    summary: 'Renewed for twenty-four months. Evidence of the wage review held.' },
+    summary: 'Renewed for twenty-four months. Evidence of the wage review held.',
+    tasks: [{ title: 'Diarise the next accreditation renewal', due: '2028-01-19' }] },
   { key: 'jc_harbour', of: 'harbour', title: 'Job check, warehouse supervisor',
     type: 'emp_job_check', status: 'on_hold', lodged: '2026-08-01',
     nextAction: 'Advertising evidence still to come from the employer',
     nextActionDue: '2026-09-20',
     parties: [{ who: 'chen', role: 'other', note: 'Director; the person INZ deals with' }],
     summary: 'Third job check this year. Held until the employer produces the '
-      + 'advertising and the market rate evidence.' },
+      + 'advertising and the market rate evidence.',
+    tasks: [{ title: 'Chase the employer for the advertising evidence', due: '2026-09-05', status: 'blocked' },
+            { title: 'Get the market rate evidence', due: '2026-09-05', status: 'blocked' },
+            { title: 'Tell the client why the job check is held up', due: '2026-09-09' }] },
   { key: 'rv_santos', of: 'santos', title: 'Straight to residence, with a medical waiver sought',
     type: 'rv_green_list_str', status: 'ppi', lodged: '2026-07-15',
     inzApp: '74203311', priority: 'urgent',
@@ -1089,13 +1110,17 @@ const CASES: SeedCase[] = [
     summary: 'Green list role. The medical assessor has raised a condition and a '
       + 'waiver is being sought with a specialist report.',
     notes: ['Medical assessor referred the case on 2 August.',
-            'Specialist appointment booked; report expected late September.'] },
+            'Specialist appointment booked; report expected late September.'],
+    tasks: [{ title: 'Answer the PPI letter on the medical waiver', due: '2026-09-16', status: 'in_progress' },
+            { title: 'Get the specialist report', due: '2026-09-12', status: 'blocked' },
+            { title: 'Draft the waiver submissions', due: '2026-09-14' }] },
   { key: 'aewv_santos', of: 'santos', title: 'The AEWV that came first',
     type: 'wv_aewv', status: 'approved', lodged: '2025-03-11',
     decided: '2025-04-22', outcome: 'approved',
     parties: [{ who: 'waikato_care', role: 'employer' }],
     summary: 'Same employer, same role. On file because the residence application '
-      + 'depends on it.' },
+      + 'depends on it.',
+    tasks: [{ title: 'File the decision on the residence file', status: 'done' }] },
   { key: 'rv_kovalenko', of: 'kovalenko', title: 'Partnership residence on limited evidence',
     type: 'rv_partnership', status: 'declined', lodged: '2026-02-09',
     decided: '2026-07-21', outcome: 'declined', priority: 'high',
@@ -1110,30 +1135,36 @@ const CASES: SeedCase[] = [
       + 'genuine and stable.',
     notes: ['Cannot obtain a police certificate from her home district; '
             + 'explanation and supporting evidence were filed.',
-            'Declined 21 July. The appeal period runs from the date of the decision.'] },
+            'Declined 21 July. The appeal period runs from the date of the decision.'],
+    tasks: [{ title: 'Collect further evidence of the relationship', due: '2026-09-20', status: 'in_progress' }] },
   { key: 'voc_kovalenko', of: 'kovalenko', title: 'Variation of conditions to change employer',
     type: 'voc_variation_work', status: 'approved', lodged: '2026-08-04',
     decided: '2026-08-26', outcome: 'approved',
-    summary: 'Keeps her lawfully working while the residence decision is dealt with.' },
+    summary: 'Keeps her lawfully working while the residence decision is dealt with.',
+    tasks: [{ title: 'Confirm the new employer has the variation', status: 'done' }] },
   { key: 'acc_kaitiaki', of: 'kaitiaki', title: 'Employer accreditation, standard',
     type: 'emp_employer_accreditation', status: 'approved', lodged: '2025-09-15',
     decided: '2025-10-22', outcome: 'approved',
-    summary: 'First accreditation. Two of the register’s clients work here.' },
+    summary: 'First accreditation. Two of the register’s clients work here.',
+    tasks: [{ title: 'Diarise the accreditation expiry', due: '2027-06-30' }] },
   { key: 'jc_kaitiaki', of: 'kaitiaki', title: 'Job check, second halal butcher',
     type: 'emp_job_check', status: 'approved', lodged: '2025-11-03',
     decided: '2025-11-25', outcome: 'approved',
     parties: [{ who: 'okonkwo', role: 'other', note: 'The worker named on the job check' }],
-    summary: 'Advertising and market rate evidence accepted first time.' },
+    summary: 'Advertising and market rate evidence accepted first time.',
+    tasks: [{ title: 'Check the pay rate against the median wage', due: '2026-09-25' }] },
   { key: 'aewv_okonkwo', of: 'okonkwo', title: 'AEWV on the second butcher job check',
     type: 'wv_aewv', status: 'approved', lodged: '2025-12-01',
     decided: '2026-01-16', outcome: 'approved',
     parties: [{ who: 'kaitiaki', role: 'employer' }],
-    summary: 'Filed offshore on the job check above. Travelled and started in February.' },
+    summary: 'Filed offshore on the job check above. Travelled and started in February.',
+    tasks: [{ title: 'Book the medical', due: '2026-09-18' }] },
   { key: 'acc_waikato', of: 'waikato_care', title: 'Employer accreditation renewal',
     type: 'emp_accreditation_renewal', status: 'decision_pending', lodged: '2026-08-29',
     due: '2026-10-24', priority: 'high',
     nextAction: 'Everything asked for has been sent — wait',
-    summary: 'Everything INZ asked for has gone in. Waiting on the decision.' },
+    summary: 'Everything INZ asked for has gone in. Waiting on the decision.',
+    tasks: [{ title: 'Collect the wage review evidence', due: '2026-10-01', status: 'in_progress' }] },
   { key: 'aewv_dlamini', of: 'dlamini', title: 'AEWV renewal, quantity surveyor',
     type: 'wv_aewv', status: 'gathering_documents',
     nextAction: 'Employment agreement and the current job check from the employer',
@@ -1143,7 +1174,8 @@ const CASES: SeedCase[] = [
       { who: 'dlamini_partner', role: 'partner' },
     ],
     summary: 'Renewal a year out, being assembled early because the residence '
-      + 'application below rests on it.' },
+      + 'application below rests on it.',
+    tasks: [{ title: 'Chase the employment agreement variation', due: '2026-09-10', status: 'blocked' }] },
   { key: 'rv_dlamini', of: 'dlamini', title: 'Skilled residence for the family',
     type: 'rv_smc', status: 'preparing', priority: 'high',
     nextAction: 'Confirm the points claim before lodging', nextActionDue: '2026-10-20',
@@ -1154,7 +1186,10 @@ const CASES: SeedCase[] = [
     ],
     summary: 'Three people on one application. The points turn on the qualification '
       + 'and the current pay rate.',
-    tasks: [{ title: 'Confirm the pay rate in writing with the employer', due: '2026-10-06' }] },
+    tasks: [{ title: 'Confirm the pay rate in writing with the employer', due: '2026-10-06' },
+            { title: 'Check the children are included correctly', due: '2026-09-30' },
+            { title: 'Get police certificates for South Africa', due: '2026-10-20', status: 'in_progress' },
+            { title: 'Book the family medicals', due: '2026-11-05' }] },
   { key: 'vv_silva', of: 'silva', title: 'Visitor visa extension, with a new passport mid-application',
     type: 'vv_general', status: 'lodged', lodged: '2026-07-28', due: '2026-10-15',
     inzApp: '74318829',
@@ -1163,14 +1198,16 @@ const CASES: SeedCase[] = [
       + 'still holds the old number, so a grant would attach to a passport he no '
       + 'longer travels on.',
     notes: ['New passport issued 19 April 2026; the old one is on file as replaced.',
-            'Letter to INZ with the new number drafted, not yet sent.'] },
+            'Letter to INZ with the new number drafted, not yet sent.'],
+    tasks: [{ title: 'Send the old passport bio page as well', due: '2026-09-18' }] },
   { key: 'rv_bekele', of: 'bekele', title: 'Refugee family support residence, declined',
     type: 'rv_refugee_family_support', status: 'declined', lodged: '2025-08-04',
     decided: '2026-05-29', outcome: 'declined', priority: 'high',
     parties: [{ who: 'bekele_sponsor', role: 'sponsor',
                 note: 'Brother; the sponsor the category requires' }],
     summary: 'Declined on whether the sponsorship requirements were met. The appeal '
-      + 'below is of this decision.' },
+      + 'below is of this decision.',
+    tasks: [{ title: 'Take instructions on appealing', due: '2026-09-19', status: 'in_progress' }] },
 
   // --- Eight that are unusual ----------------------------------------------
   // The ones a practice is actually chosen for. They are here because a
@@ -1182,25 +1219,32 @@ const CASES: SeedCase[] = [
                 note: 'New Zealand citizen; the family circumstances relied on' }],
     summary: 'Unlawful for eleven months after a visa lapsed unnoticed. Request '
       + 'granted, and the visitor visa above followed.',
-    notes: ['Full explanation of the overstay and the family circumstances filed.'] },
+    notes: ['Full explanation of the overstay and the family circumstances filed.'],
+    tasks: [{ title: 'File the section 61 approval on the file', status: 'done' }] },
   { key: 'vv_petrov', of: 'petrov', title: 'Visitor visa, declined on bona fides',
     type: 'vv_general', status: 'declined', lodged: '2026-06-30',
     decided: '2026-08-18', outcome: 'declined',
     summary: 'Declined on whether he intended a genuine visit. The reconsideration '
-      + 'below is of this decision.' },
+      + 'below is of this decision.',
+    tasks: [{ title: 'Explain the decline to the client', status: 'done' },
+            { title: 'Second visitor application after the reconsideration', status: 'cancelled' }] },
   { key: 'recon_petrov', of: 'petrov', title: 'Reconsideration of the declined visitor visa',
     type: 'rq_reconsideration_temporary_visa_decline', status: 'reconsideration',
     lodged: '2026-08-25', due: '2026-09-24', priority: 'urgent',
     nextAction: 'The statutory period runs out — confirm INZ has it',
     nextActionDue: '2026-09-24',
-    summary: 'Fresh evidence of ties and of funds filed within the period.' },
+    summary: 'Fresh evidence of ties and of funds filed within the period.',
+    tasks: [{ title: 'Draft further submissions on funds and ties', due: '2026-09-17', status: 'in_progress' }] },
   { key: 'min_mendoza', of: 'mendoza', title: 'Ministerial intervention after a decline',
     type: 'rq_ministerial_intervention', status: 'preparing', priority: 'high',
     nextAction: 'Submissions to be settled with the client',
     nextActionDue: '2026-10-08',
     summary: 'Appeal rights exhausted. Character is the obstacle and a waiver was '
       + 'refused.',
-    notes: ['Client understands there is no right of appeal from this decision.'] },
+    notes: ['Client understands there is no right of appeal from this decision.'],
+    tasks: [{ title: 'Draft the letter to the Associate Minister', due: '2026-09-26', status: 'in_progress' },
+            { title: 'Collect the character references', due: '2026-09-22' },
+            { title: 'Check there are genuinely no appeal rights left', status: 'done' }] },
   { key: 'dlr_hoang', of: 'hoang', title: 'Response to a deportation liability notice',
     type: 'reply_deportation_liability_response', status: 'lodged',
     lodged: '2026-09-01', due: '2026-09-15', priority: 'urgent',
@@ -1208,7 +1252,9 @@ const CASES: SeedCase[] = [
     nextActionDue: '2026-09-15',
     summary: 'Liability arose from a condition breach on the visa above. '
       + 'Submissions filed within the fourteen days.',
-    tasks: [{ title: 'Confirm receipt of the submissions', due: '2026-09-12' }] },
+    tasks: [{ title: 'Confirm receipt of the submissions', due: '2026-09-12' },
+            { title: 'Get the humanitarian evidence from the family', due: '2026-09-13', status: 'blocked' },
+            { title: 'Diarise the fourteen day deadline', status: 'done' }] },
   { key: 'ipt_bekele', of: 'bekele', title: 'Residence appeal to the Tribunal',
     type: 'app_ipt_residence_appeal', status: 'ipt_appeal', lodged: '2026-06-12',
     due: '2026-10-09', priority: 'urgent',
@@ -1216,19 +1262,24 @@ const CASES: SeedCase[] = [
     nextActionDue: '2026-09-30',
     parties: [{ who: 'bekele_sponsor', role: 'sponsor', note: 'Brother; the sponsor' }],
     summary: 'Filed within the appeal period. The Tribunal’s timetable, not INZ’s.',
-    notes: ['Appeal lodged 12 June, within the period running from the decision.'] },
+    notes: ['Appeal lodged 12 June, within the period running from the decision.'],
+    tasks: [{ title: 'File the statement of appeal', due: '2026-10-10' },
+            { title: 'Order the INZ file before drafting', due: '2026-09-14', status: 'in_progress' }] },
   { key: 'aip_bauer', of: 'bauer', title: 'Active Investor Plus, growth category',
     type: 'rv_active_investor_plus', status: 'gathering_documents',
     nextAction: 'Evidence of the investment funds and where they came from',
     nextActionDue: '2026-11-14',
     parties: [{ who: 'bauer_partner', role: 'secondary_applicant' }],
     summary: 'Offshore, with a company to sell first. The whole of the work is '
-      + 'evidencing the funds and their source.' },
+      + 'evidencing the funds and their source.',
+    tasks: [{ title: 'Confirm the investment funds are transferable', due: '2026-10-08' },
+            { title: 'Get the source of funds evidence', due: '2026-09-29', status: 'in_progress' }] },
   { key: 'pa_tuilagi', of: 'tuilagi', title: 'Privacy Act request for the INZ file',
     type: 'rq_privacy_act_request', status: 'closed', priority: 'low',
     lodged: '2026-02-14', decided: '2026-03-11', outcome: 'File released',
     summary: 'Asked for before the section 61 request, so the explanation could be '
-      + 'written against what INZ actually held.' },
+      + 'written against what INZ actually held.',
+    tasks: [{ title: 'Chase INZ \u2014 twenty working days are up', due: '2026-09-08' }] },
 ];
 
 // ---------------------------------------------------------------------------
@@ -2133,6 +2184,36 @@ export async function seedState(env: Env): Promise<{
     ? new Date(Date.parse(seededAt) + autoResetDays * 86_400_000).toISOString()
     : null;
   return { seededAt, autoResetDays, dueAt };
+}
+
+/**
+ * The band across the top of a trial register.
+ *
+ * **Asked for on 12 September 2026:** *"there should be a running line or a
+ * banner above saying in how many days the reset will take place."*
+ *
+ * `null` on a register whose `APP_ENV` is `production`, and that is checked
+ * before any query — the practice's own register must not pay a read for a
+ * band it can never show.
+ *
+ * Also `null` where the caseload is not on a timer: a trial with the reset
+ * switched off has nothing to warn about, and a band that says "this is a
+ * trial" and then nothing useful is a band people stop reading.
+ *
+ * The wording counts **whole days remaining** rather than printing a date
+ * alone, because the question somebody has is "how long have I got". The date
+ * is there too, for anybody planning around it.
+ */
+export async function trialNotice(env: Env): Promise<string | null> {
+  if ((env.APP_ENV ?? 'production') === 'production') return null;
+  const { dueAt } = await seedState(env);
+  if (!dueAt) return null;
+
+  const days = Math.ceil((Date.parse(dueAt) - Date.parse(nowIso())) / 86_400_000);
+  const when = dateShort(dueAt.slice(0, 10));
+  if (days <= 0) return 'This is a trial register. Everything in it goes back to how it started shortly.';
+  if (days === 1) return `This is a trial register. Everything in it goes back to how it started tomorrow, ${when}.`;
+  return `This is a trial register. Everything in it goes back to how it started in ${days} days, on ${when}.`;
 }
 
 /**

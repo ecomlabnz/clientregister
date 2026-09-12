@@ -328,6 +328,7 @@ export const PARTY_ROLES = [
   'dependent_child',
   'family_member',
   'employer',
+  'director',
   'sponsor',
   'agent',
   'lawyer',
@@ -354,6 +355,16 @@ export const PARTY_ROLE_LABELS: Record<PartyRole, string> = {
   // relied on. A parent, a sibling, an adult child.
   family_member: 'Family member',
   employer: 'Employer',
+  // **Asked for on 12 September 2026**, when the demonstration caseload had to
+  // record the person who signs for a company and the closest role was
+  // "Other" — which says nothing on a page whose whole job is saying who
+  // somebody is.
+  //
+  // Distinct from `employer`, which is the organisation itself. On an employer
+  // accreditation or a job check the client *is* the company, and the director
+  // is the human being INZ actually deals with: the one who makes the
+  // declaration and whose name is on it.
+  director: 'Director',
   sponsor: 'Sponsor',
   agent: 'Agent or representative',
   // A lawyer or a licensed immigration adviser on the matter who is not the

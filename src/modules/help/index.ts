@@ -94,6 +94,18 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.68.0', date: '12 September 2026',
+    notes: [
+      'A trial register now carries a band on every page saying it is a trial and counting down '
+        + 'to the day it puts itself back. Your own register never shows it.',
+      'Director is now a role on a matter. On an accreditation or a job check the client is the '
+        + 'company and the director is the person who signs \u2014 the nearest role before was '
+        + '\u201cOther\u201d.',
+      'The try-it caseload now has real tasks on it, across every state and spread over dates '
+        + 'that are overdue, due this week, and months away.',
+    ],
+  },
+  {
     version: '1.67.0', date: '12 September 2026',
     notes: [
       'The row tints are now on the dashboard and the alerts list as well as Cases. Red for '
