@@ -652,6 +652,12 @@ td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: 
 tr:last-child td { border-bottom: none; }
 .totals-row td { border-top: 2px solid var(--border); background: var(--surface-2); }
 .row-urgent { background: var(--red-bg); }
+/* A high-priority matter, called out more quietly than an urgent one. Asked for
+   on 12 September 2026: the badge already said amber for high and red for
+   urgent, and the row behind it only tinted for urgent. Both now come from
+   `PRIORITY_TONES` in the cases module. `--amber-bg` is defined in all three
+   theme states, so this follows the reader's theme like everything else. */
+.row-high { background: var(--amber-bg); }
 .row-muted { opacity: 0.55; }
 .edit-table input { width: 100%; }
 .edit-table td { padding: 5px 6px; }

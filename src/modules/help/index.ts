@@ -94,6 +94,16 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.62.1', date: '12 September 2026',
+    notes: [
+      'A high-priority matter now has a yellow row on the Cases list, the way an urgent one has '
+        + 'a red row. The badge already said so; the row did not.',
+      'Fixed: three matters in the try-it caseload showed a code instead of a name \u2014 two '
+        + 'statuses that do not exist, and a student visa filed under the wrong kind of work. '
+        + 'Only the demonstration caseload was affected, never your own matters.',
+    ],
+  },
+  {
     version: '1.62.0', date: '12 September 2026',
     notes: [
       'The old button in the build pipeline that could write invented clients straight into your '

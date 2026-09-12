@@ -322,6 +322,30 @@ export function elapsedLine(
   return `${days} days (about ${months} month${months === 1 ? '' : 's'})`;
 }
 
+/**
+ * What a priority looks like, said once.
+ *
+ * **Asked for on 12 September 2026:** *"high status should have yellowish
+ * background as a general rule, urgent ones - reddish as they do."* The badge
+ * already said amber for high and red for urgent; the row behind it tinted for
+ * urgent only, so a high matter was called out in the badge and not in the row.
+ * Two places deciding the same thing, and they disagreed.
+ *
+ * They now come from one map. A priority added to `PRIORITIES` with no entry
+ * here gets the badge's amber and no row tint, which is the quiet default
+ * rather than a crash.
+ */
+const PRIORITY_TONES: Record<string, 'red' | 'amber'> = {
+  urgent: 'red',
+  high: 'amber',
+};
+
+/** The class that tints a row for its priority. `''` for anything ordinary. */
+const priorityRow = (priority: string | null | undefined): string => {
+  const tone = PRIORITY_TONES[priority ?? ''];
+  return tone === 'red' ? 'row-urgent' : tone === 'amber' ? 'row-high' : '';
+};
+
 export const casesModule: AppModule = {
   name: 'cases',
   title: 'Cases',
@@ -505,7 +529,7 @@ export const casesModule: AppModule = {
         ], shown.map((row) => {
           const overdue = isOverdue(row.decision_due_at) && isOpenStatus(row.status);
           return html`
-          <tr class="${row.priority === 'urgent' ? 'row-urgent' : ''}">
+          <tr class="${priorityRow(row.priority)}">
             ${'' /* Whichever cell comes first carries the row on a phone,
                      where the other columns are dropped and their content is
                      folded in here as a sentence. With the Matter column off
@@ -514,7 +538,7 @@ export const casesModule: AppModule = {
             ${(() => {
               const priorityBadge = row.priority !== 'normal'
                 ? badge(PRIORITY_LABELS[row.priority as keyof typeof PRIORITY_LABELS],
-                        row.priority === 'urgent' ? 'red' : 'amber')
+                        PRIORITY_TONES[row.priority] ?? 'amber')
                 : '';
               const onAPhone = html`
                 <div class="row-meta show-sm">
