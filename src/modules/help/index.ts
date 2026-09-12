@@ -94,6 +94,14 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.65.1', date: '12 September 2026',
+    notes: [
+      'Fixed before it reached you: remembering a machine for the maximum 90 days could be '
+        + 'refused at random, because the register asked the clock twice and sometimes got two '
+        + 'different answers a millisecond apart.',
+    ],
+  },
+  {
     version: '1.65.0', date: '12 September 2026',
     notes: [
       'Settings \u2192 Test data now lays down a much bigger caseload to practise on: 35 matters '

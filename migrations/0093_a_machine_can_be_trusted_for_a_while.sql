@@ -120,9 +120,21 @@ END;
 
 -- The ceiling an administrator cannot raise. Ninety days is the longest this
 -- register will hold a second factor aside, whatever a setting says.
+--
+-- **The minute of tolerance is deliberate and is not slack in the rule.**
+-- `julianday()` returns a double of about 2.46 million, and the difference of
+-- two of them is not exact arithmetic: a row written to be exactly ninety days
+-- long can measure a hair over. Without the tolerance the ceiling refuses the
+-- very value it exists to allow, which is what a bare `> 90.0` did when the
+-- deploy of 12 September 2026 went red.
+--
+-- A minute cannot be used to hold a second factor aside for any length that
+-- matters; the arithmetic it absorbs is measured in microseconds. The thing
+-- that keeps the number honest is the code, which now derives both ends of the
+-- row from a single reading of the clock.
 CREATE TRIGGER trusted_device_life_is_capped
 BEFORE INSERT ON trusted_devices
-WHEN julianday(NEW.expires_at) - julianday(NEW.created_at) > 90.0
+WHEN julianday(NEW.expires_at) - julianday(NEW.created_at) > 90.0 + (1.0 / 1440.0)
 BEGIN
   SELECT RAISE(ABORT, 'a machine cannot be trusted for longer than 90 days');
 END;

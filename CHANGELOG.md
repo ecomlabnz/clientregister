@@ -7,6 +7,25 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.65.1 — 12 September 2026
+
+### Fixed
+**Remembering a machine for the maximum 90 days could be refused at random.**
+
+The register worked out when the trust started and when it ended by asking the
+clock twice. If the clock ticked over between the two — which it does, sometimes
+— the result was ninety days *and three milliseconds*, which is longer than
+ninety days, so the database refused it.
+
+At any other number of days nobody would ever have noticed. At the maximum it
+was the difference between working and not, and which one you got depended on
+the moment you pressed the button.
+
+It now reads the clock once and uses that single moment for both ends.
+
+**Nothing you have done is affected** — this was caught before the feature
+reached either register.
+
 ## 1.65.0 — 12 September 2026
 
 ### Added

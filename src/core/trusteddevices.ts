@@ -171,8 +171,22 @@ export async function createTrustedDevice(
   const selector = randomToken(SELECTOR_BYTES);
   const secret = randomToken(SECRET_BYTES);
   const id = newId('trd');
-  const at = nowIso();
-  const expiresAt = new Date(Date.now() + days * DAY_MS).toISOString();
+  /*
+   * One reading of the clock, used for both ends.
+   *
+   * This was two — `nowIso()` and then `Date.now()` — and the milliseconds
+   * between them made the life of the row *slightly longer* than the number of
+   * days asked for. At any length but the ceiling nobody would ever know. At
+   * exactly 90 days it put the row over the cap, and the database refused it:
+   * ninety days plus three milliseconds is more than ninety days.
+   *
+   * It failed in CI minutes after passing on the same commit, because whether
+   * the clock ticks between two statements depends on the machine and the
+   * moment. Found on 12 September 2026 by a deploy going red.
+   */
+  const now = Date.now();
+  const at = new Date(now).toISOString();
+  const expiresAt = new Date(now + days * DAY_MS).toISOString();
   const ip = opts.req ? clientIp(opts.req) : null;
   const userAgent = opts.req ? ((opts.req.headers.get('user-agent') ?? '').slice(0, 300) || null) : null;
 

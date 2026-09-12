@@ -708,6 +708,7 @@ later replaced still sits in the file that created it.
 | `share_token` | TEXT | yes | — |
 | `shared_at` | TEXT | yes | — |
 | `shared_by` | TEXT | yes | — |
+| `is_test` | INTEGER | no | `0` |
 
 ## `kb_documents`
 
