@@ -7,6 +7,32 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.62.1 — 12 September 2026
+
+### Fixed
+**A high-priority matter is now tinted on the list, like an urgent one.**
+
+*"high status should have yellowish background as a general rule, urgent ones -
+reddish as they do."*
+
+Urgent matters have always had a red row. High ones carried an amber badge but
+sat on a plain row, so the badge called them out and the row did not. Both marks
+now come from the same place, so they cannot disagree again.
+
+**Three matters in the try-it caseload showed a code instead of a name.** One
+said `awaiting_information`, one said `open` — neither is a real status — and
+one showed `sv_student` in the Type column, which is a visa a client *holds*
+rather than a kind of work. They are now a PPI, a matter being prepared, and a
+student visa application.
+
+Only the demonstration caseload was affected. Nothing in your own register
+showed a code, because its matters are real ones you entered.
+
+The test written the day before to catch exactly this had passed, twice over: it
+*required* one of the invented statuses, and its check on types read the whole
+vocabulary file rather than the list of matter types, so a key from the wrong
+list looked right. Both now check against the register's own lists.
+
 ## 1.62.0 — 12 September 2026
 
 ### Removed
