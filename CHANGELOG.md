@@ -7,6 +7,58 @@ number moves when a feature lands, the last when something is fixed.
 The user-facing version of this list, one line per release, is in the app under
 **Help → Recent changes**.
 
+## 1.71.0 — 12 September 2026
+
+### Added
+**Military service: the three questions on the INZ 1200, and a short record
+under them.**
+
+*"yes build the three questions, but the table - nothing fancy - just bare bones
+info - we normally say in the INZ1200 - see the document attached and let them
+peruse the records."*
+
+The Military records block had been a heading and "Not built yet" since
+11 September, because the shape of it had not been decided. It is now:
+
+**Three questions on the client's own form**, under Immigration, character,
+health and English — whether military service has ever been compulsory where
+they are from, whether they have ever served anywhere, and whether they were
+exempt. Each is Yes, No, or not answered, and *not answered* is shown as itself
+rather than as No. Answer Yes to the exemption question and there is a box for
+how they came to be exempt, which the form asks for in detail. The explanation
+can only be stored against a Yes — the database refuses it otherwise, both ways
+round.
+
+**A table of service** beside the employment, education and travel histories,
+and edited exactly like them: country, unit or formation, rank, duties, and the
+two dates, which can each be a day, a month or a year. Nothing else. The form's
+own table asks for corps, division, brigade, battalion and commanding officers
+as well; those are deliberately absent, because the practice attaches the
+service document instead. That reasoning is in the migration so the gap reads as
+a decision.
+
+### Changed
+**The employment history now answers section B1 of the form.**
+
+*"Name of the employer and supervisor name - can be joined"*, *"Country should
+change to Location which will include whatever address the applicant can
+provide - sometimes it is minimal - country and area"*, and *"Detailed account
+of duties - not sure we need it - Just open a new field - and write - Duties."*
+
+- **Employer and supervisor are one box.** The employer's name and the
+  supervisor's, the way a reference letter says them.
+- **Country became Location, and it is free text.** It was a dropdown of
+  countries, which could not hold "Onehunga, Auckland, New Zealand" — and an
+  address is what a client usually gives. Every country code already stored was
+  written out as the country's own name when this shipped: `NZ` became `New
+  Zealand`. The practice's own register held no employment rows at all, so this
+  changed nothing in it; the try-it caseload is converted.
+- **Duties is a new box**, with the practice's own sentence in it as a prompt:
+  *Standard duties of a carpenter*.
+
+Education and travel are untouched, as asked: *"Education/travel additions -
+town/province only - use existing field - Country - so not add anything else.
+Travel needs nothing - good leave as is."*
 ## 1.70.0 — 12 September 2026
 
 ### Added

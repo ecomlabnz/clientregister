@@ -62,13 +62,13 @@ describe('the order the practice asked for', () => {
     const found = headings(await page(mount()));
     expect(found[found.length - 1]).toBe('File notes');
     expect(found.indexOf('Employment history')).toBeLessThan(found.indexOf('File notes'));
-    expect(found.indexOf('Military records')).toBeLessThan(found.indexOf('File notes'));
+    expect(found.indexOf('Military service')).toBeLessThan(found.indexOf('File notes'));
   });
 
-  it('keeps the three histories and the military block between Files and File notes', async () => {
+  it('keeps the four histories between Files and File notes', async () => {
     const found = headings(await page(mount()));
     for (const h of ['Employment history', 'Education history', 'Travel history',
-      'Military records']) {
+      'Military service']) {
       expect(found.indexOf(h), h).toBeGreaterThan(found.indexOf('Files'));
       expect(found.indexOf(h), h).toBeLessThan(found.indexOf('File notes'));
     }
@@ -92,7 +92,8 @@ describe('what is open when the page is drawn', () => {
 
   it('leaves the histories and the military block closed', async () => {
     const body = await page(mount());
-    for (const id of ['history-employment', 'history-education', 'history-travel']) {
+    for (const id of ['history-employment', 'history-education', 'history-travel',
+      'history-military']) {
       expect(isOpen(body, id), id).toBe(false);
     }
   });
