@@ -15,7 +15,7 @@ dashboard, and why a test holds them there.
 
 | # | Module | What it is | Mounted at | Routes | In the menu |
 |---:|---|---|---|---:|---|
-| 1 | `auth` | Authentication | `/login`, `/logout`, `/account`, `/setup` | 18 | — |
+| 1 | `auth` | Authentication | `/login`, `/logout`, `/account`, `/setup` | 19 | — |
 | 2 | `search` | Search | `/search` | 1 | — |
 | 3 | `landing` | Public website | `/`, `/enquiry` | 14 | — |
 | 4 | `clientquote` | Quotations a client can open | `/q` | 2 | — |
@@ -56,6 +56,7 @@ dashboard, and why a test holds them there.
 | POST | `/account/preferences` |
 | POST | `/account/sessions/revoke` |
 | GET | `/account/shortcut` |
+| POST | `/account/trusted-machines/revoke` |
 | POST | `/account/upload-tokens` |
 | POST | `/account/upload-tokens/revoke` |
 | GET | `/login` |
@@ -66,7 +67,7 @@ dashboard, and why a test holds them there.
 | GET | `/setup` |
 | POST | `/setup` |
 
-Settings: **Security** (2 keys)
+Settings: **Security** (3 keys)
 
 ### `search` — Search
 

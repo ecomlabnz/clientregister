@@ -48,6 +48,47 @@ field, so it is never echoed through the browser.
 can reach nothing but the TOTP challenge and sign-out. Only the second factor
 promotes it.
 
+**Trusted machines.** Since 1.63.0 a person passing the TOTP challenge may mark
+that machine trusted, and for the next 40 days signing in on it asks for the
+password only. Asked for on 12 September 2026 — *"allow for 40 days of
+authentication memory on a machine, not every time"*.
+
+What it is: a bearer credential in a `__Host-cr_trust` cookie, `HttpOnly`,
+`Secure`, `SameSite=Lax`, standing in for **the second factor and nothing
+else**. The password is required every time. It never restores a session, never
+extends one, and is not consulted until after both rate limiters, the account
+lockout and a correct password. On its own it opens nothing.
+
+Stored the way an upload token is: a 12-character selector in the clear and a
+32-byte secret held only as a PBKDF2 hash, which a database trigger enforces. A
+verification is always performed, against a dummy hash when there is no row, so
+an unknown selector costs the same work as a real one.
+
+The expiry is **absolute, not sliding** — 40 days from the moment the code was
+typed, whether the machine is used daily or not. The database refuses to move
+`expires_at`, so a later change cannot quietly make it sliding. The period is
+`security.trusted_device_days` (default 40, `0` switches the feature off), with
+a **90-day ceiling in code that an administrator cannot raise** and the same
+ceiling as a database refusal.
+
+Every condition is re-read from the database **at the moment the cookie is
+presented**, never trusted from the cookie: the row is live, the deadline has
+not passed (the cookie's own `maxAge` is a hint to a browser and proves
+nothing), the person is still active, two-factor is still on, and it is still
+the *same* authenticator — the row carries a SHA-256 of the TOTP secret it was
+granted under, so removing two-factor and adding it again kills every machine
+trusted under the old one with nothing to remember to revoke. That is fault 43:
+*a bearer credential outlives the decision that allowed it, so the permission is
+checked where it is spent.*
+
+Every trusted machine of a person's is revoked when their password changes, an
+administrator resets it, they are suspended, two-factor is turned off or on, or
+a recovery code is used — a recovery code means the device is lost, so no new
+trust is granted on that sign-in either. A refused or expired cookie is cleared
+off the machine. People see and revoke their own at **My account → Devices**,
+scoped to the owner in the SQL statement itself. Granting, using and revoking
+are each audited under their own action name.
+
 ## Sessions
 
 The cookie carries 256 bits of entropy. What is stored — in KV *and* in D1 — is
@@ -57,8 +98,9 @@ only its SHA-256, so a dump of either store yields nothing usable.
 - 12-hour absolute lifetime, 4-hour idle timeout.
 - KV holds the live session and expires it on its own; D1 holds the durable
   record so sessions can be listed and revoked.
-- Changing a password revokes every other session. Suspending a user revokes all
-  of theirs. Users can revoke individual sessions from **My account**.
+- Changing a password revokes every other session, and every trusted machine.
+  Suspending a user revokes all of theirs, and their trusted machines. Users can
+  revoke individual sessions from **My account**.
 - Session records are touched at most every 5 minutes, so an active session does
   not mean a write per request.
 

@@ -18,6 +18,7 @@ import { newId, randomToken } from '../../core/ids';
 import { hashPassword } from '../../core/crypto';
 import { requireAuth, requirePermission, validatePassword } from '../../core/auth';
 import { revokeAllSessions } from '../../core/session';
+import { revokeAllTrustedDevices } from '../../core/trusteddevices';
 import { auditFrom } from '../../core/audit';
 import { FormReader } from '../../core/validate';
 import { page, redirectWith, breadcrumbs } from '../../ui/layout';
@@ -628,7 +629,14 @@ export const adminModule: AppModule = {
         } else {
           await run(c.env.DB, 'UPDATE users SET name = ?, email = ?, role = ?, status = ?, updated_at = ? WHERE id = ?',
             name, email, role, status, nowIso(), id);
-          if (status === 'suspended') await revokeAllSessions(c.env, id);
+          if (status === 'suspended') {
+            await revokeAllSessions(c.env, id);
+            // And the machines they had trusted. `verifyTrustedDevice` refuses a
+            // suspended person's anyway; this is so that un-suspending them does
+            // not silently hand the skipped code back to a laptop nobody has
+            // looked at since.
+            await revokeAllTrustedDevices(c.env, id);
+          }
         }
       } catch {
         // The unique index on email is what refuses a duplicate.
@@ -661,12 +669,21 @@ export const adminModule: AppModule = {
         await hashPassword(tempPassword), nowIso(), nowIso(), id,
       );
       const revoked = await revokeAllSessions(c.env, id);
-      await auditFrom(c, { action: 'admin.password_reset', entityType: 'user', entityId: id, meta: { revoked } });
+      // The same reasoning as a person changing their own password: a reset is
+      // the answer to "their credentials may be somewhere they should not be",
+      // and a trusted machine is half of a credential.
+      const forgotten = await revokeAllTrustedDevices(c.env, id);
+      await auditFrom(c, {
+        action: 'admin.password_reset', entityType: 'user', entityId: id,
+        meta: { revoked, machines_forgotten: forgotten },
+      });
 
       return page(c, { title: 'Password reset', active: '/admin' }, html`
         ${pageHeader('Password reset', `${target.name} <${target.email}>`)}
         ${card('Temporary password', html`
-          <p>All of their sessions have been ended. Give them this over a channel you trust — it is shown once.</p>
+          <p>All of their sessions have been ended, and every machine they had trusted will be
+             asked for the six-digit code again. Give them this over a channel you trust — it is
+             shown once.</p>
           <p class="key-block"><code>${tempPassword}</code></p>
           <p><a class="btn btn-primary" href="/admin/users">Back to users</a></p>`)}`);
     });

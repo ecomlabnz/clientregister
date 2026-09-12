@@ -94,6 +94,26 @@ const RECENT_RELEASES = 20;
  */
 export const RELEASES: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: '1.63.0', date: '12 September 2026',
+    notes: [
+      'You no longer have to enter the six-digit code every time. When you enter it there is '
+        + 'now a box, already ticked: “Remember this machine for 40 days”. That machine '
+        + 'then asks for your password only, until the 41st day.',
+      'Your password is still asked for every single time. The box skips the code and nothing '
+        + 'else — it does not keep you signed in and it does not make a session last longer.',
+      'The 40 days run from the day you entered the code and do not move. Using the machine every '
+        + 'morning does not push the date out.',
+      'Do not tick the box on a shared or public computer. It says so next to the box.',
+      'My account → Devices lists every machine you have remembered, when it expires, and a '
+        + 'Forget button. They are all forgotten for you when you change your password, when an '
+        + 'administrator resets it, when you turn two-factor off or on, when an account is '
+        + 'suspended, and when you use a recovery code — that one means your phone is gone.',
+      'Settings → Security sets the number of days. It starts at 40, 0 asks for the code '
+        + 'every time, and 90 is the most allowed.',
+      'Nothing to do. Nothing changed for anybody who does not tick the box.',
+    ],
+  },
+  {
     version: '1.62.1', date: '12 September 2026',
     notes: [
       'A high-priority matter now has a yellow row on the Cases list, the way an urgent one has '
@@ -3473,6 +3493,20 @@ function sections(origin: string): Section[] {
            immigration histories and fee arrangements. Two-factor is the single biggest thing you
            can do to protect it. You will be given eight recovery codes when you set it up — save
            them somewhere safe, because they are shown once.</p>
+        <h4>Remembering a machine</h4>
+        <p>When you enter the six-digit code there is a box: <strong>Remember this machine for 40
+           days</strong>. Tick it and that machine asks for your password only, until the fortieth
+           day. On the forty-first it asks for the code again. Using the machine does not push the
+           date out — the forty days run from the day you entered the code.</p>
+        <p><strong>Your password is still asked for every single time.</strong> The box skips the
+           code and nothing else. Do not tick it on a shared or public computer.</p>
+        <p><strong>My account → Devices</strong> lists every machine you have remembered, when it
+           expires, and a Forget button. Forgetting one means the code is asked for there the next
+           time. Changing your password, turning two-factor off or on, or using a recovery code
+           forgets all of them — a recovery code means your phone is gone, so every machine that
+           was trusted on the strength of it stops being trusted.</p>
+        <p>An administrator sets the number of days under Settings → Security, and can set it to 0
+           to ask for the code every time.</p>
         <p>Changing your password signs out every other device automatically.</p>
         <h4>Your preferences</h4>
         <p>Under <strong>My account → Preferences</strong> you choose how <em>you</em> like to work:

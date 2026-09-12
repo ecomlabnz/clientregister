@@ -334,6 +334,65 @@ than carry.
 Nothing was deleted from your register, and Settings → Test data — your own way
 of laying down a caseload to practise on — is untouched and is now the only one.
 
+## 12. The code, not every time
+
+*"allow for 40 days of authentication memory on a machine, not every time. it is
+annoying. so the machine should become trusted and only reset on the 41st day"*
+
+When you enter the six-digit code there is now a box, already ticked:
+**Remember this machine for 40 days**. Tick it and that machine asks for your
+password only, until the fortieth day. On the forty-first it asks for the code
+again.
+
+**Your password is still asked for every time.** That is the whole design. The
+box skips the code and nothing else — it does not keep you signed in, it does
+not make a session last longer, and the cookie on its own opens nothing at all.
+
+**The forty days do not move.** You said *"only reset on the 41st day"*, so they
+run from the day you entered the code, not from the last time you used the
+machine. Using it every morning does not push the date out. That is also the
+safer reading: a window that slides on a machine you open daily never expires.
+
+**My account → Devices** lists every machine you have remembered, when it
+expires, and a Forget button. They are all forgotten for you when you change
+your password, when an administrator resets it, when you turn two-factor off or
+on again, when an account is suspended, and when you use a recovery code.
+
+That last one is worth a sentence. A recovery code means your phone is gone. So
+every machine trusted on the strength of that phone stops being trusted, and no
+new one is handed out on that sign-in either — trusting a machine with the
+authenticator you have just lost would undo the clearing in the same breath. You
+are offered the box again the next time you type an ordinary code.
+
+**Settings → Security** sets the number of days. It starts at 40, 0 asks for the
+code every time, and 90 is the most anybody can set — that ceiling is in the
+code and in the database, not in the form, so it holds however the number gets
+written.
+
+**Do not tick it on a shared or public computer.** That is said next to the box
+and on the help page.
+
+### What was got right here on purpose, and the rule behind it
+
+Yesterday's fault 43 was about exactly this shape: *a bearer credential outlives
+the decision that allowed it, so the permission is checked where it is spent, not
+only where it is issued.* A cookie that sits on a laptop for forty days is that
+credential, and forty days is a long time in an office — somebody leaves, an
+account is suspended, two-factor is reset.
+
+So nothing is trusted from the cookie. Every time it is offered, the register
+asks the database again: is this machine still remembered, has the day passed, is
+the account still active, is two-factor still on — and **is it still the same
+authenticator**. That last check is done by keeping a fingerprint of the
+authenticator on the row, so turning two-factor off and on again kills every
+machine trusted under the old one on its own, with nobody having to remember to
+go and revoke them.
+
+And the rule that came out of building it: **a deadline a program can move is
+not a deadline.** The 40 days are pinned by the database itself, which refuses to
+change the date whatever asks. A future change that made trust "refresh on use"
+would not quietly ship — it would fail on the first sign-in.
+
 ---
 
 ## What is waiting on you
